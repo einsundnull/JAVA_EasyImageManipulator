@@ -44,6 +44,7 @@ public class TileGalleryPanel extends JPanel {
     private final List<File>      selectedImages = new ArrayList<>();
     private       boolean         multiSelectMode = false;
     private       File            activeFile      = null;
+    private       java.util.Set<File> dirtyFiles = new java.util.HashSet<>();
 
     // ── UI refs ───────────────────────────────────────────────────────────────
     private final JPanel      tilesContainer;
@@ -128,7 +129,7 @@ public class TileGalleryPanel extends JPanel {
         }
         tilesContainer.revalidate();
         tilesContainer.repaint();
-        SwingUtilities.invokeLater(this::scrollToActive);
+        SwingUtilities.invokeLater(this::scrollToActiveImpl);
     }
 
     /** Light update – called when navigating within the same directory. */
@@ -138,10 +139,25 @@ public class TileGalleryPanel extends JPanel {
             t.setActive(t.imageFile.equals(f));
             t.repaint();
         }
-        scrollToActive();
+        // No auto-scroll: callers that need the gallery to follow (e.g. nav
+        // buttons) must call scrollToActive() explicitly afterwards.
+    }
+
+    /** Scroll the gallery so the currently active tile is fully visible. */
+    public void scrollToActive() {
+        scrollToActiveImpl();
     }
 
     public List<File> getSelectedImages() { return new ArrayList<>(selectedImages); }
+
+    /**
+     * Mark which files have unsaved changes.
+     * These tiles get a red border instead of the normal green/orange one.
+     */
+    public void setDirtyFiles(java.util.Set<File> dirty) {
+        this.dirtyFiles = dirty == null ? new java.util.HashSet<>() : new java.util.HashSet<>(dirty);
+        for (TilePanel t : tiles) t.repaint();
+    }
 
     // =========================================================================
     // Internal actions
@@ -194,7 +210,7 @@ public class TileGalleryPanel extends JPanel {
         }
     }
 
-    private void scrollToActive() {
+    private void scrollToActiveImpl() {
         for (TilePanel t : tiles) {
             if (t.isActive) {
                 Rectangle r = SwingUtilities.convertRectangle(t, new Rectangle(t.getSize()), tilesContainer);
@@ -321,9 +337,18 @@ public class TileGalleryPanel extends JPanel {
                     thumbTop + THUMB_H + 15);
 
             // ── Border ───────────────────────────────────────────────────────
+            boolean isDirty = dirtyFiles.contains(imageFile);
             g2.setStroke(new BasicStroke(2f));
-            if (isActive) {
+            if (isActive && isDirty) {
+                g2.setColor(AppColors.DANGER);
+                g2.drawRoundRect(0, 0, TILE_W - 2, TILE_H - 2, 8, 8);
+                g2.setColor(AppColors.SUCCESS);
+                g2.drawRoundRect(2, 2, TILE_W - 6, TILE_H - 6, 6, 6);
+            } else if (isActive) {
                 g2.setColor(AppColors.SUCCESS);           // green
+                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
+            } else if (isDirty) {
+                g2.setColor(AppColors.DANGER);            // red – ungespeicherte Änderungen
                 g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
             } else if (isInSelection) {
                 g2.setColor(new Color(255, 140, 0));      // orange

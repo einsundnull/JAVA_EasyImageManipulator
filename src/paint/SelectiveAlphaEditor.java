@@ -35,7 +35,11 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
@@ -90,6 +94,7 @@ public class SelectiveAlphaEditor extends JFrame {
     private static final int GRID_CELL    = 16;   // image-space pixels per grid cell
     private static final int RULER_THICK  = 20;   // pixels wide/tall for ruler strip
     private static final double SCREEN_DPI = 96.0;
+    private static final double ZOOM_WHEEL = 0.06; // per notch for mouse-wheel zoom
 
     private static final int TOPBAR_BTN_W      = 50;
     private static final int TOPBAR_BTN_H      = 50;
@@ -109,6 +114,15 @@ public class SelectiveAlphaEditor extends JFrame {
             };
         }
         String label() { return switch (this) { case PX -> "px"; case MM -> "mm"; case CM -> "cm"; case INCH -> "in"; }; }
+    }
+
+    // ── Per-file canvas state (cached while switching images) ─────────────────
+    private static final class CanvasState {
+        BufferedImage               image;
+        final ArrayDeque<BufferedImage> undoStack = new ArrayDeque<>();
+        final ArrayDeque<BufferedImage> redoStack = new ArrayDeque<>();
+        final List<Element>         elements  = new ArrayList<>();
+        CanvasState(BufferedImage img) { this.image = img; }
     }
 
     // ── Application mode ──────────────────────────────────────────────────────
@@ -150,6 +164,30 @@ public class SelectiveAlphaEditor extends JFrame {
     // Undo / Redo (stack front = most recent)
     private final ArrayDeque<BufferedImage> undoStack = new ArrayDeque<>();
     private final ArrayDeque<BufferedImage> redoStack = new ArrayDeque<>();
+
+    // ── File cache (images stay alive while navigating, dirty until saved) ────
+    /** LRU-ish cache: key = canonical file, value = per-file canvas state.     */
+    private final Map<File, CanvasState> fileStateCache = new LinkedHashMap<>();
+    /** Files with unsaved changes (shown red in gallery).                        */
+    private final Set<File> dirtyFiles = new HashSet<>();
+
+    // ── Element layers ────────────────────────────────────────────────────────
+    /** Elements attached to the *current* image (alias into fileStateCache).    */
+    private List<Element>  activeElements  = new ArrayList<>();
+    private int            nextElementId   = 1;
+    /** Selected element for move / resize interaction.                           */
+    private Element        selectedElement = null;
+    private boolean        draggingElement = false;
+    private Point          elemDragAnchor  = null;
+    private int            elemActiveHandle = -1;
+    private Rectangle      elemScaleBase    = null;
+    private Point          elemScaleStart   = null;
+    /** True while "Einfügen als Element"-mode is active.                        */
+    private boolean        insertAsElement  = false;
+
+    // ── Canvas background ─────────────────────────────────────────────────────
+    private Color canvasBg1 = new Color(200, 200, 200);
+    private Color canvasBg2 = new Color(160, 160, 160);
 
     // ── Floating selection (SELECT tool – move & scale) ───────────────────────
     private BufferedImage floatingImg     = null;
@@ -246,12 +284,18 @@ public class SelectiveAlphaEditor extends JFrame {
         filmstripBtn.setSelected(true);
         filmstripBtn.addActionListener(e -> {
             tileGallery.setVisible(filmstripBtn.isSelected());
-            if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
+            if (galleryWrapper != null) {
+                galleryWrapper.revalidate();
+                galleryWrapper.repaint();
+            }
+            // centerCanvas() already defers via invokeLater, so the layout triggered
+            // by revalidate() will have settled before the view position is set.
+            centerCanvas();
         });
 
         left.add(filmstripBtn);
         left.add(modeLabel);
-        left.add(toggleBtn);
+//        left.add(toggleBtn);
         bar.add(left, BorderLayout.WEST);
  
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 6));
@@ -273,20 +317,40 @@ public class SelectiveAlphaEditor extends JFrame {
         zoomLabel = new JLabel("100%");
         zoomLabel.setForeground(AppColors.TEXT_MUTED);
         zoomLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        zoomLabel.setPreferredSize(new Dimension(46, 20));
+        zoomLabel.setPreferredSize(new Dimension(52, 20));
         zoomLabel.setHorizontalAlignment(JLabel.RIGHT);
+        zoomLabel.setToolTipText("Doppelklick: Zoom direkt eingeben");
+        zoomLabel.setCursor(Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR));
+        zoomLabel.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) showZoomInput();
+            }
+        });
 
         zoomOutBtn  .setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
         zoomInBtn   .setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
         zoomResetBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
         zoomFitBtn  .setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
-        zoomOutBtn  .addActionListener(e -> setZoom(zoom - ZOOM_STEP * 2, null));
-        zoomInBtn   .addActionListener(e -> setZoom(zoom + ZOOM_STEP * 2, null));
+        zoomOutBtn  .addActionListener(e -> setZoom(zoom - ZOOM_STEP, null));
+        zoomInBtn   .addActionListener(e -> setZoom(zoom + ZOOM_STEP, null));
         zoomResetBtn.addActionListener(e -> setZoom(1.0, null));
         zoomFitBtn  .addActionListener(e -> fitToViewport());
 
+        JButton newBitmapBtn = buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        newBitmapBtn.setToolTipText("Neue leere Bitmap erstellen");
+        newBitmapBtn.addActionListener(e -> doNewBitmap());
+        newBitmapBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
+
+        JButton bgColorBtn = buildButton("BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        bgColorBtn.setToolTipText("Canvas-Hintergrundfarbe einstellen");
+        bgColorBtn.addActionListener(e -> showCanvasBgDialog());
+        bgColorBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
+
         right.add(canvasModeBtn);
         right.add(paintModeBtn);
+        right.add(Box.createHorizontalStrut(8));
+        right.add(newBitmapBtn);
+        right.add(bgColorBtn);
         right.add(Box.createHorizontalStrut(8));
         right.add(zoomOutBtn);
         right.add(zoomLabel);
@@ -314,7 +378,7 @@ public class SelectiveAlphaEditor extends JFrame {
                 int ch = (int) Math.ceil(workingImage.getHeight() * zoom);
                 Dimension vd = scrollPane != null ? scrollPane.getViewport().getSize()
                                                   : new Dimension(cw, ch);
-                return new Dimension(Math.max(cw, vd.width), Math.max(cw, vd.height));
+                return new Dimension(Math.max(cw, vd.width), Math.max(ch, vd.height));
             }
             @Override public void doLayout() {
                 if (canvasPanel == null) return;
@@ -464,8 +528,19 @@ public class SelectiveAlphaEditor extends JFrame {
         saveButton.addActionListener(e -> saveImage());
         saveButton.setEnabled(false);
 
+        JButton insertElemBtn = buildButton("Als Element einfügen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        insertElemBtn.setToolTipText("Auswahl als nicht-destruktiven Layer einfügen (ENTER=zusammenführen, DEL=löschen)");
+        insertElemBtn.addActionListener(e -> insertSelectionAsElement());
+
+        JButton mergeElemBtn = buildButton("Element zusammenführen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        mergeElemBtn.setToolTipText("Ausgewähltes Element auf Canvas rendern (ENTER)");
+        mergeElemBtn.addActionListener(e -> { if (selectedElement != null) mergeElementToCanvas(selectedElement); });
+
         actionPanel.add(applyButton);
         actionPanel.add(clearSelectionsButton);
+        actionPanel.add(Box.createHorizontalStrut(8));
+        actionPanel.add(insertElemBtn);
+        actionPanel.add(mergeElemBtn);
         actionPanel.add(Box.createHorizontalStrut(8));
         actionPanel.add(resetButton);
         actionPanel.add(saveButton);
@@ -545,8 +620,7 @@ public class SelectiveAlphaEditor extends JFrame {
     }
 
     private void handleFileDropped(File file) {
-        if (hasUnsavedChanges && showUnsavedChangesDialog() == 0) saveImage();
-        else if (showUnsavedChangesDialog() == 2 && hasUnsavedChanges) return;
+        // State is cached — just load the new file (dirty files keep their red border)
         loadFile(file);
     }
 
@@ -554,32 +628,76 @@ public class SelectiveAlphaEditor extends JFrame {
     // File loading
     // =========================================================================
     private void loadFile(File file) {
-        try {
-            BufferedImage img = ImageIO.read(file);
-            if (img == null) { showErrorDialog("Ladefehler", "Bild konnte nicht gelesen werden:\n" + file.getName()); return; }
-            originalImage     = img;
-            workingImage      = deepCopy(originalImage);
-            sourceFile        = file;
-            hasUnsavedChanges = false;
-            undoStack.clear();
-            redoStack.clear();
-            selectedAreas.clear();
-            isSelecting = false; selectionStart = null; selectionEnd = null;
-            lastPaintPoint = null; shapeStartPoint = null; paintSnapshot = null;
-            floatingImg = null; floatRect = null;
-            isDraggingFloat = false; floatDragAnchor = null;
-            activeHandle = -1; scaleBaseRect = null; scaleDragStart = null;
+        // Save current canvas state before switching
+        if (sourceFile != null) saveCurrentState();
 
-            indexDirectory(file);
-            swapToImageView();
-            fitToViewport();
-            updateNavigationButtons();
-            updateTitle();
-            updateStatus();
-            setBottomButtonsEnabled(true);
-        } catch (IOException e) {
-            showErrorDialog("Ladefehler", "Fehler:\n" + e.getMessage());
+        // Check cache first
+        CanvasState cached = fileStateCache.get(file);
+        if (cached != null) {
+            // Restore from cache
+            workingImage = cached.image;
+            undoStack.clear(); undoStack.addAll(cached.undoStack);
+            redoStack.clear(); redoStack.addAll(cached.redoStack);
+            activeElements = cached.elements;
+        } else {
+            // Load fresh from disk
+            try {
+                BufferedImage img = ImageIO.read(file);
+                if (img == null) { showErrorDialog("Ladefehler", "Bild konnte nicht gelesen werden:\n" + file.getName()); return; }
+                originalImage = img;
+                workingImage  = normalizeImage(originalImage);
+                undoStack.clear();
+                redoStack.clear();
+                activeElements = new ArrayList<>();
+                CanvasState cs = new CanvasState(workingImage);
+                fileStateCache.put(file, cs);
+            } catch (IOException e) {
+                showErrorDialog("Ladefehler", "Fehler:\n" + e.getMessage());
+                return;
+            }
         }
+
+        sourceFile        = file;
+        hasUnsavedChanges = dirtyFiles.contains(file);
+        selectedAreas.clear();
+        isSelecting = false; selectionStart = null; selectionEnd = null;
+        lastPaintPoint = null; shapeStartPoint = null; paintSnapshot = null;
+        floatingImg = null; floatRect = null;
+        isDraggingFloat = false; floatDragAnchor = null;
+        activeHandle = -1; scaleBaseRect = null; scaleDragStart = null;
+        selectedElement = null; draggingElement = false; elemDragAnchor = null;
+        elemActiveHandle = -1; elemScaleBase = null; elemScaleStart = null;
+
+        indexDirectory(file);
+        swapToImageView();
+        SwingUtilities.invokeLater(() -> { fitToViewport(); centerCanvas(); });
+        updateNavigationButtons();
+        updateTitle();
+        updateStatus();
+        setBottomButtonsEnabled(true);
+    }
+
+    /** Saves the current workingImage + stacks + elements back into the file cache. */
+    private void saveCurrentState() {
+        if (sourceFile == null || workingImage == null) return;
+        CanvasState cs = fileStateCache.computeIfAbsent(sourceFile, k -> new CanvasState(workingImage));
+        cs.image = workingImage;
+        cs.undoStack.clear(); cs.undoStack.addAll(undoStack);
+        cs.redoStack.clear(); cs.redoStack.addAll(redoStack);
+        cs.elements.clear();  cs.elements.addAll(activeElements);
+    }
+
+    /**
+     * Converts the image to TYPE_INT_ARGB and ensures it is always stored in
+     * a clean ARGB format so paint operations work correctly on any source.
+     */
+    private BufferedImage normalizeImage(BufferedImage src) {
+        if (src.getType() == BufferedImage.TYPE_INT_ARGB) return deepCopy(src);
+        BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = out.createGraphics();
+        g2.drawImage(src, 0, 0, null);
+        g2.dispose();
+        return out;
     }
 
     private void indexDirectory(File file) {
@@ -603,9 +721,12 @@ public class SelectiveAlphaEditor extends JFrame {
         if (directoryImages.isEmpty()) return;
         int ni = currentImageIndex + dir;
         if (ni < 0 || ni >= directoryImages.size()) return;
-        if (hasUnsavedChanges) { int r = showUnsavedChangesDialog(); if (r == 0) saveImage(); else if (r == 2) return; }
+        // No unsaved-changes dialog – state is kept in cache (shown as red border)
         currentImageIndex = ni;
         loadFile(directoryImages.get(currentImageIndex));
+        // Gallery does not auto-scroll on setActiveFile; scroll explicitly here
+        // so the nav-button target tile becomes visible in the filmstrip.
+        tileGallery.scrollToActive();
     }
 
     // =========================================================================
@@ -724,7 +845,9 @@ public class SelectiveAlphaEditor extends JFrame {
             File   outFile = new File(outPath);
             ImageIO.write(workingImage, "PNG", outFile);
             hasUnsavedChanges = false;
+            dirtyFiles.remove(sourceFile);
             updateTitle();
+            updateDirtyUI();
             showInfoDialog("Gespeichert", "Gespeichert als:\n" + outFile.getName());
         } catch (IOException e) { showErrorDialog("Speicherfehler", e.getMessage()); }
     }
@@ -768,16 +891,24 @@ public class SelectiveAlphaEditor extends JFrame {
             String outPath = WhiteToAlphaConverter.getOutputPath(sourceFile, suffix);
             ImageIO.write(workingImage, "PNG", new File(outPath));
             hasUnsavedChanges = false;
+            dirtyFiles.remove(sourceFile);
             updateTitle();
+            updateDirtyUI();
             ToastNotification.show(this, "Gespeichert");
         } catch (IOException e) { showErrorDialog("Speicherfehler", e.getMessage()); }
     }
 
     private void markDirty() {
         hasUnsavedChanges = true;
+        if (sourceFile != null) dirtyFiles.add(sourceFile);
         updateTitle();
+        updateDirtyUI();
         canvasPanel.repaint();
         if (showRuler) { hRuler.repaint(); vRuler.repaint(); }
+    }
+
+    private void updateDirtyUI() {
+        tileGallery.setDirtyFiles(dirtyFiles);
     }
 
     // =========================================================================
@@ -1143,11 +1274,7 @@ public class SelectiveAlphaEditor extends JFrame {
     private TileGalleryPanel.Callbacks buildGalleryCallbacks() {
         return new TileGalleryPanel.Callbacks() {
             @Override public void onTileOpened(File f) {
-                if (hasUnsavedChanges) {
-                    int r = showUnsavedChangesDialog();
-                    if (r == 0) saveImage();
-                    else if (r == 2) { tileGallery.setActiveFile(sourceFile); return; }
-                }
+                // No unsaved-changes dialog: dirty state is kept in cache + red border
                 loadFile(f);
             }
             public void onSelectionChanged(List<File> files) {
@@ -1264,17 +1391,202 @@ public class SelectiveAlphaEditor extends JFrame {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK), "redo");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK), "save");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "escape");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "deleteElement");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER,  0), "mergeElement");
 
         am.put("copy",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doCopy(); } });
         am.put("cut",    new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doCut(); } });
         am.put("paste",  new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doPaste(); } });
-        am.put("undo",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doUndo(); } });
+        am.put("undo",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+            // If a paste-float is still open, Ctrl+Z cancels it (cancelFloat calls doUndo internally).
+            // Otherwise do a normal undo.
+            if (floatingImg != null) cancelFloat(); else doUndo();
+        } });
         am.put("redo",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRedo(); } });
         am.put("save",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageSilent(); } });
         am.put("escape", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             if (floatingImg != null) { cancelFloat(); }
+            else if (selectedElement != null) { selectedElement = null; canvasPanel.repaint(); }
             else { selectedAreas.clear(); isSelecting = false; selectionStart = null; selectionEnd = null; canvasPanel.repaint(); }
         }});
+        am.put("deleteElement", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+            if (selectedElement != null) {
+                deleteSelectedElement();
+            } else if (!selectedAreas.isEmpty() && workingImage != null) {
+                // DEL clears the pixel content of the current selection
+                pushUndo();
+                for (Rectangle r : selectedAreas) PaintEngine.clearRegion(workingImage, r);
+                selectedAreas.clear();
+                isSelecting = false; selectionStart = null; selectionEnd = null;
+                markDirty();
+            }
+        }});
+        am.put("mergeElement", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+            if (selectedElement != null) mergeElementToCanvas(selectedElement);
+        }});
+    }
+
+    // =========================================================================
+    // New helper methods
+    // =========================================================================
+
+    /** Centers the viewport over the canvas (called after zoom or sidebar toggle). */
+    private void centerCanvas() {
+        if (scrollPane == null || workingImage == null) return;
+        // Schedule after the current layout pass so viewport size is up-to-date.
+        SwingUtilities.invokeLater(() -> {
+            // Force the wrapper to re-layout with the current viewport size.
+            canvasWrapper.revalidate();
+            canvasWrapper.validate();
+            JViewport  vp    = scrollPane.getViewport();
+            Dimension  vpSz  = vp.getSize();
+            int cw = (int) Math.ceil(workingImage.getWidth()  * zoom);
+            int ch = (int) Math.ceil(workingImage.getHeight() * zoom);
+            // When image < viewport, doLayout already centres canvasPanel inside the
+            // wrapper and the view position should stay at (0,0).
+            // When image > viewport, scroll to the centre of the image.
+            int viewX = Math.max(0, (cw - vpSz.width)  / 2);
+            int viewY = Math.max(0, (ch - vpSz.height) / 2);
+            vp.setViewPosition(new Point(viewX, viewY));
+        });
+    }
+
+    /**
+     * Opens a tiny popup where the user can type a zoom percentage directly.
+     * Activated by double-clicking the zoom label.
+     */
+    private void showZoomInput() {
+        JTextField tf = new JTextField(String.valueOf(Math.round(zoom * 100)), 5);
+        tf.setBackground(AppColors.BTN_BG);
+        tf.setForeground(AppColors.TEXT);
+        tf.setCaretColor(AppColors.TEXT);
+        tf.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        tf.setHorizontalAlignment(JTextField.CENTER);
+        tf.setBorder(BorderFactory.createLineBorder(AppColors.ACCENT));
+
+        JDialog popup = new JDialog(this, false);
+        popup.setUndecorated(true);
+        popup.setSize(80, 28);
+        popup.setLocationRelativeTo(zoomLabel);
+        popup.add(tf);
+
+        tf.selectAll();
+        tf.addActionListener(ev -> {
+            try {
+                double pct = Double.parseDouble(tf.getText().trim().replace("%", ""));
+                setZoom(pct / 100.0, null);
+            } catch (NumberFormatException ignored) {}
+            popup.dispose();
+        });
+        tf.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) popup.dispose();
+            }
+        });
+        popup.addWindowFocusListener(new java.awt.event.WindowFocusListener() {
+            @Override public void windowGainedFocus(java.awt.event.WindowEvent e) {}
+            @Override public void windowLostFocus(java.awt.event.WindowEvent e)  { popup.dispose(); }
+        });
+        popup.setVisible(true);
+        tf.requestFocusInWindow();
+    }
+
+    /** Creates a new blank ARGB bitmap after asking for dimensions. */
+    private void doNewBitmap() {
+        JTextField wField = new JTextField("1024", 5);
+        JTextField hField = new JTextField("1024", 5);
+        for (JTextField f : new JTextField[]{wField, hField}) {
+            f.setBackground(AppColors.BTN_BG);
+            f.setForeground(AppColors.TEXT);
+            f.setCaretColor(AppColors.TEXT);
+        }
+        JPanel grid = new JPanel(new GridLayout(2, 2, 6, 4));
+        grid.setOpaque(false);
+        JLabel wl = new JLabel("Breite (px):"); wl.setForeground(AppColors.TEXT);
+        JLabel hl = new JLabel("Höhe  (px):"); hl.setForeground(AppColors.TEXT);
+        grid.add(wl); grid.add(wField);
+        grid.add(hl); grid.add(hField);
+
+        JDialog dialog = createBaseDialog("Neue Bitmap", 300, 200);
+        JPanel content = centeredColumnPanel(16, 20, 12);
+        content.add(grid);
+        content.add(Box.createVerticalStrut(14));
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        row.setOpaque(false);
+        JButton ok  = buildButton("Erstellen", AppColors.ACCENT,  AppColors.ACCENT_HOVER);
+        JButton can = buildButton("Abbrechen", AppColors.BTN_BG,  AppColors.BTN_HOVER);
+        ok.setForeground(Color.WHITE);
+        ok.addActionListener(e -> {
+            try {
+                int nw = Math.max(1, Integer.parseInt(wField.getText().trim()));
+                int nh = Math.max(1, Integer.parseInt(hField.getText().trim()));
+                if (sourceFile != null) saveCurrentState();
+                workingImage      = new BufferedImage(nw, nh, BufferedImage.TYPE_INT_ARGB);
+                originalImage     = deepCopy(workingImage);
+                sourceFile        = null;
+                hasUnsavedChanges = false;
+                activeElements    = new ArrayList<>();
+                undoStack.clear(); redoStack.clear();
+                selectedAreas.clear();
+                floatingImg = null; floatRect = null;
+                swapToImageView();
+                SwingUtilities.invokeLater(() -> { fitToViewport(); centerCanvas(); });
+                updateTitle();
+                updateStatus();
+                setBottomButtonsEnabled(true);
+            } catch (NumberFormatException ex) {
+                showErrorDialog("Ungültige Eingabe", "Bitte ganzzahlige Pixelwerte eingeben.");
+            }
+            dialog.dispose();
+        });
+        can.addActionListener(e -> dialog.dispose());
+        row.add(ok); row.add(can);
+        content.add(row);
+        dialog.add(content);
+        dialog.setVisible(true);
+    }
+
+    /** Lets the user choose one or both checkerboard background colors. */
+    private void showCanvasBgDialog() {
+        JPanel preview = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                int cell = 16;
+                for (int r = 0; r < getHeight(); r += cell)
+                    for (int c = 0; c < getWidth(); c += cell) {
+                        boolean even = ((r / cell) + (c / cell)) % 2 == 0;
+                        g.setColor(even ? canvasBg1 : canvasBg2);
+                        g.fillRect(c, r, Math.min(cell, getWidth()-c), Math.min(cell, getHeight()-r));
+                    }
+            }
+        };
+        preview.setPreferredSize(new Dimension(120, 60));
+
+        JButton btn1 = buildButton("Farbe 1", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton btn2 = buildButton("Farbe 2", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        btn1.addActionListener(e -> {
+            Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe 1", canvasBg1);
+            if (c != null) { canvasBg1 = c; preview.repaint(); canvasPanel.repaint(); }
+        });
+        btn2.addActionListener(e -> {
+            Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe 2", canvasBg2);
+            if (c != null) { canvasBg2 = c; preview.repaint(); canvasPanel.repaint(); }
+        });
+
+        JDialog dialog = createBaseDialog("Canvas-Hintergrund", 320, 240);
+        JPanel content = centeredColumnPanel(16, 20, 12);
+        content.add(preview);
+        content.add(Box.createVerticalStrut(12));
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        row.setOpaque(false);
+        row.add(btn1); row.add(btn2);
+        content.add(row);
+        content.add(Box.createVerticalStrut(12));
+        JButton closeBtn = buildButton("Schließen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        closeBtn.setAlignmentX(CENTER_ALIGNMENT);
+        closeBtn.addActionListener(e -> dialog.dispose());
+        content.add(closeBtn);
+        dialog.add(content);
+        dialog.setVisible(true);
     }
 
     // =========================================================================
@@ -1306,9 +1618,52 @@ public class SelectiveAlphaEditor extends JFrame {
                         return;
                     }
 
-                    if (!SwingUtilities.isLeftMouseButton(e) || sourceFile == null) return;
+                    if (!SwingUtilities.isLeftMouseButton(e) || workingImage == null) return;
 
                     Point imgPt = screenToImage(e.getPoint());
+
+                    // ── Element layer interaction (any mode, checked first) ───
+                    if (!activeElements.isEmpty() && floatingImg == null) {
+                        // Check handles of selected element first
+                        if (selectedElement != null) {
+                            Rectangle selScr = elemRectScreen(selectedElement);
+                            Rectangle[] handles = handleRects(selScr);
+                            for (int hi = 0; hi < handles.length; hi++) {
+                                if (handles[hi].contains(e.getPoint())) {
+                                    elemActiveHandle = hi;
+                                    elemScaleBase    = new Rectangle(
+                                        selectedElement.x(), selectedElement.y(),
+                                        selectedElement.width(), selectedElement.height());
+                                    elemScaleStart   = e.getPoint();
+                                    return;
+                                }
+                            }
+                            if (selScr.contains(e.getPoint())) {
+                                draggingElement = true;
+                                elemDragAnchor  = new Point(imgPt.x - selectedElement.x(),
+                                                             imgPt.y - selectedElement.y());
+                                return;
+                            }
+                        }
+                        // Hit-test unselected elements (top = last in list)
+                        Element hit = null;
+                        for (int i = activeElements.size() - 1; i >= 0; i--) {
+                            if (elemRectScreen(activeElements.get(i)).contains(e.getPoint())) {
+                                hit = activeElements.get(i); break;
+                            }
+                        }
+                        if (hit != null) {
+                            selectedElement = hit;
+                            draggingElement = true;
+                            elemDragAnchor  = new Point(imgPt.x - hit.x(), imgPt.y - hit.y());
+                            canvasPanel.repaint();
+                            return;
+                        } else {
+                            // Click outside all elements → deselect
+                            selectedElement = null;
+                            canvasPanel.repaint();
+                        }
+                    }
 
                     // ── Floating selection: handle/move/commit (any mode) ─────
                     if (floatingImg != null) {
@@ -1409,8 +1764,32 @@ public class SelectiveAlphaEditor extends JFrame {
                         return;
                     }
 
-                    if (sourceFile == null) return;
+                    if (workingImage == null) return;
                     Point imgPt = screenToImage(e.getPoint());
+
+                    // ── Element drag/resize (any mode) ───────────────────────
+                    if (selectedElement != null && elemActiveHandle >= 0
+                            && elemScaleBase != null && elemScaleStart != null) {
+                        Rectangle nr = computeNewFloatRect(elemActiveHandle, elemScaleBase,
+                                elemScaleStart, e.getPoint());
+                        int idx = activeElements.indexOf(selectedElement);
+                        if (idx >= 0) {
+                            selectedElement = selectedElement.withBounds(nr.x, nr.y, nr.width, nr.height);
+                            activeElements.set(idx, selectedElement);
+                        }
+                        canvasPanel.repaint();
+                        return;
+                    }
+                    if (draggingElement && selectedElement != null && elemDragAnchor != null) {
+                        int idx = activeElements.indexOf(selectedElement);
+                        if (idx >= 0) {
+                            selectedElement = selectedElement.withPosition(
+                                imgPt.x - elemDragAnchor.x, imgPt.y - elemDragAnchor.y);
+                            activeElements.set(idx, selectedElement);
+                        }
+                        canvasPanel.repaint();
+                        return;
+                    }
 
                     // ── Floating selection: scale/move (any mode) ─────────────
                     if (activeHandle >= 0 && scaleBaseRect != null && scaleDragStart != null) {
@@ -1507,8 +1886,19 @@ public class SelectiveAlphaEditor extends JFrame {
                                 : Cursor.getDefaultCursor());
                         return;
                     }
-                    if (sourceFile == null) return;
+                    if (workingImage == null) return;
                     Point imgPt = screenToImage(e.getPoint());
+
+                    // ── Element finish drag/resize ────────────────────────────
+                    if (draggingElement || elemActiveHandle >= 0) {
+                        draggingElement  = false;
+                        elemDragAnchor   = null;
+                        elemActiveHandle = -1;
+                        elemScaleBase    = null;
+                        elemScaleStart   = null;
+                        markDirty();
+                        return;
+                    }
 
                     // ── Floating selection: finish drag/scale (any mode) ──────
                     if (activeHandle >= 0 || isDraggingFloat) {
@@ -1591,7 +1981,7 @@ public class SelectiveAlphaEditor extends JFrame {
                 @Override public void mouseWheelMoved(MouseWheelEvent e) {
                     if ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0) {
                         Point anchor = e.getPoint(); // canvas-local
-                        setZoom(zoom + (-e.getPreciseWheelRotation() * ZOOM_STEP), anchor);
+                        setZoom(zoom + (-e.getPreciseWheelRotation() * ZOOM_WHEEL), anchor);
                         e.consume();
                     } else if (e.isShiftDown()) {
                         JScrollBar bar = scrollPane.getHorizontalScrollBar();
@@ -1638,19 +2028,43 @@ public class SelectiveAlphaEditor extends JFrame {
             int cw = (int) Math.ceil(workingImage.getWidth()  * zoom);
             int ch = (int) Math.ceil(workingImage.getHeight() * zoom);
 
-            // Checkerboard
+            // Checkerboard (colors configurable via showCanvasBgDialog)
             int cell = Math.max(4, (int)(10 * zoom));
             for (int row = 0; row < ch; row += cell)
                 for (int col = 0; col < cw; col += cell) {
                     boolean even = ((row/cell)+(col/cell)) % 2 == 0;
-                    g2.setColor(even ? new Color(200,200,200) : new Color(160,160,160));
+                    g2.setColor(even ? canvasBg1 : canvasBg2);
                     g2.fillRect(col, row, Math.min(cell, cw-col), Math.min(cell, ch-row));
                 }
 
             // Image
             g2.drawImage(workingImage, 0, 0, cw, ch, null);
 
-            // Floating selection (drawn above image, below grid/selection overlays)
+            // ── Element layers (drawn above image, below float / grid) ────────
+            for (Element el : activeElements) {
+                int ex = (int) Math.round(el.x()      * zoom);
+                int ey = (int) Math.round(el.y()      * zoom);
+                int ew = (int) Math.round(el.width()  * zoom);
+                int eh = (int) Math.round(el.height() * zoom);
+                g2.drawImage(el.image(), ex, ey, ew, eh, null);
+                boolean isSelected = el.equals(selectedElement);
+                float[] dash = { 5f, 3f };
+                g2.setColor(isSelected ? AppColors.ACCENT : new Color(255, 255, 0, 180));
+                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
+                        BasicStroke.JOIN_MITER, 1f, dash, 0f));
+                g2.drawRect(ex, ey, ew, eh);
+                if (isSelected) {
+                    g2.setStroke(new BasicStroke(1f));
+                    for (Rectangle hr : handleRects(new Rectangle(ex, ey, ew, eh))) {
+                        g2.setColor(Color.WHITE);
+                        g2.fillRect(hr.x, hr.y, hr.width, hr.height);
+                        g2.setColor(AppColors.ACCENT);
+                        g2.drawRect(hr.x, hr.y, hr.width, hr.height);
+                    }
+                }
+            }
+
+            // Floating selection (drawn above elements, below grid/selection overlays)
             if (floatingImg != null && floatRect != null) {
                 int fx = (int) Math.round(floatRect.x     * zoom);
                 int fy = (int) Math.round(floatRect.y     * zoom);
@@ -2056,6 +2470,62 @@ public class SelectiveAlphaEditor extends JFrame {
         btn.setContentAreaFilled(false); btn.setOpaque(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
+    }
+
+    // =========================================================================
+    // Element helpers
+    // =========================================================================
+
+    /** Screen-space rectangle for an element, accounting for current zoom. */
+    private Rectangle elemRectScreen(Element el) {
+        return new Rectangle(
+            (int) Math.round(el.x()      * zoom),
+            (int) Math.round(el.y()      * zoom),
+            (int) Math.round(el.width()  * zoom),
+            (int) Math.round(el.height() * zoom));
+    }
+
+    /**
+     * Inserts the current clipboard / selection as a new Element (non-destructive layer).
+     * The underlying canvas pixels are NOT modified until the element is merged
+     * via mergeElementToCanvas().
+     */
+    private void insertSelectionAsElement() {
+        BufferedImage src = null;
+        Rectangle sel = getActiveSelection();
+        if (sel != null && workingImage != null) {
+            src = PaintEngine.cropRegion(workingImage, sel);
+        } else if (clipboard != null) {
+            src = deepCopy(clipboard);
+        }
+        if (src == null) { showInfoDialog("Kein Inhalt", "Nichts zum Einfügen als Element."); return; }
+
+        int ex = sel != null ? sel.x : 0;
+        int ey = sel != null ? sel.y : 0;
+        Element el = new Element(nextElementId++, src, ex, ey, src.getWidth(), src.getHeight());
+        activeElements.add(el);
+        selectedElement = el;
+        selectedAreas.clear();
+        markDirty();
+    }
+
+    /** Merges the selected element onto the canvas and removes it from the layer list. */
+    private void mergeElementToCanvas(Element el) {
+        if (el == null || workingImage == null) return;
+        pushUndo();
+        BufferedImage scaled = PaintEngine.scale(el.image(), Math.max(1, el.width()), Math.max(1, el.height()));
+        PaintEngine.pasteRegion(workingImage, scaled, new Point(el.x(), el.y()));
+        activeElements.remove(el);
+        if (selectedElement == el) selectedElement = null;
+        markDirty();
+    }
+
+    /** Deletes the selected element without merging to canvas. */
+    private void deleteSelectedElement() {
+        if (selectedElement == null) return;
+        activeElements.remove(selectedElement);
+        selectedElement = null;
+        markDirty();
     }
 
     // =========================================================================

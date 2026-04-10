@@ -187,7 +187,13 @@ public class PaintEngine {
         int w = Math.min(r.width,  img.getWidth()  - x);
         int h = Math.min(r.height, img.getHeight() - y);
         if (w <= 0 || h <= 0) return null;
-        return img.getSubimage(x, y, w, h);
+        // Deep copy – getSubimage() shares the raster, so clearing the source
+        // would also wipe the cropped image if we returned the raw subimage.
+        BufferedImage copy = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = copy.createGraphics();
+        g2.drawImage(img.getSubimage(x, y, w, h), 0, 0, null);
+        g2.dispose();
+        return copy;
     }
 
     public static void clearRegion(BufferedImage img, Rectangle r) {
