@@ -4,41 +4,29 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import javax.swing.*;
-import javax.swing.event.ChangeListener;
 
 /**
  * Paint toolbar – a JPanel docked at BorderLayout.SOUTH of the main frame.
  *
- * Layout (single scrollable horizontal strip, MS-Paint style):
- *
- *  ┌──────────────────────────────────────────────────────────────────────┐
- *  │ [✏][▓][╱][○][□][⌫][✦][⬚] │ ●──3  α──255 │ Fill▾ Shape▾ │        │
- *  │ [Pri/Sec Swatch] │ [██████████████ 28-color palette ██████████████] │
- *  │ [✂][⎘][⎗] │ [⊞ Raster][⌇ Lineal]                                  │
- *  └──────────────────────────────────────────────────────────────────────┘
+ * Sections (left → right):
+ *  Tools | Color swatches | 28-color palette | Stroke+Alpha | Fill+Brush |
+ *  AA toggle | Transforms (FlipH, FlipV, Rotate, Scale) |
+ *  Clipboard | View toggles (Grid, Ruler, Unit)
  *
  * Visibility: hidden by default; shown only when Paint mode is active.
- * The toolbar uses a JScrollPane so it works on narrow screens too.
  */
 public class PaintToolbar extends JPanel {
-    // console.log("### PaintToolbar.java ###");
 
     // ── Constants ─────────────────────────────────────────────────────────────
-    /** All tool / action buttons are this size (set globally here). */
-    public static final int BTN_SIZE    = 50;
-    /** Each palette swatch */
-    public static final int SWATCH_W    = 22;
-    public static final int SWATCH_H    = 22;
-    /** Number of palette columns (2 rows) */
-    private static final int PAL_COLS   = 14;
-    /** Gap between items */
-    private static final int GAP        = 3;
-    /** Total toolbar height: two swatch rows + padding */
-    public static final int TOOLBAR_H   = BTN_SIZE + 18;
+    public static final int BTN_SIZE  = 50;
+    public static final int SWATCH_W  = 22;
+    public static final int SWATCH_H  = 22;
+    private static final int PAL_COLS = 14;
+    private static final int GAP      = 3;
+    public static final int TOOLBAR_H = BTN_SIZE + 18;
 
-    // ── MS-Paint-style 28-color palette ───────────────────────────────────────
+    // ── Palette ───────────────────────────────────────────────────────────────
     private static final Color[] PALETTE = {
-        // Row 1
         Color.BLACK,             new Color(128,   0,   0),
         new Color(  0, 128,   0),new Color(  0,   0, 128),
         new Color(128, 128,   0),new Color(  0, 128, 128),
@@ -46,7 +34,6 @@ public class PaintToolbar extends JPanel {
         new Color(255, 128,   0),Color.RED,
         new Color(  0, 255,   0),Color.BLUE,
         Color.YELLOW,            Color.CYAN,
-        // Row 2
         Color.WHITE,             new Color(192, 192, 192),
         new Color(255, 128, 128),new Color(128, 255, 128),
         new Color(128, 128, 255),new Color(255, 255, 128),
@@ -56,29 +43,36 @@ public class PaintToolbar extends JPanel {
         new Color(173, 216, 230),new Color(144, 238, 144),
     };
 
-    // ── Callback interface ────────────────────────────────────────────────────
+    // ── Callbacks ─────────────────────────────────────────────────────────────
     public interface Callbacks {
         void onToolChanged(PaintEngine.Tool tool);
         void onColorChanged(Color primary, Color secondary);
         void onStrokeChanged(int width);
         void onFillModeChanged(PaintEngine.FillMode mode);
         void onBrushShapeChanged(PaintEngine.BrushShape shape);
+        void onAntialiasingChanged(boolean aa);
         void onCut();
         void onCopy();
         void onPaste();
         void onToggleGrid(boolean show);
         void onToggleRuler(boolean show);
+        void onRulerUnitChanged(int unitIndex); // 0=PX 1=MM 2=CM 3=INCH
+        void onFlipHorizontal();
+        void onFlipVertical();
+        void onRotate();
+        void onScale();
         BufferedImage getWorkingImage();
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
     private final Callbacks           cb;
-    private PaintEngine.Tool          activeTool     = PaintEngine.Tool.PENCIL;
+    private PaintEngine.Tool          activeTool   = PaintEngine.Tool.PENCIL;
     private Color                     primaryColor   = Color.BLACK;
     private Color                     secondaryColor = Color.WHITE;
     private int                       strokeWidth    = 3;
     private PaintEngine.FillMode      fillMode       = PaintEngine.FillMode.SOLID;
     private PaintEngine.BrushShape    brushShape     = PaintEngine.BrushShape.ROUND;
+    private boolean                   antialias      = true;
 
     // ── UI refs ───────────────────────────────────────────────────────────────
     private JLabel              colorPrimaryPreview;
@@ -96,7 +90,6 @@ public class PaintToolbar extends JPanel {
     // Constructor
     // =========================================================================
     public PaintToolbar(Window owner, Callbacks callbacks) {
-        // console.log("### PaintToolbar.java constructor ###");
         this.cb = callbacks;
 
         setLayout(new BorderLayout());
@@ -104,17 +97,14 @@ public class PaintToolbar extends JPanel {
         setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppColors.BORDER));
         setPreferredSize(new Dimension(0, TOOLBAR_H));
 
-        // Inner strip – all sections in one horizontal FlowLayout panel
         JPanel strip = buildStrip();
 
-        // Wrap in a horizontal scroll pane (no vertical bar ever)
         JScrollPane scroll = new JScrollPane(strip,
                 JScrollPane.VERTICAL_SCROLLBAR_NEVER,
                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         scroll.setBorder(null);
         scroll.getViewport().setBackground(AppColors.BG_TOOLBAR);
         scroll.setBackground(AppColors.BG_TOOLBAR);
-        // Make scroll wheel work horizontally
         scroll.getHorizontalScrollBar().setUnitIncrement(20);
         scroll.addMouseWheelListener(e -> {
             JScrollBar bar = scroll.getHorizontalScrollBar();
@@ -122,7 +112,6 @@ public class PaintToolbar extends JPanel {
         });
         add(scroll, BorderLayout.CENTER);
 
-        // ColorPicker popup owned by the parent window
         colorPicker = new ColorPickerPopup(owner);
         colorPicker.setChangeListener(e -> {
             Color c = colorPicker.getSelectedColor();
@@ -137,7 +126,7 @@ public class PaintToolbar extends JPanel {
             cb.onColorChanged(primaryColor, secondaryColor);
         });
 
-        setVisible(false); // hidden until paint mode
+        setVisible(false);
     }
 
     // =========================================================================
@@ -149,34 +138,22 @@ public class PaintToolbar extends JPanel {
     public int                    getStrokeWidth()    { return strokeWidth; }
     public PaintEngine.FillMode   getFillMode()       { return fillMode; }
     public PaintEngine.BrushShape getBrushShape()     { return brushShape; }
+    public boolean                isAntialiasing()    { return antialias; }
 
-    /** Called by eyedropper to push picked color into toolbar. */
     public void setSelectedColor(Color c) {
-        // console.log("### PaintToolbar.java setSelectedColor ###");
         primaryColor = c;
         colorPrimaryPreview.setBackground(c);
         syncAlphaSlider();
         cb.onColorChanged(primaryColor, secondaryColor);
     }
 
-    public void showToolbar() {
-        // console.log("### PaintToolbar.java showToolbar ###");
-        setVisible(true);
-        revalidate();
-        repaint();
-    }
-
-    public void hideToolbar() {
-        // console.log("### PaintToolbar.java hideToolbar ###");
-        setVisible(false);
-        revalidate();
-    }
+    public void showToolbar() { setVisible(true); revalidate(); repaint(); }
+    public void hideToolbar() { setVisible(false); revalidate(); }
 
     // =========================================================================
     // Strip builder
     // =========================================================================
     private JPanel buildStrip() {
-        // console.log("### PaintToolbar.java buildStrip ###");
         JPanel strip = new JPanel();
         strip.setLayout(new BoxLayout(strip, BoxLayout.X_AXIS));
         strip.setBackground(AppColors.BG_TOOLBAR);
@@ -192,6 +169,10 @@ public class PaintToolbar extends JPanel {
         strip.add(vSep());
         strip.add(buildFillBrush());
         strip.add(vSep());
+        strip.add(buildAntialias());
+        strip.add(vSep());
+        strip.add(buildTransforms());
+        strip.add(vSep());
         strip.add(buildClipboard());
         strip.add(vSep());
         strip.add(buildViewToggles());
@@ -200,12 +181,10 @@ public class PaintToolbar extends JPanel {
         return strip;
     }
 
-    // ── Section: Tool buttons ─────────────────────────────────────────────────
+    // ── Tool buttons ──────────────────────────────────────────────────────────
     private JPanel buildToolButtons() {
-        // console.log("### PaintToolbar.java buildToolButtons ###");
         JPanel p = hBox();
         ButtonGroup group = new ButtonGroup();
-
         for (PaintEngine.Tool tool : PaintEngine.Tool.values()) {
             String[] st = symbolAndTip(tool);
             JToggleButton btn = toolBtn(st[0], st[1]);
@@ -218,10 +197,8 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
-    // ── Section: Primary / Secondary color swatches ───────────────────────────
+    // ── Color swatches ────────────────────────────────────────────────────────
     private JPanel buildColorSwatches() {
-        // console.log("### PaintToolbar.java buildColorSwatches ###");
-        // Overlapping layered layout: secondary behind, primary in front
         JPanel p = new JPanel(null);
         p.setOpaque(false);
         int pw = 50, ph = BTN_SIZE;
@@ -229,13 +206,11 @@ public class PaintToolbar extends JPanel {
         p.setMaximumSize(new Dimension(pw, ph));
         p.setMinimumSize(new Dimension(pw, ph));
 
-        int bigS  = 32;
-        int smallS= 22;
+        int bigS = 32, smallS = 22;
 
-        // Secondary (back – bottom-right)
         colorSecondaryPreview = swatchLabel(secondaryColor);
         colorSecondaryPreview.setBounds(pw - smallS - 2, ph - smallS - 2, smallS, smallS);
-        colorSecondaryPreview.setToolTipText("Sekundärfarbe · Klick = Farbwähler · Rechtsklick = aus Palette");
+        colorSecondaryPreview.setToolTipText("Sekundärfarbe · Klick = Farbwähler");
         colorSecondaryPreview.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 pickingSecondary = true;
@@ -244,10 +219,9 @@ public class PaintToolbar extends JPanel {
             }
         });
 
-        // Primary (front – top-left)
         colorPrimaryPreview = swatchLabel(primaryColor);
         colorPrimaryPreview.setBounds(2, (ph - bigS) / 2, bigS, bigS);
-        colorPrimaryPreview.setToolTipText("Primärfarbe · Klick = Farbwähler · Linksklick aus Palette");
+        colorPrimaryPreview.setToolTipText("Primärfarbe · Klick = Farbwähler");
         colorPrimaryPreview.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 pickingSecondary = false;
@@ -261,10 +235,8 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
-    // ── Section: 28-color palette ─────────────────────────────────────────────
+    // ── 28-color palette ─────────────────────────────────────────────────────
     private JPanel buildPalette() {
-        // console.log("### PaintToolbar.java buildPalette ###");
-        // Two rows of PAL_COLS swatches
         JPanel p = new JPanel(new GridLayout(2, PAL_COLS, 2, 2));
         p.setOpaque(false);
         int totalW = PAL_COLS * (SWATCH_W + 2) + 2;
@@ -294,9 +266,8 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
-    // ── Section: Stroke + Alpha ───────────────────────────────────────────────
+    // ── Stroke + Alpha ────────────────────────────────────────────────────────
     private JPanel buildStrokeAlpha() {
-        // console.log("### PaintToolbar.java buildStrokeAlpha ###");
         JPanel p = new JPanel(new GridLayout(2, 3, 4, 2));
         p.setOpaque(false);
         p.setPreferredSize(new Dimension(180, BTN_SIZE));
@@ -326,9 +297,8 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
-    // ── Section: Fill mode + Brush shape ─────────────────────────────────────
+    // ── Fill mode + Brush shape ───────────────────────────────────────────────
     private JPanel buildFillBrush() {
-        // console.log("### PaintToolbar.java buildFillBrush ###");
         JPanel p = new JPanel(new GridLayout(2, 1, 0, 4));
         p.setOpaque(false);
         p.setPreferredSize(new Dimension(90, BTN_SIZE));
@@ -352,13 +322,47 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
-    // ── Section: Clipboard ────────────────────────────────────────────────────
-    private JPanel buildClipboard() {
-        // console.log("### PaintToolbar.java buildClipboard ###");
+    // ── Antialiasing toggle ───────────────────────────────────────────────────
+    private JPanel buildAntialias() {
         JPanel p = hBox();
-        JButton cut   = iconBtn("✂",  "Ausschneiden (Strg+X)");
-        JButton copy  = iconBtn("⎘",  "Kopieren (Strg+C)");
-        JButton paste = iconBtn("⎗",  "Einfügen (Strg+V)");
+        JToggleButton btn = toggleBtn("AA", "Antialiasing ein/aus (weiche Kanten)");
+        btn.setSelected(true); // on by default
+        btn.setFont(new Font("SansSerif", Font.BOLD, 11));
+        btn.addActionListener(e -> {
+            antialias = btn.isSelected();
+            cb.onAntialiasingChanged(antialias);
+        });
+        p.add(btn);
+        return p;
+    }
+
+    // ── Transform buttons ─────────────────────────────────────────────────────
+    private JPanel buildTransforms() {
+        JPanel p = hBox();
+
+        JButton flipH  = iconBtn("↔",  "Horizontal spiegeln");
+        JButton flipV  = iconBtn("↕",  "Vertikal spiegeln");
+        JButton rotate = iconBtn("↺",  "Drehen …");
+        JButton scale  = iconBtn("⤡",  "Skalieren …");
+
+        flipH .addActionListener(e -> cb.onFlipHorizontal());
+        flipV .addActionListener(e -> cb.onFlipVertical());
+        rotate.addActionListener(e -> cb.onRotate());
+        scale .addActionListener(e -> cb.onScale());
+
+        p.add(flipH);  p.add(Box.createHorizontalStrut(GAP));
+        p.add(flipV);  p.add(Box.createHorizontalStrut(GAP));
+        p.add(rotate); p.add(Box.createHorizontalStrut(GAP));
+        p.add(scale);
+        return p;
+    }
+
+    // ── Clipboard ─────────────────────────────────────────────────────────────
+    private JPanel buildClipboard() {
+        JPanel p = hBox();
+        JButton cut   = iconBtn("✂", "Ausschneiden (Strg+X)");
+        JButton copy  = iconBtn("⎘", "Kopieren (Strg+C)");
+        JButton paste = iconBtn("⎗", "Einfügen (Strg+V)");
         cut  .addActionListener(e -> cb.onCut());
         copy .addActionListener(e -> cb.onCopy());
         paste.addActionListener(e -> cb.onPaste());
@@ -368,16 +372,22 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
-    // ── Section: View toggles (grid + ruler) ──────────────────────────────────
+    // ── View toggles: grid, ruler, unit ──────────────────────────────────────
     private JPanel buildViewToggles() {
-        // console.log("### PaintToolbar.java buildViewToggles ###");
         JPanel p = hBox();
+
         JToggleButton grid  = toggleBtn("⊞", "Raster ein-/ausblenden");
         JToggleButton ruler = toggleBtn("⌇", "Lineal ein-/ausblenden");
         grid .addActionListener(e -> cb.onToggleGrid(grid.isSelected()));
         ruler.addActionListener(e -> cb.onToggleRuler(ruler.isSelected()));
+
+        JComboBox<String> unitCombo = styledCombo(new String[]{"px","mm","cm","in"}, 52);
+        unitCombo.setToolTipText("Lineal-Einheit");
+        unitCombo.addActionListener(e -> cb.onRulerUnitChanged(unitCombo.getSelectedIndex()));
+
         p.add(grid);  p.add(Box.createHorizontalStrut(GAP));
-        p.add(ruler);
+        p.add(ruler); p.add(Box.createHorizontalStrut(GAP));
+        p.add(unitCombo);
         return p;
     }
 
@@ -385,16 +395,13 @@ public class PaintToolbar extends JPanel {
     // Helpers
     // =========================================================================
     private void showColorPickerAt(JComponent anchor) {
-        // console.log("### PaintToolbar.java showColorPickerAt ###");
         if (!anchor.isShowing()) return;
-        Point p = anchor.getLocationOnScreen();
+        Point pt = anchor.getLocationOnScreen();
         int   ph = colorPicker.getHeight() > 0 ? colorPicker.getHeight() : 320;
-        // Show above the toolbar (which sits at the bottom of the screen)
-        colorPicker.showAt(p.x, p.y - ph - 8);
+        colorPicker.showAt(pt.x, pt.y - ph - 8);
     }
 
     private void syncAlphaSlider() {
-        // console.log("### PaintToolbar.java syncAlphaSlider ###");
         if (alphaSlider != null) {
             alphaSlider.setValue(primaryColor.getAlpha());
             alphaLabel.setText(String.valueOf(primaryColor.getAlpha()));
@@ -411,22 +418,19 @@ public class PaintToolbar extends JPanel {
 
     private String[] symbolAndTip(PaintEngine.Tool tool) {
         return switch (tool) {
-            case PENCIL     -> new String[]{ "✏",  "Stift (P)"      };
-            case FLOODFILL  -> new String[]{ "▓",  "Fülleimer (F)"  };
-            case LINE       -> new String[]{ "╱",  "Linie (L)"      };
-            case CIRCLE     -> new String[]{ "○",  "Ellipse (E)"    };
-            case RECT       -> new String[]{ "□",  "Rechteck (R)"   };
-            case ERASER     -> new String[]{ "⌫",  "Radierer (X)"   };
-            case EYEDROPPER -> new String[]{ "✦",  "Pipette (I)"    };
-            case SELECT     -> new String[]{ "⬚",  "Auswahl (S)"    };
+            case PENCIL     -> new String[]{ "✏", "Stift (P)"      };
+            case FLOODFILL  -> new String[]{ "▓", "Fülleimer (F)"  };
+            case LINE       -> new String[]{ "╱", "Linie (L)"      };
+            case CIRCLE     -> new String[]{ "○", "Ellipse (E)"    };
+            case RECT       -> new String[]{ "□", "Rechteck (R)"   };
+            case ERASER     -> new String[]{ "⌫", "Radierer (X)"   };
+            case EYEDROPPER -> new String[]{ "✦", "Pipette (I)"    };
+            case SELECT     -> new String[]{ "⬚", "Auswahl (S)"    };
         };
     }
 
-    // =========================================================================
-    // Widget factories (all interactive buttons: BTN_SIZE × BTN_SIZE)
-    // =========================================================================
+    // ── Widget factories ──────────────────────────────────────────────────────
 
-    /** Styled tool toggle button */
     private JToggleButton toolBtn(String symbol, String tooltip) {
         JToggleButton btn = new JToggleButton(symbol) {
             @Override protected void paintComponent(Graphics g) {
@@ -449,7 +453,6 @@ public class PaintToolbar extends JPanel {
         return btn;
     }
 
-    /** Styled view-toggle button (grid, ruler) */
     private JToggleButton toggleBtn(String symbol, String tooltip) {
         JToggleButton btn = new JToggleButton(symbol) {
             @Override protected void paintComponent(Graphics g) {
@@ -466,7 +469,6 @@ public class PaintToolbar extends JPanel {
         return btn;
     }
 
-    /** Styled action button (clipboard etc.) */
     private JButton iconBtn(String symbol, String tooltip) {
         JButton btn = new JButton(symbol) {
             @Override protected void paintComponent(Graphics g) {
@@ -481,7 +483,6 @@ public class PaintToolbar extends JPanel {
         return btn;
     }
 
-    /** Shared button styling – enforces BTN_SIZE × BTN_SIZE for all buttons. */
     private void styleBtn(AbstractButton btn, String symbol, String tooltip) {
         btn.setFont(new Font("SansSerif", Font.PLAIN, 18));
         btn.setForeground(AppColors.TEXT);
@@ -505,24 +506,21 @@ public class PaintToolbar extends JPanel {
         return l;
     }
 
-    /** Thin vertical separator */
     private Component vSep() {
         JPanel s = new JPanel();
         s.setBackground(AppColors.BORDER);
         s.setPreferredSize(new Dimension(1, BTN_SIZE - 8));
         s.setMaximumSize(new Dimension(1, BTN_SIZE - 8));
         s.setMinimumSize(new Dimension(1, BTN_SIZE - 8));
-        // Wrap in a panel to get correct BoxLayout spacing
-        JPanel wrapper = new JPanel();
-        wrapper.setOpaque(false);
-        wrapper.setLayout(new BoxLayout(wrapper, BoxLayout.X_AXIS));
-        wrapper.add(Box.createHorizontalStrut(6));
-        wrapper.add(s);
-        wrapper.add(Box.createHorizontalStrut(6));
-        return wrapper;
+        JPanel w = new JPanel();
+        w.setOpaque(false);
+        w.setLayout(new BoxLayout(w, BoxLayout.X_AXIS));
+        w.add(Box.createHorizontalStrut(6));
+        w.add(s);
+        w.add(Box.createHorizontalStrut(6));
+        return w;
     }
 
-    /** Horizontal Box panel for button groups */
     private JPanel hBox() {
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.X_AXIS));
@@ -549,14 +547,14 @@ public class PaintToolbar extends JPanel {
     }
 
     private JComboBox<String> styledCombo(String[] items, int width) {
-        JComboBox<String> cb = new JComboBox<>(items);
-        cb.setBackground(AppColors.BTN_BG);
-        cb.setForeground(AppColors.TEXT);
-        cb.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        cb.setPreferredSize(new Dimension(width, 22));
-        cb.setMaximumSize(new Dimension(width, 22));
-        cb.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
-        cb.setFocusable(false);
-        return cb;
+        JComboBox<String> box = new JComboBox<>(items);
+        box.setBackground(AppColors.BTN_BG);
+        box.setForeground(AppColors.TEXT);
+        box.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        box.setPreferredSize(new Dimension(width, 22));
+        box.setMaximumSize(new Dimension(width, 22));
+        box.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
+        box.setFocusable(false);
+        return box;
     }
 }

@@ -12,7 +12,6 @@ import java.util.Stack;
  * before passing points here.
  */
 public class PaintEngine {
-    // console.log("### PaintEngine.java ###");
 
     // ── Tool enum ─────────────────────────────────────────────────────────────
     public enum Tool {
@@ -30,13 +29,12 @@ public class PaintEngine {
     }
 
     // =========================================================================
-    // Draw Pencil stroke (single point or interpolated segment)
+    // Draw Pencil stroke
     // =========================================================================
     public static void drawPencil(BufferedImage img, Point from, Point to,
-                                   Color color, int strokeWidth, BrushShape shape) {
-        // console.log("### PaintEngine.java drawPencil ###");
+                                   Color color, int strokeWidth, BrushShape shape, boolean aa) {
         Graphics2D g2 = img.createGraphics();
-        applyQuality(g2);
+        applyQuality(g2, aa);
         g2.setColor(color);
         g2.setStroke(new BasicStroke(strokeWidth,
                 shape == BrushShape.ROUND ? BasicStroke.CAP_ROUND : BasicStroke.CAP_SQUARE,
@@ -57,10 +55,9 @@ public class PaintEngine {
     // =========================================================================
     // Draw Eraser stroke
     // =========================================================================
-    public static void drawEraser(BufferedImage img, Point from, Point to, int strokeWidth) {
-        // console.log("### PaintEngine.java drawEraser ###");
+    public static void drawEraser(BufferedImage img, Point from, Point to, int strokeWidth, boolean aa) {
         Graphics2D g2 = img.createGraphics();
-        applyQuality(g2);
+        applyQuality(g2, aa);
         g2.setComposite(AlphaComposite.Clear);
         g2.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         if (from.equals(to)) {
@@ -73,13 +70,12 @@ public class PaintEngine {
     }
 
     // =========================================================================
-    // Draw Line (preview or commit)
+    // Draw Line
     // =========================================================================
     public static void drawLine(BufferedImage img, Point from, Point to,
-                                 Color color, int strokeWidth) {
-        // console.log("### PaintEngine.java drawLine ###");
+                                 Color color, int strokeWidth, boolean aa) {
         Graphics2D g2 = img.createGraphics();
-        applyQuality(g2);
+        applyQuality(g2, aa);
         g2.setColor(color);
         g2.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2.drawLine(from.x, from.y, to.x, to.y);
@@ -91,8 +87,7 @@ public class PaintEngine {
     // =========================================================================
     public static void drawCircle(BufferedImage img, Point from, Point to,
                                    Color color, int strokeWidth, FillMode fillMode,
-                                   Color color2) {
-        // console.log("### PaintEngine.java drawCircle ###");
+                                   Color color2, boolean aa) {
         int x = Math.min(from.x, to.x);
         int y = Math.min(from.y, to.y);
         int w = Math.abs(to.x - from.x);
@@ -100,21 +95,18 @@ public class PaintEngine {
         if (w < 1 || h < 1) return;
 
         Graphics2D g2 = img.createGraphics();
-        applyQuality(g2);
+        applyQuality(g2, aa);
         Ellipse2D shape = new Ellipse2D.Float(x, y, w, h);
 
         switch (fillMode) {
-            case SOLID -> {
-                g2.setColor(color);
-                g2.fill(shape);
-            }
+            case SOLID -> { g2.setColor(color); g2.fill(shape); }
             case GRADIENT -> {
                 GradientPaint gp = new GradientPaint(x, y, color, x + w, y + h,
                         color2 != null ? color2 : color.darker());
                 g2.setPaint(gp);
                 g2.fill(shape);
             }
-            case OUTLINE_ONLY -> { /* only draw outline below */ }
+            case OUTLINE_ONLY -> {}
         }
         g2.setColor(color);
         g2.setStroke(new BasicStroke(strokeWidth));
@@ -127,8 +119,7 @@ public class PaintEngine {
     // =========================================================================
     public static void drawRect(BufferedImage img, Point from, Point to,
                                  Color color, int strokeWidth, FillMode fillMode,
-                                 Color color2) {
-        // console.log("### PaintEngine.java drawRect ###");
+                                 Color color2, boolean aa) {
         int x = Math.min(from.x, to.x);
         int y = Math.min(from.y, to.y);
         int w = Math.abs(to.x - from.x);
@@ -136,7 +127,7 @@ public class PaintEngine {
         if (w < 1 || h < 1) return;
 
         Graphics2D g2 = img.createGraphics();
-        applyQuality(g2);
+        applyQuality(g2, aa);
 
         switch (fillMode) {
             case SOLID -> { g2.setColor(color); g2.fillRect(x, y, w, h); }
@@ -158,7 +149,6 @@ public class PaintEngine {
     // Floodfill
     // =========================================================================
     public static void floodFill(BufferedImage img, int x, int y, Color fillColor, int tolerance) {
-        // console.log("### PaintEngine.java floodFill ###");
         if (x < 0 || x >= img.getWidth() || y < 0 || y >= img.getHeight()) return;
         int targetARGB = img.getRGB(x, y);
         int fillARGB   = fillColor.getRGB();
@@ -182,19 +172,17 @@ public class PaintEngine {
     }
 
     // =========================================================================
-    // Eyedropper – returns the color at the given pixel
+    // Eyedropper
     // =========================================================================
     public static Color pickColor(BufferedImage img, int x, int y) {
-        // console.log("### PaintEngine.java pickColor ###");
         if (x < 0 || x >= img.getWidth() || y < 0 || y >= img.getHeight()) return Color.BLACK;
         return new Color(img.getRGB(x, y), true);
     }
 
     // =========================================================================
-    // Cut / Copy / Paste (image-space rectangle + system clipboard)
+    // Cut / Copy / Paste
     // =========================================================================
     public static BufferedImage cropRegion(BufferedImage img, Rectangle r) {
-        // console.log("### PaintEngine.java cropRegion ###");
         int x = Math.max(0, r.x),  y = Math.max(0, r.y);
         int w = Math.min(r.width,  img.getWidth()  - x);
         int h = Math.min(r.height, img.getHeight() - y);
@@ -203,7 +191,6 @@ public class PaintEngine {
     }
 
     public static void clearRegion(BufferedImage img, Rectangle r) {
-        // console.log("### PaintEngine.java clearRegion ###");
         Graphics2D g2 = img.createGraphics();
         g2.setComposite(AlphaComposite.Clear);
         g2.fillRect(r.x, r.y, r.width, r.height);
@@ -211,7 +198,6 @@ public class PaintEngine {
     }
 
     public static void pasteRegion(BufferedImage dst, BufferedImage src, Point at) {
-        // console.log("### PaintEngine.java pasteRegion ###");
         Graphics2D g2 = dst.createGraphics();
         g2.setComposite(AlphaComposite.SrcOver);
         g2.drawImage(src, at.x, at.y, null);
@@ -219,11 +205,66 @@ public class PaintEngine {
     }
 
     // =========================================================================
+    // Transformations
+    // =========================================================================
+
+    public static BufferedImage flipHorizontal(BufferedImage img) {
+        int w = img.getWidth(), h = img.getHeight();
+        BufferedImage r = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = r.createGraphics();
+        g2.drawImage(img, w, 0, -w, h, null);
+        g2.dispose();
+        return r;
+    }
+
+    public static BufferedImage flipVertical(BufferedImage img) {
+        int w = img.getWidth(), h = img.getHeight();
+        BufferedImage r = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = r.createGraphics();
+        g2.drawImage(img, 0, h, w, -h, null);
+        g2.dispose();
+        return r;
+    }
+
+    /** Rotate by angleDeg degrees clockwise around centre. Canvas resizes to fit. */
+    public static BufferedImage rotate(BufferedImage img, double angleDeg) {
+        double rad = Math.toRadians(angleDeg);
+        double sin = Math.abs(Math.sin(rad)), cos = Math.abs(Math.cos(rad));
+        int w = img.getWidth(), h = img.getHeight();
+        int nw = (int) Math.ceil(w * cos + h * sin);
+        int nh = (int) Math.ceil(h * cos + w * sin);
+        BufferedImage result = new BufferedImage(nw, nh, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = result.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.translate(nw / 2.0, nh / 2.0);
+        g2.rotate(rad);
+        g2.translate(-w / 2.0, -h / 2.0);
+        g2.drawImage(img, 0, 0, null);
+        g2.dispose();
+        return result;
+    }
+
+    /** Scale to exact pixel dimensions. */
+    public static BufferedImage scale(BufferedImage img, int newW, int newH) {
+        if (newW <= 0 || newH <= 0) return img;
+        BufferedImage result = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = result.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.drawImage(img, 0, 0, newW, newH, null);
+        g2.dispose();
+        return result;
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
-    private static void applyQuality(Graphics2D g2) {
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+    private static void applyQuality(Graphics2D g2, boolean aa) {
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                aa ? RenderingHints.VALUE_ANTIALIAS_ON : RenderingHints.VALUE_ANTIALIAS_OFF);
+        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,
+                aa ? RenderingHints.VALUE_STROKE_PURE : RenderingHints.VALUE_STROKE_NORMALIZE);
         g2.setComposite(AlphaComposite.SrcOver);
     }
 
