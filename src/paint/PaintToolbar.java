@@ -61,6 +61,8 @@ public class PaintToolbar extends JPanel {
         void onFlipVertical();
         void onRotate();
         void onScale();
+        void onUndo();
+        void onRedo();
         BufferedImage getWorkingImage();
     }
 
@@ -159,6 +161,8 @@ public class PaintToolbar extends JPanel {
         strip.setBackground(AppColors.BG_TOOLBAR);
         strip.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
 
+        strip.add(buildUndoRedo());
+        strip.add(vSep());
         strip.add(buildToolButtons());
         strip.add(vSep());
         strip.add(buildColorSwatches());
@@ -179,6 +183,19 @@ public class PaintToolbar extends JPanel {
         strip.add(Box.createHorizontalGlue());
 
         return strip;
+    }
+
+    // ── Undo / Redo ───────────────────────────────────────────────────────────
+    private JPanel buildUndoRedo() {
+        JPanel p = hBox();
+        JButton undo = iconBtn("↩", "Rückgängig (Strg+Z)");
+        JButton redo = iconBtn("↪", "Wiederholen (Strg+Y)");
+        undo.addActionListener(e -> cb.onUndo());
+        redo.addActionListener(e -> cb.onRedo());
+        p.add(undo);
+        p.add(Box.createHorizontalStrut(GAP));
+        p.add(redo);
+        return p;
     }
 
     // ── Tool buttons ──────────────────────────────────────────────────────────
