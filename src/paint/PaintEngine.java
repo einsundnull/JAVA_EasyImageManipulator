@@ -1,0 +1,236 @@
+package paint;
+
+import java.awt.*;
+import java.awt.geom.Ellipse2D;
+import java.awt.image.BufferedImage;
+import java.util.Stack;
+
+/**
+ * Stateless drawing engine.
+ * All methods operate on the supplied BufferedImage in IMAGE-space.
+ * The caller is responsible for zoom-to-image coordinate conversion
+ * before passing points here.
+ */
+public class PaintEngine {
+    // console.log("### PaintEngine.java ###");
+
+    // ── Tool enum ─────────────────────────────────────────────────────────────
+    public enum Tool {
+        PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT
+    }
+
+    // ── Fill mode enum ────────────────────────────────────────────────────────
+    public enum FillMode {
+        SOLID, OUTLINE_ONLY, GRADIENT
+    }
+
+    // ── Brush shape ───────────────────────────────────────────────────────────
+    public enum BrushShape {
+        ROUND, SQUARE
+    }
+
+    // =========================================================================
+    // Draw Pencil stroke (single point or interpolated segment)
+    // =========================================================================
+    public static void drawPencil(BufferedImage img, Point from, Point to,
+                                   Color color, int strokeWidth, BrushShape shape) {
+        // console.log("### PaintEngine.java drawPencil ###");
+        Graphics2D g2 = img.createGraphics();
+        applyQuality(g2);
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(strokeWidth,
+                shape == BrushShape.ROUND ? BasicStroke.CAP_ROUND : BasicStroke.CAP_SQUARE,
+                shape == BrushShape.ROUND ? BasicStroke.JOIN_ROUND : BasicStroke.JOIN_MITER));
+        if (from.equals(to)) {
+            int r = strokeWidth / 2;
+            if (shape == BrushShape.ROUND) {
+                g2.fillOval(from.x - r, from.y - r, strokeWidth, strokeWidth);
+            } else {
+                g2.fillRect(from.x - r, from.y - r, strokeWidth, strokeWidth);
+            }
+        } else {
+            g2.drawLine(from.x, from.y, to.x, to.y);
+        }
+        g2.dispose();
+    }
+
+    // =========================================================================
+    // Draw Eraser stroke
+    // =========================================================================
+    public static void drawEraser(BufferedImage img, Point from, Point to, int strokeWidth) {
+        // console.log("### PaintEngine.java drawEraser ###");
+        Graphics2D g2 = img.createGraphics();
+        applyQuality(g2);
+        g2.setComposite(AlphaComposite.Clear);
+        g2.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        if (from.equals(to)) {
+            int r = strokeWidth / 2;
+            g2.fillOval(from.x - r, from.y - r, strokeWidth, strokeWidth);
+        } else {
+            g2.drawLine(from.x, from.y, to.x, to.y);
+        }
+        g2.dispose();
+    }
+
+    // =========================================================================
+    // Draw Line (preview or commit)
+    // =========================================================================
+    public static void drawLine(BufferedImage img, Point from, Point to,
+                                 Color color, int strokeWidth) {
+        // console.log("### PaintEngine.java drawLine ###");
+        Graphics2D g2 = img.createGraphics();
+        applyQuality(g2);
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2.drawLine(from.x, from.y, to.x, to.y);
+        g2.dispose();
+    }
+
+    // =========================================================================
+    // Draw Circle / Ellipse
+    // =========================================================================
+    public static void drawCircle(BufferedImage img, Point from, Point to,
+                                   Color color, int strokeWidth, FillMode fillMode,
+                                   Color color2) {
+        // console.log("### PaintEngine.java drawCircle ###");
+        int x = Math.min(from.x, to.x);
+        int y = Math.min(from.y, to.y);
+        int w = Math.abs(to.x - from.x);
+        int h = Math.abs(to.y - from.y);
+        if (w < 1 || h < 1) return;
+
+        Graphics2D g2 = img.createGraphics();
+        applyQuality(g2);
+        Ellipse2D shape = new Ellipse2D.Float(x, y, w, h);
+
+        switch (fillMode) {
+            case SOLID -> {
+                g2.setColor(color);
+                g2.fill(shape);
+            }
+            case GRADIENT -> {
+                GradientPaint gp = new GradientPaint(x, y, color, x + w, y + h,
+                        color2 != null ? color2 : color.darker());
+                g2.setPaint(gp);
+                g2.fill(shape);
+            }
+            case OUTLINE_ONLY -> { /* only draw outline below */ }
+        }
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(strokeWidth));
+        g2.draw(shape);
+        g2.dispose();
+    }
+
+    // =========================================================================
+    // Draw Rectangle
+    // =========================================================================
+    public static void drawRect(BufferedImage img, Point from, Point to,
+                                 Color color, int strokeWidth, FillMode fillMode,
+                                 Color color2) {
+        // console.log("### PaintEngine.java drawRect ###");
+        int x = Math.min(from.x, to.x);
+        int y = Math.min(from.y, to.y);
+        int w = Math.abs(to.x - from.x);
+        int h = Math.abs(to.y - from.y);
+        if (w < 1 || h < 1) return;
+
+        Graphics2D g2 = img.createGraphics();
+        applyQuality(g2);
+
+        switch (fillMode) {
+            case SOLID -> { g2.setColor(color); g2.fillRect(x, y, w, h); }
+            case GRADIENT -> {
+                GradientPaint gp = new GradientPaint(x, y, color, x + w, y + h,
+                        color2 != null ? color2 : color.darker());
+                g2.setPaint(gp);
+                g2.fillRect(x, y, w, h);
+            }
+            case OUTLINE_ONLY -> {}
+        }
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(strokeWidth));
+        g2.drawRect(x, y, w, h);
+        g2.dispose();
+    }
+
+    // =========================================================================
+    // Floodfill
+    // =========================================================================
+    public static void floodFill(BufferedImage img, int x, int y, Color fillColor, int tolerance) {
+        // console.log("### PaintEngine.java floodFill ###");
+        if (x < 0 || x >= img.getWidth() || y < 0 || y >= img.getHeight()) return;
+        int targetARGB = img.getRGB(x, y);
+        int fillARGB   = fillColor.getRGB();
+        if (targetARGB == fillARGB) return;
+
+        int w = img.getWidth(), h = img.getHeight();
+        Stack<Point>  stack   = new Stack<>();
+        boolean[][]   visited = new boolean[w][h];
+        stack.push(new Point(x, y));
+        while (!stack.isEmpty()) {
+            Point p = stack.pop();
+            if (p.x < 0 || p.x >= w || p.y < 0 || p.y >= h || visited[p.x][p.y]) continue;
+            if (!colorsMatch(img.getRGB(p.x, p.y), targetARGB, tolerance)) continue;
+            visited[p.x][p.y] = true;
+            img.setRGB(p.x, p.y, fillARGB);
+            stack.push(new Point(p.x + 1, p.y));
+            stack.push(new Point(p.x - 1, p.y));
+            stack.push(new Point(p.x, p.y + 1));
+            stack.push(new Point(p.x, p.y - 1));
+        }
+    }
+
+    // =========================================================================
+    // Eyedropper – returns the color at the given pixel
+    // =========================================================================
+    public static Color pickColor(BufferedImage img, int x, int y) {
+        // console.log("### PaintEngine.java pickColor ###");
+        if (x < 0 || x >= img.getWidth() || y < 0 || y >= img.getHeight()) return Color.BLACK;
+        return new Color(img.getRGB(x, y), true);
+    }
+
+    // =========================================================================
+    // Cut / Copy / Paste (image-space rectangle + system clipboard)
+    // =========================================================================
+    public static BufferedImage cropRegion(BufferedImage img, Rectangle r) {
+        // console.log("### PaintEngine.java cropRegion ###");
+        int x = Math.max(0, r.x),  y = Math.max(0, r.y);
+        int w = Math.min(r.width,  img.getWidth()  - x);
+        int h = Math.min(r.height, img.getHeight() - y);
+        if (w <= 0 || h <= 0) return null;
+        return img.getSubimage(x, y, w, h);
+    }
+
+    public static void clearRegion(BufferedImage img, Rectangle r) {
+        // console.log("### PaintEngine.java clearRegion ###");
+        Graphics2D g2 = img.createGraphics();
+        g2.setComposite(AlphaComposite.Clear);
+        g2.fillRect(r.x, r.y, r.width, r.height);
+        g2.dispose();
+    }
+
+    public static void pasteRegion(BufferedImage dst, BufferedImage src, Point at) {
+        // console.log("### PaintEngine.java pasteRegion ###");
+        Graphics2D g2 = dst.createGraphics();
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.drawImage(src, at.x, at.y, null);
+        g2.dispose();
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+    private static void applyQuality(Graphics2D g2) {
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,  RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        g2.setComposite(AlphaComposite.SrcOver);
+    }
+
+    private static boolean colorsMatch(int c1, int c2, int tolerance) {
+        return Math.abs(((c1 >> 16) & 0xFF) - ((c2 >> 16) & 0xFF)) <= tolerance
+            && Math.abs(((c1 >>  8) & 0xFF) - ((c2 >>  8) & 0xFF)) <= tolerance
+            && Math.abs( (c1        & 0xFF) - ( c2        & 0xFF)) <= tolerance
+            && Math.abs(((c1 >> 24) & 0xFF) - ((c2 >> 24) & 0xFF)) <= tolerance;
+    }
+}
