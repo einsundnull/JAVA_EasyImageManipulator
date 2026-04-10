@@ -1,9 +1,13 @@
 package paint;
 
 import java.awt.*;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -36,6 +40,7 @@ public class TileGalleryPanel extends JPanel {
     public interface Callbacks {
         void onTileOpened(File file);
         void onSelectionChanged(List<File> selectedFiles);
+        default void onFilesAdded(List<File> files) {}
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -97,6 +102,29 @@ public class TileGalleryPanel extends JPanel {
         tilesContainer.setBackground(new Color(36, 36, 36));
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
 
+        // DnD drop target on tilesContainer: accept file lists
+        tilesContainer.setTransferHandler(new TransferHandler() {
+            @Override
+            public boolean canImport(TransferSupport support) {
+                return support.isDataFlavorSupported(DataFlavor.javaFileListFlavor);
+            }
+            @Override
+            public boolean importData(TransferSupport support) {
+                if (!canImport(support)) return false;
+                try {
+                    @SuppressWarnings("unchecked")
+                    List<File> files = (List<File>) support.getTransferable()
+                            .getTransferData(DataFlavor.javaFileListFlavor);
+                    if (files != null && !files.isEmpty()) {
+                        callbacks.onFilesAdded(new ArrayList<>(files));
+                    }
+                    return true;
+                } catch (UnsupportedFlavorException | IOException ex) {
+                    return false;
+                }
+            }
+        });
+
         galleryScroll = new JScrollPane(tilesContainer,
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -157,6 +185,32 @@ public class TileGalleryPanel extends JPanel {
     public void setDirtyFiles(java.util.Set<File> dirty) {
         this.dirtyFiles = dirty == null ? new java.util.HashSet<>() : new java.util.HashSet<>(dirty);
         for (TilePanel t : tiles) t.repaint();
+    }
+
+    /**
+     * Add new files to the gallery without clearing existing ones.
+     * Only adds files not already present.
+     */
+    public void addFiles(List<File> newFiles) {
+        boolean changed = false;
+        for (File f : newFiles) {
+            boolean alreadyPresent = false;
+            for (TilePanel t : tiles) {
+                if (t.imageFile.equals(f)) { alreadyPresent = true; break; }
+            }
+            if (!alreadyPresent) {
+                TilePanel tp = new TilePanel(f);
+                tp.setActive(f.equals(activeFile));
+                tiles.add(tp);
+                tilesContainer.add(tp);
+                tilesContainer.add(Box.createVerticalStrut(5));
+                changed = true;
+            }
+        }
+        if (changed) {
+            tilesContainer.revalidate();
+            tilesContainer.repaint();
+        }
     }
 
     // =========================================================================
@@ -231,6 +285,10 @@ public class TileGalleryPanel extends JPanel {
         boolean isInSelection = false;
         private final JCheckBox checkbox;
 
+        // For drag detection
+        private Point dragStart = null;
+        private static final int DRAG_THRESHOLD = 6;
+
         TilePanel(File f) {
             this.imageFile = f;
             setLayout(null);
@@ -248,12 +306,58 @@ public class TileGalleryPanel extends JPanel {
             checkbox.addActionListener(e -> onTileClicked(this, true));
             add(checkbox);
 
+            // DnD: export this tile's file as javaFileListFlavor
+            setTransferHandler(new TransferHandler() {
+                @Override
+                public int getSourceActions(JComponent c) {
+                    return COPY;
+                }
+                @Override
+                protected Transferable createTransferable(JComponent c) {
+                    return new Transferable() {
+                        @Override
+                        public DataFlavor[] getTransferDataFlavors() {
+                            return new DataFlavor[]{ DataFlavor.javaFileListFlavor };
+                        }
+                        @Override
+                        public boolean isDataFlavorSupported(DataFlavor flavor) {
+                            return DataFlavor.javaFileListFlavor.equals(flavor);
+                        }
+                        @Override
+                        public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException {
+                            if (!isDataFlavorSupported(flavor)) throw new UnsupportedFlavorException(flavor);
+                            List<File> list = new ArrayList<>();
+                            list.add(imageFile);
+                            return list;
+                        }
+                    };
+                }
+            });
+
             addMouseListener(new MouseAdapter() {
+                @Override public void mousePressed(MouseEvent e) {
+                    dragStart = e.getPoint();
+                }
+                @Override public void mouseReleased(MouseEvent e) {
+                    dragStart = null;
+                }
                 @Override public void mouseClicked(MouseEvent e) {
                     onTileClicked(TilePanel.this, e.isShiftDown());
                 }
                 @Override public void mouseEntered(MouseEvent e) { repaint(); }
                 @Override public void mouseExited (MouseEvent e) { repaint(); }
+            });
+            addMouseMotionListener(new MouseMotionAdapter() {
+                @Override public void mouseDragged(MouseEvent e) {
+                    if (dragStart != null) {
+                        int dx = Math.abs(e.getX() - dragStart.x);
+                        int dy = Math.abs(e.getY() - dragStart.y);
+                        if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                            dragStart = null;
+                            getTransferHandler().exportAsDrag(TilePanel.this, e, TransferHandler.COPY);
+                        }
+                    }
+                }
             });
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
