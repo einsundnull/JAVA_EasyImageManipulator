@@ -9,8 +9,8 @@ import java.util.List;
 import javax.swing.*;
 
 /**
- * Sidebar panel showing the non-destructive Element layers of the current image.
- * Each tile represents one Element, with a thumbnail preview and a small red (×)
+ * Sidebar panel showing the non-destructive layers of the current image.
+ * Each tile represents one Layer, with a thumbnail preview and a small red (×)
  * delete button in the top-right corner. Tiles are ordered highest-Z first
  * (most recently added at the top), mirroring typical layer-panel conventions.
  *
@@ -21,13 +21,13 @@ public class ElementLayerPanel extends JPanel {
 
     // ── Callback interface ────────────────────────────────────────────────────
     public interface Callbacks {
-        List<Element> getActiveElements();
-        List<Element> getSelectedElements();
-        void setSelectedElement(Element el);
-        void toggleElementSelection(Element el);
-        void deleteElement(Element el);
-        /** Burn (merge) the element permanently into the canvas image. */
-        void burnElement(Element el);
+        List<Layer> getActiveElements();
+        List<Layer> getSelectedElements();
+        void setSelectedElement(Layer el);
+        void toggleElementSelection(Layer el);
+        void deleteElement(Layer el);
+        /** Burn (merge) the layer permanently into the canvas image. */
+        void burnElement(Layer el);
         void repaintCanvas();
         void onCloseRequested();
         /** Called when the mouse enters/leaves a layer tile. id=-1 = no tile. */
@@ -43,7 +43,7 @@ public class ElementLayerPanel extends JPanel {
     private final Callbacks      cb;
     private final JPanel         tilesContainer;
     private boolean              showAllOutlines = false;
-    /** Id of the element whose tile is currently hovered in this panel, or -1. */
+    /** Id of the layer whose tile is currently hovered in this panel, or -1. */
     private int                  hoveredElementId = -1;
 
     // =========================================================================
@@ -134,7 +134,7 @@ public class ElementLayerPanel extends JPanel {
     public boolean isShowAllOutlines() { return showAllOutlines; }
 
     /**
-     * Called by the canvas when the mouse moves over/off an element.
+     * Called by the canvas when the mouse moves over/off a layer.
      * Highlights the matching tile in this panel without repainting the canvas.
      */
     public void setHoveredElement(int elementId) {
@@ -144,22 +144,22 @@ public class ElementLayerPanel extends JPanel {
     }
 
     /**
-     * Rebuilds the tile list from the given elements.
-     * The topmost element (highest Z = last in list) is shown first.
+     * Rebuilds the tile list from the given layers.
+     * The topmost layer (highest Z = last in list) is shown first.
      */
-    public void refresh(List<Element> elements) {
+    public void refresh(List<Layer> layers) {
         tilesContainer.removeAll();
-        List<Element> selectedEls = cb.getSelectedElements();
+        List<Layer> selectedEls = cb.getSelectedElements();
 
-        for (int i = elements.size() - 1; i >= 0; i--) {
-            Element el = elements.get(i);
-            boolean sel = selectedEls.stream().anyMatch(s -> s.id() == el.id());
-            tilesContainer.add(new ElementTile(el, sel));
+        for (int i = layers.size() - 1; i >= 0; i--) {
+            Layer layer = layers.get(i);
+            boolean sel = selectedEls.stream().anyMatch(s -> s.id() == layer.id());
+            tilesContainer.add(new LayerTile(layer, sel));
             tilesContainer.add(Box.createVerticalStrut(4));
         }
 
         // "Keine Ebenen" placeholder
-        if (elements.isEmpty()) {
+        if (layers.isEmpty()) {
             JLabel empty = new JLabel("<html><center>Keine<br>Ebenen</center></html>", JLabel.CENTER);
             empty.setForeground(AppColors.TEXT_MUTED);
             empty.setFont(new Font("SansSerif", Font.PLAIN, 11));
@@ -173,15 +173,15 @@ public class ElementLayerPanel extends JPanel {
     }
 
     // =========================================================================
-    // ElementTile inner class
+    // LayerTile inner class
     // =========================================================================
-    class ElementTile extends JPanel {
+    class LayerTile extends JPanel {
 
-        private final Element element;
+        private final Layer   layer;
         private final boolean selected;
 
-        ElementTile(Element el, boolean selected) {
-            this.element  = el;
+        LayerTile(Layer layer, boolean selected) {
+            this.layer    = layer;
             this.selected = selected;
             setLayout(null);
             setPreferredSize(new Dimension(TILE_W, TILE_H));
@@ -190,7 +190,7 @@ public class ElementLayerPanel extends JPanel {
             setOpaque(false);
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-            // ── Orange burn (⊞) button – second from top-right ───────────────
+            // ── Orange burn (⊕) button – second from top-right ───────────────
             JLabel burn = new JLabel("⊕", JLabel.CENTER);
             burn.setForeground(new Color(220, 140, 30));
             burn.setFont(new Font("SansSerif", Font.BOLD, 11));
@@ -203,7 +203,7 @@ public class ElementLayerPanel extends JPanel {
             burn.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
                     e.consume();
-                    cb.burnElement(element);
+                    cb.burnElement(layer);
                 }
                 @Override public void mouseEntered(MouseEvent e) {
                     burn.setBackground(new Color(160, 90, 10));
@@ -230,7 +230,7 @@ public class ElementLayerPanel extends JPanel {
             del.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
                     e.consume();
-                    cb.deleteElement(element);
+                    cb.deleteElement(layer);
                 }
                 @Override public void mouseEntered(MouseEvent e) {
                     del.setBackground(new Color(180, 40, 40));
@@ -246,25 +246,25 @@ public class ElementLayerPanel extends JPanel {
             add(del);
 
             // ── Layer label at bottom ──────────────────────────────────────────
-            JLabel lbl = new JLabel("Layer " + el.id(), JLabel.CENTER);
+            JLabel lbl = new JLabel(layer.displayName(), JLabel.CENTER);
             lbl.setForeground(AppColors.TEXT_MUTED);
             lbl.setFont(new Font("SansSerif", Font.PLAIN, 10));
             lbl.setBounds(0, TILE_H - 18, TILE_W, 16);
             add(lbl);
 
-            // Tile click: select element on canvas
+            // Tile click: select layer on canvas
             addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
                     if (e.isShiftDown()) {
-                        cb.toggleElementSelection(element);
+                        cb.toggleElementSelection(layer);
                     } else {
-                        cb.setSelectedElement(element);
+                        cb.setSelectedElement(layer);
                     }
                     cb.repaintCanvas();
                 }
                 @Override public void mouseEntered(MouseEvent e) {
-                    hoveredElementId = element.id();
-                    cb.onLayerPanelElementHover(element.id());
+                    hoveredElementId = layer.id();
+                    cb.onLayerPanelElementHover(layer.id());
                     repaint();
                 }
                 @Override public void mouseExited(MouseEvent e) {
@@ -280,8 +280,8 @@ public class ElementLayerPanel extends JPanel {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            // Hover = mouse over THIS tile OR canvas hover matches this element
-            boolean hovered = hoveredElementId == element.id();
+            // Hover = mouse over THIS tile OR canvas hover matches this layer
+            boolean hovered = hoveredElementId == layer.id();
 
             // Tile background – slightly lighter on hover
             g2.setColor(hovered ? new Color(58, 54, 44) : new Color(44, 44, 44));
@@ -291,28 +291,30 @@ public class ElementLayerPanel extends JPanel {
             int tx = 5, ty = 4, tw = TILE_W - 10, th = THUMB_H;
             paintCheckerboard(g2, tx, ty, tw, th);
 
-            // Element thumbnail (aspect-fit) — for TEXT_LAYER show a text preview
-            BufferedImage img = element.image();
-            if (img != null) {
-                double s = Math.min((double) tw / img.getWidth(), (double) th / img.getHeight());
-                int iw = Math.max(1, (int)(img.getWidth()  * s));
-                int ih = Math.max(1, (int)(img.getHeight() * s));
-                int ix = tx + (tw - iw) / 2;
-                int iy = ty + (th - ih) / 2;
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g2.drawImage(img, ix, iy, iw, ih, null);
-            } else if (element.type() == ElementType.TEXT_LAYER) {
+            // Layer thumbnail (aspect-fit)
+            if (layer instanceof ImageLayer il) {
+                BufferedImage img = il.image();
+                if (img != null) {
+                    double s = Math.min((double) tw / img.getWidth(), (double) th / img.getHeight());
+                    int iw = Math.max(1, (int)(img.getWidth()  * s));
+                    int ih = Math.max(1, (int)(img.getHeight() * s));
+                    int ix = tx + (tw - iw) / 2;
+                    int iy = ty + (th - ih) / 2;
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    g2.drawImage(img, ix, iy, iw, ih, null);
+                }
+            } else if (layer instanceof TextLayer tl) {
                 // TEXT_LAYER: render a small text preview in the tile
-                int style = (element.fontBold() ? java.awt.Font.BOLD : 0)
-                          | (element.fontItalic() ? java.awt.Font.ITALIC : 0);
+                int style = (tl.fontBold() ? java.awt.Font.BOLD : 0)
+                          | (tl.fontItalic() ? java.awt.Font.ITALIC : 0);
                 java.awt.Font pf = new java.awt.Font(
-                        element.fontName() != null ? element.fontName() : "SansSerif",
-                        style, Math.min(14, Math.max(8, element.fontSize() / 3)));
+                        tl.fontName(), style,
+                        Math.min(14, Math.max(8, tl.fontSize() / 3)));
                 g2.setFont(pf);
-                g2.setColor(element.fontColor() != null ? element.fontColor() : java.awt.Color.WHITE);
+                g2.setColor(tl.fontColor());
                 g2.setClip(tx, ty, tw, th);
-                String[] lines = element.text() != null ? element.text().split("\n", -1) : new String[]{""};
+                String[] lines = tl.text().split("\n", -1);
                 java.awt.FontMetrics fm = g2.getFontMetrics();
                 for (int i = 0; i < lines.length && i < 4; i++) {
                     g2.drawString(lines[i], tx + 2, ty + fm.getAscent() + fm.getHeight() * i + 2);

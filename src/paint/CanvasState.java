@@ -13,7 +13,7 @@ public class CanvasState {
     public BufferedImage image;
     public final ArrayDeque<BufferedImage> undoStack = new ArrayDeque<>();
     public final ArrayDeque<BufferedImage> redoStack = new ArrayDeque<>();
-    public final List<Element> elements = new ArrayList<>();
+    public final List<Layer> elements = new ArrayList<>();
 
     public CanvasState(BufferedImage img) {
         this.image = img;

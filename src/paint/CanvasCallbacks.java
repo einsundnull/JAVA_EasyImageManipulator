@@ -31,13 +31,13 @@ public interface CanvasCallbacks {
     Point getSelectionEnd();
     void setSelectionEnd(Point p);
 
-    // Element state
-    List<Element> getActiveElements();
-    Element getSelectedElement();          // primary selected element (or null)
-    void setSelectedElement(Element el);   // single-select; clears all others
-    List<Element> getSelectedElements();   // all currently selected elements
-    void setSelectedElements(List<Element> els);
-    void toggleElementSelection(Element el); // shift-click: add/remove from selection
+    // Layer state
+    List<Layer> getActiveElements();
+    Layer getSelectedElement();               // primary selected layer (or null)
+    void setSelectedElement(Layer el);        // single-select; clears all others
+    List<Layer> getSelectedElements();        // all currently selected layers
+    void setSelectedElements(List<Layer> els);
+    void toggleElementSelection(Layer el);    // shift-click: add/remove from selection
     void moveSelectedElements(int dx, int dy); // move all selected by image-pixel delta
 
     // Floating selection state
@@ -62,7 +62,7 @@ public interface CanvasCallbacks {
     BufferedImage getPaintSnapshot();
     void setPaintSnapshot(BufferedImage img);
 
-    // Element layer state
+    // Layer interaction state
     int getElemActiveHandle();
     void setElemActiveHandle(int handle);
     Rectangle getElemScaleBase();
@@ -80,12 +80,12 @@ public interface CanvasCallbacks {
     // Layer panel state
     /** True when the ElementLayerPanel "show all outlines" toggle is active. */
     boolean isShowAllLayerOutlines();
-    /** Creates an IMAGE_LAYER Element from a rendered pixel image and adds it to activeElements. */
+    /** Creates an IMAGE_LAYER from a rendered pixel image and adds it to activeElements. */
     void commitTextAsElement(java.awt.image.BufferedImage textImg, int x, int y);
 
     /**
-     * Creates or updates a TEXT_LAYER Element.
-     * @param updateId  id of the existing element to replace, or -1 to add a new one
+     * Creates or updates a TextLayer.
+     * @param updateId  id of the existing layer to replace, or -1 to add a new one
      */
     void commitTextLayer(int updateId, String text, String fontName, int fontSize,
                          boolean bold, boolean italic, java.awt.Color color, int x, int y);
@@ -97,23 +97,23 @@ public interface CanvasCallbacks {
     void paintDot(Point imagePt);
     void commitFloat();
     void repaintCanvas();
-    /** Called when the mouse enters/leaves an element on the canvas. id=-1 means no element. */
+    /** Called when the mouse enters/leaves a layer on the canvas. id=-1 means no layer. */
     void onCanvasElementHover(int elementId);
     void clearSelection();
     /** Lift pixels from the active selection into a floating selection (MS-Paint style). */
     void liftSelectionToFloat();
     /** True when Paint mode is active AND the Canvas sub-mode toggle is on. */
     boolean isCanvasSubMode();
-    /** Lift the current selection rect directly into a new Element layer (Canvas sub-mode). */
+    /** Lift the current selection rect directly into a new ImageLayer (Canvas sub-mode). */
     void liftSelectionToElement(Rectangle sel);
     /** Delete selected area pixels (or discard float if one is active). */
     void deleteSelection();
-    void updateSelectedElement(Element el);
+    void updateSelectedElement(Layer el);
 
     // Utilities
     int hitHandle(Point screenPt);
     Rectangle floatRectScreen();
-    Rectangle elemRectScreen(Element el);
+    Rectangle elemRectScreen(Layer el);
     Rectangle[] handleRects(Rectangle screenRect);
     Rectangle getActiveSelection();
     BufferedImage deepCopy(BufferedImage src);

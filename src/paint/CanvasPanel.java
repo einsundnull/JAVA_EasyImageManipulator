@@ -74,7 +74,7 @@ public class CanvasPanel extends JPanel {
 	 * When entering edit mode for an existing TEXT_LAYER, the original element is
 	 * removed from activeElements and stored here; it is restored if the user cancels.
 	 */
-	private Element editingOriginalElement = null;
+	private Layer editingOriginalElement = null;
 
 	// ── Modeless text-options dialog ──────────────────────────────────────────
 	private javax.swing.JDialog           textChooserDlg    = null;
@@ -175,7 +175,7 @@ public class CanvasPanel extends JPanel {
 					if (shiftDown) {
 						// Shift+click → toggle element in/out of selection
 						// Shift+drag (not on element) → start rubber-band multi-select
-						Element hit = hitElement(e.getPoint());
+						Layer hit = hitElement(e.getPoint());
 						if (hit != null) {
 							callbacks.toggleElementSelection(hit);
 						} else {
@@ -188,7 +188,7 @@ public class CanvasPanel extends JPanel {
 					}
 
 					// Check resize handles on the primary selected element
-					Element primary = callbacks.getSelectedElement();
+					Layer primary = callbacks.getSelectedElement();
 					if (primary != null) {
 						Rectangle[] handles = callbacks.handleRects(callbacks.elemRectScreen(primary));
 						for (int hi = 0; hi < handles.length; hi++) {
@@ -203,7 +203,7 @@ public class CanvasPanel extends JPanel {
 					}
 
 					// Click on any currently selected element → drag ALL selected
-					for (Element sel : callbacks.getSelectedElements()) {
+					for (Layer sel : callbacks.getSelectedElements()) {
 						if (callbacks.elemRectScreen(sel).contains(e.getPoint())) {
 							callbacks.setDraggingElement(true);
 							elemLastImgPt = imgPt;
@@ -212,16 +212,16 @@ public class CanvasPanel extends JPanel {
 					}
 
 					// Click on an unselected element → single-select + drag
-					// Double-click on TEXT_LAYER → enter edit mode
-					Element hit = hitElement(e.getPoint());
+					// Double-click on TextLayer → enter edit mode
+					Layer hit = hitElement(e.getPoint());
 					if (hit != null) {
-						if (e.getClickCount() == 2 && hit.type() == ElementType.TEXT_LAYER) {
+						if (e.getClickCount() == 2 && hit instanceof TextLayer) {
 							enterTextEditMode(hit);
 							return;
 						}
 						callbacks.setSelectedElement(hit);
-						// Bidirectional sync: clicking a TEXT_LAYER updates the chooser
-						if (hit.type() == ElementType.TEXT_LAYER) {
+						// Bidirectional sync: clicking a TextLayer updates the chooser
+						if (hit instanceof TextLayer) {
 							syncTextChooserFromElement(hit);
 						}
 						callbacks.setDraggingElement(true);
@@ -340,9 +340,9 @@ public class CanvasPanel extends JPanel {
 										// Canvas sub-mode: lift selection into Element layer + start drag
 										callbacks.liftSelectionToElement(existingSel);
 										// Find the newly created element (last in list) and start dragging
-										java.util.List<Element> els = callbacks.getActiveElements();
+										java.util.List<Layer> els = callbacks.getActiveElements();
 										if (!els.isEmpty()) {
-											Element newEl = els.get(els.size() - 1);
+											Layer newEl = els.get(els.size() - 1);
 											callbacks.setSelectedElement(newEl);
 											callbacks.setDraggingElement(true);
 											elemLastImgPt = imgPt;
@@ -445,7 +445,7 @@ public class CanvasPanel extends JPanel {
 					double dx = (e.getPoint().x - callbacks.getElemScaleStart().x) / callbacks.getZoom();
 					double dy = (e.getPoint().y - callbacks.getElemScaleStart().y) / callbacks.getZoom();
 
-					Element el = callbacks.getSelectedElement();
+					Layer el = callbacks.getSelectedElement();
 					int handle = callbacks.getElemActiveHandle();
 
 					double nw, nh, nx, ny;
@@ -483,7 +483,7 @@ public class CanvasPanel extends JPanel {
 						return;
 					}
 
-					Element updated = el.withBounds((int) nx, (int) ny, (int) nw, (int) nh);
+					Layer updated = el.withBounds((int) nx, (int) ny, (int) nw, (int) nh);
 					callbacks.updateSelectedElement(updated);
 					repaint();
 					return;
@@ -620,8 +620,8 @@ public class CanvasPanel extends JPanel {
 						int bh = Math.abs(elemBandEnd.y - elemBandStart.y);
 						if (bw > 2 || bh > 2) {
 							Rectangle band = new Rectangle(bx, by, bw, bh);
-							java.util.List<Element> newSel = new java.util.ArrayList<>();
-							for (Element el : callbacks.getActiveElements()) {
+							java.util.List<Layer> newSel = new java.util.ArrayList<>();
+							for (Layer el : callbacks.getActiveElements()) {
 								if (callbacks.elemRectScreen(el).intersects(band)) newSel.add(el);
 							}
 							callbacks.setSelectedElements(newSel);
@@ -720,12 +720,12 @@ public class CanvasPanel extends JPanel {
 				System.err.println("[DEBUG] mouseWheelMoved called! Rotation=" + e.getWheelRotation() + ", Ctrl="
 						+ ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0));
 				if ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0) {
-					// CTRL+wheel on a selected TEXT_LAYER → adjust font size instead of global zoom
-					Element primary = callbacks.getSelectedElement();
-					if (primary != null && primary.type() == ElementType.TEXT_LAYER) {
+					// CTRL+wheel on a selected TextLayer → adjust font size instead of global zoom
+					Layer primary = callbacks.getSelectedElement();
+					if (primary instanceof TextLayer tl) {
 						int delta = -e.getWheelRotation(); // scroll up = larger
-						int newSize = Math.max(6, primary.fontSize() + delta);
-						Element updated = primary.withFontSize(newSize);
+						int newSize = Math.max(6, tl.fontSize() + delta);
+						Layer updated = tl.withFontSize(newSize);
 						callbacks.updateSelectedElement(updated);
 						// Keep chooser spinner in sync
 						textFontSize = newSize;
@@ -756,7 +756,7 @@ public class CanvasPanel extends JPanel {
 		addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
 			@Override public void mouseMoved(java.awt.event.MouseEvent e) {
 				if (callbacks.getActiveElements().isEmpty()) return;
-				Element hit = hitElement(e.getPoint());
+				Layer hit = hitElement(e.getPoint());
 				int newId = hit != null ? hit.id() : -1;
 				if (newId != hoveredElementId) {
 					hoveredElementId = newId;
@@ -1067,13 +1067,13 @@ public class CanvasPanel extends JPanel {
 	 * Loads a TEXT_LAYER element's settings into the text* fields and syncs the dialog.
 	 * Called when the user single-clicks a TEXT_LAYER to select it.
 	 */
-	public void syncTextChooserFromElement(Element el) {
-		if (el == null || el.type() != ElementType.TEXT_LAYER) return;
-		textFontName = el.fontName() != null ? el.fontName() : "SansSerif";
-		textFontSize = el.fontSize() > 0 ? el.fontSize() : 24;
-		textBold     = el.fontBold();
-		textItalic   = el.fontItalic();
-		textColor    = el.fontColor() != null ? el.fontColor() : Color.BLACK;
+	public void syncTextChooserFromElement(Layer el) {
+		if (!(el instanceof TextLayer tl)) return;
+		textFontName = tl.fontName();
+		textFontSize = tl.fontSize() > 0 ? tl.fontSize() : 24;
+		textBold     = tl.fontBold();
+		textItalic   = tl.fontItalic();
+		textColor    = tl.fontColor();
 		syncTextChooserFromFields();
 	}
 
@@ -1082,11 +1082,11 @@ public class CanvasPanel extends JPanel {
 	 * active text input if editing).  Called by every dialog control listener.
 	 */
 	private void applyTextChooserToSelected() {
-		// Live-update a selected, committed TEXT_LAYER
-		Element primary = callbacks.getSelectedElement();
-		if (primary != null && primary.type() == ElementType.TEXT_LAYER && textBoundingBox == null) {
-			Element updated = primary.withText(
-					primary.text(), textFontName, textFontSize, textBold, textItalic, textColor);
+		// Live-update a selected, committed TextLayer
+		Layer primary = callbacks.getSelectedElement();
+		if (primary instanceof TextLayer tl && textBoundingBox == null) {
+			Layer updated = tl.withText(
+					tl.text(), textFontName, textFontSize, textBold, textItalic, textColor);
 			callbacks.updateSelectedElement(updated);
 		}
 		// Repaint if text input is active (refreshes the preview box)
@@ -1109,15 +1109,16 @@ public class CanvasPanel extends JPanel {
 	 *  – populates textBuffer + textOrigin + font settings
 	 *  – records the original element so cancel can restore it
 	 */
-	private void enterTextEditMode(Element el) {
+	private void enterTextEditMode(Layer el) {
 		commitText(); // flush any in-progress text first
-		// Load font settings from element
-		textFontName = el.fontName() != null ? el.fontName() : "SansSerif";
-		textFontSize = el.fontSize() > 0 ? el.fontSize() : 24;
-		textBold     = el.fontBold();
-		textItalic   = el.fontItalic();
-		textColor    = el.fontColor() != null ? el.fontColor() : Color.BLACK;
-		textBuffer   = new StringBuilder(el.text() != null ? el.text() : "");
+		// Load font settings from element (el must be a TextLayer here)
+		TextLayer tl = (TextLayer) el;
+		textFontName = tl.fontName();
+		textFontSize = tl.fontSize() > 0 ? tl.fontSize() : 24;
+		textBold     = tl.fontBold();
+		textItalic   = tl.fontItalic();
+		textColor    = tl.fontColor();
+		textBuffer   = new StringBuilder(tl.text());
 		textBoundingBox = new Rectangle(el.x(), el.y(), el.width(), el.height());
 		textMinBox      = new Rectangle(el.x(), el.y(), el.width(), el.height());
 		textDrawingBox  = false;
@@ -1205,9 +1206,9 @@ public class CanvasPanel extends JPanel {
 		repaint();
 	}
 
-	/** Returns the topmost element at screen point, or null. */
-	private Element hitElement(Point screenPt) {
-		java.util.List<Element> els = callbacks.getActiveElements();
+	/** Returns the topmost layer at screen point, or null. */
+	private Layer hitElement(Point screenPt) {
+		java.util.List<Layer> els = callbacks.getActiveElements();
 		for (int i = els.size() - 1; i >= 0; i--) {
 			if (callbacks.elemRectScreen(els.get(i)).contains(screenPt)) return els.get(i);
 		}
@@ -1303,37 +1304,36 @@ public class CanvasPanel extends JPanel {
 		}
 
 		// ── Element layers (non-destructive, rendered above base canvas) ──────
-		java.util.List<Element> activeEls   = callbacks.getActiveElements();
-		java.util.List<Element> selectedEls = callbacks.getSelectedElements();
-		Element primaryEl   = callbacks.getSelectedElement();
+		java.util.List<Layer> activeEls   = callbacks.getActiveElements();
+		java.util.List<Layer> selectedEls = callbacks.getSelectedElements();
+		Layer primaryEl   = callbacks.getSelectedElement();
 		boolean showOutlines = callbacks.isShowAllLayerOutlines();
 		float[] selDash = { 5f, 3f };
 		float[] dimDash = { 3f, 3f };
 
 		// Draw all non-primary elements first; primary draws last (on top)
 		for (int pass = 0; pass < 2; pass++) {
-			for (Element el : activeEls) {
+			for (Layer el : activeEls) {
 				boolean isPrimary = primaryEl != null && primaryEl.id() == el.id();
 				if (pass == 0 && isPrimary) continue;  // skip primary on first pass
 				if (pass == 1 && !isPrimary) continue; // skip others on second pass
 
 				Rectangle sr = callbacks.elemRectScreen(el);
-				if (el.type() == ElementType.IMAGE_LAYER) {
-					g2.drawImage(el.image(), sr.x, sr.y, sr.width, sr.height, null);
-				} else {
-					// TEXT_LAYER: render glyphs live — integer pt size for metric consistency with ofText()
-					int tstyle = (el.fontBold() ? Font.BOLD : 0) | (el.fontItalic() ? Font.ITALIC : 0);
-					int screenFontSz = Math.max(1, (int) Math.round(el.fontSize() * callbacks.getZoom()));
-					Font  tfont  = new Font(el.fontName() != null ? el.fontName() : "SansSerif",
-					                        tstyle, screenFontSz);
+				if (el instanceof ImageLayer il) {
+					g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
+				} else if (el instanceof TextLayer tl) {
+					// TextLayer: render glyphs live — integer pt size for metric consistency with TextLayer.of()
+					int tstyle = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
+					int screenFontSz = Math.max(1, (int) Math.round(tl.fontSize() * callbacks.getZoom()));
+					Font  tfont  = new Font(tl.fontName(), tstyle, screenFontSz);
 					g2.setFont(tfont);
-					g2.setColor(el.fontColor() != null ? el.fontColor() : Color.BLACK);
+					g2.setColor(tl.fontColor());
 					java.awt.FontMetrics tfm = g2.getFontMetrics();
-					String[] tLines = el.text() != null ? el.text().split("\n", -1) : new String[]{""};
+					String[] tLines = tl.text().split("\n", -1);
 					int tpx = sr.x + (int)(TEXT_PADDING * callbacks.getZoom());
 					int tpy = sr.y + (int)(TEXT_PADDING * callbacks.getZoom());
-					for (int tl = 0; tl < tLines.length; tl++) {
-						g2.drawString(tLines[tl], tpx, tpy + tfm.getHeight() * tl + tfm.getAscent());
+					for (int li = 0; li < tLines.length; li++) {
+						g2.drawString(tLines[li], tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
 					}
 				}
 

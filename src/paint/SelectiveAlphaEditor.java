@@ -110,7 +110,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         BufferedImage               image;
         final ArrayDeque<BufferedImage> undoStack = new ArrayDeque<>();
         final ArrayDeque<BufferedImage> redoStack = new ArrayDeque<>();
-        final List<Element>         elements  = new ArrayList<>();
+        final List<Layer>           elements  = new ArrayList<>();
         CanvasState(BufferedImage img) { this.image = img; }
     }
 
@@ -168,11 +168,11 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     private final Set<File> dirtyFiles = new HashSet<>();
 
     // ── Element layers ────────────────────────────────────────────────────────
-    /** Elements attached to the *current* image (alias into fileStateCache).    */
-    private List<Element>  activeElements  = new ArrayList<>();
-    private int            nextElementId   = 1;
-    /** Currently selected elements (index 0 = primary for handles/resize).       */
-    private List<Element>  selectedElements = new ArrayList<>();
+    /** Layers attached to the *current* image (alias into fileStateCache).       */
+    private List<Layer>  activeElements  = new ArrayList<>();
+    private int          nextElementId   = 1;
+    /** Currently selected layers (index 0 = primary for handles/resize).         */
+    private List<Layer>  selectedElements = new ArrayList<>();
     private boolean        draggingElement = false;
     private Point          elemDragAnchor  = null;
     private int            elemActiveHandle = -1;
@@ -1124,36 +1124,37 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     /** Builds the callbacks for the ElementLayerPanel. */
     private ElementLayerPanel.Callbacks buildElementLayerCallbacks() {
         return new ElementLayerPanel.Callbacks() {
-            @Override public List<Element> getActiveElements()   { return activeElements; }
-            @Override public List<Element> getSelectedElements() { return selectedElements; }
-            @Override public void setSelectedElement(Element el) {
+            @Override public List<Layer> getActiveElements()   { return activeElements; }
+            @Override public List<Layer> getSelectedElements() { return selectedElements; }
+            @Override public void setSelectedElement(Layer el) {
                 selectedElements.clear();
                 if (el != null) selectedElements.add(el);
                 if (canvasPanel != null) canvasPanel.repaint();
             }
-            @Override public void toggleElementSelection(Element el) {
+            @Override public void toggleElementSelection(Layer el) {
                 doToggleElementSelection(el);
                 if (canvasPanel != null) canvasPanel.repaint();
             }
-            @Override public void deleteElement(Element el) {
+            @Override public void deleteElement(Layer el) {
                 activeElements.removeIf(e -> e.id() == el.id());
                 selectedElements.removeIf(e -> e.id() == el.id());
                 markDirty();
                 refreshElementPanel();
                 if (canvasPanel != null) canvasPanel.repaint();
             }
-            @Override public void burnElement(Element el) {
+            @Override public void burnElement(Layer el) {
                 if (workingImage == null) return;
-                // Tile holds a snapshot — look up live element so position/scale are current
-                Element live = activeElements.stream()
+                // Tile holds a snapshot — look up live layer so position/scale are current
+                Layer live = activeElements.stream()
                         .filter(e -> e.id() == el.id()).findFirst().orElse(el);
                 pushUndo();
                 BufferedImage imgToBurn;
-                if (live.type() == ElementType.TEXT_LAYER) {
-                    imgToBurn = renderTextLayerToImage(live);
+                if (live instanceof TextLayer tl) {
+                    imgToBurn = renderTextLayerToImage(tl);
                 } else {
+                    ImageLayer il = (ImageLayer) live;
                     imgToBurn = PaintEngine.scale(
-                            live.image(), Math.max(1, live.width()), Math.max(1, live.height()));
+                            il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
                 }
                 PaintEngine.pasteRegion(workingImage, imgToBurn, new java.awt.Point(live.x(), live.y()));
                 activeElements.removeIf(e -> e.id() == el.id());
@@ -1359,8 +1360,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         BufferedImage scaled = PaintEngine.scale(floatingImg,
                 Math.max(1, floatRect.width), Math.max(1, floatRect.height));
         if (appMode == AppMode.PAINT) {
-            // Non-destructive: become an Element layer
-            Element el = Element.ofImage(nextElementId++, scaled,
+            // Non-destructive: become an ImageLayer
+            Layer el = new ImageLayer(nextElementId++, scaled,
                     floatRect.x, floatRect.y, floatRect.width, floatRect.height);
             activeElements.add(el);
             selectedElements.clear();
@@ -1618,12 +1619,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     }
 
     /**
-     * Creates a new Element layer from the given image and adds it to activeElements.
+     * Creates a new ImageLayer from the given image and adds it to activeElements.
      * Called after any copy/cut so the content immediately appears as a non-destructive layer.
      */
     private void addElementFromClipboard(BufferedImage img, int x, int y) {
         if (img == null || appMode != AppMode.PAINT) return;
-        Element el = Element.ofImage(nextElementId++, deepCopy(img), x, y, img.getWidth(), img.getHeight());
+        Layer el = new ImageLayer(nextElementId++, deepCopy(img), x, y, img.getWidth(), img.getHeight());
         activeElements.add(el);
         selectedElements.clear();
         selectedElements.add(el);
@@ -2097,8 +2098,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     // Element helpers
     // =========================================================================
 
-    /** Screen-space rectangle for an element, accounting for current zoom. */
-    @Override public Rectangle elemRectScreen(Element el) {
+    /** Screen-space rectangle for a layer, accounting for current zoom. */
+    @Override public Rectangle elemRectScreen(Layer el) {
         return new Rectangle(
             (int) Math.round(el.x()      * zoom),
             (int) Math.round(el.y()      * zoom),
@@ -2107,27 +2108,26 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     }
 
     /**
-     * Renders a TEXT_LAYER element to a pixel image at its natural (image-space) font size.
+     * Renders a TextLayer to a pixel image at its natural (image-space) font size.
      * Used when burning a text layer into the working image.
      */
-    private BufferedImage renderTextLayerToImage(Element el) {
-        int style = (el.fontBold() ? Font.BOLD : 0) | (el.fontItalic() ? Font.ITALIC : 0);
-        Font font = new Font(el.fontName() != null ? el.fontName() : "SansSerif",
-                style, Math.max(6, el.fontSize()));
+    private BufferedImage renderTextLayerToImage(TextLayer tl) {
+        int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
+        Font font = new Font(tl.fontName(), style, Math.max(6, tl.fontSize()));
         BufferedImage dummy = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         FontMetrics fm = dummy.createGraphics().getFontMetrics(font);
-        String[] lines = el.text() != null ? el.text().split("\n", -1) : new String[]{""};
+        String[] lines = tl.text().split("\n", -1);
         int w = 1;
         for (String l : lines) w = Math.max(w, fm.stringWidth(l));
         int h = Math.max(1, fm.getHeight() * lines.length);
-        BufferedImage img = new BufferedImage(w + 8, h + 8, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage img = new BufferedImage(w + TextLayer.TEXT_PADDING * 2, h + TextLayer.TEXT_PADDING * 2, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = img.createGraphics();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setFont(font);
-        g2.setColor(el.fontColor() != null ? el.fontColor() : Color.BLACK);
+        g2.setColor(tl.fontColor());
         for (int i = 0; i < lines.length; i++) {
-            g2.drawString(lines[i], 4, 4 + fm.getHeight() * i + fm.getAscent());
+            g2.drawString(lines[i], TextLayer.TEXT_PADDING, TextLayer.TEXT_PADDING + fm.getHeight() * i + fm.getAscent());
         }
         g2.dispose();
         return img;
@@ -2150,7 +2150,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         int ex = sel != null ? sel.x : 0;
         int ey = sel != null ? sel.y : 0;
-        Element el = Element.ofImage(nextElementId++, src, ex, ey, src.getWidth(), src.getHeight());
+        Layer el = new ImageLayer(nextElementId++, src, ex, ey, src.getWidth(), src.getHeight());
         activeElements.add(el);
         selectedElements.clear();
         selectedElements.add(el);
@@ -2159,13 +2159,18 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         refreshElementPanel();
     }
 
-    /** Merges all selected elements onto the canvas and removes them from the layer list. */
+    /** Merges all selected layers onto the canvas and removes them from the layer list. */
     private void mergeSelectedElements() {
         if (selectedElements.isEmpty() || workingImage == null) return;
         pushUndo();
-        for (Element el : new ArrayList<>(selectedElements)) {
-            BufferedImage scaled = PaintEngine.scale(el.image(), Math.max(1, el.width()), Math.max(1, el.height()));
-            PaintEngine.pasteRegion(workingImage, scaled, new Point(el.x(), el.y()));
+        for (Layer el : new ArrayList<>(selectedElements)) {
+            if (el instanceof ImageLayer il) {
+                BufferedImage scaled = PaintEngine.scale(il.image(), Math.max(1, el.width()), Math.max(1, el.height()));
+                PaintEngine.pasteRegion(workingImage, scaled, new Point(el.x(), el.y()));
+            } else if (el instanceof TextLayer tl) {
+                BufferedImage rendered = renderTextLayerToImage(tl);
+                PaintEngine.pasteRegion(workingImage, rendered, new Point(el.x(), el.y()));
+            }
             activeElements.removeIf(e -> e.id() == el.id());
         }
         selectedElements.clear();
@@ -2173,17 +2178,17 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         refreshElementPanel();
     }
 
-    /** Deletes all selected elements without merging to canvas. */
+    /** Deletes all selected layers without merging to canvas. */
     private void deleteSelectedElements() {
         if (selectedElements.isEmpty()) return;
-        for (Element el : selectedElements) activeElements.removeIf(e -> e.id() == el.id());
+        for (Layer el : selectedElements) activeElements.removeIf(e -> e.id() == el.id());
         selectedElements.clear();
         markDirty();
         refreshElementPanel();
     }
 
-    /** Toggles an element in/out of the multi-selection. New primary is put at index 0. */
-    private void doToggleElementSelection(Element el) {
+    /** Toggles a layer in/out of the multi-selection. New primary is put at index 0. */
+    private void doToggleElementSelection(Layer el) {
         for (int i = 0; i < selectedElements.size(); i++) {
             if (selectedElements.get(i).id() == el.id()) {
                 selectedElements.remove(i);
@@ -2237,23 +2242,23 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     @Override public Point getSelectionEnd() { return selectionEnd; }
     @Override public void setSelectionEnd(Point p) { selectionEnd = p; }
 
-    @Override public List<Element> getActiveElements() { return activeElements; }
-    @Override public Element getSelectedElement() {
+    @Override public List<Layer> getActiveElements() { return activeElements; }
+    @Override public Layer getSelectedElement() {
         return selectedElements.isEmpty() ? null : selectedElements.get(0);
     }
-    @Override public void setSelectedElement(Element el) {
+    @Override public void setSelectedElement(Layer el) {
         selectedElements.clear();
         if (el != null) selectedElements.add(el);
         refreshElementPanel();
     }
-    @Override public List<Element> getSelectedElements() { return selectedElements; }
-    @Override public void setSelectedElements(List<Element> els) {
+    @Override public List<Layer> getSelectedElements() { return selectedElements; }
+    @Override public void setSelectedElements(List<Layer> els) {
         selectedElements.clear();
         selectedElements.addAll(els);
         refreshElementPanel();
         if (canvasPanel != null) canvasPanel.repaint();
     }
-    @Override public void toggleElementSelection(Element el) {
+    @Override public void toggleElementSelection(Layer el) {
         doToggleElementSelection(el);
         refreshElementPanel();
         if (canvasPanel != null) canvasPanel.repaint();
@@ -2261,8 +2266,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     @Override public void moveSelectedElements(int dx, int dy) {
         if (dx == 0 && dy == 0) return;
         for (int i = 0; i < selectedElements.size(); i++) {
-            Element el = selectedElements.get(i);
-            Element updated = el.withPosition(el.x() + dx, el.y() + dy);
+            Layer el = selectedElements.get(i);
+            Layer updated = el.withPosition(el.x() + dx, el.y() + dy);
             for (int j = 0; j < activeElements.size(); j++) {
                 if (activeElements.get(j).id() == el.id()) { activeElements.set(j, updated); break; }
             }
@@ -2311,7 +2316,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
     @Override public void commitTextAsElement(BufferedImage textImg, int x, int y) {
         if (textImg == null || appMode != AppMode.PAINT) return;
-        Element el = Element.ofImage(nextElementId++, textImg, x, y, textImg.getWidth(), textImg.getHeight());
+        Layer el = new ImageLayer(nextElementId++, textImg, x, y, textImg.getWidth(), textImg.getHeight());
         activeElements.add(el);
         selectedElements.clear();
         selectedElements.add(el);
@@ -2324,8 +2329,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                                           boolean bold, boolean italic, java.awt.Color color, int x, int y) {
         if (text == null || text.isEmpty() || appMode != AppMode.PAINT) return;
         if (updateId >= 0) {
-            // Replace existing element (keep its id so the layer panel doesn't flicker)
-            Element updated = Element.ofText(updateId, text, fontName, fontSize, bold, italic, color, x, y);
+            // Replace existing layer (keep its id so the layer panel doesn't flicker)
+            Layer updated = TextLayer.of(updateId, text, fontName, fontSize, bold, italic, color, x, y);
             for (int i = 0; i < activeElements.size(); i++) {
                 if (activeElements.get(i).id() == updateId) {
                     activeElements.set(i, updated);
@@ -2339,7 +2344,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             activeElements.add(updated);
             selectedElements.clear(); selectedElements.add(updated);
         } else {
-            Element el = Element.ofText(nextElementId++, text, fontName, fontSize, bold, italic, color, x, y);
+            Layer el = TextLayer.of(nextElementId++, text, fontName, fontSize, bold, italic, color, x, y);
             activeElements.add(el);
             selectedElements.clear(); selectedElements.add(el);
         }
@@ -2393,7 +2398,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         pushUndo();
         BufferedImage crop = PaintEngine.cropRegion(workingImage, clipped);
         PaintEngine.clearRegion(workingImage, clipped);
-        Element el = Element.ofImage(nextElementId++, crop, clipped.x, clipped.y, clipped.width, clipped.height);
+        Layer el = new ImageLayer(nextElementId++, crop, clipped.x, clipped.y, clipped.width, clipped.height);
         activeElements.add(el);
         selectedElements.clear();
         selectedElements.add(el);
@@ -2430,9 +2435,9 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         markDirty();
     }
 
-    @Override public void updateSelectedElement(Element el) {
+    @Override public void updateSelectedElement(Layer el) {
         if (el != null && !selectedElements.isEmpty()) {
-            Element primary = selectedElements.get(0);
+            Layer primary = selectedElements.get(0);
             for (int j = 0; j < activeElements.size(); j++) {
                 if (activeElements.get(j).id() == primary.id()) { activeElements.set(j, el); break; }
             }
