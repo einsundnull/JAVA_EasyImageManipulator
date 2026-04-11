@@ -58,7 +58,7 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
 public class TileGalleryPanel extends JPanel {
 
     // ── Dimensions ────────────────────────────────────────────────────────────
-    public  static final int GALLERY_W = 168;
+    public  static final int GALLERY_W = 198;
     private static final int TILE_W    = 150;
     private static final int TILE_H    = 118;
     private static final int THUMB_H   = 88;
@@ -91,7 +91,9 @@ public class TileGalleryPanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(new Color(36, 36, 36));
         setPreferredSize(new Dimension(GALLERY_W, 0));
-        setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, AppColors.BORDER));
+        setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 0, 1, AppColors.BORDER),
+                BorderFactory.createEmptyBorder(0, 0, 16, 0)));
 
         // ── Header label ──────────────────────────────────────────────────────
         JPanel header = new JPanel(new BorderLayout());
@@ -290,7 +292,13 @@ public class TileGalleryPanel extends JPanel {
         for (TilePanel t : tiles) {
             if (t.isActive) {
                 Rectangle r = SwingUtilities.convertRectangle(t, new Rectangle(t.getSize()), tilesContainer);
-                galleryScroll.getViewport().scrollRectToVisible(r);
+                // scrollRectToVisible on the viewport only scrolls downward reliably;
+                // set the view position directly so upward navigation also works.
+                int viewH  = galleryScroll.getViewport().getHeight();
+                int contH  = tilesContainer.getHeight();
+                int targetY = r.y + r.height / 2 - viewH / 2;
+                targetY = Math.max(0, Math.min(targetY, Math.max(0, contH - viewH)));
+                galleryScroll.getViewport().setViewPosition(new Point(0, targetY));
                 break;
             }
         }

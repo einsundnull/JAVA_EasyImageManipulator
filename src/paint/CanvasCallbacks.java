@@ -33,8 +33,12 @@ public interface CanvasCallbacks {
 
     // Element state
     List<Element> getActiveElements();
-    Element getSelectedElement();
-    void setSelectedElement(Element el);
+    Element getSelectedElement();          // primary selected element (or null)
+    void setSelectedElement(Element el);   // single-select; clears all others
+    List<Element> getSelectedElements();   // all currently selected elements
+    void setSelectedElements(List<Element> els);
+    void toggleElementSelection(Element el); // shift-click: add/remove from selection
+    void moveSelectedElements(int dx, int dy); // move all selected by image-pixel delta
 
     // Floating selection state
     BufferedImage getFloatingImage();
@@ -80,6 +84,11 @@ public interface CanvasCallbacks {
     void paintDot(Point imagePt);
     void commitFloat();
     void repaintCanvas();
+    void clearSelection();
+    /** Lift pixels from the active selection into a floating selection (MS-Paint style). */
+    void liftSelectionToFloat();
+    /** Delete selected area pixels (or discard float if one is active). */
+    void deleteSelection();
     void updateSelectedElement(Element el);
 
     // Utilities

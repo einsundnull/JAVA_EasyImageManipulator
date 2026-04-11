@@ -197,6 +197,46 @@ public class PaintEngine {
         g2.dispose();
     }
 
+    // ── Region-space transforms (in-place) ───────────────────────────────────
+
+    /** Flip the pixels inside rectangle r horizontally, in-place. */
+    public static void flipHorizontalInRegion(BufferedImage img, Rectangle r) {
+        BufferedImage region = cropRegion(img, r);
+        BufferedImage flipped = flipHorizontal(region);
+        clearRegion(img, r);
+        pasteRegion(img, flipped, new Point(r.x, r.y));
+    }
+
+    /** Flip the pixels inside rectangle r vertically, in-place. */
+    public static void flipVerticalInRegion(BufferedImage img, Rectangle r) {
+        BufferedImage region = cropRegion(img, r);
+        BufferedImage flipped = flipVertical(region);
+        clearRegion(img, r);
+        pasteRegion(img, flipped, new Point(r.x, r.y));
+    }
+
+    /** Rotate the pixels inside r by angleDeg degrees; result is scaled back to fit r. */
+    public static void rotateInRegion(BufferedImage img, Rectangle r, double angleDeg) {
+        BufferedImage region = cropRegion(img, r);
+        BufferedImage rotated = rotate(region, angleDeg);
+        BufferedImage scaled  = scale(rotated, Math.max(1, r.width), Math.max(1, r.height));
+        clearRegion(img, r);
+        pasteRegion(img, scaled, new Point(r.x, r.y));
+    }
+
+    /**
+     * Scale the pixels inside r to nw×nh, clearing the original area first.
+     * @return new selection rectangle (same origin, new size)
+     */
+    public static Rectangle scaleInRegion(BufferedImage img, Rectangle r, int nw, int nh) {
+        nw = Math.max(1, nw); nh = Math.max(1, nh);
+        BufferedImage region = cropRegion(img, r);
+        BufferedImage scaled  = scale(region, nw, nh);
+        clearRegion(img, r);
+        pasteRegion(img, scaled, new Point(r.x, r.y));
+        return new Rectangle(r.x, r.y, nw, nh);
+    }
+
     // Transformations
     public static BufferedImage flipHorizontal(BufferedImage img) { return flip(img, true); }
     public static BufferedImage flipVertical(BufferedImage img)   { return flip(img, false); }

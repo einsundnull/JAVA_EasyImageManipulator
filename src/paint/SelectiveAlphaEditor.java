@@ -25,6 +25,7 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.WindowEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -131,6 +132,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     private RulerUnit rulerUnit        = RulerUnit.PX;
 
     private double zoom = 1.0;
+    private boolean userHasManuallyZoomed = false; // true after any user-driven zoom change
 
     // Smooth zoom animation
     private double       zoomTarget   = 1.0;  // animation target zoom level
@@ -169,8 +171,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     /** Elements attached to the *current* image (alias into fileStateCache).    */
     private List<Element>  activeElements  = new ArrayList<>();
     private int            nextElementId   = 1;
-    /** Selected element for move / resize interaction.                           */
-    private Element        selectedElement = null;
+    /** Currently selected elements (index 0 = primary for handles/resize).       */
+    private List<Element>  selectedElements = new ArrayList<>();
     private boolean        draggingElement = false;
     private Point          elemDragAnchor  = null;
     private int            elemActiveHandle = -1;
@@ -258,6 +260,20 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         setLocationRelativeTo(null);
 
         setupKeyBindings();
+        addWindowStateListener((WindowEvent e) -> {
+            boolean wasMax = (e.getOldState() & MAXIMIZED_BOTH) == MAXIMIZED_BOTH;
+            boolean isMax  = (e.getNewState() & MAXIMIZED_BOTH) == MAXIMIZED_BOTH;
+            if (wasMax != isMax && workingImage != null) {
+                SwingUtilities.invokeLater(() -> {
+                    if (!userHasManuallyZoomed) {
+                        fitToViewport();
+                    } else {
+                        centerCanvasX();
+                    }
+                    if (canvasPanel != null) canvasPanel.repaint();
+                });
+            }
+        });
         setVisible(true);
     }
 
@@ -323,7 +339,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         JButton mergeElemBtn = UIComponentFactory.buildButton("\u229e", AppColors.BTN_BG, AppColors.BTN_HOVER);
         mergeElemBtn.setToolTipText("Ausgewähltes Element auf Canvas rendern (ENTER)");
-        mergeElemBtn.addActionListener(e -> { if (selectedElement != null) mergeElementToCanvas(selectedElement); });
+        mergeElemBtn.addActionListener(e -> { if (!selectedElements.isEmpty()) mergeSelectedElements(); });
         mergeElemBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 
         // — File/image operations (formerly statusBar) —
@@ -674,12 +690,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         floatingImg = null; floatRect = null;
         isDraggingFloat = false; floatDragAnchor = null;
         activeHandle = -1; scaleBaseRect = null; scaleDragStart = null;
-        selectedElement = null; draggingElement = false; elemDragAnchor = null;
+        selectedElements.clear(); draggingElement = false; elemDragAnchor = null;
         elemActiveHandle = -1; elemScaleBase = null; elemScaleStart = null;
 
         indexDirectory(file);
         swapToImageView();
-        SwingUtilities.invokeLater(() -> { fitToViewportInstant(); centerCanvas(); });
+        SwingUtilities.invokeLater(this::fitToViewport);
         updateNavigationButtons();
         updateTitle();
         updateStatus();
@@ -747,6 +763,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
      * If anchorCanvas != null, keep that canvas point fixed on screen (zoom toward cursor).
      */
     @Override public void setZoom(double nz, Point anchorCanvas) {
+        userHasManuallyZoomed = true;
         zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
 
         // Capture anchor point only if a new gesture is starting (no animation running)
@@ -771,22 +788,15 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         if (workingImage == null || scrollPane == null) return;
         Dimension vd = scrollPane.getViewport().getSize();
         if (vd.width <= 0 || vd.height <= 0) { SwingUtilities.invokeLater(this::fitToViewport); return; }
-        setZoom(Math.min((double) vd.width  / workingImage.getWidth(),
-                         (double) vd.height / workingImage.getHeight()*0.98), null);
-    }
-
-    /** Fit to viewport instantly without animation — used when browsing between images. */
-    private void fitToViewportInstant() {
-        if (workingImage == null || scrollPane == null) return;
-        Dimension vd = scrollPane.getViewport().getSize();
-        if (vd.width <= 0 || vd.height <= 0) { SwingUtilities.invokeLater(this::fitToViewportInstant); return; }
         double nz = Math.min((double) vd.width  / workingImage.getWidth(),
                              (double) vd.height / workingImage.getHeight() * 0.98);
         setZoomInstant(nz);
+        centerCanvas();
     }
 
     /** Set zoom immediately without animation. Used for image load/browse. */
     private void setZoomInstant(double nz) {
+        userHasManuallyZoomed = false;
         if (zoomTimer != null) { zoomTimer.stop(); zoomTimer = null; }
         zoom = zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
         zoomImgPt = null;
@@ -1040,8 +1050,17 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         selectedAreas.clear();
         lastPaintPoint = null;
         shapeStartPoint = null;
-        // Refit image to viewport after paint toolbar visibility changes
-        SwingUtilities.invokeLater(() -> { fitToViewportInstant(); canvasPanel.repaint(); });
+        // Refit or center after paint toolbar visibility changes.
+        // Double-deferred so the toolbar layout pass completes before we
+        // measure the viewport height for fitting.
+        SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> {
+            if (!userHasManuallyZoomed) {
+                fitToViewport();
+            } else {
+                centerCanvasX();
+            }
+            canvasPanel.repaint();
+        }));
         paintSnapshot   = null;
         canvasPanel.setCursor(entering
                 ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR)
@@ -1054,15 +1073,25 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     // =========================================================================
     private void doFlipH() {
         if (workingImage == null) return;
+        Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
         pushUndo();
-        workingImage = PaintEngine.flipHorizontal(workingImage);
+        if (sel != null) {
+            PaintEngine.flipHorizontalInRegion(workingImage, sel);
+        } else {
+            workingImage = PaintEngine.flipHorizontal(workingImage);
+        }
         markDirty();
     }
 
     private void doFlipV() {
         if (workingImage == null) return;
+        Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
         pushUndo();
-        workingImage = PaintEngine.flipVertical(workingImage);
+        if (sel != null) {
+            PaintEngine.flipVerticalInRegion(workingImage, sel);
+        } else {
+            workingImage = PaintEngine.flipVertical(workingImage);
+        }
         markDirty();
     }
 
@@ -1091,13 +1120,19 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         JButton ok  = UIComponentFactory.buildButton("OK",       AppColors.ACCENT,  AppColors.ACCENT_HOVER);
         JButton can = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
         ok.setForeground(Color.WHITE);
+        final boolean rotateHasSel = (appMode == AppMode.PAINT && getActiveSelection() != null);
+        final Rectangle rotateSel  = rotateHasSel ? getActiveSelection() : null;
         ok.addActionListener(e -> {
             try {
                 double deg = Double.parseDouble(angleField.getText().trim());
                 pushUndo();
-                workingImage = PaintEngine.rotate(workingImage, deg);
+                if (rotateHasSel) {
+                    PaintEngine.rotateInRegion(workingImage, rotateSel, deg);
+                } else {
+                    workingImage = PaintEngine.rotate(workingImage, deg);
+                    canvasWrapper.revalidate();
+                }
                 markDirty();
-                canvasWrapper.revalidate();
             } catch (NumberFormatException ex) {
                 showErrorDialog("Ungültige Eingabe", "Bitte eine Zahl eingeben.");
             }
@@ -1112,8 +1147,9 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
     private void doScale() {
         if (workingImage == null) return;
-        int origW = workingImage.getWidth();
-        int origH = workingImage.getHeight();
+        Rectangle scaleSel  = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
+        int origW = scaleSel != null ? scaleSel.width  : workingImage.getWidth();
+        int origH = scaleSel != null ? scaleSel.height : workingImage.getHeight();
 
         JTextField wField = new JTextField(String.valueOf(origW), 5);
         JTextField hField = new JTextField(String.valueOf(origH), 5);
@@ -1183,9 +1219,15 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 int nw = Integer.parseInt(wField.getText().trim());
                 int nh = Integer.parseInt(hField.getText().trim());
                 pushUndo();
-                workingImage = PaintEngine.scale(workingImage, nw, nh);
+                if (scaleSel != null) {
+                    Rectangle newSel = PaintEngine.scaleInRegion(workingImage, scaleSel, nw, nh);
+                    selectedAreas.clear();
+                    selectedAreas.add(newSel);
+                } else {
+                    workingImage = PaintEngine.scale(workingImage, nw, nh);
+                    canvasWrapper.revalidate();
+                }
                 markDirty();
-                canvasWrapper.revalidate();
             } catch (NumberFormatException ex) {
                 showErrorDialog("Ungültige Eingabe", "Bitte ganzzahlige Pixelwerte eingeben.");
             }
@@ -1202,12 +1244,22 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     // Floating selection operations
     // =========================================================================
 
-    /** Paste the floating image at its current (possibly scaled) rect and clear float state. */
+    /** Paste the floating image at its current (possibly scaled) rect and clear float state.
+     *  In Paint mode: creates a non-destructive Element layer instead of writing to canvas. */
     @Override public void commitFloat() {
         if (floatingImg == null || floatRect == null) return;
         BufferedImage scaled = PaintEngine.scale(floatingImg,
                 Math.max(1, floatRect.width), Math.max(1, floatRect.height));
-        PaintEngine.pasteRegion(workingImage, scaled, new Point(floatRect.x, floatRect.y));
+        if (appMode == AppMode.PAINT) {
+            // Non-destructive: become an Element layer
+            Element el = new Element(nextElementId++, scaled,
+                    floatRect.x, floatRect.y, floatRect.width, floatRect.height);
+            activeElements.add(el);
+            selectedElements.clear();
+            selectedElements.add(el);
+        } else {
+            PaintEngine.pasteRegion(workingImage, scaled, new Point(floatRect.x, floatRect.y));
+        }
         floatingImg = null; floatRect = null;
         isDraggingFloat = false; floatDragAnchor = null;
         activeHandle = -1;  scaleBaseRect = null; scaleDragStart = null;
@@ -1507,12 +1559,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         am.put("save",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageSilent(); } });
         am.put("escape", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             if (floatingImg != null) { cancelFloat(); }
-            else if (selectedElement != null) { selectedElement = null; canvasPanel.repaint(); }
+            else if (!selectedElements.isEmpty()) { selectedElements.clear(); canvasPanel.repaint(); }
             else { selectedAreas.clear(); isSelecting = false; selectionStart = null; selectionEnd = null; canvasPanel.repaint(); }
         }});
         am.put("deleteElement", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
-            if (selectedElement != null) {
-                deleteSelectedElement();
+            if (!selectedElements.isEmpty()) {
+                deleteSelectedElements();
             } else if (!selectedAreas.isEmpty() && workingImage != null) {
                 // DEL clears the pixel content of the current selection
                 pushUndo();
@@ -1523,7 +1575,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             }
         }});
         am.put("mergeElement", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
-            if (selectedElement != null) mergeElementToCanvas(selectedElement);
+            if (!selectedElements.isEmpty()) mergeSelectedElements();
         }});
     }
 
@@ -1548,6 +1600,24 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             // When image > viewport, scroll to the centre of the image.
             int viewX = Math.max(0, (cw - vpSz.width)  / 2);
             int viewY = Math.max(0, (ch - vpSz.height) / 2);
+            vp.setViewPosition(new Point(viewX, viewY));
+        });
+    }
+
+    /**
+     * Centers the viewport horizontally only (X-axis).
+     * Called when the user has a custom zoom and the toolbar or fullscreen state changes.
+     */
+    private void centerCanvasX() {
+        if (scrollPane == null || workingImage == null) return;
+        SwingUtilities.invokeLater(() -> {
+            canvasWrapper.revalidate();
+            canvasWrapper.validate();
+            JViewport vp = scrollPane.getViewport();
+            Dimension vpSz = vp.getSize();
+            int cw = (int) Math.ceil(workingImage.getWidth() * zoom);
+            int viewX = Math.max(0, (cw - vpSz.width) / 2);
+            int viewY = vp.getViewPosition().y; // keep vertical position unchanged
             vp.setViewPosition(new Point(viewX, viewY));
         });
     }
@@ -1627,11 +1697,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 sourceFile        = null;
                 hasUnsavedChanges = false;
                 activeElements    = new ArrayList<>();
+                selectedElements.clear();
                 undoStack.clear(); redoStack.clear();
                 selectedAreas.clear();
                 floatingImg = null; floatRect = null;
                 swapToImageView();
-                SwingUtilities.invokeLater(() -> { fitToViewportInstant(); centerCanvas(); });
+                SwingUtilities.invokeLater(this::fitToViewport);
                 updateTitle();
                 updateStatus();
                 setBottomButtonsEnabled(true);
@@ -1865,27 +1936,30 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         int ey = sel != null ? sel.y : 0;
         Element el = new Element(nextElementId++, src, ex, ey, src.getWidth(), src.getHeight());
         activeElements.add(el);
-        selectedElement = el;
+        selectedElements.clear();
+        selectedElements.add(el);
         selectedAreas.clear();
         markDirty();
     }
 
-    /** Merges the selected element onto the canvas and removes it from the layer list. */
-    private void mergeElementToCanvas(Element el) {
-        if (el == null || workingImage == null) return;
+    /** Merges all selected elements onto the canvas and removes them from the layer list. */
+    private void mergeSelectedElements() {
+        if (selectedElements.isEmpty() || workingImage == null) return;
         pushUndo();
-        BufferedImage scaled = PaintEngine.scale(el.image(), Math.max(1, el.width()), Math.max(1, el.height()));
-        PaintEngine.pasteRegion(workingImage, scaled, new Point(el.x(), el.y()));
-        activeElements.remove(el);
-        if (selectedElement == el) selectedElement = null;
+        for (Element el : new ArrayList<>(selectedElements)) {
+            BufferedImage scaled = PaintEngine.scale(el.image(), Math.max(1, el.width()), Math.max(1, el.height()));
+            PaintEngine.pasteRegion(workingImage, scaled, new Point(el.x(), el.y()));
+            activeElements.remove(el);
+        }
+        selectedElements.clear();
         markDirty();
     }
 
-    /** Deletes the selected element without merging to canvas. */
-    private void deleteSelectedElement() {
-        if (selectedElement == null) return;
-        activeElements.remove(selectedElement);
-        selectedElement = null;
+    /** Deletes all selected elements without merging to canvas. */
+    private void deleteSelectedElements() {
+        if (selectedElements.isEmpty()) return;
+        activeElements.removeAll(selectedElements);
+        selectedElements.clear();
         markDirty();
     }
 
@@ -1932,8 +2006,41 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     @Override public void setSelectionEnd(Point p) { selectionEnd = p; }
 
     @Override public List<Element> getActiveElements() { return activeElements; }
-    @Override public Element getSelectedElement() { return selectedElement; }
-    @Override public void setSelectedElement(Element el) { selectedElement = el; }
+    @Override public Element getSelectedElement() {
+        return selectedElements.isEmpty() ? null : selectedElements.get(0);
+    }
+    @Override public void setSelectedElement(Element el) {
+        selectedElements.clear();
+        if (el != null) selectedElements.add(el);
+    }
+    @Override public List<Element> getSelectedElements() { return selectedElements; }
+    @Override public void setSelectedElements(List<Element> els) {
+        selectedElements.clear();
+        selectedElements.addAll(els);
+        if (canvasPanel != null) canvasPanel.repaint();
+    }
+    @Override public void toggleElementSelection(Element el) {
+        for (int i = 0; i < selectedElements.size(); i++) {
+            if (selectedElements.get(i).id() == el.id()) {
+                selectedElements.remove(i);
+                if (canvasPanel != null) canvasPanel.repaint();
+                return;
+            }
+        }
+        selectedElements.add(0, el); // new primary = front of list
+        if (canvasPanel != null) canvasPanel.repaint();
+    }
+    @Override public void moveSelectedElements(int dx, int dy) {
+        if (dx == 0 && dy == 0) return;
+        for (int i = 0; i < selectedElements.size(); i++) {
+            Element el = selectedElements.get(i);
+            Element updated = el.withPosition(el.x() + dx, el.y() + dy);
+            int actIdx = activeElements.indexOf(el);
+            if (actIdx >= 0) activeElements.set(actIdx, updated);
+            selectedElements.set(i, updated);
+        }
+        markDirty();
+    }
 
     @Override public BufferedImage getFloatingImage() { return floatingImg; }
     @Override public Rectangle getFloatRect() { return floatRect; }
@@ -1970,6 +2077,49 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
     @Override public void repaintCanvas() { canvasPanel.repaint(); }
 
+    @Override public void clearSelection() {
+        selectedAreas.clear();
+        isSelecting = false; selectionStart = null; selectionEnd = null;
+        if (canvasPanel != null) canvasPanel.repaint();
+    }
+
+    @Override public void liftSelectionToFloat() {
+        Rectangle sel = getActiveSelection();
+        if (sel == null || workingImage == null) return;
+        int x = Math.max(0, sel.x),  y = Math.max(0, sel.y);
+        int w = Math.min(sel.width,  workingImage.getWidth()  - x);
+        int h = Math.min(sel.height, workingImage.getHeight() - y);
+        if (w <= 0 || h <= 0) return;
+        Rectangle clipped = new Rectangle(x, y, w, h);
+        pushUndo();
+        floatingImg  = PaintEngine.cropRegion(workingImage, clipped);
+        floatRect    = new Rectangle(clipped);
+        PaintEngine.clearRegion(workingImage, clipped);
+        selectedAreas.clear();
+        isSelecting = false; selectionStart = null; selectionEnd = null;
+        isDraggingFloat = false; floatDragAnchor = null;
+        activeHandle = -1; scaleBaseRect = null; scaleDragStart = null;
+        markDirty();
+        if (canvasPanel != null) canvasPanel.repaint();
+    }
+
+    @Override public void deleteSelection() {
+        if (floatingImg != null) {
+            // Discard float pixels (region already cleared when lifted)
+            floatingImg = null; floatRect = null;
+            isDraggingFloat = false; floatDragAnchor = null;
+            activeHandle = -1; scaleBaseRect = null; scaleDragStart = null;
+            markDirty();
+        } else if (!selectedAreas.isEmpty() && workingImage != null) {
+            pushUndo();
+            for (Rectangle r : selectedAreas) PaintEngine.clearRegion(workingImage, r);
+            selectedAreas.clear();
+            isSelecting = false; selectionStart = null; selectionEnd = null;
+            markDirty();
+        }
+        if (canvasPanel != null) canvasPanel.repaint();
+    }
+
     @Override public void paintDot(Point imagePt) {
         boolean aa = paintToolbar != null && paintToolbar.isAntialiasing();
         PaintEngine.drawPencil(workingImage, imagePt, imagePt,
@@ -1980,11 +2130,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     }
 
     @Override public void updateSelectedElement(Element el) {
-        if (el != null && selectedElement != null) {
-            int idx = activeElements.indexOf(selectedElement);
-            if (idx >= 0) {
-                selectedElement = el;
-                activeElements.set(idx, el);
+        if (el != null && !selectedElements.isEmpty()) {
+            Element primary = selectedElements.get(0);
+            int actIdx = activeElements.indexOf(primary);
+            if (actIdx >= 0) {
+                activeElements.set(actIdx, el);
+                selectedElements.set(0, el);
                 markDirty();
             }
         }

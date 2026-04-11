@@ -35,6 +35,13 @@ public class CanvasPanel extends JPanel {
 	private Point panViewPos = null;
 	public int mouseWheelSensitivityInPx = 16;
 
+	// Element multi-select: rubber-band state (screen coords)
+	private Point elemBandStart = null;
+	private Point elemBandEnd   = null;
+	private boolean isElemBanding = false;
+	// Delta-based multi-drag: last image-space drag point
+	private Point elemLastImgPt = null;
+
 	public CanvasPanel(CanvasCallbacks callbacks) {
 		this.callbacks = callbacks;
 		setOpaque(false);
@@ -68,43 +75,61 @@ public class CanvasPanel extends JPanel {
 				Point imgPt = callbacks.screenToImage(e.getPoint());
 
 				if (!callbacks.getActiveElements().isEmpty() && callbacks.getFloatingImage() == null) {
-					if (callbacks.getSelectedElement() != null) {
-						Rectangle selScr = callbacks.elemRectScreen(callbacks.getSelectedElement());
-						Rectangle[] handles = callbacks.handleRects(selScr);
+					boolean shiftDown = (e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0;
+
+					if (shiftDown) {
+						// Shift+click → toggle element in/out of selection
+						// Shift+drag (not on element) → start rubber-band multi-select
+						Element hit = hitElement(e.getPoint());
+						if (hit != null) {
+							callbacks.toggleElementSelection(hit);
+						} else {
+							isElemBanding = true;
+							elemBandStart = e.getPoint();
+							elemBandEnd   = e.getPoint();
+						}
+						repaint();
+						return;
+					}
+
+					// Check resize handles on the primary selected element
+					Element primary = callbacks.getSelectedElement();
+					if (primary != null) {
+						Rectangle[] handles = callbacks.handleRects(callbacks.elemRectScreen(primary));
 						for (int hi = 0; hi < handles.length; hi++) {
 							if (handles[hi].contains(e.getPoint())) {
 								callbacks.setElemActiveHandle(hi);
-								callbacks.setElemScaleBase(new Rectangle(callbacks.getSelectedElement().x(),
-										callbacks.getSelectedElement().y(), callbacks.getSelectedElement().width(),
-										callbacks.getSelectedElement().height()));
+								callbacks.setElemScaleBase(new Rectangle(
+										primary.x(), primary.y(), primary.width(), primary.height()));
 								callbacks.setElemScaleStart(e.getPoint());
 								return;
 							}
 						}
-						if (selScr.contains(e.getPoint())) {
+					}
+
+					// Click on any currently selected element → drag ALL selected
+					for (Element sel : callbacks.getSelectedElements()) {
+						if (callbacks.elemRectScreen(sel).contains(e.getPoint())) {
 							callbacks.setDraggingElement(true);
-							callbacks.setElemDragAnchor(new Point(imgPt.x - callbacks.getSelectedElement().x(),
-									imgPt.y - callbacks.getSelectedElement().y()));
+							elemLastImgPt = imgPt;
 							return;
 						}
 					}
 
-					Element hit = null;
-					for (int i = callbacks.getActiveElements().size() - 1; i >= 0; i--) {
-						if (callbacks.elemRectScreen(callbacks.getActiveElements().get(i)).contains(e.getPoint())) {
-							hit = callbacks.getActiveElements().get(i);
-							break;
-						}
-					}
+					// Click on an unselected element → single-select + drag
+					Element hit = hitElement(e.getPoint());
 					if (hit != null) {
 						callbacks.setSelectedElement(hit);
 						callbacks.setDraggingElement(true);
-						callbacks.setElemDragAnchor(new Point(imgPt.x - hit.x(), imgPt.y - hit.y()));
+						elemLastImgPt = imgPt;
 						repaint();
 						return;
 					} else {
-						callbacks.setSelectedElement(null);
-						repaint();
+						// Click on empty area → deselect all
+						if (!callbacks.getSelectedElements().isEmpty()) {
+							callbacks.setSelectedElement(null);
+							repaint();
+						}
 					}
 				}
 
@@ -149,11 +174,53 @@ public class CanvasPanel extends JPanel {
 						callbacks.setPaintSnapshot(callbacks.deepCopy(callbacks.getWorkingImage()));
 					}
 					case SELECT -> {
-						// SELECT tool: draw selection frame (same as ALPHA_EDITOR mode)
-						System.err.println("[DEBUG] Started selection (PAINT mode SELECT) at " + imgPt);
-						callbacks.setSelecting(true);
-						callbacks.setSelectionStart(imgPt);
-						callbacks.setSelectionEnd(imgPt);
+						Rectangle existingSel = callbacks.getActiveSelection();
+						if (existingSel != null) {
+							// Selection exists – check handles, inside, outside
+							int sx = (int) Math.round(existingSel.x * callbacks.getZoom());
+							int sy = (int) Math.round(existingSel.y * callbacks.getZoom());
+							int sw = (int) Math.round(existingSel.width  * callbacks.getZoom());
+							int sh = (int) Math.round(existingSel.height * callbacks.getZoom());
+							Rectangle selScr = new Rectangle(sx, sy, sw, sh);
+							Rectangle[] handles = callbacks.handleRects(selScr);
+							boolean hitHandle = false;
+							for (int hi = 0; hi < handles.length; hi++) {
+								if (handles[hi].contains(e.getPoint())) {
+									// Handle hit → lift pixels, then start float scale-resize
+									callbacks.liftSelectionToFloat();
+									Rectangle fr = callbacks.getFloatRect();
+									if (fr != null) {
+										callbacks.setActiveHandle(hi);
+										callbacks.setScaleBaseRect(new Rectangle(fr));
+										callbacks.setScaleDragStart(e.getPoint());
+									}
+									hitHandle = true;
+									break;
+								}
+							}
+							if (!hitHandle) {
+								if (selScr.contains(e.getPoint())) {
+									// Click inside → lift pixels, then start float drag
+									callbacks.liftSelectionToFloat();
+									Rectangle fr = callbacks.getFloatRect();
+									if (fr != null) {
+										callbacks.setDraggingFloat(true);
+										callbacks.setFloatDragAnchor(
+												new Point(imgPt.x - fr.x, imgPt.y - fr.y));
+									}
+								} else {
+									// Click outside → clear selection, start new
+									callbacks.clearSelection();
+									callbacks.setSelecting(true);
+									callbacks.setSelectionStart(imgPt);
+									callbacks.setSelectionEnd(imgPt);
+								}
+							}
+						} else {
+							callbacks.setSelecting(true);
+							callbacks.setSelectionStart(imgPt);
+							callbacks.setSelectionEnd(imgPt);
+						}
 					}
 					}
 				} else {
@@ -190,13 +257,21 @@ public class CanvasPanel extends JPanel {
 				Point imgPt = callbacks.screenToImage(e.getPoint());
 
 				if (callbacks.isDraggingElement()) {
-					Element el = callbacks.getSelectedElement();
-					if (el != null) {
-						Element updated = el.withPosition(imgPt.x - callbacks.getElemDragAnchor().x,
-								imgPt.y - callbacks.getElemDragAnchor().y);
-						callbacks.updateSelectedElement(updated);
-						repaint();
+					if (elemLastImgPt != null) {
+						int dx = imgPt.x - elemLastImgPt.x;
+						int dy = imgPt.y - elemLastImgPt.y;
+						if (dx != 0 || dy != 0) {
+							callbacks.moveSelectedElements(dx, dy);
+							elemLastImgPt = imgPt;
+						}
 					}
+					repaint();
+					return;
+				}
+
+				if (isElemBanding) {
+					elemBandEnd = e.getPoint();
+					repaint();
 					return;
 				}
 
@@ -315,9 +390,33 @@ public class CanvasPanel extends JPanel {
 			public void mouseReleased(MouseEvent e) {
 				panStart = null;
 				panViewPos = null;
+				elemLastImgPt = null;
 
 				if (callbacks.getWorkingImage() == null)
 					return;
+
+				// Finalize rubber-band element multi-select
+				if (isElemBanding) {
+					isElemBanding = false;
+					if (elemBandStart != null && elemBandEnd != null) {
+						int bx = Math.min(elemBandStart.x, elemBandEnd.x);
+						int by = Math.min(elemBandStart.y, elemBandEnd.y);
+						int bw = Math.abs(elemBandEnd.x - elemBandStart.x);
+						int bh = Math.abs(elemBandEnd.y - elemBandStart.y);
+						if (bw > 2 || bh > 2) {
+							Rectangle band = new Rectangle(bx, by, bw, bh);
+							java.util.List<Element> newSel = new java.util.ArrayList<>();
+							for (Element el : callbacks.getActiveElements()) {
+								if (callbacks.elemRectScreen(el).intersects(band)) newSel.add(el);
+							}
+							callbacks.setSelectedElements(newSel);
+						}
+					}
+					elemBandStart = null;
+					elemBandEnd   = null;
+					repaint();
+					return;
+				}
 
 				callbacks.setDraggingElement(false);
 				callbacks.setElemActiveHandle(-1);
@@ -358,6 +457,7 @@ public class CanvasPanel extends JPanel {
 								int h = Math.abs(end.y - start.y);
 								if (w > 0 && h > 0) {
 									Rectangle sel = new Rectangle(x, y, w, h);
+									callbacks.getSelectedAreas().clear(); // single selection in Paint mode
 									callbacks.getSelectedAreas().add(sel);
 									callbacks.repaintCanvas();
 								}
@@ -418,9 +518,14 @@ public class CanvasPanel extends JPanel {
 			public void actionPerformed(ActionEvent e) {
 				if (callbacks.getFloatingImage() != null) {
 					callbacks.commitFloat();
+				} else if (!callbacks.getSelectedElements().isEmpty()) {
+					callbacks.setSelectedElement(null); // clears all
+					callbacks.repaintCanvas();
 				} else if (callbacks.isSelecting()) {
 					callbacks.setSelecting(false);
 					callbacks.repaintCanvas();
+				} else {
+					callbacks.clearSelection();
 				}
 			}
 		});
@@ -439,9 +544,7 @@ public class CanvasPanel extends JPanel {
 		getActionMap().put("delete", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if (callbacks.getFloatingImage() != null) {
-					// cancelFloat() would need to be exposed
-				}
+				callbacks.deleteSelection();
 			}
 		});
 	}
@@ -495,6 +598,15 @@ public class CanvasPanel extends JPanel {
 					callbacks.getPaintToolbar().getStrokeWidth(), callbacks.getPaintToolbar().getFillMode(),
 					callbacks.getPaintToolbar().getSecondaryColor(), aa);
 		}
+	}
+
+	/** Returns the topmost element at screen point, or null. */
+	private Element hitElement(Point screenPt) {
+		java.util.List<Element> els = callbacks.getActiveElements();
+		for (int i = els.size() - 1; i >= 0; i--) {
+			if (callbacks.elemRectScreen(els.get(i)).contains(screenPt)) return els.get(i);
+		}
+		return null;
 	}
 
 	private Rectangle computeNewFloatRect(int handle, Rectangle base, Point origin, Point current) {
@@ -580,6 +692,48 @@ public class CanvasPanel extends JPanel {
 		int ch = (int) Math.round(callbacks.getWorkingImage().getHeight() * callbacks.getZoom());
 		g2.drawImage(callbacks.getWorkingImage(), 0, 0, cw, ch, null);
 
+		// ── Element layers (non-destructive, rendered above base canvas) ──────
+		java.util.List<Element> activeEls  = callbacks.getActiveElements();
+		java.util.List<Element> selectedEls = callbacks.getSelectedElements();
+		Element primaryEl = callbacks.getSelectedElement();
+		for (Element el : activeEls) {
+			Rectangle sr = callbacks.elemRectScreen(el);
+			g2.drawImage(el.image(), sr.x, sr.y, sr.width, sr.height, null);
+
+			boolean isSel     = selectedEls.stream().anyMatch(s -> s.id() == el.id());
+			boolean isPrimary = primaryEl != null && primaryEl.id() == el.id();
+			if (isSel) {
+				float[] dash = { 5f, 3f };
+				g2.setColor(AppColors.ACCENT);
+				g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 0f));
+				g2.drawRect(sr.x, sr.y, sr.width, sr.height);
+				if (isPrimary) {
+					// Scale handles only on the primary element
+					g2.setStroke(new BasicStroke(1f));
+					for (Rectangle hr : callbacks.handleRects(sr)) {
+						g2.setColor(Color.WHITE);
+						g2.fillRect(hr.x, hr.y, hr.width, hr.height);
+						g2.setColor(AppColors.ACCENT);
+						g2.drawRect(hr.x, hr.y, hr.width, hr.height);
+					}
+				}
+			}
+		}
+
+		// Rubber-band multi-select rect (screen coords, drawn while shift-dragging)
+		if (isElemBanding && elemBandStart != null && elemBandEnd != null) {
+			int bx = Math.min(elemBandStart.x, elemBandEnd.x);
+			int by = Math.min(elemBandStart.y, elemBandEnd.y);
+			int bw = Math.abs(elemBandEnd.x - elemBandStart.x);
+			int bh = Math.abs(elemBandEnd.y - elemBandStart.y);
+			g2.setColor(new Color(100, 150, 255, 40));
+			g2.fillRect(bx, by, bw, bh);
+			float[] dash = { 5f, 3f };
+			g2.setColor(new Color(100, 150, 255));
+			g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 0f));
+			g2.drawRect(bx, by, bw, bh);
+		}
+
 		// Selections overlay
 		g2.setColor(new Color(255, 0, 0, 70));
 		for (Rectangle r : callbacks.getSelectedAreas()) {
@@ -598,6 +752,24 @@ public class CanvasPanel extends JPanel {
 			int sw = (int) Math.round(r.width * callbacks.getZoom());
 			int sh = (int) Math.round(r.height * callbacks.getZoom());
 			g2.drawRect(sx, sy, sw, sh);
+		}
+
+		// Drag handles on the active selection (PAINT mode SELECT tool only)
+		if (callbacks.getAppMode() == AppMode.PAINT && !callbacks.isSelecting()) {
+			Rectangle aSel = callbacks.getActiveSelection();
+			if (aSel != null) {
+				int sx = (int) Math.round(aSel.x * callbacks.getZoom());
+				int sy = (int) Math.round(aSel.y * callbacks.getZoom());
+				int sw = (int) Math.round(aSel.width  * callbacks.getZoom());
+				int sh = (int) Math.round(aSel.height * callbacks.getZoom());
+				g2.setStroke(new BasicStroke(1f));
+				for (Rectangle hr : callbacks.handleRects(new Rectangle(sx, sy, sw, sh))) {
+					g2.setColor(Color.WHITE);
+					g2.fillRect(hr.x, hr.y, hr.width, hr.height);
+					g2.setColor(AppColors.ACCENT);
+					g2.drawRect(hr.x, hr.y, hr.width, hr.height);
+				}
+			}
 		}
 
 		// Active selection being drawn (during drag)
@@ -644,4 +816,5 @@ public class CanvasPanel extends JPanel {
 			}
 		}
 	}
+
 }
