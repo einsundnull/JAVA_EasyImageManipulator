@@ -18,18 +18,18 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
-import java.awt.geom.Point2D;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.awt.event.WindowEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowEvent;
+import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -2327,29 +2327,47 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
     @Override public void commitTextLayer(int updateId, String text, String fontName, int fontSize,
                                           boolean bold, boolean italic, java.awt.Color color, int x, int y) {
-        if (text == null || text.isEmpty() || appMode != AppMode.PAINT) return;
+        System.err.println("[DEBUG] commitTextLayer: updateId=" + updateId + ", text='" + text + "', appMode=" + appMode
+                         + ", isEmpty=" + (text == null || text.isEmpty()));
+        if (text == null || text.isEmpty() || appMode != AppMode.PAINT) {
+            System.err.println("[DEBUG] commitTextLayer: RETURNING EARLY (empty text or wrong mode)");
+            return;
+        }
+
+        System.err.println("[DEBUG] commitTextLayer: Creating/updating layer, activeElements.size() before=" + activeElements.size());
+
+        Layer newLayer;
+        boolean isUpdate = false;
+
         if (updateId >= 0) {
             // Replace existing layer (keep its id so the layer panel doesn't flicker)
-            Layer updated = TextLayer.of(updateId, text, fontName, fontSize, bold, italic, color, x, y);
+            newLayer = TextLayer.of(updateId, text, fontName, fontSize, bold, italic, color, x, y);
             for (int i = 0; i < activeElements.size(); i++) {
                 if (activeElements.get(i).id() == updateId) {
-                    activeElements.set(i, updated);
-                    selectedElements.clear(); selectedElements.add(updated);
-                    refreshElementPanel(); markDirty();
-                    if (canvasPanel != null) canvasPanel.repaint();
-                    return;
+                    activeElements.set(i, newLayer);
+                    selectedElements.clear(); selectedElements.add(newLayer);
+                    isUpdate = true;
+                    System.err.println("[DEBUG] commitTextLayer: Updated existing layer with id=" + updateId);
+                    break;
                 }
             }
-            // Not found → fall through and add as new
-            activeElements.add(updated);
-            selectedElements.clear(); selectedElements.add(updated);
+            // If not found in the list, add as new element
+            if (!isUpdate) {
+                activeElements.add(newLayer);
+                selectedElements.clear(); selectedElements.add(newLayer);
+                System.err.println("[DEBUG] commitTextLayer: Layer not found, added as new");
+            }
         } else {
-            Layer el = TextLayer.of(nextElementId++, text, fontName, fontSize, bold, italic, color, x, y);
-            activeElements.add(el);
-            selectedElements.clear(); selectedElements.add(el);
+            // Create new layer with fresh id
+            newLayer = TextLayer.of(nextElementId++, text, fontName, fontSize, bold, italic, color, x, y);
+            activeElements.add(newLayer);
+            selectedElements.clear(); selectedElements.add(newLayer);
+            System.err.println("[DEBUG] commitTextLayer: Created NEW layer with id=" + newLayer.id() + ", activeElements.size() after=" + activeElements.size());
         }
+
         refreshElementPanel(); markDirty();
         if (canvasPanel != null) canvasPanel.repaint();
+        System.err.println("[DEBUG] commitTextLayer: DONE");
     }
 
     @Override public void repaintCanvas() { canvasPanel.repaint(); }

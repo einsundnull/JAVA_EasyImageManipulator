@@ -78,6 +78,7 @@ public class CanvasPanel extends JPanel {
 
 	// ── Modeless text-options dialog ──────────────────────────────────────────
 	private javax.swing.JDialog           textChooserDlg    = null;
+	private javax.swing.JTextArea         dlgTextArea       = null;
 	private javax.swing.JComboBox<String> dlgFontBox        = null;
 	private javax.swing.JSpinner          dlgSizeSpinner    = null;
 	private javax.swing.JCheckBox         dlgBoldCb         = null;
@@ -187,6 +188,14 @@ public class CanvasPanel extends JPanel {
 						return;
 					}
 
+					// CHECK DOUBLE-CLICK ON TEXTLAYER FIRST (before any other element handling)
+					Layer hit = hitElement(e.getPoint());
+					if (hit instanceof TextLayer && e.getClickCount() == 2) {
+						System.err.println("[DEBUG] Double-click on TextLayer detected!");
+						enterTextEditMode(hit);
+						return;
+					}
+
 					// Check resize handles on the primary selected element
 					Layer primary = callbacks.getSelectedElement();
 					if (primary != null) {
@@ -212,18 +221,8 @@ public class CanvasPanel extends JPanel {
 					}
 
 					// Click on an unselected element → single-select + drag
-					// Double-click on TextLayer → enter edit mode
-					Layer hit = hitElement(e.getPoint());
 					if (hit != null) {
-						if (e.getClickCount() == 2 && hit instanceof TextLayer) {
-							enterTextEditMode(hit);
-							return;
-						}
 						callbacks.setSelectedElement(hit);
-						// Bidirectional sync: clicking a TextLayer updates the chooser
-						if (hit instanceof TextLayer) {
-							syncTextChooserFromElement(hit);
-						}
 						callbacks.setDraggingElement(true);
 						elemLastImgPt = imgPt;
 						repaint();
@@ -935,9 +934,9 @@ public class CanvasPanel extends JPanel {
 		if (textChooserDlg == null) buildTextChooserDialog();
 		syncTextChooserFromFields();
 		if (!textChooserDlg.isShowing()) textChooserDlg.setVisible(true);
-		textChooserDlg.toFront();
-		// Give focus back to canvas so key events (text typing) are received
-		javax.swing.SwingUtilities.invokeLater(this::requestFocusInWindow);
+		// Request focus IMMEDIATELY for canvas so key events (text typing) are received
+		// Do NOT use invokeLater or toFront() as they interfere with keyboard focus
+		requestFocusInWindow();
 	}
 
 	/** Builds the one-time modeless dialog and wires live-update listeners. */
@@ -969,6 +968,46 @@ public class CanvasPanel extends JPanel {
 			rowIdx[0]++;
 			gbc.fill = java.awt.GridBagConstraints.NONE;
 		};
+
+		// Text input field (for editing selected TextLayer content)
+		dlgTextArea = new javax.swing.JTextArea(4, 30);
+		dlgTextArea.setBackground(new Color(50, 50, 50));
+		dlgTextArea.setForeground(AppColors.TEXT);
+		dlgTextArea.setLineWrap(true);
+		dlgTextArea.setWrapStyleWord(true);
+		dlgTextArea.setFont(new Font("Monospace", Font.PLAIN, 10));
+		dlgTextArea.addKeyListener(new java.awt.event.KeyAdapter() {
+			@Override
+			public void keyPressed(java.awt.event.KeyEvent e) {
+				if ((e.getModifiersEx() & java.awt.event.InputEvent.CTRL_DOWN_MASK) != 0
+						&& e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+					// CTRL+Enter: apply and close dialog
+					textBuffer = new StringBuilder(dlgTextArea.getText());
+					applyTextChooserToSelected();
+					commitText();
+					textChooserDlg.setVisible(false);
+					requestFocusInWindow();
+				}
+			}
+		});
+		dlgTextArea.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+			@Override
+			public void insertUpdate(javax.swing.event.DocumentEvent e) { updateTextFromField(); }
+			@Override
+			public void removeUpdate(javax.swing.event.DocumentEvent e) { updateTextFromField(); }
+			@Override
+			public void changedUpdate(javax.swing.event.DocumentEvent e) { updateTextFromField(); }
+
+			private void updateTextFromField() {
+				textBuffer = new StringBuilder(dlgTextArea.getText());
+				applyTextChooserToSelected();
+			}
+		});
+		javax.swing.JScrollPane textScrollPane = new javax.swing.JScrollPane(dlgTextArea,
+				javax.swing.JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+				javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		textScrollPane.setBackground(new Color(36, 36, 36));
+		addRow.accept("Text:", textScrollPane);
 
 		// Font family
 		String[] sysfonts = java.awt.GraphicsEnvironment
@@ -1045,7 +1084,12 @@ public class CanvasPanel extends JPanel {
 		textChooserDlg.add(south, java.awt.BorderLayout.SOUTH);
 
 		textChooserDlg.pack();
-		textChooserDlg.setLocationRelativeTo(topFrame);
+		// Position dialog at top-right of main frame (don't overlap canvas)
+		if (topFrame != null) {
+			int dialogX = topFrame.getX() + topFrame.getWidth() - textChooserDlg.getWidth() - 10;
+			int dialogY = topFrame.getY() + 30;
+			textChooserDlg.setLocation(Math.max(0, dialogX), Math.max(0, dialogY));
+		}
 	}
 
 	/** Pushes current text* field values into the dialog controls without firing listeners. */
@@ -1053,6 +1097,7 @@ public class CanvasPanel extends JPanel {
 		if (textChooserDlg == null) return;
 		suppressChooserSync = true;
 		try {
+			dlgTextArea.setText(textBuffer.toString());
 			dlgFontBox.setSelectedItem(textFontName);
 			dlgSizeSpinner.setValue(textFontSize);
 			dlgBoldCb.setSelected(textBold);
@@ -1069,6 +1114,7 @@ public class CanvasPanel extends JPanel {
 	 */
 	public void syncTextChooserFromElement(Layer el) {
 		if (!(el instanceof TextLayer tl)) return;
+		textBuffer   = new StringBuilder(tl.text());
 		textFontName = tl.fontName();
 		textFontSize = tl.fontSize() > 0 ? tl.fontSize() : 24;
 		textBold     = tl.fontBold();
@@ -1085,8 +1131,9 @@ public class CanvasPanel extends JPanel {
 		// Live-update a selected, committed TextLayer
 		Layer primary = callbacks.getSelectedElement();
 		if (primary instanceof TextLayer tl && textBoundingBox == null) {
+			// Use textBuffer (current text from dialog) instead of tl.text() (old text)
 			Layer updated = tl.withText(
-					tl.text(), textFontName, textFontSize, textBold, textItalic, textColor);
+					textBuffer.toString(), textFontName, textFontSize, textBold, textItalic, textColor);
 			callbacks.updateSelectedElement(updated);
 		}
 		// Repaint if text input is active (refreshes the preview box)
@@ -1129,7 +1176,12 @@ public class CanvasPanel extends JPanel {
 		callbacks.getActiveElements().removeIf(e -> e.id() == el.id());
 		syncTextChooserFromFields();
 		ensureTextChooserVisible();
-		requestFocusInWindow();
+		// Set focus to text area so cursor is visible and user can type immediately
+		if (dlgTextArea != null) {
+			dlgTextArea.requestFocus();
+			// Position caret at end of text (don't select all, to avoid accidental deletion)
+			dlgTextArea.setCaretPosition(dlgTextArea.getText().length());
+		}
 		repaint();
 	}
 
@@ -1183,9 +1235,14 @@ public class CanvasPanel extends JPanel {
 	 * Clears text state afterwards.
 	 */
 	private void commitText() {
-		if (textBoundingBox == null) return;
+		System.err.println("[DEBUG] commitText: textBoundingBox=" + textBoundingBox + ", textBuffer.length()=" + textBuffer.length());
+		if (textBoundingBox == null) {
+			System.err.println("[DEBUG] commitText: RETURNING (no textBoundingBox)");
+			return;
+		}
 		if (textBuffer.length() == 0) {
 			// Nothing typed: if editing, restore original; otherwise just clear
+			System.err.println("[DEBUG] commitText: Empty text buffer, restoring original element if exists");
 			if (editingOriginalElement != null) {
 				callbacks.getActiveElements().add(editingOriginalElement);
 			}
@@ -1195,6 +1252,7 @@ public class CanvasPanel extends JPanel {
 			repaint();
 			return;
 		}
+		System.err.println("[DEBUG] commitText: Calling commitTextLayer with text='" + textBuffer.toString() + "'");
 		callbacks.commitTextLayer(
 				editingTextElementId,
 				textBuffer.toString(),
