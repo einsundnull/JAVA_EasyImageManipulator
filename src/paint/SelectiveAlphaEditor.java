@@ -929,32 +929,28 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     }
 
     private void indexDirectory(File file) {
-        File dir = file.getParentFile();
-        if (dir == null) return;
-        boolean sameDir = dir.equals(lastIndexedDir);
-        if (!sameDir) {
-            File[] files = dir.listFiles(f -> f.isFile() && isSupportedFile(f));
-            if (files == null) return;
-            Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-            directoryImages = new ArrayList<>(Arrays.asList(files));
-            lastIndexedDir  = dir;
-            tileGallery.setFiles(directoryImages, file);
-        } else {
-            tileGallery.setActiveFile(file);
+        // DELEGATED to FileStateCache manager
+        fileCacheManager.indexDirectory(file);
+        // Update gallery UI with indexed files
+        List<File> files = fileCacheManager.getDirectoryImages();
+        if (!files.isEmpty()) {
+            tileGallery.setFiles(files, file);
         }
-        currentImageIndex = directoryImages.indexOf(file);
+        // Sync legacy fields
+        directoryImages = new ArrayList<>(files);
+        currentImageIndex = fileCacheManager.getCurrentImageIndex();
     }
 
     private void navigateImage(int dir) {
-        if (directoryImages.isEmpty()) return;
-        int ni = currentImageIndex + dir;
-        if (ni < 0 || ni >= directoryImages.size()) return;
-        // No unsaved-changes dialog – state is kept in cache (shown as red border)
-        currentImageIndex = ni;
-        loadFile(directoryImages.get(currentImageIndex));
-        // Gallery does not auto-scroll on setActiveFile; scroll explicitly here
-        // so the nav-button target tile becomes visible in the filmstrip.
-        tileGallery.scrollToActive();
+        // DELEGATED to FileStateCache manager
+        File nextFile = (dir < 0) ? fileCacheManager.navigatePrevious()
+                                  : fileCacheManager.navigateNext();
+        if (nextFile != null) {
+            loadFile(nextFile);
+            tileGallery.scrollToActive();
+            // Sync legacy fields
+            currentImageIndex = fileCacheManager.getCurrentImageIndex();
+        }
     }
 
     // =========================================================================
@@ -2451,30 +2447,25 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
     /** Merges all selected layers onto the canvas and removes them from the layer list. */
     private void mergeSelectedElements() {
+        // DELEGATED to ElementLayerState manager
         if (selectedElements.isEmpty() || workingImage == null) return;
-        pushUndo();
-        for (Layer el : new ArrayList<>(selectedElements)) {
-            if (el instanceof ImageLayer il) {
-                BufferedImage scaled = PaintEngine.scale(il.image(), Math.max(1, el.width()), Math.max(1, el.height()));
-                PaintEngine.pasteRegion(workingImage, scaled, new Point(el.x(), el.y()));
-            } else if (el instanceof TextLayer tl) {
-                BufferedImage rendered = renderTextLayerToImage(tl);
-                PaintEngine.pasteRegion(workingImage, rendered, new Point(el.x(), el.y()));
-            }
-            activeElements.removeIf(e -> e.id() == el.id());
-        }
+        elementLayerState.setWorkingImage(workingImage);
+        elementLayerState.mergeSelectedElements();
+        // Sync legacy fields
+        activeElements.clear();
+        activeElements.addAll(elementLayerState.getActiveElements());
         selectedElements.clear();
-        markDirty();
-        refreshElementPanel();
     }
 
     /** Deletes all selected layers without merging to canvas. */
     private void deleteSelectedElements() {
+        // DELEGATED to ElementLayerState manager
         if (selectedElements.isEmpty()) return;
-        for (Layer el : selectedElements) activeElements.removeIf(e -> e.id() == el.id());
+        elementLayerState.deleteSelectedElements();
+        // Sync legacy fields
+        activeElements.clear();
+        activeElements.addAll(elementLayerState.getActiveElements());
         selectedElements.clear();
-        markDirty();
-        refreshElementPanel();
     }
 
     /** Toggles a layer in/out of the multi-selection. New primary is put at index 0. */
@@ -2554,16 +2545,16 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         if (canvasPanel != null) canvasPanel.repaint();
     }
     @Override public void moveSelectedElements(int dx, int dy) {
+        // DELEGATED to ElementLayerState manager
         if (dx == 0 && dy == 0) return;
-        for (int i = 0; i < selectedElements.size(); i++) {
-            Layer el = selectedElements.get(i);
-            Layer updated = el.withPosition(el.x() + dx, el.y() + dy);
-            for (int j = 0; j < activeElements.size(); j++) {
-                if (activeElements.get(j).id() == el.id()) { activeElements.set(j, updated); break; }
-            }
-            selectedElements.set(i, updated);
+        elementLayerState.moveSelectedElements(dx, dy);
+        // Sync legacy fields
+        activeElements.clear();
+        activeElements.addAll(elementLayerState.getActiveElements());
+        selectedElements.clear();
+        for (Layer el : elementLayerState.getSelectedLayers()) {
+            selectedElements.add(el);
         }
-        markDirty();
     }
     @Override public int getNextElementId() {
         return nextElementId++;
@@ -2628,47 +2619,19 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
     @Override public void commitTextLayer(int updateId, String text, String fontName, int fontSize,
                                           boolean bold, boolean italic, java.awt.Color color, int x, int y) {
-        System.err.println("[DEBUG] commitTextLayer: updateId=" + updateId + ", text='" + text + "', appMode=" + appMode
-                         + ", isEmpty=" + (text == null || text.isEmpty()));
-        if (text == null || text.isEmpty() || appMode != AppMode.PAINT) {
-            System.err.println("[DEBUG] commitTextLayer: RETURNING EARLY (empty text or wrong mode)");
-            return;
-        }
+        // DELEGATED to ElementLayerState manager
+        elementLayerState.setAppMode(appMode);
+        elementLayerState.setWorkingImage(workingImage);
+        elementLayerState.commitTextLayer(updateId, text, fontName, fontSize, bold, italic, color, x, y);
 
-        System.err.println("[DEBUG] commitTextLayer: Creating/updating layer, activeElements.size() before=" + activeElements.size());
-
-        Layer newLayer;
-        boolean isUpdate = false;
-
-        if (updateId >= 0) {
-            // Replace existing layer (keep its id so the layer panel doesn't flicker)
-            newLayer = TextLayer.of(updateId, text, fontName, fontSize, bold, italic, color, x, y);
-            for (int i = 0; i < activeElements.size(); i++) {
-                if (activeElements.get(i).id() == updateId) {
-                    activeElements.set(i, newLayer);
-                    selectedElements.clear(); selectedElements.add(newLayer);
-                    isUpdate = true;
-                    System.err.println("[DEBUG] commitTextLayer: Updated existing layer with id=" + updateId);
-                    break;
-                }
-            }
-            // If not found in the list, add as new element
-            if (!isUpdate) {
-                activeElements.add(newLayer);
-                selectedElements.clear(); selectedElements.add(newLayer);
-                System.err.println("[DEBUG] commitTextLayer: Layer not found, added as new");
-            }
-        } else {
-            // Create new layer with fresh id
-            newLayer = TextLayer.of(nextElementId++, text, fontName, fontSize, bold, italic, color, x, y);
-            activeElements.add(newLayer);
-            selectedElements.clear(); selectedElements.add(newLayer);
-            System.err.println("[DEBUG] commitTextLayer: Created NEW layer with id=" + newLayer.id() + ", activeElements.size() after=" + activeElements.size());
-        }
-
-        refreshElementPanel(); markDirty();
+        // Sync legacy fields
+        activeElements.clear();
+        activeElements.addAll(elementLayerState.getActiveElements());
+        selectedElements.clear();
+        Layer sel = elementLayerState.getSelectedLayer();
+        if (sel != null) selectedElements.add(sel);
+        refreshElementPanel();
         if (canvasPanel != null) canvasPanel.repaint();
-        System.err.println("[DEBUG] commitTextLayer: DONE");
     }
 
     @Override public void repaintCanvas() { canvasPanel.repaint(); }
