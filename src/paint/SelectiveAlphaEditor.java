@@ -63,7 +63,6 @@ import javax.swing.JToggleButton;
 import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 
 /**
  * Main application window.
@@ -172,6 +171,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     // ── Project Management ────────────────────────────────────────────────────
     private ProjectManager projectManager = new ProjectManager();
 
+    // ── NEW: State Managers (Modularization) ───────────────────────────────────
+    private ZoomState         zoomState              = new ZoomState();
+    private FloatSelectionState floatSelectionState  = new FloatSelectionState();
+    private ElementLayerState elementLayerState      = new ElementLayerState();
+    private FileStateCache    fileCacheManager       = new FileStateCache();
+
     // ── Element layers ────────────────────────────────────────────────────────
     /** Layers attached to the *current* image (alias into fileStateCache).       */
     private List<Layer>  activeElements  = new ArrayList<>();
@@ -265,6 +270,9 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         setMinimumSize(new Dimension(900, 650));
         pack();
+
+        // Initialize state managers with UI component references (all UI components now exist)
+        initializeStateManagers();
 
         // Lade Settings und stelle Fensterposition wieder her
         try {
@@ -411,6 +419,34 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         // Normal beenden
         System.exit(0);
+    }
+
+    /**
+     * Initialize state managers with UI component references.
+     * Called after pack() when all UI components are created.
+     */
+    private void initializeStateManagers() {
+        // ZoomState: provide UI component references it needs
+        zoomState.setCanvasWrapper(canvasWrapper);
+        zoomState.setScrollPane(scrollPane);
+        zoomState.setZoomLabel(zoomLabel);
+        zoomState.setWorkingImage(workingImage);
+
+        // FloatSelectionState: provide coordinate transformation context
+        floatSelectionState.setZoom(zoom);
+        floatSelectionState.setWorkingImage(workingImage);
+
+        // ElementLayerState: provide UI and callback hooks
+        elementLayerState.setWorkingImage(workingImage);
+        elementLayerState.setAppMode(appMode);
+        elementLayerState.setElementLayerPanel(elementLayerPanel);
+        elementLayerState.setCanvasPanel(canvasPanel);
+        elementLayerState.setOnUndo(() -> pushUndo());
+        elementLayerState.setOnMarkDirty(() -> markDirty());
+
+        // FileStateCache: provide project manager reference
+        fileCacheManager.setProjectManager(projectManager);
+        fileCacheManager.setOnDirectoryIndexed(() -> updateNavigationButtons());
     }
 
     // ── Top bar ───────────────────────────────────────────────────────────────
@@ -824,9 +860,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         selectedAreas.clear();
         isSelecting = false; selectionStart = null; selectionEnd = null;
         lastPaintPoint = null; shapeStartPoint = null; paintSnapshot = null;
-        floatingImg = null; floatRect = null;
-        isDraggingFloat = false; floatDragAnchor = null;
-        activeHandle = -1; scaleBaseRect = null; scaleDragStart = null;
+        floatSelectionState.clear();  // DELEGATED: clears floatingImg, floatRect, isDraggingFloat, etc.
         selectedElements.clear(); draggingElement = false; elemDragAnchor = null;
         elemActiveHandle = -1; elemScaleBase = null; elemScaleStart = null;
         if (canvasPanel != null) canvasPanel.resetInputState();
@@ -929,133 +963,51 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
     /**
      * Set zoom level with smooth animation.
-     * If anchorCanvas != null, keep that canvas point fixed on screen (zoom toward cursor).
+     * DELEGATED to ZoomState manager.
      */
     @Override public void setZoom(double nz, Point anchorCanvas) {
-        userHasManuallyZoomed = true;
-        zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
-
-        // Capture anchor point only if a new gesture is starting (no animation running)
-        if (zoomTimer == null) {
-            if (anchorCanvas != null && scrollPane != null) {
-                JViewport vp = scrollPane.getViewport();
-                // image coord under cursor (using CURRENT zoom, before animation starts)
-                zoomImgPt = new Point2D.Double(anchorCanvas.x / zoom, anchorCanvas.y / zoom);
-                // viewport-relative mouse position (stays fixed during animation)
-                zoomVpMouse = SwingUtilities.convertPoint(canvasPanel, anchorCanvas, vp);
-            } else {
-                zoomImgPt  = null;
-                zoomVpMouse = null;
-            }
-        }
-        // If animation is already running, just update zoomTarget and continue
-
-        startZoomAnimation();
+        zoomState.setZoom(nz, anchorCanvas);
+        // Sync legacy field for backward compat
+        zoom = zoomState.getZoom();
     }
 
     public void fitToViewport() {
-        if (workingImage == null || scrollPane == null) return;
-        Dimension vd = scrollPane.getViewport().getSize();
-        if (vd.width <= 0 || vd.height <= 0) { SwingUtilities.invokeLater(this::fitToViewport); return; }
-        double nz = Math.min((double) vd.width  / workingImage.getWidth(),
-                             (double) vd.height / workingImage.getHeight() * 0.98);
-        setZoomInstant(nz);
+        // DELEGATED to ZoomState manager
+        zoomState.setWorkingImage(workingImage);
+        zoomState.fitToViewport();
         centerCanvas();
     }
 
     /** Set zoom immediately without animation. Used for image load/browse. */
     private void setZoomInstant(double nz) {
-        userHasManuallyZoomed = false;
-        if (zoomTimer != null) { zoomTimer.stop(); zoomTimer = null; }
-        zoom = zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
-        zoomImgPt = null;
-        zoomVpMouse = null;
-        if (canvasWrapper != null) {
-            canvasWrapper.revalidate();
-            canvasWrapper.repaint();
-        }
-        updateZoomLabel();
-        SwingUtilities.invokeLater(() ->
-            scrollPane.getViewport().setViewPosition(new Point(0, 0)));
+        // DELEGATED to ZoomState manager
+        zoomState.setZoomInstant(nz);
+        zoom = zoomState.getZoom();
     }
 
     private void updateZoomLabel() {
-        if (zoomLabel != null) zoomLabel.setText(Math.round(zoom * 100) + "%");
+        // DELEGATED to ZoomState manager
+        // zoomState automatically updates the label during animation
     }
 
     /**
      * Start or restart the zoom animation timer.
-     * Each tick, zoom approaches zoomTarget using exponential decay.
+     * DELEGATED to ZoomState manager (called from setZoom).
      */
     private void startZoomAnimation() {
-        if (zoomTimer != null) {
-            zoomTimer.stop();
-            zoomTimer = null;
-        }
-
-        final int INTERVAL_MS = 16;  // ~60 FPS
-        final double FACTOR = 0.30;  // 30% per tick — snappy but not jarring
-
-        zoomTimer = new Timer(INTERVAL_MS, null);
-        zoomTimer.addActionListener(e -> {
-            double diff = zoomTarget - zoom;
-            boolean done = Math.abs(diff) < 0.0005;
-            if (done) {
-                zoom = zoomTarget;
-                zoomTimer.stop();
-                zoomTimer = null;
-            } else {
-                zoom += diff * FACTOR;
-            }
-            applyZoomFrame();
-            // After animation ends with no anchor: reset viewport to (0,0) so the
-            // canvas is correctly positioned after scrollbars may have shifted it.
-            if (done && zoomImgPt == null && scrollPane != null) {
-                SwingUtilities.invokeLater(() ->
-                    scrollPane.getViewport().setViewPosition(new Point(0, 0)));
-            }
-        });
-        zoomTimer.setInitialDelay(0);
-        zoomTimer.start();
+        // zoomState.startZoomAnimation() is called internally from setZoom()
+        // Sync legacy field
+        zoom = zoomState.getZoom();
     }
 
     /**
      * Apply current zoom to the UI (called every animation frame).
-     *
-     * revalidate() on the EDT is synchronous in Java 6+ — it calls
-     * scrollPane.validate() internally before returning, so canvasPanel.getX/Y()
-     * are already correct after the call. No invokeLater() is used here;
-     * at 60 FPS those callbacks accumulate and fire stale viewport positions,
-     * which is what caused the jump when scrollbars appeared.
+     * DELEGATED to ZoomState manager.
      */
     private void applyZoomFrame() {
-        if (canvasWrapper == null) return;
-
-        // Synchronous layout pass — canvasPanel bounds and scroll extents correct after this.
-        canvasWrapper.revalidate();
-
-        // Adjust viewport so the anchor image pixel stays under the mouse.
-        if (zoomImgPt != null && zoomVpMouse != null && scrollPane != null && workingImage != null) {
-            JViewport vp   = scrollPane.getViewport();
-            Dimension vs   = vp.getViewSize();
-            Dimension vpSz = vp.getSize();
-            // centering offset of canvasPanel inside wrapper (0 when image > viewport)
-            int cx = canvasPanel.getX();
-            int cy = canvasPanel.getY();
-            // where the fixed image pixel now sits in wrapper coords
-            int newCanvasX = (int)(zoomImgPt.getX() * zoom);
-            int newCanvasY = (int)(zoomImgPt.getY() * zoom);
-            // viewport position that keeps the mouse at the same screen location
-            int vx = cx + newCanvasX - zoomVpMouse.x;
-            int vy = cy + newCanvasY - zoomVpMouse.y;
-            int maxVx = Math.max(0, vs.width  - vpSz.width);
-            int maxVy = Math.max(0, vs.height - vpSz.height);
-            vp.setViewPosition(new Point(Math.max(0, Math.min(vx, maxVx)),
-                                         Math.max(0, Math.min(vy, maxVy))));
-        }
-
-        canvasWrapper.repaint();
-        updateZoomLabel();
+        // zoomState.applyZoomFrame() is called by the animation timer
+        // Sync legacy fields
+        zoom = zoomState.getZoom();
     }
 
     // =========================================================================
@@ -1627,8 +1579,14 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     /** Paste the floating image at its current (possibly scaled) rect and clear float state.
      *  In Paint mode: creates a non-destructive Element layer instead of writing to canvas. */
     @Override public void commitFloat() {
-        if (floatingImg == null || floatRect == null) return;
-        BufferedImage scaled = PaintEngine.scale(floatingImg,
+        // DELEGATED to FloatSelectionState manager for image handling
+        if (!floatSelectionState.isActive()) return;
+
+        BufferedImage floatImg = floatSelectionState.getImage();
+        Rectangle floatRect = floatSelectionState.getRect();
+        if (floatImg == null || floatRect == null) return;
+
+        BufferedImage scaled = PaintEngine.scale(floatImg,
                 Math.max(1, floatRect.width), Math.max(1, floatRect.height));
         if (appMode == AppMode.PAINT) {
             // Non-destructive: become an ImageLayer
@@ -1641,58 +1599,43 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         } else {
             PaintEngine.pasteRegion(workingImage, scaled, new Point(floatRect.x, floatRect.y));
         }
-        floatingImg = null; floatRect = null;
-        isDraggingFloat = false; floatDragAnchor = null;
-        activeHandle = -1;  scaleBaseRect = null; scaleDragStart = null;
+
+        // Clear float state via manager
+        floatSelectionState.clear();
         selectedAreas.clear();
         markDirty();
     }
 
     /** Discard the float and undo to the state before it was lifted. */
     private void cancelFloat() {
-        floatingImg = null; floatRect = null;
-        isDraggingFloat = false; floatDragAnchor = null;
-        activeHandle = -1;  scaleBaseRect = null; scaleDragStart = null;
+        // DELEGATED to FloatSelectionState manager
+        floatSelectionState.clear();
         selectedAreas.clear();
         doUndo();
     }
 
     /** Convert floatRect (image-space) to canvasPanel screen-space. */
     @Override public Rectangle floatRectScreen() {
-        if (floatRect == null) return new Rectangle(0, 0, 0, 0);
-        return new Rectangle(
-            (int) Math.round(floatRect.x      * zoom),
-            (int) Math.round(floatRect.y      * zoom),
-            (int) Math.round(floatRect.width  * zoom),
-            (int) Math.round(floatRect.height * zoom));
+        // DELEGATED to FloatSelectionState manager
+        floatSelectionState.setZoom(zoom);  // Keep in sync
+        return floatSelectionState.getRectScreen();
     }
 
     /**
      * 8 handle hit-rects around {@code sr} (screen-space).
+     * DELEGATED to FloatSelectionState manager.
      * Order: TL=0, TC=1, TR=2, ML=3, MR=4, BL=5, BC=6, BR=7
      */
     @Override public Rectangle[] handleRects(Rectangle sr) {
-        int x = sr.x, y = sr.y, w = sr.width, h = sr.height;
-        int mx = x + w / 2, my = y + h / 2, rx = x + w, by = y + h;
-        int hs = 4; // half-size → each handle square is 8×8 px
-        return new Rectangle[]{
-            new Rectangle(x  - hs, y  - hs, hs*2, hs*2), // 0 TL
-            new Rectangle(mx - hs, y  - hs, hs*2, hs*2), // 1 TC
-            new Rectangle(rx - hs, y  - hs, hs*2, hs*2), // 2 TR
-            new Rectangle(x  - hs, my - hs, hs*2, hs*2), // 3 ML
-            new Rectangle(rx - hs, my - hs, hs*2, hs*2), // 4 MR
-            new Rectangle(x  - hs, by - hs, hs*2, hs*2), // 5 BL
-            new Rectangle(mx - hs, by - hs, hs*2, hs*2), // 6 BC
-            new Rectangle(rx - hs, by - hs, hs*2, hs*2), // 7 BR
-        };
+        // FloatSelectionState.getHandleRects() already does this
+        return floatSelectionState.getHandleRects();
     }
 
     /** Returns 0-7 if {@code pt} (canvasPanel coords) hits a handle, else -1. */
     @Override public int hitHandle(Point pt) {
-        if (floatRect == null) return -1;
-        Rectangle[] handles = handleRects(floatRectScreen());
-        for (int i = 0; i < handles.length; i++) if (handles[i].contains(pt)) return i;
-        return -1;
+        // DELEGATED to FloatSelectionState manager
+        floatSelectionState.setZoom(zoom);  // Keep in sync
+        return floatSelectionState.hitHandle(pt);
     }
 
     /**
@@ -2202,7 +2145,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 selectedElements.clear();
                 undoStack.clear(); redoStack.clear();
                 selectedAreas.clear();
-                floatingImg = null; floatRect = null;
+                floatSelectionState.clear();  // DELEGATED
 
                 // Create and save new file
                 File saveDir = lastIndexedDir != null ? lastIndexedDir : new File(System.getProperty("user.home"));
@@ -2788,9 +2731,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     @Override public void deleteSelection() {
         if (floatingImg != null) {
             // Discard float pixels (region already cleared when lifted)
-            floatingImg = null; floatRect = null;
-            isDraggingFloat = false; floatDragAnchor = null;
-            activeHandle = -1; scaleBaseRect = null; scaleDragStart = null;
+            floatSelectionState.clear();  // DELEGATED: clears all 7 fields
             markDirty();
         } else if (!selectedAreas.isEmpty() && workingImage != null) {
             pushUndo();
