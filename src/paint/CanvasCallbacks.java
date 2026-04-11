@@ -80,8 +80,15 @@ public interface CanvasCallbacks {
     // Layer panel state
     /** True when the ElementLayerPanel "show all outlines" toggle is active. */
     boolean isShowAllLayerOutlines();
-    /** Creates an Element layer from a rendered text image and adds it to activeElements. */
+    /** Creates an IMAGE_LAYER Element from a rendered pixel image and adds it to activeElements. */
     void commitTextAsElement(java.awt.image.BufferedImage textImg, int x, int y);
+
+    /**
+     * Creates or updates a TEXT_LAYER Element.
+     * @param updateId  id of the existing element to replace, or -1 to add a new one
+     */
+    void commitTextLayer(int updateId, String text, String fontName, int fontSize,
+                         boolean bold, boolean italic, java.awt.Color color, int x, int y);
 
     // Actions
     void pushUndo();
@@ -90,6 +97,8 @@ public interface CanvasCallbacks {
     void paintDot(Point imagePt);
     void commitFloat();
     void repaintCanvas();
+    /** Called when the mouse enters/leaves an element on the canvas. id=-1 means no element. */
+    void onCanvasElementHover(int elementId);
     void clearSelection();
     /** Lift pixels from the active selection into a floating selection (MS-Paint style). */
     void liftSelectionToFloat();

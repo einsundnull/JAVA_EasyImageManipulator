@@ -30,6 +30,8 @@ public class ElementLayerPanel extends JPanel {
         void burnElement(Element el);
         void repaintCanvas();
         void onCloseRequested();
+        /** Called when the mouse enters/leaves a layer tile. id=-1 = no tile. */
+        void onLayerPanelElementHover(int elementId);
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
@@ -41,6 +43,8 @@ public class ElementLayerPanel extends JPanel {
     private final Callbacks      cb;
     private final JPanel         tilesContainer;
     private boolean              showAllOutlines = false;
+    /** Id of the element whose tile is currently hovered in this panel, or -1. */
+    private int                  hoveredElementId = -1;
 
     // =========================================================================
     // Constructor
@@ -128,6 +132,16 @@ public class ElementLayerPanel extends JPanel {
     // Public API
     // =========================================================================
     public boolean isShowAllOutlines() { return showAllOutlines; }
+
+    /**
+     * Called by the canvas when the mouse moves over/off an element.
+     * Highlights the matching tile in this panel without repainting the canvas.
+     */
+    public void setHoveredElement(int elementId) {
+        if (hoveredElementId == elementId) return;
+        hoveredElementId = elementId;
+        tilesContainer.repaint();
+    }
 
     /**
      * Rebuilds the tile list from the given elements.
@@ -248,8 +262,16 @@ public class ElementLayerPanel extends JPanel {
                     }
                     cb.repaintCanvas();
                 }
-                @Override public void mouseEntered(MouseEvent e) { repaint(); }
-                @Override public void mouseExited (MouseEvent e) { repaint(); }
+                @Override public void mouseEntered(MouseEvent e) {
+                    hoveredElementId = element.id();
+                    cb.onLayerPanelElementHover(element.id());
+                    repaint();
+                }
+                @Override public void mouseExited(MouseEvent e) {
+                    hoveredElementId = -1;
+                    cb.onLayerPanelElementHover(-1);
+                    repaint();
+                }
             });
         }
 
@@ -258,15 +280,18 @@ public class ElementLayerPanel extends JPanel {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            // Tile background
-            g2.setColor(new Color(44, 44, 44));
+            // Hover = mouse over THIS tile OR canvas hover matches this element
+            boolean hovered = hoveredElementId == element.id();
+
+            // Tile background – slightly lighter on hover
+            g2.setColor(hovered ? new Color(58, 54, 44) : new Color(44, 44, 44));
             g2.fillRoundRect(0, 0, TILE_W, TILE_H, 6, 6);
 
             // Checkerboard for transparency indication
             int tx = 5, ty = 4, tw = TILE_W - 10, th = THUMB_H;
             paintCheckerboard(g2, tx, ty, tw, th);
 
-            // Element thumbnail (aspect-fit)
+            // Element thumbnail (aspect-fit) — for TEXT_LAYER show a text preview
             BufferedImage img = element.image();
             if (img != null) {
                 double s = Math.min((double) tw / img.getWidth(), (double) th / img.getHeight());
@@ -277,12 +302,33 @@ public class ElementLayerPanel extends JPanel {
                 g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                         RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                 g2.drawImage(img, ix, iy, iw, ih, null);
+            } else if (element.type() == ElementType.TEXT_LAYER) {
+                // TEXT_LAYER: render a small text preview in the tile
+                int style = (element.fontBold() ? java.awt.Font.BOLD : 0)
+                          | (element.fontItalic() ? java.awt.Font.ITALIC : 0);
+                java.awt.Font pf = new java.awt.Font(
+                        element.fontName() != null ? element.fontName() : "SansSerif",
+                        style, Math.min(14, Math.max(8, element.fontSize() / 3)));
+                g2.setFont(pf);
+                g2.setColor(element.fontColor() != null ? element.fontColor() : java.awt.Color.WHITE);
+                g2.setClip(tx, ty, tw, th);
+                String[] lines = element.text() != null ? element.text().split("\n", -1) : new String[]{""};
+                java.awt.FontMetrics fm = g2.getFontMetrics();
+                for (int i = 0; i < lines.length && i < 4; i++) {
+                    g2.drawString(lines[i], tx + 2, ty + fm.getAscent() + fm.getHeight() * i + 2);
+                }
+                g2.setClip(null);
             }
 
-            // Selection / normal border
+            // Selection border / hover border / normal border
             if (selected) {
                 g2.setColor(AppColors.ACCENT);
                 g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 6, 6);
+            } else if (hovered) {
+                // Warm amber hover border — mirrors the canvas hover outline colour
+                g2.setColor(new Color(255, 200, 80));
+                g2.setStroke(new BasicStroke(1.5f));
                 g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 6, 6);
             } else {
                 g2.setColor(new Color(62, 62, 62));
