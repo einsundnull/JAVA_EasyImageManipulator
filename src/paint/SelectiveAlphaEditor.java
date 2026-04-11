@@ -169,6 +169,9 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     /** Files with unsaved changes (shown red in gallery).                        */
     private final Set<File> dirtyFiles = new HashSet<>();
 
+    // ── Project Management ────────────────────────────────────────────────────
+    private ProjectManager projectManager = new ProjectManager();
+
     // ── Element layers ────────────────────────────────────────────────────────
     /** Layers attached to the *current* image (alias into fileStateCache).       */
     private List<Layer>  activeElements  = new ArrayList<>();
@@ -262,9 +265,79 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         setMinimumSize(new Dimension(900, 650));
         pack();
-        setLocationRelativeTo(null);
+
+        // Lade Settings und stelle Fensterposition wieder her
+        try {
+            AppSettings.load();
+            AppSettings settings = AppSettings.getInstance();
+
+            // Fensterposition
+            setLocation(settings.getWindowX(), settings.getWindowY());
+            setSize(settings.getWindowWidth(), settings.getWindowHeight());
+            if (settings.isWindowMaximized()) {
+                setExtendedState(JFrame.MAXIMIZED_BOTH);
+            }
+
+            // Canvas-Farben
+            canvasBg1 = new Color(settings.getBg1());
+            canvasBg2 = new Color(settings.getBg2());
+
+            // View-Optionen
+            showGrid = settings.isShowGrid();
+            showRuler = settings.isShowRuler();
+            rulerUnit = RulerUnit.valueOf(settings.getRulerUnit());
+
+            // Zoom-Einstellungen
+            ZOOM_MIN = settings.getZoomMin();
+            ZOOM_MAX = settings.getZoomMax();
+            ZOOM_STEP = settings.getZoomStep();
+            ZOOM_FACTOR = settings.getZoomFactor();
+
+            // App-Modus
+            try {
+                appMode = AppMode.valueOf(settings.getAppMode());
+            } catch (IllegalArgumentException e) {
+                appMode = AppMode.ALPHA_EDITOR;
+            }
+
+            // PaintToolbar-Einstellungen
+            if (paintToolbar != null) {
+                paintToolbar.setPrimaryColor(new Color(settings.getPrimaryColor(), true));
+                paintToolbar.setSecondaryColor(new Color(settings.getSecondaryColor(), true));
+                paintToolbar.setStrokeWidth(settings.getStrokeWidth());
+                paintToolbar.setAntialiasing(settings.isAntialias());
+                try {
+                    paintToolbar.setFillMode(settings.getFillMode());
+                    paintToolbar.setBrushShape(settings.getBrushShape());
+                    paintToolbar.setActiveTool(settings.getActiveTool());
+                } catch (Exception e) {
+                    System.err.println("[WARN] Fehler beim Restore von Paint-Einstellungen: " + e.getMessage());
+                }
+            }
+
+            // Text-Tool-Einstellungen
+            if (canvasPanel != null) {
+                canvasPanel.setTextFontName(settings.getFontName());
+                canvasPanel.setTextFontSize(settings.getFontSize());
+                canvasPanel.setTextBold(settings.isTextBold());
+                canvasPanel.setTextItalic(settings.isTextItalic());
+                canvasPanel.setTextColor(new Color(settings.getFontColor(), true));
+            }
+
+        } catch (IOException e) {
+            System.err.println("[WARN] Fehler beim Laden der Einstellungen: " + e.getMessage());
+            setLocationRelativeTo(null); // Fallback
+        }
 
         setupKeyBindings();
+
+        // WindowListener für State-Change (Resize/Maximize) und Schließen
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosing(java.awt.event.WindowEvent e) {
+                onApplicationClosing();
+            }
+        });
+
         addWindowStateListener((WindowEvent e) -> {
             boolean wasMax = (e.getOldState() & MAXIMIZED_BOTH) == MAXIMIZED_BOTH;
             boolean isMax  = (e.getNewState() & MAXIMIZED_BOTH) == MAXIMIZED_BOTH;
@@ -279,7 +352,65 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 });
             }
         });
+
         setVisible(true);
+    }
+
+    private void onApplicationClosing() {
+        try {
+            // Speichere aktuelle Szene
+            if (sourceFile != null && workingImage != null) {
+                projectManager.saveScene(sourceFile, activeElements, zoom, appMode);
+            }
+
+            // Speichere globale Einstellungen
+            AppSettings settings = AppSettings.getInstance();
+            settings.setBg1(canvasBg1.getRGB());
+            settings.setBg2(canvasBg2.getRGB());
+            settings.setShowGrid(showGrid);
+            settings.setShowRuler(showRuler);
+            settings.setRulerUnit(rulerUnit.toString());
+            settings.setAppMode(appMode.toString());
+            settings.setZoomMin(ZOOM_MIN);
+            settings.setZoomMax(ZOOM_MAX);
+            settings.setZoomStep(ZOOM_STEP);
+            settings.setZoomFactor(ZOOM_FACTOR);
+
+            // Fensterposition
+            settings.setWindowX(getX());
+            settings.setWindowY(getY());
+            settings.setWindowWidth(getWidth());
+            settings.setWindowHeight(getHeight());
+            settings.setWindowMaximized((getExtendedState() & JFrame.MAXIMIZED_BOTH) == JFrame.MAXIMIZED_BOTH);
+
+            // PaintToolbar
+            if (paintToolbar != null) {
+                settings.setPrimaryColor(paintToolbar.getPrimaryColor().getRGB());
+                settings.setSecondaryColor(paintToolbar.getSecondaryColor().getRGB());
+                settings.setStrokeWidth(paintToolbar.getStrokeWidth());
+                settings.setAntialias(paintToolbar.isAntialiasing());
+                settings.setActiveTool(paintToolbar.getActiveTool().toString());
+                settings.setFillMode(paintToolbar.getFillMode().toString());
+                settings.setBrushShape(paintToolbar.getBrushShape().toString());
+            }
+
+            // Text-Tool
+            if (canvasPanel != null) {
+                settings.setFontName(canvasPanel.getTextFontName());
+                settings.setFontSize(canvasPanel.getTextFontSize());
+                settings.setTextBold(canvasPanel.isTextBold());
+                settings.setTextItalic(canvasPanel.isTextItalic());
+                settings.setFontColor(canvasPanel.getTextColor().getRGB());
+            }
+
+            // Speichern
+            settings.save();
+        } catch (IOException e) {
+            System.err.println("[ERROR] Fehler beim Speichern der Einstellungen: " + e.getMessage());
+        }
+
+        // Normal beenden
+        System.exit(0);
     }
 
     // ── Top bar ───────────────────────────────────────────────────────────────
@@ -700,9 +831,39 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         elemActiveHandle = -1; elemScaleBase = null; elemScaleStart = null;
         if (canvasPanel != null) canvasPanel.resetInputState();
 
+        // NEW: Lade gespeicherte Szene-Daten (Layer, Zoom, Mode)
+        try {
+            if (projectManager.getProjectName() != null) {
+                List<Layer> savedLayers = projectManager.loadScene(file);
+                if (savedLayers != null) {
+                    activeElements = savedLayers;
+                }
+
+                double savedZoom = projectManager.loadSceneZoom(file);
+                if (savedZoom > 0) {
+                    zoom = savedZoom;
+                    userHasManuallyZoomed = true;
+                }
+
+                AppMode savedMode = projectManager.loadSceneMode(file);
+                if (savedMode != null) {
+                    appMode = savedMode;
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("[WARN] Fehler beim Laden der Szenen-Daten: " + e.getMessage());
+        }
+
         indexDirectory(file);
         swapToImageView();
-        SwingUtilities.invokeLater(this::fitToViewport);
+        SwingUtilities.invokeLater(() -> {
+            if (userHasManuallyZoomed) {
+                // Halte den Zoom, aber zentriere
+                centerCanvas();
+            } else {
+                fitToViewport();
+            }
+        });
         refreshElementPanel();
         updateNavigationButtons();
         updateTitle();

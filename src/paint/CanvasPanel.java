@@ -114,6 +114,25 @@ public class CanvasPanel extends JPanel {
 	}
 
 	/** Called by ElementLayerPanel when the mouse enters/leaves a tile. */
+	// ──────────────────────────────────────────────────────────────
+	// Text-Tool Getter/Setter für Settings-Persistierung
+	// ──────────────────────────────────────────────────────────────
+
+	public String getTextFontName() { return textFontName; }
+	public void setTextFontName(String name) { textFontName = name; }
+
+	public int getTextFontSize() { return textFontSize; }
+	public void setTextFontSize(int size) { textFontSize = Math.max(6, size); }
+
+	public boolean isTextBold() { return textBold; }
+	public void setTextBold(boolean b) { textBold = b; }
+
+	public boolean isTextItalic() { return textItalic; }
+	public void setTextItalic(boolean i) { textItalic = i; }
+
+	public Color getTextColor() { return textColor; }
+	public void setTextColor(Color c) { textColor = c; }
+
 	public void setHoveredElementId(int id) {
 		if (hoveredElementId == id) return;
 		hoveredElementId = id;

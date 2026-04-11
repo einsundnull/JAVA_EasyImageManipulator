@@ -187,6 +187,59 @@ public class PaintToolbar extends JPanel {
         cb.onColorChanged(primaryColor, secondaryColor);
     }
 
+    // Setter für Settings-Restore
+    public void setAntialiasing(boolean aa) {
+        antialias = aa;
+        // Button-Zustand synchronisieren (über Callback)
+        cb.onAntialiasingChanged(aa);
+    }
+
+    public void setPrimaryColor(Color c) {
+        primaryColor = c;
+        colorPrimaryPreview.setBackground(c);
+        syncAlphaSlider();
+        cb.onColorChanged(primaryColor, secondaryColor);
+    }
+
+    public void setSecondaryColor(Color c) {
+        secondaryColor = c;
+        colorSecondaryPreview.setBackground(c);
+        cb.onColorChanged(primaryColor, secondaryColor);
+    }
+
+    public void setStrokeWidth(int w) {
+        strokeWidth = Math.max(1, w);
+        cb.onStrokeChanged(strokeWidth);
+    }
+
+    public void setActiveTool(String toolName) {
+        try {
+            PaintEngine.Tool t = PaintEngine.Tool.valueOf(toolName);
+            activeTool = t;
+            cb.onToolChanged(activeTool);
+        } catch (IllegalArgumentException e) {
+            System.err.println("[WARN] Unbekanntes Tool: " + toolName);
+        }
+    }
+
+    public void setFillMode(String modeName) {
+        try {
+            PaintEngine.FillMode m = PaintEngine.FillMode.valueOf(modeName);
+            fillMode = m;
+        } catch (IllegalArgumentException e) {
+            System.err.println("[WARN] Unbekannter FillMode: " + modeName);
+        }
+    }
+
+    public void setBrushShape(String shapeName) {
+        try {
+            PaintEngine.BrushShape s = PaintEngine.BrushShape.valueOf(shapeName);
+            brushShape = s;
+        } catch (IllegalArgumentException e) {
+            System.err.println("[WARN] Unbekannte BrushShape: " + shapeName);
+        }
+    }
+
     public void showToolbar() { setVisible(true); revalidate(); repaint(); }
     public void hideToolbar() { setVisible(false); revalidate(); }
 
