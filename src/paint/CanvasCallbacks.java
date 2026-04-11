@@ -87,6 +87,10 @@ public interface CanvasCallbacks {
     void clearSelection();
     /** Lift pixels from the active selection into a floating selection (MS-Paint style). */
     void liftSelectionToFloat();
+    /** True when Paint mode is active AND the Canvas sub-mode toggle is on. */
+    boolean isCanvasSubMode();
+    /** Lift the current selection rect directly into a new Element layer (Canvas sub-mode). */
+    void liftSelectionToElement(Rectangle sel);
     /** Delete selected area pixels (or discard float if one is active). */
     void deleteSelection();
     void updateSelectedElement(Element el);

@@ -449,7 +449,7 @@ public class CanvasPanel extends JPanel {
 						if (callbacks.isSelecting()) {
 							callbacks.setSelecting(false);
 							Point start = callbacks.getSelectionStart();
-							Point end = callbacks.getSelectionEnd();
+							Point end   = callbacks.getSelectionEnd();
 							if (start != null && end != null) {
 								int x = Math.min(start.x, end.x);
 								int y = Math.min(start.y, end.y);
@@ -457,9 +457,15 @@ public class CanvasPanel extends JPanel {
 								int h = Math.abs(end.y - start.y);
 								if (w > 0 && h > 0) {
 									Rectangle sel = new Rectangle(x, y, w, h);
-									callbacks.getSelectedAreas().clear(); // single selection in Paint mode
-									callbacks.getSelectedAreas().add(sel);
-									callbacks.repaintCanvas();
+									if (callbacks.isCanvasSubMode()) {
+										// Canvas sub-mode: immediately lift pixels into an Element layer
+										callbacks.liftSelectionToElement(sel);
+									} else {
+										// Normal Paint mode: keep selection rect for further action
+										callbacks.getSelectedAreas().clear();
+										callbacks.getSelectedAreas().add(sel);
+										callbacks.repaintCanvas();
+									}
 								}
 							}
 						}

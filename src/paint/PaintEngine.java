@@ -197,6 +197,43 @@ public class PaintEngine {
         g2.dispose();
     }
 
+    /**
+     * Returns a full-canvas-size copy with the selection area punched out (transparent).
+     * Used for "copy/cut outside selection" operations.
+     */
+    public static BufferedImage cropOutside(BufferedImage img, Rectangle sel) {
+        BufferedImage result = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = result.createGraphics();
+        g2.drawImage(img, 0, 0, null);
+        g2.setComposite(AlphaComposite.Clear);
+        int x = Math.max(0, sel.x), y = Math.max(0, sel.y);
+        int w = Math.min(sel.width,  img.getWidth()  - x);
+        int h = Math.min(sel.height, img.getHeight() - y);
+        if (w > 0 && h > 0) g2.fillRect(x, y, w, h);
+        g2.dispose();
+        return result;
+    }
+
+    /**
+     * Clears everything OUTSIDE the selection rectangle (makes it transparent).
+     */
+    public static void clearOutside(BufferedImage img, Rectangle sel) {
+        Graphics2D g2 = img.createGraphics();
+        g2.setComposite(AlphaComposite.Clear);
+        int x = Math.max(0, sel.x), y = Math.max(0, sel.y);
+        int w = Math.min(sel.width,  img.getWidth()  - x);
+        int h = Math.min(sel.height, img.getHeight() - y);
+        // Clear top strip
+        if (y > 0)                        g2.fillRect(0, 0, img.getWidth(), y);
+        // Clear bottom strip
+        if (y + h < img.getHeight())      g2.fillRect(0, y + h, img.getWidth(), img.getHeight() - y - h);
+        // Clear left strip (within sel row band)
+        if (x > 0)                        g2.fillRect(0, y, x, h);
+        // Clear right strip (within sel row band)
+        if (x + w < img.getWidth())       g2.fillRect(x + w, y, img.getWidth() - x - w, h);
+        g2.dispose();
+    }
+
     // ── Region-space transforms (in-place) ───────────────────────────────────
 
     /** Flip the pixels inside rectangle r horizontally, in-place. */

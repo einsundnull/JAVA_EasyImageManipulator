@@ -198,6 +198,9 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     private JPanel        galleryWrapper;
     private JToggleButton filmstripBtn;
 
+    // ── Element layer panel (right sidebar, shown in Canvas mode) ─────────────
+    private ElementLayerPanel elementLayerPanel;
+
     // ── UI references ─────────────────────────────────────────────────────────
     private CanvasPanel       canvasPanel;
     private TileGalleryPanel  tileGallery;
@@ -378,12 +381,10 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         // — Mode toggle buttons —
         // \u25a1 (□) = white square  \u270f (✏) = pencil — both BMP, safe
-        canvasModeBtn = UIComponentFactory.buildModeToggleBtn("\u25a1", "Canvas (Funktion folgt)");
+        canvasModeBtn = UIComponentFactory.buildModeToggleBtn("\u25a6", "Canvas-Modus: Layer-Verwaltung – nur im Paint-Modus (STRG+A = Alle auswählen)");
         canvasModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-        canvasModeBtn.addActionListener(e -> {
-            canvasModeBtn.setSelected(false);
-            showInfoDialog("Canvas-Modus", "Diese Funktion wird in einer späteren Version implementiert.");
-        });
+        canvasModeBtn.setEnabled(false); // enabled only while Paint mode is active
+        canvasModeBtn.addActionListener(e -> toggleCanvasMode());
 
         paintModeBtn = UIComponentFactory.buildModeToggleBtn("\u270f", "Paint-Modus aktivieren / deaktivieren");
         paintModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
@@ -546,10 +547,13 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         tileGallery = new TileGalleryPanel(buildGalleryCallbacks());
 
+        elementLayerPanel = new ElementLayerPanel(buildElementLayerCallbacks());
+
         galleryWrapper = new JPanel(new BorderLayout());
         galleryWrapper.setBackground(AppColors.BG_DARK);
         galleryWrapper.add(tileGallery, BorderLayout.WEST);
         galleryWrapper.add(layeredPane, BorderLayout.CENTER);
+        // elementLayerPanel is added to EAST only when Canvas mode is active
         return galleryWrapper;
     }
 
@@ -696,6 +700,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         indexDirectory(file);
         swapToImageView();
         SwingUtilities.invokeLater(this::fitToViewport);
+        refreshElementPanel();
         updateNavigationButtons();
         updateTitle();
         updateStatus();
@@ -1035,8 +1040,21 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
     private void togglePaintMode() {
         boolean entering = paintModeBtn.isSelected();
-        appMode = entering ? AppMode.PAINT : AppMode.ALPHA_EDITOR;
-        modeLabel.setText("Modus: " + (entering ? "Paint" : (floodfillMode ? "Floodfill" : "Selective Alpha")));
+        if (entering) {
+            appMode = AppMode.PAINT;
+        } else {
+            // Leaving Paint: also deactivate Canvas sub-mode
+            if (canvasModeBtn.isSelected()) {
+                canvasModeBtn.setSelected(false);
+                setElementPanelVisible(false);
+            }
+            appMode = AppMode.ALPHA_EDITOR;
+        }
+        // Canvas sub-mode button is only meaningful inside Paint
+        canvasModeBtn.setEnabled(entering);
+        modeLabel.setText(entering
+                ? (canvasModeBtn.isSelected() ? "Modus: Paint / Canvas" : "Modus: Paint")
+                : (floodfillMode ? "Modus: Floodfill" : "Modus: Selective Alpha"));
         if (entering) {
             paintToolbar.showToolbar();
             applyButton.setEnabled(false);
@@ -1061,11 +1079,76 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             }
             canvasPanel.repaint();
         }));
-        paintSnapshot   = null;
+        paintSnapshot = null;
         canvasPanel.setCursor(entering
                 ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR)
                 : Cursor.getDefaultCursor());
         canvasPanel.repaint();
+    }
+
+    /** Canvas is a sub-mode of Paint: layers panel shown, drawing stays non-destructive. */
+    private void toggleCanvasMode() {
+        boolean entering = canvasModeBtn.isSelected();
+        // appMode stays PAINT in both cases — Canvas is just a sub-mode flag
+        if (entering) {
+            setElementPanelVisible(true);
+        } else {
+            setElementPanelVisible(false);
+        }
+        modeLabel.setText(entering ? "Modus: Paint / Canvas" : "Modus: Paint");
+        canvasPanel.repaint();
+    }
+
+    /** Shows or hides the element layer panel on the right side of the canvas. */
+    private void setElementPanelVisible(boolean visible) {
+        if (visible) {
+            if (elementLayerPanel.getParent() != galleryWrapper) {
+                galleryWrapper.add(elementLayerPanel, BorderLayout.EAST);
+            }
+            refreshElementPanel();
+        } else {
+            galleryWrapper.remove(elementLayerPanel);
+        }
+        galleryWrapper.revalidate();
+        galleryWrapper.repaint();
+    }
+
+    /** Rebuilds the element layer panel tiles from the current activeElements. */
+    private void refreshElementPanel() {
+        if (elementLayerPanel != null && elementLayerPanel.isShowing()) {
+            elementLayerPanel.refresh(activeElements);
+        }
+    }
+
+    /** Builds the callbacks for the ElementLayerPanel. */
+    private ElementLayerPanel.Callbacks buildElementLayerCallbacks() {
+        return new ElementLayerPanel.Callbacks() {
+            @Override public List<Element> getActiveElements()   { return activeElements; }
+            @Override public List<Element> getSelectedElements() { return selectedElements; }
+            @Override public void setSelectedElement(Element el) {
+                selectedElements.clear();
+                if (el != null) selectedElements.add(el);
+                if (canvasPanel != null) canvasPanel.repaint();
+            }
+            @Override public void toggleElementSelection(Element el) {
+                doToggleElementSelection(el);
+                if (canvasPanel != null) canvasPanel.repaint();
+            }
+            @Override public void deleteElement(Element el) {
+                activeElements.removeIf(e -> e.id() == el.id());
+                selectedElements.removeIf(e -> e.id() == el.id());
+                markDirty();
+                refreshElementPanel();
+                if (canvasPanel != null) canvasPanel.repaint();
+            }
+            @Override public void repaintCanvas() {
+                if (canvasPanel != null) canvasPanel.repaint();
+            }
+            @Override public void onCloseRequested() {
+                canvasModeBtn.setSelected(false);
+                toggleCanvasMode();
+            }
+        };
     }
 
     // =========================================================================
@@ -1257,6 +1340,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             activeElements.add(el);
             selectedElements.clear();
             selectedElements.add(el);
+            refreshElementPanel();
         } else {
             PaintEngine.pasteRegion(workingImage, scaled, new Point(floatRect.x, floatRect.y));
         }
@@ -1439,16 +1523,50 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     // =========================================================================
     // Clipboard operations
     // =========================================================================
-    private void doCut() {
+
+    /** CTRL+C — copy INSIDE selection → Element layer (or full image if no selection). */
+    private void doCopy() {
         if (workingImage == null) return;
-        pushUndo();
         Rectangle sel = getActiveSelection();
         if (sel != null) {
             clipboard = PaintEngine.cropRegion(workingImage, sel);
             copyToSystemClipboard(clipboard);
+            addElementFromClipboard(clipboard, sel.x, sel.y);
+        } else {
+            clipboard = deepCopy(workingImage);
+            copyToSystemClipboard(clipboard);
+        }
+    }
+
+    /** CTRL+SHIFT+C — copy OUTSIDE selection → Element layer (full-size, inside punched out). */
+    private void doCopyOutside() {
+        if (workingImage == null) return;
+        Rectangle sel = getActiveSelection();
+        if (sel != null) {
+            clipboard = PaintEngine.cropOutside(workingImage, sel);
+            copyToSystemClipboard(clipboard);
+            addElementFromClipboard(clipboard, 0, 0);
+        } else {
+            // No selection: same as normal copy
+            clipboard = deepCopy(workingImage);
+            copyToSystemClipboard(clipboard);
+        }
+    }
+
+    /** CTRL+X — cut INSIDE selection → Element layer + clear canvas pixels. */
+    private void doCut() {
+        if (workingImage == null) return;
+        Rectangle sel = getActiveSelection();
+        if (sel != null) {
+            pushUndo();
+            clipboard = PaintEngine.cropRegion(workingImage, sel);
+            copyToSystemClipboard(clipboard);
             PaintEngine.clearRegion(workingImage, sel);
             markDirty();
+            addElementFromClipboard(clipboard, sel.x, sel.y);
         } else {
+            // No selection: cut entire image
+            pushUndo();
             clipboard = deepCopy(workingImage);
             copyToSystemClipboard(clipboard);
             PaintEngine.clearRegion(workingImage,
@@ -1457,11 +1575,35 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         }
     }
 
-    private void doCopy() {
+    /** CTRL+SHIFT+X — cut OUTSIDE selection → Element layer (full-size) + clear canvas outside. */
+    private void doCutOutside() {
         if (workingImage == null) return;
         Rectangle sel = getActiveSelection();
-        clipboard = (sel != null) ? PaintEngine.cropRegion(workingImage, sel) : deepCopy(workingImage);
-        copyToSystemClipboard(clipboard);
+        if (sel != null) {
+            pushUndo();
+            clipboard = PaintEngine.cropOutside(workingImage, sel);
+            copyToSystemClipboard(clipboard);
+            PaintEngine.clearOutside(workingImage, sel);
+            markDirty();
+            addElementFromClipboard(clipboard, 0, 0);
+        } else {
+            // No selection: same as normal cut
+            doCut();
+        }
+    }
+
+    /**
+     * Creates a new Element layer from the given image and adds it to activeElements.
+     * Called after any copy/cut so the content immediately appears as a non-destructive layer.
+     */
+    private void addElementFromClipboard(BufferedImage img, int x, int y) {
+        if (img == null || appMode != AppMode.PAINT) return;
+        Element el = new Element(nextElementId++, deepCopy(img), x, y, img.getWidth(), img.getHeight());
+        activeElements.add(el);
+        selectedElements.clear();
+        selectedElements.add(el);
+        refreshElementPanel();
+        if (canvasPanel != null) canvasPanel.repaint();
     }
 
     private void doPaste() {
@@ -1537,40 +1679,62 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         InputMap  im = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap am = root.getActionMap();
 
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.CTRL_DOWN_MASK), "copy");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, InputEvent.CTRL_DOWN_MASK), "cut");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_DOWN_MASK), "paste");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undo");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK), "redo");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK), "save");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "escape");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "deleteElement");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER,  0), "mergeElement");
+        int CTRL       = InputEvent.CTRL_DOWN_MASK;
+        int CTRL_SHIFT = InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, CTRL),        "copy");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, CTRL_SHIFT),  "copyOutside");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, CTRL),        "cut");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, CTRL_SHIFT),  "cutOutside");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, CTRL),        "paste");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, CTRL),        "selectAll");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, CTRL),        "undo");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, CTRL),        "redo");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL),        "save");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE,    0),   "escape");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE,    0),   "deleteInside");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0),  "deleteOutside");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER,     0),   "mergeElement");
 
-        am.put("copy",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doCopy(); } });
-        am.put("cut",    new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doCut(); } });
-        am.put("paste",  new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doPaste(); } });
-        am.put("undo",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
-            // If a paste-float is still open, Ctrl+Z cancels it (cancelFloat calls doUndo internally).
-            // Otherwise do a normal undo.
+        am.put("copy",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doCopy(); } });
+        am.put("copyOutside", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doCopyOutside(); } });
+        am.put("cut",         new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doCut(); } });
+        am.put("cutOutside",  new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doCutOutside(); } });
+        am.put("paste",       new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doPaste(); } });
+        am.put("selectAll",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+            if (appMode == AppMode.PAINT) {
+                selectedElements.clear();
+                selectedElements.addAll(activeElements);
+                if (canvasPanel != null) canvasPanel.repaint();
+                refreshElementPanel();
+            }
+        }});
+        am.put("undo",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             if (floatingImg != null) cancelFloat(); else doUndo();
-        } });
-        am.put("redo",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRedo(); } });
-        am.put("save",   new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageSilent(); } });
-        am.put("escape", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+        }});
+        am.put("redo",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRedo(); } });
+        am.put("save",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageSilent(); } });
+        am.put("escape",      new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             if (floatingImg != null) { cancelFloat(); }
             else if (!selectedElements.isEmpty()) { selectedElements.clear(); canvasPanel.repaint(); }
             else { selectedAreas.clear(); isSelecting = false; selectionStart = null; selectionEnd = null; canvasPanel.repaint(); }
         }});
-        am.put("deleteElement", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+        am.put("deleteInside", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             if (!selectedElements.isEmpty()) {
                 deleteSelectedElements();
             } else if (!selectedAreas.isEmpty() && workingImage != null) {
-                // DEL clears the pixel content of the current selection
                 pushUndo();
                 for (Rectangle r : selectedAreas) PaintEngine.clearRegion(workingImage, r);
                 selectedAreas.clear();
                 isSelecting = false; selectionStart = null; selectionEnd = null;
+                markDirty();
+            }
+        }});
+        am.put("deleteOutside", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+            if (workingImage == null) return;
+            Rectangle sel = getActiveSelection();
+            if (sel != null) {
+                pushUndo();
+                PaintEngine.clearOutside(workingImage, sel);
                 markDirty();
             }
         }});
@@ -1940,6 +2104,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         selectedElements.add(el);
         selectedAreas.clear();
         markDirty();
+        refreshElementPanel();
     }
 
     /** Merges all selected elements onto the canvas and removes them from the layer list. */
@@ -1949,18 +2114,33 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         for (Element el : new ArrayList<>(selectedElements)) {
             BufferedImage scaled = PaintEngine.scale(el.image(), Math.max(1, el.width()), Math.max(1, el.height()));
             PaintEngine.pasteRegion(workingImage, scaled, new Point(el.x(), el.y()));
-            activeElements.remove(el);
+            activeElements.removeIf(e -> e.id() == el.id());
         }
         selectedElements.clear();
         markDirty();
+        refreshElementPanel();
     }
 
     /** Deletes all selected elements without merging to canvas. */
     private void deleteSelectedElements() {
         if (selectedElements.isEmpty()) return;
-        activeElements.removeAll(selectedElements);
+        for (Element el : selectedElements) activeElements.removeIf(e -> e.id() == el.id());
         selectedElements.clear();
         markDirty();
+        refreshElementPanel();
+    }
+
+    /** Toggles an element in/out of the multi-selection. New primary is put at index 0. */
+    private void doToggleElementSelection(Element el) {
+        for (int i = 0; i < selectedElements.size(); i++) {
+            if (selectedElements.get(i).id() == el.id()) {
+                selectedElements.remove(i);
+                refreshElementPanel();
+                return;
+            }
+        }
+        selectedElements.add(0, el);
+        refreshElementPanel();
     }
 
     // =========================================================================
@@ -2020,14 +2200,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         if (canvasPanel != null) canvasPanel.repaint();
     }
     @Override public void toggleElementSelection(Element el) {
-        for (int i = 0; i < selectedElements.size(); i++) {
-            if (selectedElements.get(i).id() == el.id()) {
-                selectedElements.remove(i);
-                if (canvasPanel != null) canvasPanel.repaint();
-                return;
-            }
-        }
-        selectedElements.add(0, el); // new primary = front of list
+        doToggleElementSelection(el);
         if (canvasPanel != null) canvasPanel.repaint();
     }
     @Override public void moveSelectedElements(int dx, int dy) {
@@ -2035,8 +2208,9 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         for (int i = 0; i < selectedElements.size(); i++) {
             Element el = selectedElements.get(i);
             Element updated = el.withPosition(el.x() + dx, el.y() + dy);
-            int actIdx = activeElements.indexOf(el);
-            if (actIdx >= 0) activeElements.set(actIdx, updated);
+            for (int j = 0; j < activeElements.size(); j++) {
+                if (activeElements.get(j).id() == el.id()) { activeElements.set(j, updated); break; }
+            }
             selectedElements.set(i, updated);
         }
         markDirty();
@@ -2103,6 +2277,31 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         if (canvasPanel != null) canvasPanel.repaint();
     }
 
+    @Override public boolean isCanvasSubMode() {
+        return appMode == AppMode.PAINT && canvasModeBtn != null && canvasModeBtn.isSelected();
+    }
+
+    @Override public void liftSelectionToElement(Rectangle sel) {
+        if (sel == null || workingImage == null) return;
+        int x = Math.max(0, sel.x), y = Math.max(0, sel.y);
+        int w = Math.min(sel.width,  workingImage.getWidth()  - x);
+        int h = Math.min(sel.height, workingImage.getHeight() - y);
+        if (w <= 0 || h <= 0) return;
+        Rectangle clipped = new Rectangle(x, y, w, h);
+        pushUndo();
+        BufferedImage crop = PaintEngine.cropRegion(workingImage, clipped);
+        PaintEngine.clearRegion(workingImage, clipped);
+        Element el = new Element(nextElementId++, crop, clipped.x, clipped.y, clipped.width, clipped.height);
+        activeElements.add(el);
+        selectedElements.clear();
+        selectedElements.add(el);
+        selectedAreas.clear();
+        isSelecting = false; selectionStart = null; selectionEnd = null;
+        markDirty();
+        refreshElementPanel();
+        if (canvasPanel != null) canvasPanel.repaint();
+    }
+
     @Override public void deleteSelection() {
         if (floatingImg != null) {
             // Discard float pixels (region already cleared when lifted)
@@ -2132,12 +2331,11 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     @Override public void updateSelectedElement(Element el) {
         if (el != null && !selectedElements.isEmpty()) {
             Element primary = selectedElements.get(0);
-            int actIdx = activeElements.indexOf(primary);
-            if (actIdx >= 0) {
-                activeElements.set(actIdx, el);
-                selectedElements.set(0, el);
-                markDirty();
+            for (int j = 0; j < activeElements.size(); j++) {
+                if (activeElements.get(j).id() == primary.id()) { activeElements.set(j, el); break; }
             }
+            selectedElements.set(0, el);
+            markDirty();
         }
     }
 
