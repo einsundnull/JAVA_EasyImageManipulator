@@ -1,9 +1,10 @@
 package paint;
 
-import java.awt.*;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.List;
-import javax.swing.JPanel;
+
 import javax.swing.JScrollPane;
 
 /**
@@ -39,6 +40,8 @@ public interface CanvasCallbacks {
     void setSelectedElements(List<Layer> els);
     void toggleElementSelection(Layer el);    // shift-click: add/remove from selection
     void moveSelectedElements(int dx, int dy); // move all selected by image-pixel delta
+    int getNextElementId();                   // generate next unique layer ID
+    void addElement(Layer el);                // add a new layer to activeElements
 
     // Floating selection state
     BufferedImage getFloatingImage();

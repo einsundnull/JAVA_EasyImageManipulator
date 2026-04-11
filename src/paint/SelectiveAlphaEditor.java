@@ -2367,6 +2367,17 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         }
         markDirty();
     }
+    @Override public int getNextElementId() {
+        return nextElementId++;
+    }
+    @Override public void addElement(Layer el) {
+        if (el != null) {
+            activeElements.add(el);
+            refreshElementPanel();
+            markDirty();
+            if (canvasPanel != null) canvasPanel.repaint();
+        }
+    }
 
     @Override public BufferedImage getFloatingImage() { return floatingImg; }
     @Override public Rectangle getFloatRect() { return floatRect; }
@@ -2553,6 +2564,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             }
             selectedElements.set(0, el);
             markDirty();
+            refreshElementPanel();
         }
     }
 

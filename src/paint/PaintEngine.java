@@ -22,7 +22,7 @@ public class PaintEngine {
 
     // ── Tool enum ─────────────────────────────────────────────────────────────
     public enum Tool {
-        PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT, TEXT
+        PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT, TEXT, PATH
     }
 
     // ── Fill mode enum ────────────────────────────────────────────────────────

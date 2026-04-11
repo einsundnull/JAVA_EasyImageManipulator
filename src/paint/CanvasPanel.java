@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
-import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -183,8 +182,10 @@ public class CanvasPanel extends JPanel {
 				if (primaryEl instanceof PathLayer pl) {
 					Rectangle sr = callbacks.elemRectScreen(pl);
 					Point screenPt = e.getPoint();
-					int layerX = screenPt.x - sr.x;
-					int layerY = screenPt.y - sr.y;
+					// Convert screen-relative offset to image-space by dividing by zoom
+					double zoom = callbacks.getZoom();
+					double layerX = (screenPt.x - sr.x) / zoom;
+					double layerY = (screenPt.y - sr.y) / zoom;
 
 					java.util.List<Point3D> points = pl.points();
 					int hitRadius = 12;
@@ -420,6 +421,29 @@ public class CanvasPanel extends JPanel {
 						textBoundingBox = null;
 						textMinBox      = null;
 					}
+					case PATH -> {
+						// PATH tool: first click creates new path with 3 initial points in triangle shape
+						// Otherwise, do nothing (user edits by dragging points)
+						Layer primary = callbacks.getSelectedElement();
+						if (!(primary instanceof PathLayer)) {
+							// Create new path with 3 starter points in triangle arrangement
+							// Points are positioned within the bounding box (10-90 on a 100x100 box)
+							java.util.List<Point3D> points = new java.util.ArrayList<>();
+							points.add(new Point3D(50, 10));     // Top
+							points.add(new Point3D(10, 90));     // Bottom-left
+							points.add(new Point3D(90, 90));     // Bottom-right
+
+							PathLayer newPath = PathLayer.of(callbacks.getNextElementId(), points, null, true, imgPt.x, imgPt.y);
+							callbacks.addElement(newPath);
+							callbacks.setSelectedElement(newPath);
+
+							// Deselect PATH tool after creating path (switch to SELECT to prevent accidental path creation)
+							callbacks.getPaintToolbar().setActiveTool(PaintEngine.Tool.SELECT);
+
+							System.err.println("[DEBUG] Created new path with triangle at " + imgPt);
+						}
+						repaint();
+					}
 					}
 				} else {
 					if (callbacks.isFloodfillMode()) {
@@ -457,8 +481,32 @@ public class CanvasPanel extends JPanel {
 				// ── PathLayer point drag ────────────────────────────────────────
 				Layer primary = callbacks.getSelectedElement();
 				if (primary instanceof PathLayer pl && selectedPathPointIndex >= 0) {
-					System.err.println("[DEBUG] Dragging path point " + selectedPathPointIndex);
 					PathLayer updated = pl.withMovedPoint(selectedPathPointIndex, imgPt.x - pl.x(), imgPt.y - pl.y());
+
+					// ── DEBUG: print all point coords + frame bounds after move ──
+					java.util.List<Point3D> dbgPts = updated.points();
+					double dbgMinX = Double.MAX_VALUE, dbgMaxX = -Double.MAX_VALUE;
+					double dbgMinY = Double.MAX_VALUE, dbgMaxY = -Double.MAX_VALUE;
+					StringBuilder sb = new StringBuilder();
+					sb.append("[PATH-DRAG] dragged=").append(selectedPathPointIndex).append("\n");
+					for (int di = 0; di < dbgPts.size(); di++) {
+						Point3D dp = dbgPts.get(di);
+						if (dp.x < dbgMinX) dbgMinX = dp.x;
+						if (dp.x > dbgMaxX) dbgMaxX = dp.x;
+						if (dp.y < dbgMinY) dbgMinY = dp.y;
+						if (dp.y > dbgMaxY) dbgMaxY = dp.y;
+						sb.append("  point[").append(di).append("] x=")
+						  .append(String.format("%.1f", dp.x))
+						  .append(" y=").append(String.format("%.1f", dp.y));
+						if (di == selectedPathPointIndex) sb.append(" <-- dragged");
+						sb.append("\n");
+					}
+					sb.append("  frame: left=").append(String.format("%.1f", dbgMinX - 8))
+					  .append(" right=").append(String.format("%.1f", dbgMaxX + 8))
+					  .append(" top=").append(String.format("%.1f", dbgMinY - 8))
+					  .append(" bottom=").append(String.format("%.1f", dbgMaxY + 8));
+					System.err.println(sb);
+
 					callbacks.updateSelectedElement(updated);
 					repaint();
 					return;
@@ -808,9 +856,10 @@ public class CanvasPanel extends JPanel {
 				if (primary instanceof PathLayer pl) {
 					Rectangle sr = callbacks.elemRectScreen(pl);
 					Point screenPt = e.getPoint();
-					// Convert to layer-space coordinates
-					int layerX = screenPt.x - sr.x;
-					int layerY = screenPt.y - sr.y;
+					// Convert screen-relative offset to image-space by dividing by zoom
+					double zoom = callbacks.getZoom();
+					double layerX = (screenPt.x - sr.x) / zoom;
+					double layerY = (screenPt.y - sr.y) / zoom;
 
 					java.util.List<Point3D> points = pl.points();
 					int hitRadius = 12;  // Larger hit area for points
@@ -860,17 +909,27 @@ public class CanvasPanel extends JPanel {
 						selectedPathPointIndex = -1;
 						ke.consume(); repaint(); return;
 					}
-					if (code == KeyEvent.VK_PLUS && selectedPathPointIndex >= 0) {
+					// Check for PLUS key (VK_PLUS or VK_ADD for numpad, or character '=' with shift)
+					boolean isPlusKey = (code == KeyEvent.VK_PLUS || code == KeyEvent.VK_ADD ||
+					                    (code == KeyEvent.VK_EQUALS && ke.isShiftDown()));
+					if (isPlusKey && selectedPathPointIndex >= 0) {
 						// PLUS: add new point after selected point
-						System.err.println("[DEBUG] ADD point after index " + selectedPathPointIndex);
+						System.err.println("[DEBUG] ADD point after index " + selectedPathPointIndex + ", keyCode=" + code);
 						Point3D current = pl.getPoint(selectedPathPointIndex);
-						Point3D next = pl.getPoint(selectedPathPointIndex + 1);
+						Point3D next;
+						// For closed paths, wrap around to first point; otherwise use next point or offset
+						if (pl.isClosed() && selectedPathPointIndex == pl.pointCount() - 1) {
+							next = pl.getPoint(0);
+						} else {
+							next = pl.getPoint(selectedPathPointIndex + 1);
+						}
 						// Midpoint between current and next (or offset if at end)
 						double newX = next != null ? (current.x + next.x) / 2 : current.x + 20;
 						double newY = next != null ? (current.y + next.y) / 2 : current.y + 20;
 						PathLayer updated = pl.withAddedPoint(selectedPathPointIndex + 1, new Point3D(newX, newY));
 						callbacks.updateSelectedElement(updated);
 						selectedPathPointIndex++;  // Auto-select new point
+						System.err.println("[DEBUG] Added point, new pointCount=" + updated.pointCount());
 						ke.consume(); repaint(); return;
 					}
 				}
@@ -1479,6 +1538,29 @@ public class CanvasPanel extends JPanel {
 				if (pass == 1 && !isPrimary) continue; // skip others on second pass
 
 				Rectangle sr = callbacks.elemRectScreen(el);
+
+				// For PathLayer the frame must be derived from the actual point
+				// extents, not from the stored pl.x/pl.y/pl.width/pl.height.
+				// pl.x() is the layer origin; points can have negative coordinates
+				// (to the left/above the origin), so elemRectScreen gives the wrong rect.
+				Rectangle frameRect = sr;
+				if (el instanceof PathLayer pl) {
+					double zoom = callbacks.getZoom();
+					double fMinX = Double.MAX_VALUE, fMaxX = -Double.MAX_VALUE;
+					double fMinY = Double.MAX_VALUE, fMaxY = -Double.MAX_VALUE;
+					for (Point3D p : pl.points()) {
+						if (p.x < fMinX) fMinX = p.x;
+						if (p.x > fMaxX) fMaxX = p.x;
+						if (p.y < fMinY) fMinY = p.y;
+						if (p.y > fMaxY) fMaxY = p.y;
+					}
+					int fx = (int) Math.round((pl.x() + fMinX - 8) * zoom);
+					int fy = (int) Math.round((pl.y() + fMinY - 8) * zoom);
+					int fw = (int) Math.round((fMaxX - fMinX + 16) * zoom);
+					int fh = (int) Math.round((fMaxY - fMinY + 16) * zoom);
+					frameRect = new Rectangle(fx, fy, Math.max(1, fw), Math.max(1, fh));
+				}
+
 				if (el instanceof ImageLayer il) {
 					g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
 				} else if (el instanceof TextLayer tl) {
@@ -1505,10 +1587,10 @@ public class CanvasPanel extends JPanel {
 				if (isSel) {
 					g2.setColor(AppColors.ACCENT);
 					g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, selDash, 0f));
-					g2.drawRect(sr.x, sr.y, sr.width, sr.height);
+					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
 					if (isPrimary) {
 						g2.setStroke(new BasicStroke(1f));
-						for (Rectangle hr : callbacks.handleRects(sr)) {
+						for (Rectangle hr : callbacks.handleRects(frameRect)) {
 							g2.setColor(Color.WHITE);
 							g2.fillRect(hr.x, hr.y, hr.width, hr.height);
 							g2.setColor(AppColors.ACCENT);
@@ -1519,12 +1601,12 @@ public class CanvasPanel extends JPanel {
 					// Hover outline: brighter, solid
 					g2.setColor(new Color(255, 200, 80, 200));
 					g2.setStroke(new BasicStroke(1.5f));
-					g2.drawRect(sr.x, sr.y, sr.width, sr.height);
+					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
 				} else if (showOutlines) {
 					// Dim outline for unselected layers when toggle is on
 					g2.setColor(new Color(160, 160, 160, 140));
 					g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dimDash, 0f));
-					g2.drawRect(sr.x, sr.y, sr.width, sr.height);
+					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
 				}
 			}
 		}
@@ -1700,15 +1782,17 @@ public class CanvasPanel extends JPanel {
 		int pointRadius = 8;  // Pixel radius for point rendering
 
 		// ── Draw lines connecting points ──
+		// sr is in screen space (image coords * zoom); point coords are image-space,
+		// so multiply by zoom before adding to sr to get correct screen position.
 		g2.setColor(new Color(0, 200, 255, 180));  // Cyan
 		g2.setStroke(new BasicStroke(1.5f));
 		for (int i = 0; i < points.size() - 1; i++) {
 			Point3D p1 = points.get(i);
 			Point3D p2 = points.get(i + 1);
-			int x1 = sr.x + (int) p1.x;
-			int y1 = sr.y + (int) p1.y;
-			int x2 = sr.x + (int) p2.x;
-			int y2 = sr.y + (int) p2.y;
+			int x1 = sr.x + (int) Math.round(p1.x * zoom);
+			int y1 = sr.y + (int) Math.round(p1.y * zoom);
+			int x2 = sr.x + (int) Math.round(p2.x * zoom);
+			int y2 = sr.y + (int) Math.round(p2.y * zoom);
 			g2.drawLine(x1, y1, x2, y2);
 		}
 
@@ -1716,18 +1800,18 @@ public class CanvasPanel extends JPanel {
 		if (pl.isClosed() && points.size() >= 2) {
 			Point3D p1 = points.get(points.size() - 1);
 			Point3D p2 = points.get(0);
-			int x1 = sr.x + (int) p1.x;
-			int y1 = sr.y + (int) p1.y;
-			int x2 = sr.x + (int) p2.x;
-			int y2 = sr.y + (int) p2.y;
+			int x1 = sr.x + (int) Math.round(p1.x * zoom);
+			int y1 = sr.y + (int) Math.round(p1.y * zoom);
+			int x2 = sr.x + (int) Math.round(p2.x * zoom);
+			int y2 = sr.y + (int) Math.round(p2.y * zoom);
 			g2.drawLine(x1, y1, x2, y2);
 		}
 
 		// ── Draw point markers ──
 		for (int i = 0; i < points.size(); i++) {
 			Point3D p = points.get(i);
-			int px = sr.x + (int) p.x;
-			int py = sr.y + (int) p.y;
+			int px = sr.x + (int) Math.round(p.x * zoom);
+			int py = sr.y + (int) Math.round(p.y * zoom);
 
 			boolean isHovered = isPrimary && (i == hoveredPathPointIndex);
 			boolean isSelected = isPrimary && (i == selectedPathPointIndex);

@@ -1,12 +1,33 @@
 package paint;
 
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
 import java.util.List;
-import javax.swing.*;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JToggleButton;
+import javax.swing.SwingUtilities;
 
 /**
  * Sidebar panel showing the non-destructive layers of the current image.
@@ -285,7 +306,10 @@ public class ElementLayerPanel extends JPanel {
             // Tile click: select layer on canvas
             addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
-                    if (e.isShiftDown()) {
+                    if (e.getClickCount() == 2 && layer instanceof PathLayer pl) {
+                        // Double-click on PathLayer: open path editor dialog
+                        openPathEditorDialog(pl);
+                    } else if (e.isShiftDown()) {
                         cb.toggleElementSelection(layer);
                     } else {
                         cb.setSelectedElement(layer);
@@ -350,6 +374,75 @@ public class ElementLayerPanel extends JPanel {
                     g2.drawString(lines[i], tx + 2, ty + fm.getAscent() + fm.getHeight() * i + 2);
                 }
                 g2.setClip(null);
+            } else if (layer instanceof PathLayer pl) {
+                // PATH_LAYER: live preview
+                java.util.List<Point3D> points = pl.points();
+                if (!points.isEmpty()) {
+                    // Step 1: find min/max over all points
+                    double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE;
+                    double minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+                    for (Point3D p : points) {
+                        if (p.x < minX) minX = p.x;
+                        if (p.x > maxX) maxX = p.x;
+                        if (p.y < minY) minY = p.y;
+                        if (p.y > maxY) maxY = p.y;
+                    }
+
+                    // Step 2: frame edges — 8px outside each extreme point
+                    double fX1 = minX - 8;
+                    double fY1 = minY - 8;
+                    double fX2 = maxX + 8;
+                    double fY2 = maxY + 8;
+                    double fW  = Math.max(1, fX2 - fX1);
+                    double fH  = Math.max(1, fY2 - fY1);
+
+                    // Step 3: scale frame to fit thumbnail, centered
+                    double scale   = Math.min(tw / fW, th / fH);
+                    double originX = tx + (tw - fW * scale) / 2.0;
+                    double originY = ty + (th - fH * scale) / 2.0;
+
+                    // Helper: map a path-space x/y to tile pixels
+                    // px = originX + (p.x - fX1) * scale
+
+                    // Step 4: draw frame rectangle
+                    g2.setColor(new java.awt.Color(90, 90, 90, 180));
+                    g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT,
+                            BasicStroke.JOIN_MITER, 1f, new float[]{3f, 3f}, 0f));
+                    g2.drawRect((int) originX, (int) originY,
+                                (int)(fW * scale), (int)(fH * scale));
+
+                    // Step 5: path lines
+                    g2.setColor(new java.awt.Color(0, 200, 255, 180));
+                    g2.setStroke(new BasicStroke(1f));
+                    if (pl.isClosed() && points.size() >= 2) {
+                        Point3D p1 = points.get(points.size() - 1);
+                        Point3D p2 = points.get(0);
+                        int x1 = (int)(originX + (p1.x - fX1) * scale);
+                        int y1 = (int)(originY + (p1.y - fY1) * scale);
+                        int x2 = (int)(originX + (p2.x - fX1) * scale);
+                        int y2 = (int)(originY + (p2.y - fY1) * scale);
+                        g2.drawLine(x1, y1, x2, y2);
+                    }
+                    for (int i = 0; i < points.size() - 1; i++) {
+                        Point3D p1 = points.get(i);
+                        Point3D p2 = points.get(i + 1);
+                        int x1 = (int)(originX + (p1.x - fX1) * scale);
+                        int y1 = (int)(originY + (p1.y - fY1) * scale);
+                        int x2 = (int)(originX + (p2.x - fX1) * scale);
+                        int y2 = (int)(originY + (p2.y - fY1) * scale);
+                        g2.drawLine(x1, y1, x2, y2);
+                    }
+
+                    // Step 6: point circles
+                    for (Point3D p : points) {
+                        int px = (int)(originX + (p.x - fX1) * scale);
+                        int py = (int)(originY + (p.y - fY1) * scale);
+                        g2.setColor(java.awt.Color.WHITE);
+                        g2.fillOval(px - 2, py - 2, 4, 4);
+                        g2.setColor(new java.awt.Color(0, 150, 200));
+                        g2.drawOval(px - 2, py - 2, 4, 4);
+                    }
+                }
             }
 
             // Selection border / hover border / normal border
@@ -383,5 +476,48 @@ public class ElementLayerPanel extends JPanel {
                 }
             }
         }
+    }
+
+    // ── Path Editor Dialog (double-click handler) ──────────────────────────────
+    private void openPathEditorDialog(PathLayer pathLayer) {
+        JDialog dlg = new JDialog((JFrame) SwingUtilities.getWindowAncestor(this), "Path Editor", true);
+        dlg.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dlg.setSize(400, 500);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Title
+        JLabel titleLbl = new JLabel("Path Points: " + pathLayer.displayName());
+        titleLbl.setFont(titleLbl.getFont().deriveFont(java.awt.Font.BOLD, 12f));
+        mainPanel.add(titleLbl, BorderLayout.NORTH);
+
+        // Points list
+        JPanel listPanel = new JPanel(new BorderLayout());
+        DefaultListModel<String> listModel = new DefaultListModel<>();
+        for (int i = 0; i < pathLayer.pointCount(); i++) {
+            Point3D p = pathLayer.getPoint(i);
+            if (p != null) {
+                listModel.addElement(String.format("Point %d: (%.1f, %.1f, %.1f)", i, p.x, p.y, p.z));
+            }
+        }
+        JList<String> pointsList = new JList<>(listModel);
+        pointsList.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 11));
+        JScrollPane scrollPane = new JScrollPane(pointsList);
+        listPanel.add(scrollPane, BorderLayout.CENTER);
+
+        mainPanel.add(listPanel, BorderLayout.CENTER);
+
+        // Buttons
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton closeBtn = new JButton("Close");
+        closeBtn.addActionListener(e -> dlg.dispose());
+        btnPanel.add(closeBtn);
+
+        mainPanel.add(btnPanel, BorderLayout.SOUTH);
+
+        dlg.setContentPane(mainPanel);
+        dlg.setVisible(true);
     }
 }

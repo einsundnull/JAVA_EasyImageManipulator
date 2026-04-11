@@ -115,6 +115,7 @@ public class PaintToolbar extends JPanel {
     private JComboBox<String>   brushShapeCombo;
     private ColorPickerPopup    colorPicker;
     private boolean             pickingSecondary = false;
+    private java.util.Map<PaintEngine.Tool, javax.swing.JToggleButton> toolButtons = new java.util.HashMap<>();
 
     // =========================================================================
     // Constructor
@@ -163,6 +164,15 @@ public class PaintToolbar extends JPanel {
     // Public API
     // =========================================================================
     public PaintEngine.Tool       getActiveTool()    { return activeTool; }
+    public void                   setActiveTool(PaintEngine.Tool tool) {
+        activeTool = tool;
+        if (cb != null) cb.onToolChanged(tool);
+        // Update button visual state
+        JToggleButton btn = toolButtons.get(tool);
+        if (btn != null) {
+            btn.setSelected(true);
+        }
+    }
     public Color                  getPrimaryColor()   { return primaryColor; }
     public Color                  getSecondaryColor() { return secondaryColor; }
     public int                    getStrokeWidth()    { return strokeWidth; }
@@ -235,6 +245,7 @@ public class PaintToolbar extends JPanel {
             JToggleButton btn = toolBtn(st[0], st[1]);
             btn.addActionListener(e -> { activeTool = tool; cb.onToolChanged(tool); });
             group.add(btn);
+            toolButtons.put(tool, btn);  // Store button for later access
             p.add(btn);
             p.add(Box.createHorizontalStrut(GAP));
             if (tool == PaintEngine.Tool.PENCIL) btn.setSelected(true);
@@ -472,6 +483,7 @@ public class PaintToolbar extends JPanel {
             case EYEDROPPER -> new String[]{ "✦", "Pipette (I)"    };
             case SELECT     -> new String[]{ "⬚", "Auswahl (S)"    };
             case TEXT       -> new String[]{ "A", "Text (T)"       };
+            case PATH       -> new String[]{ "≈", "Pfad (K)"       };
         };
     }
 
