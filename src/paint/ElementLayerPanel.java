@@ -192,6 +192,34 @@ public class ElementLayerPanel extends JPanel {
             setOpaque(false);
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
+            // ── Blue "zu image" (📥) button – export as image file ───────────────
+            JLabel toImage = new JLabel("↓", JLabel.CENTER);
+            toImage.setForeground(new Color(60, 140, 220));
+            toImage.setFont(new Font("SansSerif", Font.BOLD, 11));
+            toImage.setBounds(TILE_W - 55, 4, 16, 16);
+            toImage.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            toImage.setOpaque(true);
+            toImage.setBackground(new Color(50, 50, 50));
+            toImage.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            toImage.setToolTipText("Als Bild exportieren");
+            toImage.addMouseListener(new MouseAdapter() {
+                @Override public void mouseClicked(MouseEvent e) {
+                    e.consume();
+                    cb.exportElementAsImage(layer);
+                }
+                @Override public void mouseEntered(MouseEvent e) {
+                    toImage.setBackground(new Color(40, 100, 160));
+                    toImage.setForeground(Color.WHITE);
+                    toImage.setBorder(BorderFactory.createLineBorder(new Color(60, 140, 220), 1));
+                }
+                @Override public void mouseExited(MouseEvent e) {
+                    toImage.setBackground(new Color(50, 50, 50));
+                    toImage.setForeground(new Color(60, 140, 220));
+                    toImage.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                }
+            });
+            add(toImage);
+
             // ── Orange burn (⊕) button – second from top-right ───────────────
             JLabel burn = new JLabel("⊕", JLabel.CENTER);
             burn.setForeground(new Color(220, 140, 30));

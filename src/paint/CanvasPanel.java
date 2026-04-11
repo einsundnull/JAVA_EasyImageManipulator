@@ -87,6 +87,12 @@ public class CanvasPanel extends JPanel {
 	/** True while syncing controls from an element (suppresses the listener → element update loop). */
 	private boolean suppressChooserSync = false;
 
+	// ── Path editor state ────────────────────────────────────────────────────────
+	/** Index of the currently hovered path point (for PathLayer), or -1. */
+	private int hoveredPathPointIndex = -1;
+	/** Index of the currently selected path point (for PathLayer), or -1. */
+	private int selectedPathPointIndex = -1;
+
 	// ── Hover highlight (bidirectional with ElementLayerPanel) ───────────────
 	/** Id of the element the mouse is currently over, or -1. Used for bidirectional hover. */
 	private int hoveredElementId = -1;
@@ -131,6 +137,8 @@ public class CanvasPanel extends JPanel {
 		textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
 		textBuffer.setLength(0);
 		editingTextElementId = -1; editingOriginalElement = null;
+		// Reset path editor state
+		hoveredPathPointIndex = -1; selectedPathPointIndex = -1;
 		// Cancel canvas draw overlay
 		canvasDrawOverlay = null; overlayLastPt = null; overlayShapeStart = null;
 		// Hover state
@@ -169,6 +177,34 @@ public class CanvasPanel extends JPanel {
 				}
 
 				Point imgPt = callbacks.screenToImage(e.getPoint());
+
+				// ── PathLayer point selection ────────────────────────────────────
+				Layer primaryEl = callbacks.getSelectedElement();
+				if (primaryEl instanceof PathLayer pl) {
+					Rectangle sr = callbacks.elemRectScreen(pl);
+					Point screenPt = e.getPoint();
+					int layerX = screenPt.x - sr.x;
+					int layerY = screenPt.y - sr.y;
+
+					java.util.List<Point3D> points = pl.points();
+					int hitRadius = 12;
+					int hitPoint = -1;
+					for (int i = 0; i < points.size(); i++) {
+						Point3D p = points.get(i);
+						double dist = Math.sqrt(Math.pow(layerX - p.x, 2) + Math.pow(layerY - p.y, 2));
+						if (dist <= hitRadius) {
+							hitPoint = i;
+							break;
+						}
+					}
+
+					if (hitPoint >= 0) {
+						selectedPathPointIndex = hitPoint;
+						System.err.println("[DEBUG] Selected path point " + hitPoint);
+						repaint();
+						return;
+					}
+				}
 
 				if (!callbacks.getActiveElements().isEmpty() && callbacks.getFloatingImage() == null) {
 					boolean shiftDown = (e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0;
@@ -417,6 +453,16 @@ public class CanvasPanel extends JPanel {
 				if (callbacks.getWorkingImage() == null)
 					return;
 				Point imgPt = callbacks.screenToImage(e.getPoint());
+
+				// ── PathLayer point drag ────────────────────────────────────────
+				Layer primary = callbacks.getSelectedElement();
+				if (primary instanceof PathLayer pl && selectedPathPointIndex >= 0) {
+					System.err.println("[DEBUG] Dragging path point " + selectedPathPointIndex);
+					PathLayer updated = pl.withMovedPoint(selectedPathPointIndex, imgPt.x - pl.x(), imgPt.y - pl.y());
+					callbacks.updateSelectedElement(updated);
+					repaint();
+					return;
+				}
 
 				if (callbacks.isDraggingElement()) {
 					if (elemLastImgPt != null) {
@@ -755,6 +801,34 @@ public class CanvasPanel extends JPanel {
 		addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
 			@Override public void mouseMoved(java.awt.event.MouseEvent e) {
 				if (callbacks.getActiveElements().isEmpty()) return;
+
+				// Check PathLayer point hover (primary element only)
+				Layer primary = callbacks.getSelectedElement();
+				int newPathPointHover = -1;
+				if (primary instanceof PathLayer pl) {
+					Rectangle sr = callbacks.elemRectScreen(pl);
+					Point screenPt = e.getPoint();
+					// Convert to layer-space coordinates
+					int layerX = screenPt.x - sr.x;
+					int layerY = screenPt.y - sr.y;
+
+					java.util.List<Point3D> points = pl.points();
+					int hitRadius = 12;  // Larger hit area for points
+					for (int i = 0; i < points.size(); i++) {
+						Point3D p = points.get(i);
+						double dist = Math.sqrt(Math.pow(layerX - p.x, 2) + Math.pow(layerY - p.y, 2));
+						if (dist <= hitRadius) {
+							newPathPointHover = i;
+							break;  // Hit the first (topmost) point
+						}
+					}
+				}
+
+				if (newPathPointHover != hoveredPathPointIndex) {
+					hoveredPathPointIndex = newPathPointHover;
+					repaint();  // Redraw point highlights
+				}
+
 				Layer hit = hitElement(e.getPoint());
 				int newId = hit != null ? hit.id() : -1;
 				if (newId != hoveredElementId) {
@@ -774,6 +848,34 @@ public class CanvasPanel extends JPanel {
 		addKeyListener(new java.awt.event.KeyAdapter() {
 			@Override
 			public void keyPressed(java.awt.event.KeyEvent ke) {
+				// ── PathLayer point editing ────────────────────────────────────
+				Layer primary = callbacks.getSelectedElement();
+				if (primary instanceof PathLayer pl) {
+					int code = ke.getKeyCode();
+					if (code == KeyEvent.VK_DELETE && selectedPathPointIndex >= 0) {
+						// DEL: remove selected point
+						System.err.println("[DEBUG] DELETE point at index " + selectedPathPointIndex);
+						PathLayer updated = pl.withRemovedPoint(selectedPathPointIndex);
+						callbacks.updateSelectedElement(updated);
+						selectedPathPointIndex = -1;
+						ke.consume(); repaint(); return;
+					}
+					if (code == KeyEvent.VK_PLUS && selectedPathPointIndex >= 0) {
+						// PLUS: add new point after selected point
+						System.err.println("[DEBUG] ADD point after index " + selectedPathPointIndex);
+						Point3D current = pl.getPoint(selectedPathPointIndex);
+						Point3D next = pl.getPoint(selectedPathPointIndex + 1);
+						// Midpoint between current and next (or offset if at end)
+						double newX = next != null ? (current.x + next.x) / 2 : current.x + 20;
+						double newY = next != null ? (current.y + next.y) / 2 : current.y + 20;
+						PathLayer updated = pl.withAddedPoint(selectedPathPointIndex + 1, new Point3D(newX, newY));
+						callbacks.updateSelectedElement(updated);
+						selectedPathPointIndex++;  // Auto-select new point
+						ke.consume(); repaint(); return;
+					}
+				}
+
+				// ── Text tool editing ──────────────────────────────────────────
 				if (textBoundingBox == null || textDrawingBox) return;
 				int code = ke.getKeyCode();
 				if (code == KeyEvent.VK_ENTER) {
@@ -1393,6 +1495,9 @@ public class CanvasPanel extends JPanel {
 					for (int li = 0; li < tLines.length; li++) {
 						g2.drawString(tLines[li], tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
 					}
+				} else if (el instanceof PathLayer pl) {
+					// PathLayer: render path lines and control points
+					renderPathLayer(g2, pl, sr, callbacks.getZoom(), isPrimary);
 				}
 
 				boolean isHov = el.id() == hoveredElementId;
@@ -1573,6 +1678,88 @@ public class CanvasPanel extends JPanel {
 				g2.setColor(AppColors.ACCENT);
 				g2.drawRect(hr.x, hr.y, hr.width, hr.height);
 			}
+		}
+	}
+
+	// =========================================================================
+	// PathLayer Rendering
+	// =========================================================================
+
+	/**
+	 * Renders a PathLayer: lines connecting points + point markers + hover/select effects.
+	 */
+	private void renderPathLayer(Graphics2D g2, PathLayer pl, Rectangle sr, double zoom, boolean isPrimary) {
+		java.util.List<Point3D> points = pl.points();
+		if (points.isEmpty()) return;
+
+		// Render optional image (if present)
+		if (pl.image() != null) {
+			g2.drawImage(pl.image(), sr.x, sr.y, sr.width, sr.height, null);
+		}
+
+		int pointRadius = 8;  // Pixel radius for point rendering
+
+		// ── Draw lines connecting points ──
+		g2.setColor(new Color(0, 200, 255, 180));  // Cyan
+		g2.setStroke(new BasicStroke(1.5f));
+		for (int i = 0; i < points.size() - 1; i++) {
+			Point3D p1 = points.get(i);
+			Point3D p2 = points.get(i + 1);
+			int x1 = sr.x + (int) p1.x;
+			int y1 = sr.y + (int) p1.y;
+			int x2 = sr.x + (int) p2.x;
+			int y2 = sr.y + (int) p2.y;
+			g2.drawLine(x1, y1, x2, y2);
+		}
+
+		// Close polygon if needed
+		if (pl.isClosed() && points.size() >= 2) {
+			Point3D p1 = points.get(points.size() - 1);
+			Point3D p2 = points.get(0);
+			int x1 = sr.x + (int) p1.x;
+			int y1 = sr.y + (int) p1.y;
+			int x2 = sr.x + (int) p2.x;
+			int y2 = sr.y + (int) p2.y;
+			g2.drawLine(x1, y1, x2, y2);
+		}
+
+		// ── Draw point markers ──
+		for (int i = 0; i < points.size(); i++) {
+			Point3D p = points.get(i);
+			int px = sr.x + (int) p.x;
+			int py = sr.y + (int) p.y;
+
+			boolean isHovered = isPrimary && (i == hoveredPathPointIndex);
+			boolean isSelected = isPrimary && (i == selectedPathPointIndex);
+
+			// Point size varies based on state
+			int drawRadius = pointRadius;
+			if (isSelected) drawRadius = pointRadius + 4;
+			else if (isHovered) drawRadius = pointRadius + 2;
+
+			// Point fill color
+			Color fillColor;
+			if (isSelected) fillColor = new Color(255, 200, 0);      // Yellow = selected
+			else if (isHovered) fillColor = new Color(255, 100, 200);// Pink = hovered
+			else fillColor = Color.WHITE;                             // White = normal
+
+			g2.setColor(fillColor);
+			g2.fillOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
+
+			// Point border
+			Color borderColor;
+			if (isSelected) borderColor = new Color(255, 140, 0);    // Orange border = selected
+			else if (isHovered) borderColor = new Color(255, 80, 150);// Darker pink = hovered
+			else borderColor = new Color(0, 150, 200);               // Cyan border = normal
+
+			g2.setColor(borderColor);
+			g2.setStroke(isSelected || isHovered ? new BasicStroke(2f) : new BasicStroke(1.5f));
+			g2.drawOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
+
+			// Point index label
+			g2.setColor(Color.BLACK);
+			g2.setFont(new Font("SansSerif", Font.PLAIN, 9));
+			g2.drawString(String.valueOf(i), px + drawRadius + 3, py - 2);
 		}
 	}
 

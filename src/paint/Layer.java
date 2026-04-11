@@ -4,13 +4,14 @@ package paint;
  * Abstract base class for all non-destructive canvas layers.
  *
  * Common state: id, position (x/y) and rendered size (width/height) in image-space.
- * Subclasses carry the type-specific payload (pixels or text).
+ * Subclasses carry the type-specific payload (pixels, text, or path points).
  *
  * All mutations return NEW instances (value-object semantics).
  *
  * Concrete subclasses:
  *   {@link ImageLayer} – a rasterised pixel region
  *   {@link TextLayer}  – live text rendered on-the-fly from font settings
+ *   {@link PathLayer}  – a path with control points (and optional image)
  */
 public abstract class Layer {
 

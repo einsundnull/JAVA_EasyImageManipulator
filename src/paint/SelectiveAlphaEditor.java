@@ -1163,6 +1163,98 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 refreshElementPanel();
                 if (canvasPanel != null) canvasPanel.repaint();
             }
+
+            @Override public void exportElementAsImage(Layer el) {
+                if (workingImage == null || sourceFile == null) return;
+                System.err.println("[DEBUG] exportElementAsImage called for layer id=" + el.id());
+
+                // Get live layer
+                Layer live = activeElements.stream()
+                        .filter(e -> e.id() == el.id()).findFirst().orElse(el);
+
+                // Render element to image
+                BufferedImage imgToExport;
+                if (live instanceof TextLayer tl) {
+                    imgToExport = renderTextLayerToImage(tl);
+                } else {
+                    ImageLayer il = (ImageLayer) live;
+                    imgToExport = PaintEngine.scale(
+                            il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
+                }
+
+                // Generate default filename: originalName + _layer_<id>
+                String sourceName = sourceFile.getName();
+                int lastDot = sourceName.lastIndexOf('.');
+                String baseName = lastDot > 0 ? sourceName.substring(0, lastDot) : sourceName;
+                String extension = lastDot > 0 ? sourceName.substring(lastDot) : ".png";
+                String defaultName = baseName + "_layer_" + live.id() + extension;
+
+                // Find unique filename if file already exists
+                File exportDir = sourceFile.getParentFile();
+                File targetFile = new File(exportDir, defaultName);
+                int counter = 1;
+                while (targetFile.exists()) {
+                    String uniqueName = baseName + "_layer_" + live.id() + "_" + counter + extension;
+                    targetFile = new File(exportDir, uniqueName);
+                    counter++;
+                    defaultName = uniqueName;
+                }
+
+                // Show dialog for filename confirmation
+                final File exportDirFinal = exportDir;
+                final String defaultNameFinal = defaultName;
+                javax.swing.JTextField fileNameField = new javax.swing.JTextField(defaultName);
+                fileNameField.selectAll();
+
+                String[] options = {"Speichern", "Abbrechen"};
+                javax.swing.JPanel panel = new javax.swing.JPanel(new java.awt.BorderLayout(5, 5));
+                panel.add(new javax.swing.JLabel("Dateiname:"), java.awt.BorderLayout.WEST);
+                panel.add(fileNameField, java.awt.BorderLayout.CENTER);
+
+                // Allow Enter key to save immediately
+                fileNameField.addActionListener(ev -> {
+                    System.err.println("[DEBUG] Enter pressed in filename dialog");
+                    String fileName = fileNameField.getText().trim();
+                    if (!fileName.isEmpty()) {
+                        saveElementAsImageFile(imgToExport, new File(exportDirFinal, fileName));
+                    }
+                });
+
+                int result = javax.swing.JOptionPane.showOptionDialog(SelectiveAlphaEditor.this, panel, "Exportieren als Bild",
+                        javax.swing.JOptionPane.OK_CANCEL_OPTION, javax.swing.JOptionPane.QUESTION_MESSAGE, null,
+                        options, options[0]);
+
+                if (result == javax.swing.JOptionPane.OK_OPTION) {
+                    String fileName = fileNameField.getText().trim();
+                    if (!fileName.isEmpty()) {
+                        saveElementAsImageFile(imgToExport, new File(exportDirFinal, fileName));
+                    }
+                }
+            }
+
+            private void saveElementAsImageFile(BufferedImage img, File file) {
+                try {
+                    javax.imageio.ImageIO.write(img, "PNG", file);
+                    System.err.println("[DEBUG] Element exported to: " + file.getAbsolutePath());
+
+                    // Add the new image to the tile gallery
+                    if (tileGallery != null) {
+                        java.util.List<File> newFiles = new java.util.ArrayList<>();
+                        newFiles.add(file);
+                        tileGallery.addFiles(newFiles);
+                        System.err.println("[DEBUG] Added new image to gallery: " + file.getName());
+                    }
+
+                    javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this, "Bild gespeichert:\n" + file.getName(),
+                            "Erfolg", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception ex) {
+                    System.err.println("[ERROR] Failed to export element: " + ex.getMessage());
+                    ex.printStackTrace();
+                    javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this, "Fehler beim Speichern:\n" + ex.getMessage(),
+                            "Fehler", javax.swing.JOptionPane.ERROR_MESSAGE);
+                }
+            }
+
             @Override public void repaintCanvas() {
                 if (canvasPanel != null) canvasPanel.repaint();
             }
