@@ -51,7 +51,7 @@ public class PaintToolbar extends JPanel {
     public static final int SWATCH_H  = 22;
     private static final int PAL_COLS = 14;
     private static final int GAP      = 3;
-    public static final int TOOLBAR_H = BTN_SIZE + 25;
+    public static final int TOOLBAR_H = BTN_SIZE + 55;
 
     // ── Palette ───────────────────────────────────────────────────────────────
     private static final Color[] PALETTE = {

@@ -18,6 +18,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.geom.Point2D;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
@@ -61,6 +62,7 @@ import javax.swing.JToggleButton;
 import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 /**
  * Main application window.
@@ -92,12 +94,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     private static final int GRID_CELL    = 16;   // image-space pixels per grid cell
     private static final int RULER_THICK  = 20;   // pixels wide/tall for ruler strip
     private static final double SCREEN_DPI = 96.0;
-    private static final double ZOOM_WHEEL = 0.06; // per notch for mouse-wheel zoom
+    private static final double ZOOM_WHEEL = 0.16; // per notch for mouse-wheel zoom
 
-    private static final int TOPBAR_BTN_W      = 50;
-    private static final int TOPBAR_BTN_H      = 50;
-    private static final int TOPBAR_ZOOM_BTN_W = 50;
-    private static final int TOPBAR_ZOOM_BTN_H = 50;
+    private static final int TOPBAR_BTN_W      = 36;
+    private static final int TOPBAR_BTN_H      = 36;
+    private static final int TOPBAR_ZOOM_BTN_W = 36;
+    private static final int TOPBAR_ZOOM_BTN_H = 36;
 
     // ── Ruler unit ────────────────────────────────────────────────────────────
     // RulerUnit is now defined in RulerUnit.java (extracted as separate enum)
@@ -129,6 +131,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     private RulerUnit rulerUnit        = RulerUnit.PX;
 
     private double zoom = 1.0;
+
+    // Smooth zoom animation
+    private double       zoomTarget   = 1.0;  // animation target zoom level
+    private Point2D      zoomImgPt    = null; // image-space pixel to keep fixed during animation
+    private Point        zoomVpMouse  = null; // mouse position in viewport coords (stays fixed)
+    private javax.swing.Timer zoomTimer = null; // timer driving the animation
 
     // Alpha-editor selection (image-space)
     private boolean          isSelecting    = false;
@@ -259,52 +267,122 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         bar.setBackground(AppColors.BG_PANEL);
         bar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
 
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
+        // ── LEFT: filmstrip toggle + mode + status labels ──────────────────────
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 5));
         left.setOpaque(false);
-        modeLabel = new JLabel("Modus: Selective Alpha");
-        modeLabel.setForeground(AppColors.TEXT_MUTED);
-        modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        JButton toggleBtn = UIComponentFactory.buildButton("Alpha-Modus wechseln", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        toggleBtn.addActionListener(e -> toggleAlphaMode());
 
-        filmstripBtn = UIComponentFactory.buildModeToggleBtn("\uD83C\uDEDE", "Filmstreifen ein-/ausblenden");
+        // \u2261 (≡) is in Basic Multilingual Plane — safe on all Windows systems
+        filmstripBtn = UIComponentFactory.buildModeToggleBtn("\u2261", "Filmstreifen ein-/ausblenden");
+        filmstripBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
         filmstripBtn.setSelected(true);
         filmstripBtn.addActionListener(e -> {
             tileGallery.setVisible(filmstripBtn.isSelected());
-            if (galleryWrapper != null) {
-                galleryWrapper.revalidate();
-                galleryWrapper.repaint();
-            }
-            // centerCanvas() already defers via invokeLater, so the layout triggered
-            // by revalidate() will have settled before the view position is set.
+            if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
             centerCanvas();
         });
 
+        modeLabel = new JLabel("Modus: Selective Alpha");
+        modeLabel.setForeground(AppColors.TEXT_MUTED);
+        modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+        statusLabel = new JLabel("Keine Datei geladen");
+        statusLabel.setForeground(AppColors.TEXT_MUTED);
+        statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        statusLabel.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
+
         left.add(filmstripBtn);
         left.add(modeLabel);
-//        left.add(toggleBtn);
+        left.add(statusLabel);
         bar.add(left, BorderLayout.WEST);
- 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 6));
+
+        // ── RIGHT: all action + layer + file + mode + zoom buttons ─────────────
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 5));
         right.setOpaque(false);
 
-        canvasModeBtn = UIComponentFactory.buildModeToggleBtn("⬜", "Canvas (Funktion folgt)");
+        // — Selection/alpha actions (formerly statusBar) —
+        // applyButton and clearSelectionsButton are fields accessed by setBottomButtonsEnabled()
+        applyButton = UIComponentFactory.buildButton("\u2713", AppColors.ACCENT, AppColors.ACCENT_HOVER);
+        applyButton.setForeground(Color.WHITE);
+        applyButton.setToolTipText("Auswahl auf Alpha anwenden");
+        applyButton.addActionListener(e -> applySelectionsToAlpha());
+        applyButton.setEnabled(false);
+        applyButton.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+        clearSelectionsButton = UIComponentFactory.buildButton("\u2715", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        clearSelectionsButton.setToolTipText("Auswahl löschen");
+        clearSelectionsButton.addActionListener(e -> clearSelections());
+        clearSelectionsButton.setEnabled(false);
+        clearSelectionsButton.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+        // — Non-destructive layer buttons (moved from statusBar) —
+        // \u2295 (⊕) = circled plus  \u229e (⊞) = squared plus — both BMP, safe
+        JButton insertElemBtn = UIComponentFactory.buildButton("\u2295", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        insertElemBtn.setToolTipText("Als nicht-destruktiven Layer einfügen (ENTER=zusammenführen, DEL=löschen)");
+        insertElemBtn.addActionListener(e -> insertSelectionAsElement());
+        insertElemBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+        JButton mergeElemBtn = UIComponentFactory.buildButton("\u229e", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        mergeElemBtn.setToolTipText("Ausgewähltes Element auf Canvas rendern (ENTER)");
+        mergeElemBtn.addActionListener(e -> { if (selectedElement != null) mergeElementToCanvas(selectedElement); });
+        mergeElemBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+        // — File/image operations (formerly statusBar) —
+        // actionPanel is a field used by setBottomButtonsEnabled() to find resetButton/saveButton by name
+        actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        actionPanel.setOpaque(false);
+
+        JButton newBitmapBtn = UIComponentFactory.buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        newBitmapBtn.setToolTipText("Neue leere Bitmap erstellen");
+        newBitmapBtn.addActionListener(e -> doNewBitmap());
+        newBitmapBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+        JButton bgColorBtn = UIComponentFactory.buildButton("BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        bgColorBtn.setToolTipText("Canvas-Hintergrundfarbe einstellen");
+        bgColorBtn.addActionListener(e -> showCanvasBgDialog());
+        bgColorBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+        // \u21ba (↺) = anticlockwise arrow — BMP, safe
+        JButton resetButton = UIComponentFactory.buildButton("\u21ba", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        resetButton.setName("resetButton");
+        resetButton.setToolTipText("Bild zurücksetzen");
+        resetButton.addActionListener(e -> resetImage());
+        resetButton.setEnabled(false);
+        resetButton.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+        JButton saveButton = UIComponentFactory.buildButton("Save", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
+        saveButton.setName("saveButton");
+        saveButton.setForeground(Color.WHITE);
+        saveButton.setToolTipText("Bild speichern (STRG+S)");
+        saveButton.addActionListener(e -> saveImage());
+        saveButton.setEnabled(false);
+        saveButton.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+        actionPanel.add(resetButton);
+        actionPanel.add(saveButton);
+
+        // — Mode toggle buttons —
+        // \u25a1 (□) = white square  \u270f (✏) = pencil — both BMP, safe
+        canvasModeBtn = UIComponentFactory.buildModeToggleBtn("\u25a1", "Canvas (Funktion folgt)");
+        canvasModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
         canvasModeBtn.addActionListener(e -> {
             canvasModeBtn.setSelected(false);
             showInfoDialog("Canvas-Modus", "Diese Funktion wird in einer späteren Version implementiert.");
         });
 
-        paintModeBtn = UIComponentFactory.buildModeToggleBtn("🖌", "Paint-Modus aktivieren / deaktivieren");
+        paintModeBtn = UIComponentFactory.buildModeToggleBtn("\u270f", "Paint-Modus aktivieren / deaktivieren");
+        paintModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
         paintModeBtn.addActionListener(e -> togglePaintMode());
 
-        JButton zoomOutBtn   = UIComponentFactory.buildButton("−",   AppColors.BTN_BG, AppColors.BTN_HOVER);
-        JButton zoomInBtn    = UIComponentFactory.buildButton("+",   AppColors.BTN_BG, AppColors.BTN_HOVER);
-        JButton zoomResetBtn = UIComponentFactory.buildButton("1:1", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        JButton zoomFitBtn   = UIComponentFactory.buildButton("Fit", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        // — Zoom controls —
+        JButton zoomOutBtn   = UIComponentFactory.buildButton("\u2212", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton zoomInBtn    = UIComponentFactory.buildButton("+",      AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton zoomResetBtn = UIComponentFactory.buildButton("1:1",   AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton zoomFitBtn   = UIComponentFactory.buildButton("Fit",   AppColors.BTN_BG, AppColors.BTN_HOVER);
+
         zoomLabel = new JLabel("100%");
         zoomLabel.setForeground(AppColors.TEXT_MUTED);
         zoomLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        zoomLabel.setPreferredSize(new Dimension(52, 20));
+        zoomLabel.setPreferredSize(new Dimension(46, 20));
         zoomLabel.setHorizontalAlignment(JLabel.RIGHT);
         zoomLabel.setToolTipText("Doppelklick: Zoom direkt eingeben");
         zoomLabel.setCursor(Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR));
@@ -323,22 +401,20 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         zoomResetBtn.addActionListener(e -> setZoom(1.0, null));
         zoomFitBtn  .addActionListener(e -> fitToViewport());
 
-        JButton newBitmapBtn = UIComponentFactory.buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        newBitmapBtn.setToolTipText("Neue leere Bitmap erstellen");
-        newBitmapBtn.addActionListener(e -> doNewBitmap());
-        newBitmapBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
-
-        JButton bgColorBtn = UIComponentFactory.buildButton("BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        bgColorBtn.setToolTipText("Canvas-Hintergrundfarbe einstellen");
-        bgColorBtn.addActionListener(e -> showCanvasBgDialog());
-        bgColorBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
-
-        right.add(canvasModeBtn);
-        right.add(paintModeBtn);
-        right.add(Box.createHorizontalStrut(8));
+        // — Assemble right panel (left-to-right order in FlowLayout.RIGHT = right-to-left visual) —
+        right.add(applyButton);
+        right.add(clearSelectionsButton);
+        right.add(Box.createHorizontalStrut(4));
+        right.add(insertElemBtn);
+        right.add(mergeElemBtn);
+        right.add(Box.createHorizontalStrut(4));
         right.add(newBitmapBtn);
         right.add(bgColorBtn);
-        right.add(Box.createHorizontalStrut(8));
+        right.add(actionPanel);
+        right.add(Box.createHorizontalStrut(4));
+        right.add(canvasModeBtn);
+        right.add(paintModeBtn);
+        right.add(Box.createHorizontalStrut(4));
         right.add(zoomOutBtn);
         right.add(zoomLabel);
         right.add(zoomInBtn);
@@ -483,65 +559,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         nextNavButton.setBounds(layeredPane.getWidth() - bw - 8, y, bw, bh);
     }
 
-    // ── Bottom bar ────────────────────────────────────────────────────────────
+    // ── Bottom bar: only the Paint toolbar (status bar merged into top bar) ───
     private JPanel buildBottomBar() {
         paintToolbar = new PaintToolbar(this, buildPaintCallbacks());
-
-        JPanel statusBar = new JPanel(new BorderLayout());
-        statusBar.setBackground(AppColors.BG_PANEL);
-        statusBar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppColors.BORDER));
-
-        actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        actionPanel.setOpaque(false);
-
-        applyButton = UIComponentFactory.buildButton("Auswahl anwenden", AppColors.ACCENT, AppColors.ACCENT_HOVER);
-        applyButton.setForeground(Color.WHITE);
-        applyButton.addActionListener(e -> applySelectionsToAlpha());
-        applyButton.setEnabled(false);
-
-        clearSelectionsButton = UIComponentFactory.buildButton("Auswahl löschen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        clearSelectionsButton.addActionListener(e -> clearSelections());
-        clearSelectionsButton.setEnabled(false);
-
-        JButton resetButton = UIComponentFactory.buildButton("Zurücksetzen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        resetButton.setName("resetButton");
-        resetButton.addActionListener(e -> resetImage());
-        resetButton.setEnabled(false);
-
-        JButton saveButton = UIComponentFactory.buildButton("Speichern", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
-        saveButton.setName("saveButton");
-        saveButton.setForeground(Color.WHITE);
-        saveButton.addActionListener(e -> saveImage());
-        saveButton.setEnabled(false);
-
-        JButton insertElemBtn = UIComponentFactory.buildButton("Als Element einfügen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        insertElemBtn.setToolTipText("Auswahl als nicht-destruktiven Layer einfügen (ENTER=zusammenführen, DEL=löschen)");
-        insertElemBtn.addActionListener(e -> insertSelectionAsElement());
-
-        JButton mergeElemBtn = UIComponentFactory.buildButton("Element zusammenführen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        mergeElemBtn.setToolTipText("Ausgewähltes Element auf Canvas rendern (ENTER)");
-        mergeElemBtn.addActionListener(e -> { if (selectedElement != null) mergeElementToCanvas(selectedElement); });
-
-        actionPanel.add(applyButton);
-        actionPanel.add(clearSelectionsButton);
-        actionPanel.add(Box.createHorizontalStrut(8));
-        actionPanel.add(insertElemBtn);
-        actionPanel.add(mergeElemBtn);
-        actionPanel.add(Box.createHorizontalStrut(8));
-        actionPanel.add(resetButton);
-        actionPanel.add(saveButton);
-        statusBar.add(actionPanel, BorderLayout.WEST);
-
-        statusLabel = new JLabel("Keine Datei geladen");
-        statusLabel.setForeground(AppColors.TEXT_MUTED);
-        statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        statusLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 12));
-        statusBar.add(statusLabel, BorderLayout.EAST);
-
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setBackground(AppColors.BG_DARK);
         wrapper.add(paintToolbar, BorderLayout.NORTH);
-        wrapper.add(statusBar,    BorderLayout.SOUTH);
         return wrapper;
     }
 
@@ -656,7 +679,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         indexDirectory(file);
         swapToImageView();
-        SwingUtilities.invokeLater(() -> { fitToViewport(); centerCanvas(); });
+        SwingUtilities.invokeLater(() -> { fitToViewportInstant(); centerCanvas(); });
         updateNavigationButtons();
         updateTitle();
         updateStatus();
@@ -720,46 +743,28 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     // =========================================================================
 
     /**
-     * Set zoom level. If anchorCanvas != null, keep that canvas point fixed
-     * on screen (zoom toward cursor).
+     * Set zoom level with smooth animation.
+     * If anchorCanvas != null, keep that canvas point fixed on screen (zoom toward cursor).
      */
     @Override public void setZoom(double nz, Point anchorCanvas) {
-        double oldZoom = zoom;
-        zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
+        zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
 
-        if (canvasWrapper != null) {
-            canvasWrapper.revalidate();
-            canvasWrapper.repaint();
+        // Capture anchor point only if a new gesture is starting (no animation running)
+        if (zoomTimer == null) {
+            if (anchorCanvas != null && scrollPane != null) {
+                JViewport vp = scrollPane.getViewport();
+                // image coord under cursor (using CURRENT zoom, before animation starts)
+                zoomImgPt = new Point2D.Double(anchorCanvas.x / zoom, anchorCanvas.y / zoom);
+                // viewport-relative mouse position (stays fixed during animation)
+                zoomVpMouse = SwingUtilities.convertPoint(canvasPanel, anchorCanvas, vp);
+            } else {
+                zoomImgPt  = null;
+                zoomVpMouse = null;
+            }
         }
+        // If animation is already running, just update zoomTarget and continue
 
-        // Zoom toward anchor point (keep image pixel under cursor steady)
-        if (anchorCanvas != null && scrollPane != null && Math.abs(zoom - oldZoom) > 1e-9) {
-            final Point anchor = anchorCanvas;
-            final double oz    = oldZoom;
-            SwingUtilities.invokeLater(() -> {
-                JViewport vp   = scrollPane.getViewport();
-                Dimension vs   = vp.getViewSize();
-                Dimension vpSz = vp.getSize();
-                // canvas offset inside wrapper
-                int cx = canvasPanel.getX();
-                int cy = canvasPanel.getY();
-                // image coord under anchor
-                int imgX = (int)(anchor.x / oz);
-                int imgY = (int)(anchor.y / oz);
-                // where that image coord is in the wrapper after zoom
-                int newCanvasX = (int)(imgX * zoom);
-                int newCanvasY = (int)(imgY * zoom);
-                // viewport position so anchor screen pos stays same
-                Point vpMouse = SwingUtilities.convertPoint(canvasPanel, anchor, vp);
-                int vx = cx + newCanvasX - vpMouse.x;
-                int vy = cy + newCanvasY - vpMouse.y;
-                vx = Math.max(0, Math.min(vx, vs.width  - vpSz.width));
-                vy = Math.max(0, Math.min(vy, vs.height - vpSz.height));
-                vp.setViewPosition(new Point(vx, vy));
-            });
-        }
-
-        updateZoomLabel();
+        startZoomAnimation();
     }
 
     public void fitToViewport() {
@@ -767,11 +772,111 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         Dimension vd = scrollPane.getViewport().getSize();
         if (vd.width <= 0 || vd.height <= 0) { SwingUtilities.invokeLater(this::fitToViewport); return; }
         setZoom(Math.min((double) vd.width  / workingImage.getWidth(),
-                         (double) vd.height / workingImage.getHeight()), null);
+                         (double) vd.height / workingImage.getHeight()*0.98), null);
+    }
+
+    /** Fit to viewport instantly without animation — used when browsing between images. */
+    private void fitToViewportInstant() {
+        if (workingImage == null || scrollPane == null) return;
+        Dimension vd = scrollPane.getViewport().getSize();
+        if (vd.width <= 0 || vd.height <= 0) { SwingUtilities.invokeLater(this::fitToViewportInstant); return; }
+        double nz = Math.min((double) vd.width  / workingImage.getWidth(),
+                             (double) vd.height / workingImage.getHeight() * 0.98);
+        setZoomInstant(nz);
+    }
+
+    /** Set zoom immediately without animation. Used for image load/browse. */
+    private void setZoomInstant(double nz) {
+        if (zoomTimer != null) { zoomTimer.stop(); zoomTimer = null; }
+        zoom = zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
+        zoomImgPt = null;
+        zoomVpMouse = null;
+        if (canvasWrapper != null) {
+            canvasWrapper.revalidate();
+            canvasWrapper.repaint();
+        }
+        updateZoomLabel();
+        SwingUtilities.invokeLater(() ->
+            scrollPane.getViewport().setViewPosition(new Point(0, 0)));
     }
 
     private void updateZoomLabel() {
         if (zoomLabel != null) zoomLabel.setText(Math.round(zoom * 100) + "%");
+    }
+
+    /**
+     * Start or restart the zoom animation timer.
+     * Each tick, zoom approaches zoomTarget using exponential decay.
+     */
+    private void startZoomAnimation() {
+        if (zoomTimer != null) {
+            zoomTimer.stop();
+            zoomTimer = null;
+        }
+
+        final int INTERVAL_MS = 16;  // ~60 FPS
+        final double FACTOR = 0.30;  // 30% per tick — snappy but not jarring
+
+        zoomTimer = new Timer(INTERVAL_MS, null);
+        zoomTimer.addActionListener(e -> {
+            double diff = zoomTarget - zoom;
+            boolean done = Math.abs(diff) < 0.0005;
+            if (done) {
+                zoom = zoomTarget;
+                zoomTimer.stop();
+                zoomTimer = null;
+            } else {
+                zoom += diff * FACTOR;
+            }
+            applyZoomFrame();
+            // After animation ends with no anchor: reset viewport to (0,0) so the
+            // canvas is correctly positioned after scrollbars may have shifted it.
+            if (done && zoomImgPt == null && scrollPane != null) {
+                SwingUtilities.invokeLater(() ->
+                    scrollPane.getViewport().setViewPosition(new Point(0, 0)));
+            }
+        });
+        zoomTimer.setInitialDelay(0);
+        zoomTimer.start();
+    }
+
+    /**
+     * Apply current zoom to the UI (called every animation frame).
+     *
+     * revalidate() on the EDT is synchronous in Java 6+ — it calls
+     * scrollPane.validate() internally before returning, so canvasPanel.getX/Y()
+     * are already correct after the call. No invokeLater() is used here;
+     * at 60 FPS those callbacks accumulate and fire stale viewport positions,
+     * which is what caused the jump when scrollbars appeared.
+     */
+    private void applyZoomFrame() {
+        if (canvasWrapper == null) return;
+
+        // Synchronous layout pass — canvasPanel bounds and scroll extents correct after this.
+        canvasWrapper.revalidate();
+
+        // Adjust viewport so the anchor image pixel stays under the mouse.
+        if (zoomImgPt != null && zoomVpMouse != null && scrollPane != null && workingImage != null) {
+            JViewport vp   = scrollPane.getViewport();
+            Dimension vs   = vp.getViewSize();
+            Dimension vpSz = vp.getSize();
+            // centering offset of canvasPanel inside wrapper (0 when image > viewport)
+            int cx = canvasPanel.getX();
+            int cy = canvasPanel.getY();
+            // where the fixed image pixel now sits in wrapper coords
+            int newCanvasX = (int)(zoomImgPt.getX() * zoom);
+            int newCanvasY = (int)(zoomImgPt.getY() * zoom);
+            // viewport position that keeps the mouse at the same screen location
+            int vx = cx + newCanvasX - zoomVpMouse.x;
+            int vy = cy + newCanvasY - zoomVpMouse.y;
+            int maxVx = Math.max(0, vs.width  - vpSz.width);
+            int maxVy = Math.max(0, vs.height - vpSz.height);
+            vp.setViewPosition(new Point(Math.max(0, Math.min(vx, maxVx)),
+                                         Math.max(0, Math.min(vy, maxVy))));
+        }
+
+        canvasWrapper.repaint();
+        updateZoomLabel();
     }
 
     // =========================================================================
@@ -935,6 +1040,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         selectedAreas.clear();
         lastPaintPoint = null;
         shapeStartPoint = null;
+        // Refit image to viewport after paint toolbar visibility changes
+        SwingUtilities.invokeLater(() -> { fitToViewportInstant(); canvasPanel.repaint(); });
         paintSnapshot   = null;
         canvasPanel.setCursor(entering
                 ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR)
@@ -1524,7 +1631,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 selectedAreas.clear();
                 floatingImg = null; floatRect = null;
                 swapToImageView();
-                SwingUtilities.invokeLater(() -> { fitToViewport(); centerCanvas(); });
+                SwingUtilities.invokeLater(() -> { fitToViewportInstant(); centerCanvas(); });
                 updateTitle();
                 updateStatus();
                 setBottomButtonsEnabled(true);

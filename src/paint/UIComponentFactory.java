@@ -29,8 +29,8 @@ import javax.swing.border.EmptyBorder;
  */
 public class UIComponentFactory {
 
-    private static final int BUTTON_WIDTH = 50;
-    private static final int BUTTON_HEIGHT = 50;
+    private static final int BUTTON_WIDTH = 36;
+    private static final int BUTTON_HEIGHT = 36;
 
     // ── Dialog creation ────────────────────────────────────────────────────────
     public static JDialog createBaseDialog(JFrame owner, String title, int w, int h) {
@@ -100,7 +100,7 @@ public class UIComponentFactory {
         btn.setContentAreaFilled(false);
         btn.setOpaque(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
+        btn.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
         btn.setPreferredSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
         btn.setMinimumSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
         return btn;
