@@ -77,6 +77,12 @@ public interface CanvasCallbacks {
     // Toolbar/Tools
     PaintToolbar getPaintToolbar();
 
+    // Layer panel state
+    /** True when the ElementLayerPanel "show all outlines" toggle is active. */
+    boolean isShowAllLayerOutlines();
+    /** Creates an Element layer from a rendered text image and adds it to activeElements. */
+    void commitTextAsElement(java.awt.image.BufferedImage textImg, int x, int y);
+
     // Actions
     void pushUndo();
     void markDirty();

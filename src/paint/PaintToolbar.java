@@ -471,6 +471,7 @@ public class PaintToolbar extends JPanel {
             case ERASER     -> new String[]{ "⌫", "Radierer (X)"   };
             case EYEDROPPER -> new String[]{ "✦", "Pipette (I)"    };
             case SELECT     -> new String[]{ "⬚", "Auswahl (S)"    };
+            case TEXT       -> new String[]{ "A", "Text (T)"       };
         };
     }
 

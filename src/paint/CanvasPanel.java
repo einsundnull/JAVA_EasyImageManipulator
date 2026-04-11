@@ -4,6 +4,8 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -42,6 +44,12 @@ public class CanvasPanel extends JPanel {
 	// Delta-based multi-drag: last image-space drag point
 	private Point elemLastImgPt = null;
 
+	// ── Text tool state ───────────────────────────────────────────────────────
+	/** Image-space origin of the active text input box, or null when not editing. */
+	private Point   textOrigin  = null;
+	private StringBuilder textBuffer = new StringBuilder();
+	private static final int TEXT_PADDING = 4;
+
 	public CanvasPanel(CanvasCallbacks callbacks) {
 		this.callbacks = callbacks;
 		setOpaque(false);
@@ -71,6 +79,16 @@ public class CanvasPanel extends JPanel {
 
 				if (!SwingUtilities.isLeftMouseButton(e) || callbacks.getWorkingImage() == null)
 					return;
+
+				// Commit any open text box when clicking elsewhere (even with TEXT tool)
+				if (textOrigin != null) {
+					PaintEngine.Tool curTool = callbacks.getAppMode() == AppMode.PAINT
+					        ? callbacks.getPaintToolbar().getActiveTool() : null;
+					if (curTool != PaintEngine.Tool.TEXT) {
+						commitText();
+					}
+					// TEXT tool click-away → commitText() then open new one (handled below in switch)
+				}
 
 				Point imgPt = callbacks.screenToImage(e.getPoint());
 
@@ -221,6 +239,14 @@ public class CanvasPanel extends JPanel {
 							callbacks.setSelectionStart(imgPt);
 							callbacks.setSelectionEnd(imgPt);
 						}
+					}
+					case TEXT -> {
+						// Commit any existing text first, then start a new text box
+						commitText();
+						textOrigin = imgPt;
+						textBuffer.setLength(0);
+						requestFocusInWindow();
+						repaint();
 					}
 					}
 				} else {
@@ -518,10 +544,50 @@ public class CanvasPanel extends JPanel {
 	}
 
 	private void setupKeyBindings() {
+		// Text tool: all printable keys are captured via a KeyAdapter registered on the
+		// panel so we don't need to enumerate individual KeyStrokes in the InputMap.
+		addKeyListener(new java.awt.event.KeyAdapter() {
+			@Override
+			public void keyPressed(java.awt.event.KeyEvent ke) {
+				if (textOrigin == null) return;
+				int code = ke.getKeyCode();
+				if (code == KeyEvent.VK_ENTER) {
+					// Shift+Enter = newline inside text; plain Enter = commit
+					if (ke.isShiftDown()) {
+						textBuffer.append('\n');
+					} else {
+						commitText();
+					}
+					ke.consume(); repaint(); return;
+				}
+				if (code == KeyEvent.VK_ESCAPE) {
+					textOrigin = null; textBuffer.setLength(0);
+					ke.consume(); repaint(); return;
+				}
+				if (code == KeyEvent.VK_BACK_SPACE) {
+					if (textBuffer.length() > 0)
+						textBuffer.deleteCharAt(textBuffer.length() - 1);
+					ke.consume(); repaint(); return;
+				}
+			}
+			@Override
+			public void keyTyped(java.awt.event.KeyEvent ke) {
+				if (textOrigin == null) return;
+				char c = ke.getKeyChar();
+				if (c == KeyEvent.CHAR_UNDEFINED) return;
+				if (c == '\r' || c == '\n' || c == '\u001b' || c == '\b') return; // handled in keyPressed
+				textBuffer.append(c);
+				ke.consume(); repaint();
+			}
+		});
+
 		getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "cancel");
 		getActionMap().put("cancel", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				if (textOrigin != null) {
+					textOrigin = null; textBuffer.setLength(0); repaint(); return;
+				}
 				if (callbacks.getFloatingImage() != null) {
 					callbacks.commitFloat();
 				} else if (!callbacks.getSelectedElements().isEmpty()) {
@@ -540,19 +606,15 @@ public class CanvasPanel extends JPanel {
 		getActionMap().put("commit", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				if (textOrigin != null) { commitText(); return; }
 				if (callbacks.getFloatingImage() != null) {
 					callbacks.commitFloat();
 				}
 			}
 		});
 
-		getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "delete");
-		getActionMap().put("delete", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				callbacks.deleteSelection();
-			}
-		});
+		// DEL and Backspace are handled by the parent window's WHEN_IN_FOCUSED_WINDOW
+		// binding in SelectiveAlphaEditor.setupKeyBindings() — do not shadow them here.
 	}
 
 	private void copyInto(BufferedImage src, BufferedImage dst) {
@@ -604,6 +666,51 @@ public class CanvasPanel extends JPanel {
 					callbacks.getPaintToolbar().getStrokeWidth(), callbacks.getPaintToolbar().getFillMode(),
 					callbacks.getPaintToolbar().getSecondaryColor(), aa);
 		}
+	}
+
+	/**
+	 * Render the current text buffer into a BufferedImage and hand it to the
+	 * callbacks as a new Element layer. Clears the active text state afterwards.
+	 */
+	private void commitText() {
+		if (textOrigin == null || textBuffer.length() == 0) {
+			textOrigin = null;
+			textBuffer.setLength(0);
+			repaint();
+			return;
+		}
+		Color  color    = callbacks.getPaintToolbar().getPrimaryColor();
+		Font   font     = new Font("SansSerif", Font.PLAIN,
+		                           Math.max(8, callbacks.getPaintToolbar().getStrokeWidth() * 4));
+		String text     = textBuffer.toString();
+		String[] lines  = text.split("\n", -1);
+
+		// Measure total size
+		java.awt.image.BufferedImage dummy = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+		java.awt.FontMetrics fm = dummy.createGraphics().getFontMetrics(font);
+		int lineH  = fm.getHeight();
+		int descent = fm.getDescent();
+		int maxW   = 1;
+		for (String l : lines) maxW = Math.max(maxW, fm.stringWidth(l));
+		int totalH = Math.max(1, lineH * lines.length);
+
+		java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+		        maxW + TEXT_PADDING * 2, totalH + TEXT_PADDING * 2,
+		        java.awt.image.BufferedImage.TYPE_INT_ARGB);
+		java.awt.Graphics2D g2 = img.createGraphics();
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+		g2.setFont(font);
+		g2.setColor(color);
+		for (int i = 0; i < lines.length; i++) {
+			g2.drawString(lines[i], TEXT_PADDING, TEXT_PADDING + lineH * i + lineH - descent);
+		}
+		g2.dispose();
+
+		callbacks.commitTextAsElement(img, textOrigin.x, textOrigin.y);
+		textOrigin = null;
+		textBuffer.setLength(0);
+		repaint();
 	}
 
 	/** Returns the topmost element at screen point, or null. */
@@ -699,30 +806,73 @@ public class CanvasPanel extends JPanel {
 		g2.drawImage(callbacks.getWorkingImage(), 0, 0, cw, ch, null);
 
 		// ── Element layers (non-destructive, rendered above base canvas) ──────
-		java.util.List<Element> activeEls  = callbacks.getActiveElements();
+		java.util.List<Element> activeEls   = callbacks.getActiveElements();
 		java.util.List<Element> selectedEls = callbacks.getSelectedElements();
-		Element primaryEl = callbacks.getSelectedElement();
-		for (Element el : activeEls) {
-			Rectangle sr = callbacks.elemRectScreen(el);
-			g2.drawImage(el.image(), sr.x, sr.y, sr.width, sr.height, null);
+		Element primaryEl   = callbacks.getSelectedElement();
+		boolean showOutlines = callbacks.isShowAllLayerOutlines();
+		float[] selDash = { 5f, 3f };
+		float[] dimDash = { 3f, 3f };
 
-			boolean isSel     = selectedEls.stream().anyMatch(s -> s.id() == el.id());
-			boolean isPrimary = primaryEl != null && primaryEl.id() == el.id();
-			if (isSel) {
-				float[] dash = { 5f, 3f };
-				g2.setColor(AppColors.ACCENT);
-				g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 0f));
-				g2.drawRect(sr.x, sr.y, sr.width, sr.height);
-				if (isPrimary) {
-					// Scale handles only on the primary element
-					g2.setStroke(new BasicStroke(1f));
-					for (Rectangle hr : callbacks.handleRects(sr)) {
-						g2.setColor(Color.WHITE);
-						g2.fillRect(hr.x, hr.y, hr.width, hr.height);
-						g2.setColor(AppColors.ACCENT);
-						g2.drawRect(hr.x, hr.y, hr.width, hr.height);
+		// Draw all non-primary elements first; primary draws last (on top)
+		for (int pass = 0; pass < 2; pass++) {
+			for (Element el : activeEls) {
+				boolean isPrimary = primaryEl != null && primaryEl.id() == el.id();
+				if (pass == 0 && isPrimary) continue;  // skip primary on first pass
+				if (pass == 1 && !isPrimary) continue; // skip others on second pass
+
+				Rectangle sr = callbacks.elemRectScreen(el);
+				g2.drawImage(el.image(), sr.x, sr.y, sr.width, sr.height, null);
+
+				boolean isSel = selectedEls.stream().anyMatch(s -> s.id() == el.id());
+				if (isSel) {
+					g2.setColor(AppColors.ACCENT);
+					g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, selDash, 0f));
+					g2.drawRect(sr.x, sr.y, sr.width, sr.height);
+					if (isPrimary) {
+						g2.setStroke(new BasicStroke(1f));
+						for (Rectangle hr : callbacks.handleRects(sr)) {
+							g2.setColor(Color.WHITE);
+							g2.fillRect(hr.x, hr.y, hr.width, hr.height);
+							g2.setColor(AppColors.ACCENT);
+							g2.drawRect(hr.x, hr.y, hr.width, hr.height);
+						}
 					}
+				} else if (showOutlines) {
+					// Dim outline for unselected layers when toggle is on
+					g2.setColor(new Color(160, 160, 160, 140));
+					g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dimDash, 0f));
+					g2.drawRect(sr.x, sr.y, sr.width, sr.height);
 				}
+			}
+		}
+
+		// ── Active text input preview ─────────────────────────────────────────
+		if (textOrigin != null) {
+			Color  color  = callbacks.getPaintToolbar().getPrimaryColor();
+			Font   font   = new Font("SansSerif", Font.PLAIN,
+			                         Math.max(8, callbacks.getPaintToolbar().getStrokeWidth() * 4));
+			String text   = textBuffer.toString() + "|"; // cursor
+			String[] tLines = text.split("\n", -1);
+			g2.setFont(font.deriveFont((float)(font.getSize() * callbacks.getZoom())));
+			java.awt.FontMetrics fm = g2.getFontMetrics();
+			int lineH  = fm.getHeight();
+			int maxW   = 1;
+			for (String l : tLines) maxW = Math.max(maxW, fm.stringWidth(l));
+			int sx = (int) Math.round(textOrigin.x * callbacks.getZoom());
+			int sy = (int) Math.round(textOrigin.y * callbacks.getZoom());
+			int boxW = maxW + TEXT_PADDING * 2;
+			int boxH = lineH * tLines.length + TEXT_PADDING * 2;
+			// Background
+			g2.setColor(new Color(255, 255, 255, 30));
+			g2.fillRect(sx, sy, boxW, boxH);
+			// Border
+			g2.setColor(AppColors.ACCENT);
+			g2.setStroke(new BasicStroke(1f));
+			g2.drawRect(sx, sy, boxW, boxH);
+			// Text
+			g2.setColor(color);
+			for (int i = 0; i < tLines.length; i++) {
+				g2.drawString(tLines[i], sx + TEXT_PADDING, sy + TEXT_PADDING + lineH * (i + 1) - fm.getDescent());
 			}
 		}
 

@@ -26,6 +26,8 @@ public class ElementLayerPanel extends JPanel {
         void setSelectedElement(Element el);
         void toggleElementSelection(Element el);
         void deleteElement(Element el);
+        /** Burn (merge) the element permanently into the canvas image. */
+        void burnElement(Element el);
         void repaintCanvas();
         void onCloseRequested();
     }
@@ -36,8 +38,9 @@ public class ElementLayerPanel extends JPanel {
     private static final int TILE_H  = 106;
     private static final int THUMB_H =  74;
 
-    private final Callbacks cb;
-    private final JPanel    tilesContainer;
+    private final Callbacks      cb;
+    private final JPanel         tilesContainer;
+    private boolean              showAllOutlines = false;
 
     // =========================================================================
     // Constructor
@@ -75,7 +78,34 @@ public class ElementLayerPanel extends JPanel {
             @Override public void mouseEntered(MouseEvent e) { closeBtn.setForeground(Color.WHITE); }
             @Override public void mouseExited (MouseEvent e) { closeBtn.setForeground(AppColors.TEXT_MUTED); }
         });
-        header.add(closeBtn, BorderLayout.EAST);
+        // "Show all outlines" toggle – small square icon button
+        JToggleButton outlineBtn = new JToggleButton("▣") {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(isSelected() ? AppColors.ACCENT : new Color(55, 55, 55));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 4, 4);
+                super.paintComponent(g2);
+                g2.dispose();
+            }
+        };
+        outlineBtn.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        outlineBtn.setForeground(AppColors.TEXT);
+        outlineBtn.setFocusPainted(false);
+        outlineBtn.setBorderPainted(false);
+        outlineBtn.setContentAreaFilled(false);
+        outlineBtn.setPreferredSize(new Dimension(22, 22));
+        outlineBtn.setToolTipText("Alle Layer-Rahmen immer anzeigen");
+        outlineBtn.addActionListener(e -> {
+            showAllOutlines = outlineBtn.isSelected();
+            cb.repaintCanvas();
+        });
+
+        JPanel eastBtns = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 2, 3));
+        eastBtns.setOpaque(false);
+        eastBtns.add(outlineBtn);
+        eastBtns.add(closeBtn);
+        header.add(eastBtns, BorderLayout.EAST);
         add(header, BorderLayout.NORTH);
 
         // ── Tiles container ───────────────────────────────────────────────────
@@ -97,6 +127,8 @@ public class ElementLayerPanel extends JPanel {
     // =========================================================================
     // Public API
     // =========================================================================
+    public boolean isShowAllOutlines() { return showAllOutlines; }
+
     /**
      * Rebuilds the tile list from the given elements.
      * The topmost element (highest Z = last in list) is shown first.
@@ -144,6 +176,34 @@ public class ElementLayerPanel extends JPanel {
             setOpaque(false);
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
+            // ── Orange burn (⊞) button – second from top-right ───────────────
+            JLabel burn = new JLabel("⊕", JLabel.CENTER);
+            burn.setForeground(new Color(220, 140, 30));
+            burn.setFont(new Font("SansSerif", Font.BOLD, 11));
+            burn.setBounds(TILE_W - 37, 4, 16, 16);
+            burn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            burn.setOpaque(true);
+            burn.setBackground(new Color(50, 50, 50));
+            burn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            burn.setToolTipText("Layer einbrennen (auf Canvas anwenden)");
+            burn.addMouseListener(new MouseAdapter() {
+                @Override public void mouseClicked(MouseEvent e) {
+                    e.consume();
+                    cb.burnElement(element);
+                }
+                @Override public void mouseEntered(MouseEvent e) {
+                    burn.setBackground(new Color(160, 90, 10));
+                    burn.setForeground(Color.WHITE);
+                    burn.setBorder(BorderFactory.createLineBorder(new Color(220, 140, 30), 1));
+                }
+                @Override public void mouseExited(MouseEvent e) {
+                    burn.setBackground(new Color(50, 50, 50));
+                    burn.setForeground(new Color(220, 140, 30));
+                    burn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                }
+            });
+            add(burn);
+
             // ── Red (×) delete button – top-right corner ──────────────────────
             JLabel del = new JLabel("✕", JLabel.CENTER);
             del.setForeground(new Color(220, 60, 60));
@@ -155,7 +215,7 @@ public class ElementLayerPanel extends JPanel {
             del.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
             del.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
-                    e.consume(); // don't also fire the tile's click
+                    e.consume();
                     cb.deleteElement(element);
                 }
                 @Override public void mouseEntered(MouseEvent e) {

@@ -1141,6 +1141,18 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 refreshElementPanel();
                 if (canvasPanel != null) canvasPanel.repaint();
             }
+            @Override public void burnElement(Element el) {
+                if (workingImage == null) return;
+                pushUndo();
+                BufferedImage scaled = PaintEngine.scale(
+                        el.image(), Math.max(1, el.width()), Math.max(1, el.height()));
+                PaintEngine.pasteRegion(workingImage, scaled, new java.awt.Point(el.x(), el.y()));
+                activeElements.removeIf(e -> e.id() == el.id());
+                selectedElements.removeIf(e -> e.id() == el.id());
+                markDirty();
+                refreshElementPanel();
+                if (canvasPanel != null) canvasPanel.repaint();
+            }
             @Override public void repaintCanvas() {
                 if (canvasPanel != null) canvasPanel.repaint();
             }
@@ -2248,6 +2260,22 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     @Override public void setElemDragAnchor(Point p) { elemDragAnchor = p; }
 
     @Override public PaintToolbar getPaintToolbar() { return paintToolbar; }
+
+    @Override public boolean isShowAllLayerOutlines() {
+        return elementLayerPanel != null && elementLayerPanel.isShowing()
+                && elementLayerPanel.isShowAllOutlines();
+    }
+
+    @Override public void commitTextAsElement(BufferedImage textImg, int x, int y) {
+        if (textImg == null || appMode != AppMode.PAINT) return;
+        Element el = new Element(nextElementId++, textImg, x, y, textImg.getWidth(), textImg.getHeight());
+        activeElements.add(el);
+        selectedElements.clear();
+        selectedElements.add(el);
+        refreshElementPanel();
+        markDirty();
+        if (canvasPanel != null) canvasPanel.repaint();
+    }
 
     @Override public void repaintCanvas() { canvasPanel.repaint(); }
 
