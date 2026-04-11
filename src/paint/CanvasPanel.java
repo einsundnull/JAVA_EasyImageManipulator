@@ -28,6 +28,8 @@ public class CanvasPanel extends JPanel {
     public CanvasPanel(CanvasCallbacks callbacks) {
         this.callbacks = callbacks;
         setOpaque(false);
+        setFocusable(true);
+        System.err.println("[DEBUG] CanvasPanel created, focusable=" + isFocusable());
         setupMouseHandling();
         setupKeyBindings();
     }
@@ -36,6 +38,7 @@ public class CanvasPanel extends JPanel {
         MouseAdapter handler = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                System.err.println("[DEBUG] mousePressed called! Button=" + e.getButton() + ", Point=" + e.getPoint());
                 requestFocusInWindow();
 
                 boolean isMiddle = (e.getButton() == MouseEvent.BUTTON2);
@@ -154,6 +157,7 @@ public class CanvasPanel extends JPanel {
                         callbacks.performFloodfill(e.getPoint());
                     } else {
                         // Start a new selection (Shift adds to existing)
+                        System.err.println("[DEBUG] Started selection at " + imgPt + ", appMode=" + callbacks.getAppMode() + ", floodfill=" + callbacks.isFloodfillMode());
                         callbacks.setSelecting(true);
                         callbacks.setSelectionStart(imgPt);
                         callbacks.setSelectionEnd(imgPt);
@@ -163,6 +167,7 @@ public class CanvasPanel extends JPanel {
 
             @Override
             public void mouseDragged(MouseEvent e) {
+                System.err.println("[DEBUG] mouseDragged called! Point=" + e.getPoint());
                 if (panStart != null) {
                     Point curVp = SwingUtilities.convertPoint(CanvasPanel.this, e.getPoint(),
                             callbacks.getScrollPane().getViewport());
@@ -289,6 +294,7 @@ public class CanvasPanel extends JPanel {
                         callbacks.repaintCanvas();
                     }
                 } else {
+                    System.err.println("[DEBUG] Selection drag: imgPt=" + imgPt + ", start=" + callbacks.getSelectionStart() + ", end=" + callbacks.getSelectionEnd() + " -> " + imgPt);
                     callbacks.setSelectionEnd(imgPt);
                     callbacks.repaintCanvas();
                 }
@@ -349,10 +355,11 @@ public class CanvasPanel extends JPanel {
 
             @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
+                System.err.println("[DEBUG] mouseWheelMoved called! Rotation=" + e.getWheelRotation() + ", Ctrl=" + ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0));
                 if ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0) {
                     double zoomStep = 0.06;
                     double newZoom = callbacks.getZoom() - (e.getWheelRotation() * zoomStep);
-                    callbacks.repaintCanvas();
+                    callbacks.setZoom(newZoom, e.getPoint());
                 } else if ((e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0) {
                     callbacks.getScrollPane().getHorizontalScrollBar()
                             .setValue(callbacks.getScrollPane().getHorizontalScrollBar().getValue() +
@@ -368,6 +375,7 @@ public class CanvasPanel extends JPanel {
         addMouseListener(handler);
         addMouseMotionListener(handler);
         addMouseWheelListener(handler);
+        System.err.println("[DEBUG] Mouse listeners registered! Focusable=" + isFocusable() + ", Enabled=" + isEnabled() + ", Visible=" + isVisible());
     }
 
     private void setupKeyBindings() {
@@ -569,6 +577,7 @@ public class CanvasPanel extends JPanel {
             int y = Math.min(callbacks.getSelectionStart().y, callbacks.getSelectionEnd().y);
             int w = Math.abs(callbacks.getSelectionEnd().x - callbacks.getSelectionStart().x);
             int h = Math.abs(callbacks.getSelectionEnd().y - callbacks.getSelectionStart().y);
+            System.err.println("[DEBUG PAINT] Drawing selection: imgCoords=(" + x + "," + y + "," + w + "," + h + "), zoom=" + callbacks.getZoom());
 
             g2.setColor(new Color(0, 200, 255, 60));
             g2.fillRect((int) Math.round(x * callbacks.getZoom()),

@@ -723,7 +723,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
      * Set zoom level. If anchorCanvas != null, keep that canvas point fixed
      * on screen (zoom toward cursor).
      */
-    public void setZoom(double nz, Point anchorCanvas) {
+    @Override public void setZoom(double nz, Point anchorCanvas) {
         double oldZoom = zoom;
         zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
 
