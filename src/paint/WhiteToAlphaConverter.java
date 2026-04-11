@@ -8,10 +8,7 @@ import javax.imageio.ImageIO;
 import javax.swing.JOptionPane;
 
 public class WhiteToAlphaConverter {
-	// console.log("### WhiteToAlphaConverter.java ###");
-
 	public static void convertCompleteWhiteToAlpha(File inputFile) {
-		// console.log("### WhiteToAlphaConverter.java convertCompleteWhiteToAlpha ###");
 		try {
 			BufferedImage image = ImageIO.read(inputFile);
 			if (image == null) {
@@ -60,14 +57,12 @@ public class WhiteToAlphaConverter {
 	}
 
 	private static boolean isWhite(int r, int g, int b, int tolerance) {
-		// console.log("### WhiteToAlphaConverter.java isWhite ###");
 		return r >= (255 - tolerance) && 
 		       g >= (255 - tolerance) && 
 		       b >= (255 - tolerance);
 	}
 
 	public static String getOutputPath(File inputFile, String suffix) {
-		// console.log("### WhiteToAlphaConverter.java getOutputPath ###");
 		String path = inputFile.getAbsolutePath();
 		int lastDot = path.lastIndexOf('.');
 		if (lastDot != -1) {

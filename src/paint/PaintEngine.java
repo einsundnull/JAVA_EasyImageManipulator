@@ -1,6 +1,13 @@
 package paint;
 
-import java.awt.*;
+import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.GradientPaint;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.util.Stack;
@@ -28,9 +35,7 @@ public class PaintEngine {
         ROUND, SQUARE
     }
 
-    // =========================================================================
     // Draw Pencil stroke
-    // =========================================================================
     public static void drawPencil(BufferedImage img, Point from, Point to,
                                    Color color, int strokeWidth, BrushShape shape, boolean aa) {
         Graphics2D g2 = img.createGraphics();
@@ -52,9 +57,7 @@ public class PaintEngine {
         g2.dispose();
     }
 
-    // =========================================================================
     // Draw Eraser stroke
-    // =========================================================================
     public static void drawEraser(BufferedImage img, Point from, Point to, int strokeWidth, boolean aa) {
         Graphics2D g2 = img.createGraphics();
         applyQuality(g2, aa);
@@ -69,9 +72,7 @@ public class PaintEngine {
         g2.dispose();
     }
 
-    // =========================================================================
     // Draw Line
-    // =========================================================================
     public static void drawLine(BufferedImage img, Point from, Point to,
                                  Color color, int strokeWidth, boolean aa) {
         Graphics2D g2 = img.createGraphics();
@@ -82,17 +83,13 @@ public class PaintEngine {
         g2.dispose();
     }
 
-    // =========================================================================
     // Draw Circle / Ellipse
-    // =========================================================================
     public static void drawCircle(BufferedImage img, Point from, Point to,
                                    Color color, int strokeWidth, FillMode fillMode,
                                    Color color2, boolean aa) {
-        int x = Math.min(from.x, to.x);
-        int y = Math.min(from.y, to.y);
-        int w = Math.abs(to.x - from.x);
-        int h = Math.abs(to.y - from.y);
-        if (w < 1 || h < 1) return;
+        int[] bbox = boundingBox(from, to);
+        if (bbox == null) return;
+        int x = bbox[0], y = bbox[1], w = bbox[2], h = bbox[3];
 
         Graphics2D g2 = img.createGraphics();
         applyQuality(g2, aa);
@@ -114,17 +111,13 @@ public class PaintEngine {
         g2.dispose();
     }
 
-    // =========================================================================
     // Draw Rectangle
-    // =========================================================================
     public static void drawRect(BufferedImage img, Point from, Point to,
                                  Color color, int strokeWidth, FillMode fillMode,
                                  Color color2, boolean aa) {
-        int x = Math.min(from.x, to.x);
-        int y = Math.min(from.y, to.y);
-        int w = Math.abs(to.x - from.x);
-        int h = Math.abs(to.y - from.y);
-        if (w < 1 || h < 1) return;
+        int[] bbox = boundingBox(from, to);
+        if (bbox == null) return;
+        int x = bbox[0], y = bbox[1], w = bbox[2], h = bbox[3];
 
         Graphics2D g2 = img.createGraphics();
         applyQuality(g2, aa);
@@ -145,9 +138,7 @@ public class PaintEngine {
         g2.dispose();
     }
 
-    // =========================================================================
     // Floodfill
-    // =========================================================================
     public static void floodFill(BufferedImage img, int x, int y, Color fillColor, int tolerance) {
         if (x < 0 || x >= img.getWidth() || y < 0 || y >= img.getHeight()) return;
         int targetARGB = img.getRGB(x, y);
@@ -171,17 +162,13 @@ public class PaintEngine {
         }
     }
 
-    // =========================================================================
     // Eyedropper
-    // =========================================================================
     public static Color pickColor(BufferedImage img, int x, int y) {
         if (x < 0 || x >= img.getWidth() || y < 0 || y >= img.getHeight()) return Color.BLACK;
         return new Color(img.getRGB(x, y), true);
     }
 
-    // =========================================================================
     // Cut / Copy / Paste
-    // =========================================================================
     public static BufferedImage cropRegion(BufferedImage img, Rectangle r) {
         int x = Math.max(0, r.x),  y = Math.max(0, r.y);
         int w = Math.min(r.width,  img.getWidth()  - x);
@@ -210,24 +197,16 @@ public class PaintEngine {
         g2.dispose();
     }
 
-    // =========================================================================
     // Transformations
-    // =========================================================================
+    public static BufferedImage flipHorizontal(BufferedImage img) { return flip(img, true); }
+    public static BufferedImage flipVertical(BufferedImage img)   { return flip(img, false); }
 
-    public static BufferedImage flipHorizontal(BufferedImage img) {
+    private static BufferedImage flip(BufferedImage img, boolean horizontal) {
         int w = img.getWidth(), h = img.getHeight();
         BufferedImage r = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = r.createGraphics();
-        g2.drawImage(img, w, 0, -w, h, null);
-        g2.dispose();
-        return r;
-    }
-
-    public static BufferedImage flipVertical(BufferedImage img) {
-        int w = img.getWidth(), h = img.getHeight();
-        BufferedImage r = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = r.createGraphics();
-        g2.drawImage(img, 0, h, w, -h, null);
+        if (horizontal) g2.drawImage(img, w, 0, -w, h, null);
+        else            g2.drawImage(img, 0, h,  w, -h, null);
         g2.dispose();
         return r;
     }
@@ -263,9 +242,15 @@ public class PaintEngine {
         return result;
     }
 
-    // =========================================================================
     // Helpers
-    // =========================================================================
+    private static int[] boundingBox(Point from, Point to) {
+        int x = Math.min(from.x, to.x);
+        int y = Math.min(from.y, to.y);
+        int w = Math.abs(to.x - from.x);
+        int h = Math.abs(to.y - from.y);
+        return (w < 1 || h < 1) ? null : new int[]{x, y, w, h};
+    }
+
     private static void applyQuality(Graphics2D g2, boolean aa) {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 aa ? RenderingHints.VALUE_ANTIALIAS_ON : RenderingHints.VALUE_ANTIALIAS_OFF);

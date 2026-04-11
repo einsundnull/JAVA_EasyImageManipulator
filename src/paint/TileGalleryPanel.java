@@ -1,10 +1,25 @@
 package paint;
 
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
-import java.awt.event.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -13,7 +28,19 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import javax.imageio.ImageIO;
-import javax.swing.*;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
+import javax.swing.TransferHandler;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 
 /**
@@ -148,13 +175,7 @@ public class TileGalleryPanel extends JPanel {
         multiSelectMode = false;
         actionRow.setVisible(false);
 
-        for (File f : files) {
-            TilePanel tp = new TilePanel(f);
-            tp.setActive(f.equals(active));
-            tiles.add(tp);
-            tilesContainer.add(tp);
-            tilesContainer.add(Box.createVerticalStrut(5));
-        }
+        for (File f : files) addTile(f);
         tilesContainer.revalidate();
         tilesContainer.repaint();
         SwingUtilities.invokeLater(this::scrollToActiveImpl);
@@ -194,16 +215,9 @@ public class TileGalleryPanel extends JPanel {
     public void addFiles(List<File> newFiles) {
         boolean changed = false;
         for (File f : newFiles) {
-            boolean alreadyPresent = false;
-            for (TilePanel t : tiles) {
-                if (t.imageFile.equals(f)) { alreadyPresent = true; break; }
-            }
+            boolean alreadyPresent = tiles.stream().anyMatch(t -> t.imageFile.equals(f));
             if (!alreadyPresent) {
-                TilePanel tp = new TilePanel(f);
-                tp.setActive(f.equals(activeFile));
-                tiles.add(tp);
-                tilesContainer.add(tp);
-                tilesContainer.add(Box.createVerticalStrut(5));
+                addTile(f);
                 changed = true;
             }
         }
@@ -211,6 +225,14 @@ public class TileGalleryPanel extends JPanel {
             tilesContainer.revalidate();
             tilesContainer.repaint();
         }
+    }
+
+    private void addTile(File f) {
+        TilePanel tp = new TilePanel(f);
+        tp.setActive(f.equals(activeFile));
+        tiles.add(tp);
+        tilesContainer.add(tp);
+        tilesContainer.add(Box.createVerticalStrut(5));
     }
 
     // =========================================================================
@@ -401,9 +423,9 @@ public class TileGalleryPanel extends JPanel {
             boolean hover = getMousePosition() != null;
 
             // ── Background ───────────────────────────────────────────────────
-            Color bg = isActive ? new Color(28, 52, 28)
-                     : hover   ? new Color(58, 58, 58)
-                     : new Color(48, 48, 48);
+            Color bg = isActive ? AppColors.TILE_ACTIVE_BG
+                     : hover   ? AppColors.TILE_HOVER_BG
+                     : AppColors.TILE_DEFAULT_BG;
             g2.setColor(bg);
             g2.fillRoundRect(0, 0, TILE_W - 1, TILE_H - 1, 8, 8);
 
@@ -419,7 +441,7 @@ public class TileGalleryPanel extends JPanel {
                 g2.setClip(null);
             } else {
                 // Placeholder while loading
-                g2.setColor(new Color(55, 55, 55));
+                g2.setColor(AppColors.TILE_PLACEHOLDER);
                 g2.fillRoundRect(3, thumbTop, TILE_W - 6, THUMB_H, 4, 4);
                 g2.setColor(AppColors.TEXT_MUTED);
                 g2.setFont(new Font("SansSerif", Font.PLAIN, 11));
@@ -455,7 +477,7 @@ public class TileGalleryPanel extends JPanel {
                 g2.setColor(AppColors.DANGER);            // red – ungespeicherte Änderungen
                 g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
             } else if (isInSelection) {
-                g2.setColor(new Color(255, 140, 0));      // orange
+                g2.setColor(AppColors.SELECTION);
                 g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
             } else if (hover) {
                 g2.setStroke(new BasicStroke(1f));

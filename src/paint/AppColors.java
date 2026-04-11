@@ -7,8 +7,6 @@ import java.awt.Color;
  * Single source of truth – change here, affects everywhere.
  */
 public final class AppColors {
-    // console.log("### AppColors.java ###");
-
     private AppColors() {}
 
     public static final Color BG_DARK        = new Color(30,  30,  30);
@@ -28,4 +26,10 @@ public final class AppColors {
     public static final Color DANGER         = new Color(200,  60,  60);
     public static final Color DANGER_HOVER   = new Color(220,  80,  80);
     public static final Color WARNING        = new Color(220, 160,   0);
+    public static final Color HANDLE_BAR_TOP = new Color(28, 28, 28);
+    public static final Color TILE_ACTIVE_BG = new Color(28, 52, 28);
+    public static final Color TILE_HOVER_BG  = new Color(58, 58, 58);
+    public static final Color TILE_DEFAULT_BG= new Color(48, 48, 48);
+    public static final Color TILE_PLACEHOLDER= new Color(55, 55, 55);
+    public static final Color SELECTION      = new Color(255, 140, 0);
 }

@@ -1,10 +1,31 @@
 package paint;
 
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.RenderingHints;
+import java.awt.Toolkit;
+import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
-import javax.swing.*;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.JWindow;
+import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeListener;
 
 /**
@@ -20,8 +41,6 @@ import javax.swing.event.ChangeListener;
  * Owned by a parent JComponent; shown as undecorated JWindow near that component.
  */
 public class ColorPickerPopup extends JWindow {
-    // console.log("### ColorPickerPopup.java ###");
-
     // ── Constants ────────────────────────────────────────────────────────────
     private static final int SV_SIZE   = 180;
     private static final int HUE_W     = 18;
@@ -44,6 +63,7 @@ public class ColorPickerPopup extends JWindow {
     private AlphaPanel alphaPanel;
     private JLabel     previewLabel;
     private JTextField hexField;
+    private JLabel     alphaValLabel;
 
     // ── Callback ──────────────────────────────────────────────────────────────
     private ChangeListener changeListener;
@@ -54,7 +74,6 @@ public class ColorPickerPopup extends JWindow {
 
     // =========================================================================
     public ColorPickerPopup(Window owner) {
-        // console.log("### ColorPickerPopup.java constructor ###");
         super(owner);
         // setAlwaysOnTop works for most cases; for fullscreen we also set
         // the WINDOW_ALWAYS_ON_TOP hint which is respected by more WMs.
@@ -70,13 +89,11 @@ public class ColorPickerPopup extends JWindow {
     // Public API
     // =========================================================================
     public Color getSelectedColor() {
-        // console.log("### ColorPickerPopup.java getSelectedColor ###");
         Color rgb = Color.getHSBColor(hue, sat, val);
         return new Color(rgb.getRed(), rgb.getGreen(), rgb.getBlue(), alpha);
     }
 
     public void setSelectedColor(Color c) {
-        // console.log("### ColorPickerPopup.java setSelectedColor ###");
         float[] hsb = Color.RGBtoHSB(c.getRed(), c.getGreen(), c.getBlue(), null);
         hue   = hsb[0];
         sat   = hsb[1];
@@ -93,7 +110,6 @@ public class ColorPickerPopup extends JWindow {
 
     /** Show the popup anchored below (or above) the given screen point. */
     public void showAt(int screenX, int screenY) {
-        // console.log("### ColorPickerPopup.java showAt ###");
         Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
         int w = getWidth(), h = getHeight();
         int x = Math.min(screenX, screen.width  - w - 4);
@@ -107,7 +123,6 @@ public class ColorPickerPopup extends JWindow {
     // UI construction
     // =========================================================================
     private void buildUI() {
-        // console.log("### ColorPickerPopup.java buildUI ###");
         JPanel root = new JPanel(null);
         root.setBackground(AppColors.BG_PANEL);
         root.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
@@ -138,10 +153,9 @@ public class ColorPickerPopup extends JWindow {
         alphaPanel.setBounds(PADDING + 20, HANDLE_H + rowY, alphaStripW, 18);
         root.add(alphaPanel);
 
-        JLabel alphaValLbl = makeLabel("255");
-        alphaValLbl.setName("alphaValLbl");
-        alphaValLbl.setBounds(PADDING + 20 + alphaStripW + 4, HANDLE_H + rowY, 28, 18);
-        root.add(alphaValLbl);
+        alphaValLabel = makeLabel("255");
+        alphaValLabel.setBounds(PADDING + 20 + alphaStripW + 4, HANDLE_H + rowY, 28, 18);
+        root.add(alphaValLabel);
 
         // ── Preview + hex ─────────────────────────────────────────────────────
         int previewY = HANDLE_H + rowY + 20 + PADDING/2;
@@ -166,7 +180,7 @@ public class ColorPickerPopup extends JWindow {
         // ── Drag handle bar at top ────────────────────────────────────────────
         int handleH = 20;
         JPanel handleBar = new JPanel(null);
-        handleBar.setBackground(new Color(28, 28, 28));
+        handleBar.setBackground(AppColors.HANDLE_BAR_TOP);
         handleBar.setBounds(0, 0, totalW, handleH);
         handleBar.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
 
@@ -219,7 +233,6 @@ public class ColorPickerPopup extends JWindow {
         // Hide when clicking outside – but NOT while dragging the popup itself
         addWindowFocusListener(new WindowAdapter() {
             @Override public void windowLostFocus(WindowEvent e) {
-                // console.log("### ColorPickerPopup.java windowLostFocus ###");
                 if (!isDragging) setVisible(false);
             }
         });
@@ -260,7 +273,6 @@ public class ColorPickerPopup extends JWindow {
     // ── SV (Saturation / Value) square ────────────────────────────────────────
     private class SVPanel extends JPanel {
         SVPanel() {
-            // console.log("### ColorPickerPopup.java SVPanel constructor ###");
             setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
             MouseAdapter ma = new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e)  { pick(e); }
@@ -276,7 +288,6 @@ public class ColorPickerPopup extends JWindow {
         }
 
         @Override protected void paintComponent(Graphics g) {
-            // console.log("### ColorPickerPopup.java SVPanel paintComponent ###");
             super.paintComponent(g);
             int w = getWidth(), h = getHeight();
             if (svImage == null || svImage.getWidth() != w || svImage.getHeight() != h) {
@@ -307,7 +318,6 @@ public class ColorPickerPopup extends JWindow {
     // ── Hue strip ─────────────────────────────────────────────────────────────
     private class HuePanel extends JPanel {
         HuePanel() {
-            // console.log("### ColorPickerPopup.java HuePanel constructor ###");
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             buildHueImage();
             MouseAdapter ma = new MouseAdapter() {
@@ -331,7 +341,6 @@ public class ColorPickerPopup extends JWindow {
         }
 
         @Override protected void paintComponent(Graphics g) {
-            // console.log("### ColorPickerPopup.java HuePanel paintComponent ###");
             super.paintComponent(g);
             g.drawImage(hueImage, 0, 0, getWidth(), getHeight(), null);
             int y = Math.round(hue * (getHeight() - 1));
@@ -345,7 +354,6 @@ public class ColorPickerPopup extends JWindow {
     // ── Alpha strip ───────────────────────────────────────────────────────────
     private class AlphaPanel extends JPanel {
         AlphaPanel() {
-            // console.log("### ColorPickerPopup.java AlphaPanel constructor ###");
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             MouseAdapter ma = new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e)  { pick(e); }
@@ -362,7 +370,6 @@ public class ColorPickerPopup extends JWindow {
         }
 
         @Override protected void paintComponent(Graphics g) {
-            // console.log("### ColorPickerPopup.java AlphaPanel paintComponent ###");
             super.paintComponent(g);
             int w = getWidth(), h = getHeight();
             // Checkerboard
@@ -394,7 +401,6 @@ public class ColorPickerPopup extends JWindow {
     // Helpers
     // =========================================================================
     private void repaintAll() {
-        // console.log("### ColorPickerPopup.java repaintAll ###");
         svPanel.repaint();
         huePanel.repaint();
         alphaPanel.repaint();
@@ -403,19 +409,16 @@ public class ColorPickerPopup extends JWindow {
     }
 
     private void syncPreview() {
-        // console.log("### ColorPickerPopup.java syncPreview ###");
         previewLabel.setBackground(getSelectedColor());
     }
 
     private void syncHexField() {
-        // console.log("### ColorPickerPopup.java syncHexField ###");
         Color c = getSelectedColor();
         hexField.setText(String.format("#%02X%02X%02X%02X",
                 c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha()));
     }
 
     private void parseHexField() {
-        // console.log("### ColorPickerPopup.java parseHexField ###");
         try {
             String s = hexField.getText().trim().replaceAll("^#", "");
             if (s.length() == 6)  s = s + "FF";
@@ -430,18 +433,11 @@ public class ColorPickerPopup extends JWindow {
     }
 
     private void updateAlphaValLabel() {
-        // console.log("### ColorPickerPopup.java updateAlphaValLabel ###");
-        if (getContentPane() == null) return;
-        for (Component c : ((Container) getContentPane()).getComponents()) {
-            if (c instanceof JLabel l && "alphaValLbl".equals(l.getName())) {
-                l.setText(String.valueOf(alpha));
-                break;
-            }
-        }
+        if (alphaValLabel != null)
+            alphaValLabel.setText(String.valueOf(alpha));
     }
 
     private void fireChange() {
-        // console.log("### ColorPickerPopup.java fireChange ###");
         if (changeListener != null)
             changeListener.stateChanged(new javax.swing.event.ChangeEvent(this));
     }

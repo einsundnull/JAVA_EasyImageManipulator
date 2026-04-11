@@ -28,7 +28,6 @@ import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -56,7 +55,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
@@ -82,7 +80,7 @@ import javax.swing.SwingUtilities;
  *  - Drawn OUTSIDE the image in dedicated panels (H top, V left)
  *  - Configurable unit: px / mm / cm / inch
  */
-public class SelectiveAlphaEditor extends JFrame {
+public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, RulerCallbacks {
 
     // ── Constants ─────────────────────────────────────────────────────────────
     private static final String[] SUPPORTED_EXTENSIONS = { "png", "jpg", "jpeg", "bmp", "gif" };
@@ -102,19 +100,7 @@ public class SelectiveAlphaEditor extends JFrame {
     private static final int TOPBAR_ZOOM_BTN_H = 50;
 
     // ── Ruler unit ────────────────────────────────────────────────────────────
-    private enum RulerUnit {
-        PX, MM, CM, INCH;
-        /** How many image pixels equal one unit (at given image DPI). */
-        double pxPerUnit() {
-            return switch (this) {
-                case PX   -> 1.0;
-                case MM   -> SCREEN_DPI / 25.4;
-                case CM   -> SCREEN_DPI / 2.54;
-                case INCH -> SCREEN_DPI;
-            };
-        }
-        String label() { return switch (this) { case PX -> "px"; case MM -> "mm"; case CM -> "cm"; case INCH -> "in"; }; }
-    }
+    // RulerUnit is now defined in RulerUnit.java (extracted as separate enum)
 
     // ── Per-file canvas state (cached while switching images) ─────────────────
     private static final class CanvasState {
@@ -126,7 +112,7 @@ public class SelectiveAlphaEditor extends JFrame {
     }
 
     // ── Application mode ──────────────────────────────────────────────────────
-    public enum AppMode { ALPHA_EDITOR, PAINT }
+    // AppMode is now defined in AppMode.java (extracted as separate enum)
 
     // ── State ─────────────────────────────────────────────────────────────────
     private BufferedImage originalImage;
@@ -214,6 +200,7 @@ public class SelectiveAlphaEditor extends JFrame {
     private JPanel        viewportPanel;   // BorderLayout: ruler + scrollPane
     private JPanel        dropHintPanel;
     private JLayeredPane  layeredPane;
+    private JPanel        actionPanel;    // Holds apply/clear/reset/save buttons
 
     private JLabel  statusLabel;
     private JLabel  modeLabel;
@@ -277,10 +264,10 @@ public class SelectiveAlphaEditor extends JFrame {
         modeLabel = new JLabel("Modus: Selective Alpha");
         modeLabel.setForeground(AppColors.TEXT_MUTED);
         modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        JButton toggleBtn = buildButton("Alpha-Modus wechseln", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton toggleBtn = UIComponentFactory.buildButton("Alpha-Modus wechseln", AppColors.BTN_BG, AppColors.BTN_HOVER);
         toggleBtn.addActionListener(e -> toggleAlphaMode());
 
-        filmstripBtn = buildModeToggleBtn("\uD83C\uDEDE", "Filmstreifen ein-/ausblenden");
+        filmstripBtn = UIComponentFactory.buildModeToggleBtn("\uD83C\uDEDE", "Filmstreifen ein-/ausblenden");
         filmstripBtn.setSelected(true);
         filmstripBtn.addActionListener(e -> {
             tileGallery.setVisible(filmstripBtn.isSelected());
@@ -301,19 +288,19 @@ public class SelectiveAlphaEditor extends JFrame {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 6));
         right.setOpaque(false);
 
-        canvasModeBtn = buildModeToggleBtn("⬜", "Canvas (Funktion folgt)");
+        canvasModeBtn = UIComponentFactory.buildModeToggleBtn("⬜", "Canvas (Funktion folgt)");
         canvasModeBtn.addActionListener(e -> {
             canvasModeBtn.setSelected(false);
             showInfoDialog("Canvas-Modus", "Diese Funktion wird in einer späteren Version implementiert.");
         });
 
-        paintModeBtn = buildModeToggleBtn("🖌", "Paint-Modus aktivieren / deaktivieren");
+        paintModeBtn = UIComponentFactory.buildModeToggleBtn("🖌", "Paint-Modus aktivieren / deaktivieren");
         paintModeBtn.addActionListener(e -> togglePaintMode());
 
-        JButton zoomOutBtn   = buildButton("−",   AppColors.BTN_BG, AppColors.BTN_HOVER);
-        JButton zoomInBtn    = buildButton("+",   AppColors.BTN_BG, AppColors.BTN_HOVER);
-        JButton zoomResetBtn = buildButton("1:1", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        JButton zoomFitBtn   = buildButton("Fit", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton zoomOutBtn   = UIComponentFactory.buildButton("−",   AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton zoomInBtn    = UIComponentFactory.buildButton("+",   AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton zoomResetBtn = UIComponentFactory.buildButton("1:1", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton zoomFitBtn   = UIComponentFactory.buildButton("Fit", AppColors.BTN_BG, AppColors.BTN_HOVER);
         zoomLabel = new JLabel("100%");
         zoomLabel.setForeground(AppColors.TEXT_MUTED);
         zoomLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -336,12 +323,12 @@ public class SelectiveAlphaEditor extends JFrame {
         zoomResetBtn.addActionListener(e -> setZoom(1.0, null));
         zoomFitBtn  .addActionListener(e -> fitToViewport());
 
-        JButton newBitmapBtn = buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton newBitmapBtn = UIComponentFactory.buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
         newBitmapBtn.setToolTipText("Neue leere Bitmap erstellen");
         newBitmapBtn.addActionListener(e -> doNewBitmap());
         newBitmapBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
 
-        JButton bgColorBtn = buildButton("BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton bgColorBtn = UIComponentFactory.buildButton("BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
         bgColorBtn.setToolTipText("Canvas-Hintergrundfarbe einstellen");
         bgColorBtn.addActionListener(e -> showCanvasBgDialog());
         bgColorBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
@@ -368,7 +355,7 @@ public class SelectiveAlphaEditor extends JFrame {
         setupDropTarget(dropHintPanel);
 
         // Canvas panel (the actual drawing surface)
-        canvasPanel = new CanvasPanel();
+        canvasPanel = new CanvasPanel(this);
 
         // Wrapper that centres canvasPanel when image < viewport
         canvasWrapper = new JPanel(null) {
@@ -406,8 +393,8 @@ public class SelectiveAlphaEditor extends JFrame {
         TileGalleryPanel.applyDarkScrollBar(scrollPane.getHorizontalScrollBar());
 
         // Ruler panels (redrawn on scroll change)
-        hRuler     = new HRulerPanel();
-        vRuler     = new VRulerPanel();
+        hRuler     = new HRulerPanel(this);
+        vRuler     = new VRulerPanel(this);
         rulerCorner = new JPanel();
         rulerCorner.setBackground(new Color(50, 50, 50));
         rulerCorner.setPreferredSize(new Dimension(RULER_THICK, RULER_THICK));
@@ -446,8 +433,8 @@ public class SelectiveAlphaEditor extends JFrame {
         dropHintPanel.setBounds(0, 0, 860, 560);
         layeredPane.add(dropHintPanel, JLayeredPane.DEFAULT_LAYER);
 
-        prevNavButton = buildNavButton("‹");
-        nextNavButton = buildNavButton("›");
+        prevNavButton = UIComponentFactory.buildNavButton("‹");
+        nextNavButton = UIComponentFactory.buildNavButton("›");
         prevNavButton.setEnabled(false);
         nextNavButton.setEnabled(false);
         prevNavButton.addActionListener(e -> navigateImage(-1));
@@ -504,35 +491,34 @@ public class SelectiveAlphaEditor extends JFrame {
         statusBar.setBackground(AppColors.BG_PANEL);
         statusBar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppColors.BORDER));
 
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         actionPanel.setOpaque(false);
-        actionPanel.setName("actionPanel");
 
-        applyButton = buildButton("Auswahl anwenden", AppColors.ACCENT, AppColors.ACCENT_HOVER);
+        applyButton = UIComponentFactory.buildButton("Auswahl anwenden", AppColors.ACCENT, AppColors.ACCENT_HOVER);
         applyButton.setForeground(Color.WHITE);
         applyButton.addActionListener(e -> applySelectionsToAlpha());
         applyButton.setEnabled(false);
 
-        clearSelectionsButton = buildButton("Auswahl löschen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        clearSelectionsButton = UIComponentFactory.buildButton("Auswahl löschen", AppColors.BTN_BG, AppColors.BTN_HOVER);
         clearSelectionsButton.addActionListener(e -> clearSelections());
         clearSelectionsButton.setEnabled(false);
 
-        JButton resetButton = buildButton("Zurücksetzen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton resetButton = UIComponentFactory.buildButton("Zurücksetzen", AppColors.BTN_BG, AppColors.BTN_HOVER);
         resetButton.setName("resetButton");
         resetButton.addActionListener(e -> resetImage());
         resetButton.setEnabled(false);
 
-        JButton saveButton = buildButton("Speichern", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
+        JButton saveButton = UIComponentFactory.buildButton("Speichern", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
         saveButton.setName("saveButton");
         saveButton.setForeground(Color.WHITE);
         saveButton.addActionListener(e -> saveImage());
         saveButton.setEnabled(false);
 
-        JButton insertElemBtn = buildButton("Als Element einfügen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton insertElemBtn = UIComponentFactory.buildButton("Als Element einfügen", AppColors.BTN_BG, AppColors.BTN_HOVER);
         insertElemBtn.setToolTipText("Auswahl als nicht-destruktiven Layer einfügen (ENTER=zusammenführen, DEL=löschen)");
         insertElemBtn.addActionListener(e -> insertSelectionAsElement());
 
-        JButton mergeElemBtn = buildButton("Element zusammenführen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton mergeElemBtn = UIComponentFactory.buildButton("Element zusammenführen", AppColors.BTN_BG, AppColors.BTN_HOVER);
         mergeElemBtn.setToolTipText("Ausgewähltes Element auf Canvas rendern (ENTER)");
         mergeElemBtn.addActionListener(e -> { if (selectedElement != null) mergeElementToCanvas(selectedElement); });
 
@@ -678,7 +664,7 @@ public class SelectiveAlphaEditor extends JFrame {
     }
 
     /** Saves the current workingImage + stacks + elements back into the file cache. */
-    private void saveCurrentState() {
+    public void saveCurrentState() {
         if (sourceFile == null || workingImage == null) return;
         CanvasState cs = fileStateCache.computeIfAbsent(sourceFile, k -> new CanvasState(workingImage));
         cs.image = workingImage;
@@ -737,7 +723,7 @@ public class SelectiveAlphaEditor extends JFrame {
      * Set zoom level. If anchorCanvas != null, keep that canvas point fixed
      * on screen (zoom toward cursor).
      */
-    private void setZoom(double nz, Point anchorCanvas) {
+    public void setZoom(double nz, Point anchorCanvas) {
         double oldZoom = zoom;
         zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
 
@@ -776,7 +762,7 @@ public class SelectiveAlphaEditor extends JFrame {
         updateZoomLabel();
     }
 
-    private void fitToViewport() {
+    public void fitToViewport() {
         if (workingImage == null || scrollPane == null) return;
         Dimension vd = scrollPane.getViewport().getSize();
         if (vd.width <= 0 || vd.height <= 0) { SwingUtilities.invokeLater(this::fitToViewport); return; }
@@ -792,7 +778,7 @@ public class SelectiveAlphaEditor extends JFrame {
     // Coordinate transform
     // =========================================================================
     /** Convert a point in canvasPanel-local coordinates to image-space. */
-    private Point screenToImage(Point sp) {
+    @Override public Point screenToImage(Point sp) {
         int ix = (int) Math.floor(sp.x / zoom);
         int iy = (int) Math.floor(sp.y / zoom);
         if (workingImage != null) {
@@ -805,7 +791,7 @@ public class SelectiveAlphaEditor extends JFrame {
     // =========================================================================
     // Alpha-editor operations
     // =========================================================================
-    private void performFloodfill(Point screenPt) {
+    @Override public void performFloodfill(Point screenPt) {
         Point ip = screenToImage(screenPt);
         int tc = workingImage.getRGB(ip.x, ip.y);
         if (((tc >> 24) & 0xFF) == 0) { showInfoDialog("Bereits transparent", "Klicke auf eine sichtbare Farbe."); return; }
@@ -824,6 +810,11 @@ public class SelectiveAlphaEditor extends JFrame {
 
     private void clearSelections() { selectedAreas.clear(); canvasPanel.repaint(); }
 
+    private String getSaveSuffix() {
+        return (appMode == AppMode.PAINT) ? "_painted"
+             : floodfillMode ? "_floodfill_alpha" : "_selective_alpha";
+    }
+
     private void resetImage() {
         pushUndo();
         workingImage = deepCopy(originalImage);
@@ -839,8 +830,7 @@ public class SelectiveAlphaEditor extends JFrame {
     private void saveImage() {
         if (sourceFile == null) return;
         try {
-            String suffix  = (appMode == AppMode.PAINT) ? "_painted"
-                    : floodfillMode ? "_floodfill_alpha" : "_selective_alpha";
+            String suffix  = getSaveSuffix();
             String outPath = WhiteToAlphaConverter.getOutputPath(sourceFile, suffix);
             File   outFile = new File(outPath);
             ImageIO.write(workingImage, "PNG", outFile);
@@ -853,10 +843,15 @@ public class SelectiveAlphaEditor extends JFrame {
     }
 
     /** Saves current workingImage to undo stack before a destructive operation. */
-    private void pushUndo() {
+    public void pushUndo() {
         if (workingImage == null) return;
         undoStack.push(deepCopy(workingImage));
         if (undoStack.size() > MAX_UNDO) undoStack.pollLast();
+        redoStack.clear();
+    }
+
+    public void clearUndoRedo() {
+        undoStack.clear();
         redoStack.clear();
     }
 
@@ -864,17 +859,17 @@ public class SelectiveAlphaEditor extends JFrame {
         if (undoStack.isEmpty()) return;
         redoStack.push(deepCopy(workingImage));
         workingImage = undoStack.pop();
-        hasUnsavedChanges = true;
-        updateTitle();
-        canvasWrapper.revalidate();
-        canvasPanel.repaint();
-        if (showRuler) { hRuler.repaint(); vRuler.repaint(); }
+        afterUndoRedo();
     }
 
     private void doRedo() {
         if (redoStack.isEmpty()) return;
         undoStack.push(deepCopy(workingImage));
         workingImage = redoStack.pop();
+        afterUndoRedo();
+    }
+
+    private void afterUndoRedo() {
         hasUnsavedChanges = true;
         updateTitle();
         canvasWrapper.revalidate();
@@ -886,8 +881,7 @@ public class SelectiveAlphaEditor extends JFrame {
     private void saveImageSilent() {
         if (sourceFile == null) return;
         try {
-            String suffix  = (appMode == AppMode.PAINT) ? "_painted"
-                    : floodfillMode ? "_floodfill_alpha" : "_selective_alpha";
+            String suffix  = getSaveSuffix();
             String outPath = WhiteToAlphaConverter.getOutputPath(sourceFile, suffix);
             ImageIO.write(workingImage, "PNG", new File(outPath));
             hasUnsavedChanges = false;
@@ -898,7 +892,7 @@ public class SelectiveAlphaEditor extends JFrame {
         } catch (IOException e) { showErrorDialog("Speicherfehler", e.getMessage()); }
     }
 
-    private void markDirty() {
+    public void markDirty() {
         hasUnsavedChanges = true;
         if (sourceFile != null) dirtyFiles.add(sourceFile);
         updateTitle();
@@ -987,8 +981,8 @@ public class SelectiveAlphaEditor extends JFrame {
 
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
         row.setOpaque(false);
-        JButton ok  = buildButton("OK",       AppColors.ACCENT,  AppColors.ACCENT_HOVER);
-        JButton can = buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton ok  = UIComponentFactory.buildButton("OK",       AppColors.ACCENT,  AppColors.ACCENT_HOVER);
+        JButton can = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
         ok.setForeground(Color.WHITE);
         ok.addActionListener(e -> {
             try {
@@ -1074,8 +1068,8 @@ public class SelectiveAlphaEditor extends JFrame {
 
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
         row.setOpaque(false);
-        JButton ok  = buildButton("OK",        AppColors.ACCENT, AppColors.ACCENT_HOVER);
-        JButton can = buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton ok  = UIComponentFactory.buildButton("OK",        AppColors.ACCENT, AppColors.ACCENT_HOVER);
+        JButton can = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
         ok.setForeground(Color.WHITE);
         ok.addActionListener(e -> {
             try {
@@ -1102,7 +1096,7 @@ public class SelectiveAlphaEditor extends JFrame {
     // =========================================================================
 
     /** Paste the floating image at its current (possibly scaled) rect and clear float state. */
-    private void commitFloat() {
+    @Override public void commitFloat() {
         if (floatingImg == null || floatRect == null) return;
         BufferedImage scaled = PaintEngine.scale(floatingImg,
                 Math.max(1, floatRect.width), Math.max(1, floatRect.height));
@@ -1124,7 +1118,7 @@ public class SelectiveAlphaEditor extends JFrame {
     }
 
     /** Convert floatRect (image-space) to canvasPanel screen-space. */
-    private Rectangle floatRectScreen() {
+    @Override public Rectangle floatRectScreen() {
         if (floatRect == null) return new Rectangle(0, 0, 0, 0);
         return new Rectangle(
             (int) Math.round(floatRect.x      * zoom),
@@ -1137,7 +1131,7 @@ public class SelectiveAlphaEditor extends JFrame {
      * 8 handle hit-rects around {@code sr} (screen-space).
      * Order: TL=0, TC=1, TR=2, ML=3, MR=4, BL=5, BC=6, BR=7
      */
-    private Rectangle[] handleRects(Rectangle sr) {
+    @Override public Rectangle[] handleRects(Rectangle sr) {
         int x = sr.x, y = sr.y, w = sr.width, h = sr.height;
         int mx = x + w / 2, my = y + h / 2, rx = x + w, by = y + h;
         int hs = 4; // half-size → each handle square is 8×8 px
@@ -1154,7 +1148,7 @@ public class SelectiveAlphaEditor extends JFrame {
     }
 
     /** Returns 0-7 if {@code pt} (canvasPanel coords) hits a handle, else -1. */
-    private int hitHandle(Point pt) {
+    @Override public int hitHandle(Point pt) {
         if (floatRect == null) return -1;
         Rectangle[] handles = handleRects(floatRectScreen());
         for (int i = 0; i < handles.length; i++) if (handles[i].contains(pt)) return i;
@@ -1331,7 +1325,7 @@ public class SelectiveAlphaEditor extends JFrame {
         }
     }
 
-    private Rectangle getActiveSelection() {
+    @Override public Rectangle getActiveSelection() {
         if (!selectedAreas.isEmpty()) return selectedAreas.get(selectedAreas.size() - 1);
         if (isSelecting && selectionStart != null && selectionEnd != null) {
             int x = Math.min(selectionStart.x, selectionEnd.x);
@@ -1431,7 +1425,7 @@ public class SelectiveAlphaEditor extends JFrame {
     // =========================================================================
 
     /** Centers the viewport over the canvas (called after zoom or sidebar toggle). */
-    private void centerCanvas() {
+    public void centerCanvas() {
         if (scrollPane == null || workingImage == null) return;
         // Schedule after the current layout pass so viewport size is up-to-date.
         SwingUtilities.invokeLater(() -> {
@@ -1513,8 +1507,8 @@ public class SelectiveAlphaEditor extends JFrame {
         content.add(Box.createVerticalStrut(14));
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
         row.setOpaque(false);
-        JButton ok  = buildButton("Erstellen", AppColors.ACCENT,  AppColors.ACCENT_HOVER);
-        JButton can = buildButton("Abbrechen", AppColors.BTN_BG,  AppColors.BTN_HOVER);
+        JButton ok  = UIComponentFactory.buildButton("Erstellen", AppColors.ACCENT,  AppColors.ACCENT_HOVER);
+        JButton can = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG,  AppColors.BTN_HOVER);
         ok.setForeground(Color.WHITE);
         ok.addActionListener(e -> {
             try {
@@ -1561,8 +1555,8 @@ public class SelectiveAlphaEditor extends JFrame {
         };
         preview.setPreferredSize(new Dimension(120, 60));
 
-        JButton btn1 = buildButton("Farbe 1", AppColors.BTN_BG, AppColors.BTN_HOVER);
-        JButton btn2 = buildButton("Farbe 2", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton btn1 = UIComponentFactory.buildButton("Farbe 1", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton btn2 = UIComponentFactory.buildButton("Farbe 2", AppColors.BTN_BG, AppColors.BTN_HOVER);
         btn1.addActionListener(e -> {
             Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe 1", canvasBg1);
             if (c != null) { canvasBg1 = c; preview.repaint(); canvasPanel.repaint(); }
@@ -1581,7 +1575,7 @@ public class SelectiveAlphaEditor extends JFrame {
         row.add(btn1); row.add(btn2);
         content.add(row);
         content.add(Box.createVerticalStrut(12));
-        JButton closeBtn = buildButton("Schließen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton closeBtn = UIComponentFactory.buildButton("Schließen", AppColors.BTN_BG, AppColors.BTN_HOVER);
         closeBtn.setAlignmentX(CENTER_ALIGNMENT);
         closeBtn.addActionListener(e -> dialog.dispose());
         content.add(closeBtn);
@@ -1590,666 +1584,9 @@ public class SelectiveAlphaEditor extends JFrame {
     }
 
     // =========================================================================
-    // CanvasPanel
-    // =========================================================================
-    private class CanvasPanel extends JPanel {
-
-        // Pan tracking
-        private Point panStart   = null;   // mouse position in viewport coords at drag start
-        private Point panViewPos = null;   // viewport position at drag start
-
-        CanvasPanel() {
-            setOpaque(false);
-            MouseAdapter handler = new MouseAdapter() {
-
-                // ── Press ────────────────────────────────────────────────────
-                @Override public void mousePressed(MouseEvent e) {
-                    requestFocusInWindow();
-
-                    // ── Pan: middle mouse or CTRL+left ────────────────────
-                    boolean isMiddle  = (e.getButton() == MouseEvent.BUTTON2);
-                    boolean isCtrlDrg = SwingUtilities.isLeftMouseButton(e)
-                                     && (e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0;
-                    if (isMiddle || isCtrlDrg) {
-                        setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
-                        panStart   = SwingUtilities.convertPoint(canvasPanel, e.getPoint(),
-                                         scrollPane.getViewport());
-                        panViewPos = scrollPane.getViewport().getViewPosition();
-                        return;
-                    }
-
-                    if (!SwingUtilities.isLeftMouseButton(e) || workingImage == null) return;
-
-                    Point imgPt = screenToImage(e.getPoint());
-
-                    // ── Element layer interaction (any mode, checked first) ───
-                    if (!activeElements.isEmpty() && floatingImg == null) {
-                        // Check handles of selected element first
-                        if (selectedElement != null) {
-                            Rectangle selScr = elemRectScreen(selectedElement);
-                            Rectangle[] handles = handleRects(selScr);
-                            for (int hi = 0; hi < handles.length; hi++) {
-                                if (handles[hi].contains(e.getPoint())) {
-                                    elemActiveHandle = hi;
-                                    elemScaleBase    = new Rectangle(
-                                        selectedElement.x(), selectedElement.y(),
-                                        selectedElement.width(), selectedElement.height());
-                                    elemScaleStart   = e.getPoint();
-                                    return;
-                                }
-                            }
-                            if (selScr.contains(e.getPoint())) {
-                                draggingElement = true;
-                                elemDragAnchor  = new Point(imgPt.x - selectedElement.x(),
-                                                             imgPt.y - selectedElement.y());
-                                return;
-                            }
-                        }
-                        // Hit-test unselected elements (top = last in list)
-                        Element hit = null;
-                        for (int i = activeElements.size() - 1; i >= 0; i--) {
-                            if (elemRectScreen(activeElements.get(i)).contains(e.getPoint())) {
-                                hit = activeElements.get(i); break;
-                            }
-                        }
-                        if (hit != null) {
-                            selectedElement = hit;
-                            draggingElement = true;
-                            elemDragAnchor  = new Point(imgPt.x - hit.x(), imgPt.y - hit.y());
-                            canvasPanel.repaint();
-                            return;
-                        } else {
-                            // Click outside all elements → deselect
-                            selectedElement = null;
-                            canvasPanel.repaint();
-                        }
-                    }
-
-                    // ── Floating selection: handle/move/commit (any mode) ─────
-                    if (floatingImg != null) {
-                        int h = hitHandle(e.getPoint());
-                        if (h >= 0) {
-                            activeHandle   = h;
-                            scaleBaseRect  = new Rectangle(floatRect);
-                            scaleDragStart = e.getPoint();
-                            return;
-                        } else if (floatRectScreen().contains(e.getPoint())) {
-                            isDraggingFloat = true;
-                            floatDragAnchor = new Point(imgPt.x - floatRect.x, imgPt.y - floatRect.y);
-                            return;
-                        } else {
-                            commitFloat();
-                            // fall through to normal handling with fresh state
-                        }
-                    }
-
-                    if (appMode == AppMode.PAINT) {
-                        PaintEngine.Tool tool = paintToolbar.getActiveTool();
-                        switch (tool) {
-                            case PENCIL, ERASER -> {
-                                pushUndo();
-                                lastPaintPoint = imgPt;
-                                paintDot(imgPt);
-                            }
-                            case FLOODFILL -> {
-                                pushUndo();
-                                PaintEngine.floodFill(workingImage, imgPt.x, imgPt.y,
-                                        paintToolbar.getPrimaryColor(), 30);
-                                markDirty();
-                            }
-                            case EYEDROPPER -> {
-                                Color picked = PaintEngine.pickColor(workingImage, imgPt.x, imgPt.y);
-                                paintToolbar.setSelectedColor(picked);
-                            }
-                            case LINE, CIRCLE, RECT -> {
-                                pushUndo();
-                                shapeStartPoint = imgPt;
-                                paintSnapshot   = deepCopy(workingImage);
-                            }
-                            case SELECT -> {
-                                if (!selectedAreas.isEmpty()) {
-                                    Rectangle sel = selectedAreas.get(selectedAreas.size() - 1);
-                                    if (sel.contains(imgPt)) {
-                                        // Lift selection into floating image
-                                        pushUndo();
-                                        floatingImg     = PaintEngine.cropRegion(workingImage, sel);
-                                        floatRect       = new Rectangle(sel);
-                                        PaintEngine.clearRegion(workingImage, sel);
-                                        selectedAreas.clear();
-                                        isDraggingFloat = true;
-                                        floatDragAnchor = new Point(imgPt.x - sel.x, imgPt.y - sel.y);
-                                        canvasPanel.repaint();
-                                    } else {
-                                        shapeStartPoint = imgPt;
-                                    }
-                                } else {
-                                    shapeStartPoint = imgPt;
-                                }
-                            }
-                        }
-                    } else {
-                        if (floodfillMode) {
-                            pushUndo();
-                            performFloodfill(e.getPoint());
-                        } else {
-                            // SHIFT = add to multi-selection; plain = start new
-                            if (!e.isShiftDown()) {
-                                isSelecting    = true;
-                                selectionStart = imgPt;
-                                selectionEnd   = imgPt;
-                            } else {
-                                isSelecting    = true;
-                                selectionStart = imgPt;
-                                selectionEnd   = imgPt;
-                                // existing selections preserved (SHIFT adds)
-                            }
-                        }
-                    }
-                }
-
-                // ── Drag ─────────────────────────────────────────────────────
-                @Override public void mouseDragged(MouseEvent e) {
-                    // Pan
-                    if (panStart != null) {
-                        Point now = SwingUtilities.convertPoint(canvasPanel, e.getPoint(),
-                                        scrollPane.getViewport());
-                        int dx = now.x - panStart.x;
-                        int dy = now.y - panStart.y;
-                        JViewport vp = scrollPane.getViewport();
-                        Dimension vs = vp.getViewSize();
-                        Dimension vd = vp.getSize();
-                        int nx = Math.max(0, Math.min(panViewPos.x - dx, vs.width  - vd.width));
-                        int ny = Math.max(0, Math.min(panViewPos.y - dy, vs.height - vd.height));
-                        vp.setViewPosition(new Point(nx, ny));
-                        return;
-                    }
-
-                    if (workingImage == null) return;
-                    Point imgPt = screenToImage(e.getPoint());
-
-                    // ── Element drag/resize (any mode) ───────────────────────
-                    if (selectedElement != null && elemActiveHandle >= 0
-                            && elemScaleBase != null && elemScaleStart != null) {
-                        Rectangle nr = computeNewFloatRect(elemActiveHandle, elemScaleBase,
-                                elemScaleStart, e.getPoint());
-                        int idx = activeElements.indexOf(selectedElement);
-                        if (idx >= 0) {
-                            selectedElement = selectedElement.withBounds(nr.x, nr.y, nr.width, nr.height);
-                            activeElements.set(idx, selectedElement);
-                        }
-                        canvasPanel.repaint();
-                        return;
-                    }
-                    if (draggingElement && selectedElement != null && elemDragAnchor != null) {
-                        int idx = activeElements.indexOf(selectedElement);
-                        if (idx >= 0) {
-                            selectedElement = selectedElement.withPosition(
-                                imgPt.x - elemDragAnchor.x, imgPt.y - elemDragAnchor.y);
-                            activeElements.set(idx, selectedElement);
-                        }
-                        canvasPanel.repaint();
-                        return;
-                    }
-
-                    // ── Floating selection: scale/move (any mode) ─────────────
-                    if (activeHandle >= 0 && scaleBaseRect != null && scaleDragStart != null) {
-                        floatRect = computeNewFloatRect(activeHandle, scaleBaseRect,
-                                scaleDragStart, e.getPoint());
-                        canvasPanel.repaint();
-                        return;
-                    }
-                    if (isDraggingFloat && floatDragAnchor != null) {
-                        floatRect = new Rectangle(
-                            imgPt.x - floatDragAnchor.x,
-                            imgPt.y - floatDragAnchor.y,
-                            floatRect.width, floatRect.height);
-                        canvasPanel.repaint();
-                        return;
-                    }
-
-                    if (appMode == AppMode.PAINT) {
-                        boolean aa = paintToolbar.isAntialiasing();
-                        PaintEngine.Tool tool = paintToolbar.getActiveTool();
-                        switch (tool) {
-                            case PENCIL -> {
-                                if (lastPaintPoint != null)
-                                    PaintEngine.drawPencil(workingImage, lastPaintPoint, imgPt,
-                                            paintToolbar.getPrimaryColor(),
-                                            paintToolbar.getStrokeWidth(),
-                                            paintToolbar.getBrushShape(), aa);
-                                lastPaintPoint = imgPt;
-                                markDirty();
-                            }
-                            case ERASER -> {
-                                if (lastPaintPoint != null)
-                                    PaintEngine.drawEraser(workingImage, lastPaintPoint, imgPt,
-                                            paintToolbar.getStrokeWidth(), aa);
-                                lastPaintPoint = imgPt;
-                                markDirty();
-                            }
-                            case LINE -> {
-                                if (shapeStartPoint != null && paintSnapshot != null) {
-                                    copyInto(paintSnapshot, workingImage);
-                                    PaintEngine.drawLine(workingImage, shapeStartPoint, imgPt,
-                                            paintToolbar.getPrimaryColor(),
-                                            paintToolbar.getStrokeWidth(), aa);
-                                    canvasPanel.repaint();
-                                }
-                            }
-                            case CIRCLE -> {
-                                if (shapeStartPoint != null && paintSnapshot != null) {
-                                    copyInto(paintSnapshot, workingImage);
-                                    PaintEngine.drawCircle(workingImage, shapeStartPoint, imgPt,
-                                            paintToolbar.getPrimaryColor(),
-                                            paintToolbar.getStrokeWidth(),
-                                            paintToolbar.getFillMode(),
-                                            paintToolbar.getSecondaryColor(), aa);
-                                    canvasPanel.repaint();
-                                }
-                            }
-                            case RECT -> {
-                                if (shapeStartPoint != null && paintSnapshot != null) {
-                                    copyInto(paintSnapshot, workingImage);
-                                    PaintEngine.drawRect(workingImage, shapeStartPoint, imgPt,
-                                            paintToolbar.getPrimaryColor(),
-                                            paintToolbar.getStrokeWidth(),
-                                            paintToolbar.getFillMode(),
-                                            paintToolbar.getSecondaryColor(), aa);
-                                    canvasPanel.repaint();
-                                }
-                            }
-                            case SELECT -> {
-                                if (shapeStartPoint != null) {
-                                    selectionStart = shapeStartPoint;
-                                    selectionEnd   = imgPt;
-                                    isSelecting    = true;
-                                    canvasPanel.repaint();
-                                }
-                            }
-                            default -> {}
-                        }
-                    } else {
-                        if (!floodfillMode && isSelecting) {
-                            selectionEnd = imgPt;
-                            repaint();
-                        }
-                    }
-                }
-
-                // ── Release ───────────────────────────────────────────────────
-                @Override public void mouseReleased(MouseEvent e) {
-                    if (panStart != null) {
-                        panStart   = null;
-                        panViewPos = null;
-                        setCursor(appMode == AppMode.PAINT
-                                ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR)
-                                : Cursor.getDefaultCursor());
-                        return;
-                    }
-                    if (workingImage == null) return;
-                    Point imgPt = screenToImage(e.getPoint());
-
-                    // ── Element finish drag/resize ────────────────────────────
-                    if (draggingElement || elemActiveHandle >= 0) {
-                        draggingElement  = false;
-                        elemDragAnchor   = null;
-                        elemActiveHandle = -1;
-                        elemScaleBase    = null;
-                        elemScaleStart   = null;
-                        markDirty();
-                        return;
-                    }
-
-                    // ── Floating selection: finish drag/scale (any mode) ──────
-                    if (activeHandle >= 0 || isDraggingFloat) {
-                        activeHandle    = -1;
-                        isDraggingFloat = false;
-                        floatDragAnchor = null;
-                        scaleDragStart  = null;
-                        scaleBaseRect   = null;
-                        canvasPanel.repaint();
-                        return;
-                    }
-
-                    if (appMode == AppMode.PAINT) {
-                        PaintEngine.Tool tool = paintToolbar.getActiveTool();
-                        if (tool == PaintEngine.Tool.SELECT) {
-                            if (shapeStartPoint != null) {
-                                // Finished rubber-band selection
-                                int x = Math.min(shapeStartPoint.x, imgPt.x);
-                                int y = Math.min(shapeStartPoint.y, imgPt.y);
-                                int w = Math.abs(imgPt.x - shapeStartPoint.x);
-                                int h = Math.abs(imgPt.y - shapeStartPoint.y);
-                                if (w > 2 && h > 2) {
-                                    selectedAreas.clear();
-                                    selectedAreas.add(new Rectangle(x, y, w, h));
-                                }
-                                shapeStartPoint = null;
-                                isSelecting     = false;
-                                selectionStart  = null;
-                                selectionEnd    = null;
-                            }
-                            canvasPanel.repaint();
-                        } else {
-                            lastPaintPoint  = null;
-                            shapeStartPoint = null;
-                            paintSnapshot   = null;
-                            markDirty();
-                        }
-                    } else {
-                        if (!floodfillMode && isSelecting && SwingUtilities.isLeftMouseButton(e)) {
-                            isSelecting = false;
-                            if (selectionStart != null && selectionEnd != null) {
-                                int x = Math.min(selectionStart.x, selectionEnd.x);
-                                int y = Math.min(selectionStart.y, selectionEnd.y);
-                                int w = Math.abs(selectionEnd.x - selectionStart.x);
-                                int h = Math.abs(selectionEnd.y - selectionStart.y);
-                                if (w > 2 && h > 2) {
-                                    // SHIFT = add; no SHIFT = replace
-                                    if (!e.isShiftDown()) selectedAreas.clear();
-                                    selectedAreas.add(new Rectangle(x, y, w, h));
-                                }
-                            }
-                            selectionStart = null; selectionEnd = null;
-                            repaint();
-                        }
-                    }
-                }
-
-                // ── Mouse moved: cursor shape over handles / float ────────────
-                @Override public void mouseMoved(MouseEvent e) {
-                    if (floatingImg != null) {
-                        int h = hitHandle(e.getPoint());
-                        if (h >= 0) {
-                            setCursor(getResizeCursor(h));
-                        } else if (floatRectScreen().contains(e.getPoint())) {
-                            setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
-                        } else {
-                            setCursor(appMode == AppMode.PAINT
-                                    ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR)
-                                    : Cursor.getDefaultCursor());
-                        }
-                        return;
-                    }
-                    if (appMode == AppMode.PAINT && paintToolbar != null
-                            && paintToolbar.getActiveTool() == PaintEngine.Tool.SELECT) {
-                        setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
-                    }
-                }
-
-                // ── Wheel: CTRL→zoom, else→scroll ────────────────────────────
-                @Override public void mouseWheelMoved(MouseWheelEvent e) {
-                    if ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0) {
-                        Point anchor = e.getPoint(); // canvas-local
-                        setZoom(zoom + (-e.getPreciseWheelRotation() * ZOOM_WHEEL), anchor);
-                        e.consume();
-                    } else if (e.isShiftDown()) {
-                        JScrollBar bar = scrollPane.getHorizontalScrollBar();
-                        bar.setValue(bar.getValue() + e.getUnitsToScroll() * bar.getUnitIncrement());
-                        e.consume();
-                    } else {
-                        JScrollBar bar = scrollPane.getVerticalScrollBar();
-                        bar.setValue(bar.getValue() + e.getUnitsToScroll() * bar.getUnitIncrement());
-                        e.consume();
-                    }
-                }
-            };
-
-            addMouseListener(handler);
-            addMouseMotionListener(handler);
-            addMouseWheelListener(handler);
-        }
-
-        private void paintDot(Point imgPt) {
-            boolean aa = paintToolbar != null && paintToolbar.isAntialiasing();
-            PaintEngine.drawPencil(workingImage, imgPt, imgPt,
-                    paintToolbar.getPrimaryColor(),
-                    paintToolbar.getStrokeWidth(),
-                    paintToolbar.getBrushShape(), aa);
-            markDirty();
-        }
-
-        @Override public Dimension getPreferredSize() {
-            if (workingImage == null) return new Dimension(1, 1);
-            return new Dimension(
-                    (int) Math.ceil(workingImage.getWidth()  * zoom),
-                    (int) Math.ceil(workingImage.getHeight() * zoom));
-        }
-
-        @Override protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            if (workingImage == null) return;
-            Graphics2D g2 = (Graphics2D) g;
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                    zoom >= 2.0 ? RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
-                                : RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-
-            int cw = (int) Math.ceil(workingImage.getWidth()  * zoom);
-            int ch = (int) Math.ceil(workingImage.getHeight() * zoom);
-
-            // Checkerboard (colors configurable via showCanvasBgDialog)
-            int cell = Math.max(4, (int)(10 * zoom));
-            for (int row = 0; row < ch; row += cell)
-                for (int col = 0; col < cw; col += cell) {
-                    boolean even = ((row/cell)+(col/cell)) % 2 == 0;
-                    g2.setColor(even ? canvasBg1 : canvasBg2);
-                    g2.fillRect(col, row, Math.min(cell, cw-col), Math.min(cell, ch-row));
-                }
-
-            // Image
-            g2.drawImage(workingImage, 0, 0, cw, ch, null);
-
-            // ── Element layers (drawn above image, below float / grid) ────────
-            for (Element el : activeElements) {
-                int ex = (int) Math.round(el.x()      * zoom);
-                int ey = (int) Math.round(el.y()      * zoom);
-                int ew = (int) Math.round(el.width()  * zoom);
-                int eh = (int) Math.round(el.height() * zoom);
-                g2.drawImage(el.image(), ex, ey, ew, eh, null);
-                boolean isSelected = el.equals(selectedElement);
-                float[] dash = { 5f, 3f };
-                g2.setColor(isSelected ? AppColors.ACCENT : new Color(255, 255, 0, 180));
-                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
-                        BasicStroke.JOIN_MITER, 1f, dash, 0f));
-                g2.drawRect(ex, ey, ew, eh);
-                if (isSelected) {
-                    g2.setStroke(new BasicStroke(1f));
-                    for (Rectangle hr : handleRects(new Rectangle(ex, ey, ew, eh))) {
-                        g2.setColor(Color.WHITE);
-                        g2.fillRect(hr.x, hr.y, hr.width, hr.height);
-                        g2.setColor(AppColors.ACCENT);
-                        g2.drawRect(hr.x, hr.y, hr.width, hr.height);
-                    }
-                }
-            }
-
-            // Floating selection (drawn above elements, below grid/selection overlays)
-            if (floatingImg != null && floatRect != null) {
-                int fx = (int) Math.round(floatRect.x     * zoom);
-                int fy = (int) Math.round(floatRect.y     * zoom);
-                int fw = (int) Math.round(floatRect.width  * zoom);
-                int fh = (int) Math.round(floatRect.height * zoom);
-                g2.drawImage(floatingImg, fx, fy, fw, fh, null);
-                // Marching-ant dashed border
-                float[] dash = { 6f, 4f };
-                g2.setColor(Color.WHITE);
-                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
-                        BasicStroke.JOIN_MITER, 1f, dash, 0f));
-                g2.drawRect(fx, fy, fw, fh);
-                g2.setColor(Color.BLACK);
-                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
-                        BasicStroke.JOIN_MITER, 1f, dash, 6f));
-                g2.drawRect(fx, fy, fw, fh);
-                // 8 scale handles
-                g2.setStroke(new BasicStroke(1f));
-                for (Rectangle hr : handleRects(new Rectangle(fx, fy, fw, fh))) {
-                    g2.setColor(Color.WHITE);
-                    g2.fillRect(hr.x, hr.y, hr.width, hr.height);
-                    g2.setColor(AppColors.ACCENT);
-                    g2.drawRect(hr.x, hr.y, hr.width, hr.height);
-                }
-            }
-
-            // Grid
-            if (showGrid) {
-                g2.setColor(new Color(100, 100, 255, 60));
-                g2.setStroke(new BasicStroke(0.5f));
-                int gx = (int) Math.max(1, GRID_CELL * zoom);
-                for (int x = 0; x < cw; x += gx) g2.drawLine(x, 0, x, ch);
-                for (int y = 0; y < ch; y += gx) g2.drawLine(0, y, cw, y);
-            }
-
-            // Selections
-            if (appMode == AppMode.ALPHA_EDITOR || paintToolbar == null
-                    || paintToolbar.getActiveTool() == PaintEngine.Tool.SELECT) {
-                g2.setColor(new Color(255, 0, 0, 70));
-                for (Rectangle r : selectedAreas)
-                    g2.fillRect(toSx(r.x), toSy(r.y), toSw(r.width), toSw(r.height));
-                g2.setColor(Color.RED);
-                g2.setStroke(new BasicStroke(1.2f));
-                for (Rectangle r : selectedAreas)
-                    g2.drawRect(toSx(r.x), toSy(r.y), toSw(r.width), toSw(r.height));
-                if ((isSelecting || (appMode == AppMode.PAINT && shapeStartPoint != null))
-                        && selectionStart != null && selectionEnd != null) {
-                    int x = Math.min(selectionStart.x, selectionEnd.x);
-                    int y = Math.min(selectionStart.y, selectionEnd.y);
-                    int w = Math.abs(selectionEnd.x - selectionStart.x);
-                    int h = Math.abs(selectionEnd.y - selectionStart.y);
-                    g2.setColor(new Color(0, 200, 255, 60));
-                    g2.fillRect(toSx(x), toSy(y), toSw(w), toSw(h));
-                    g2.setColor(new Color(0, 200, 255));
-                    g2.setStroke(new BasicStroke(1.5f));
-                    g2.drawRect(toSx(x), toSy(y), toSw(w), toSw(h));
-                }
-            }
-        }
-
-        private int toSx(int ix) { return (int) Math.round(ix * zoom); }
-        private int toSy(int iy) { return (int) Math.round(iy * zoom); }
-        private int toSw(int iw) { return (int) Math.round(iw * zoom); }
-    }
-
-    // =========================================================================
-    // Ruler panels (drawn OUTSIDE the image, synchronized with scroll)
-    // =========================================================================
-
-    /** Horizontal ruler above the scroll pane. */
-    private class HRulerPanel extends JPanel {
-        HRulerPanel() {
-            setPreferredSize(new Dimension(0, RULER_THICK));
-            setBackground(new Color(50, 50, 50));
-            setOpaque(true);
-        }
-        @Override protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            if (workingImage == null || scrollPane == null) return;
-            Graphics2D g2 = (Graphics2D) g;
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int w = getWidth();
-            Point viewPos = scrollPane.getViewport().getViewPosition();
-            int canvasOffX = canvasPanel.getX(); // centering offset in wrapper
-
-            g2.setFont(new Font("SansSerif", Font.PLAIN, 8));
-            g2.setColor(new Color(180, 180, 180));
-
-            double pxPerUnit   = rulerUnit.pxPerUnit();
-            // How many image pixels between ruler ticks (auto-scale for readability)
-            double imgPxPerTick = chooseTick(pxPerUnit, zoom);
-            double screenPxPerTick = imgPxPerTick * zoom;
-            if (screenPxPerTick < 4) return;
-
-            // First tick at which image-coord
-            double startImgX = (viewPos.x - canvasOffX) / zoom;
-            double firstTick = Math.floor(startImgX / imgPxPerTick) * imgPxPerTick;
-
-            for (double imgX = firstTick; imgX * zoom - (viewPos.x - canvasOffX) < w; imgX += imgPxPerTick) {
-                int sx = (int)((imgX * zoom) - (viewPos.x - canvasOffX));
-                if (sx < 0) continue;
-                g2.drawLine(sx, RULER_THICK - 5, sx, RULER_THICK);
-                if (screenPxPerTick > 20) {
-                    double val = imgX / pxPerUnit;
-                    String label = (val == (long) val) ? String.valueOf((long) val)
-                                                       : String.format("%.1f", val);
-                    g2.drawString(label + rulerUnit.label(), sx + 2, 9);
-                }
-            }
-            // Bottom border line
-            g2.setColor(AppColors.BORDER);
-            g2.drawLine(0, RULER_THICK - 1, w, RULER_THICK - 1);
-        }
-    }
-
-    /** Vertical ruler to the left of the scroll pane. */
-    private class VRulerPanel extends JPanel {
-        VRulerPanel() {
-            setPreferredSize(new Dimension(RULER_THICK, 0));
-            setBackground(new Color(50, 50, 50));
-            setOpaque(true);
-        }
-        @Override protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            if (workingImage == null || scrollPane == null) return;
-            Graphics2D g2 = (Graphics2D) g;
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int h = getHeight();
-            Point viewPos = scrollPane.getViewport().getViewPosition();
-            int canvasOffY = canvasPanel.getY();
-
-            g2.setFont(new Font("SansSerif", Font.PLAIN, 8));
-            g2.setColor(new Color(180, 180, 180));
-
-            double pxPerUnit   = rulerUnit.pxPerUnit();
-            double imgPxPerTick = chooseTick(pxPerUnit, zoom);
-            double screenPxPerTick = imgPxPerTick * zoom;
-            if (screenPxPerTick < 4) return;
-
-            double startImgY = (viewPos.y - canvasOffY) / zoom;
-            double firstTick = Math.floor(startImgY / imgPxPerTick) * imgPxPerTick;
-
-            for (double imgY = firstTick; imgY * zoom - (viewPos.y - canvasOffY) < h; imgY += imgPxPerTick) {
-                int sy = (int)((imgY * zoom) - (viewPos.y - canvasOffY));
-                if (sy < 0) continue;
-                g2.drawLine(RULER_THICK - 5, sy, RULER_THICK, sy);
-                if (screenPxPerTick > 20) {
-                    double val = imgY / pxPerUnit;
-                    String label = (val == (long) val) ? String.valueOf((long) val)
-                                                       : String.format("%.1f", val);
-                    Graphics2D gr = (Graphics2D) g2.create();
-                    gr.translate(9, sy - 2);
-                    gr.rotate(-Math.PI / 2);
-                    gr.drawString(label, 0, 0);
-                    gr.dispose();
-                }
-            }
-            // Right border line
-            g2.setColor(AppColors.BORDER);
-            g2.drawLine(RULER_THICK - 1, 0, RULER_THICK - 1, h);
-        }
-    }
-
-    /**
-     * Chooses a sensible tick interval in image-pixels so ticks are
-     * not too crowded (min ~30 screen px apart) and snap to nice values.
-     */
-    private static double chooseTick(double pxPerUnit, double zoom) {
-        // Target: ≥ 30 screen pixels between ticks
-        double minScreenPx  = 30.0;
-        double imgPxPerTick = minScreenPx / zoom;
-        // Round up to a "nice" multiple of pxPerUnit
-        double unitsPerTick = imgPxPerTick / pxPerUnit;
-        double nice = Math.pow(10, Math.ceil(Math.log10(unitsPerTick)));
-        if (unitsPerTick <= nice / 5) nice /= 5;
-        else if (unitsPerTick <= nice / 2) nice /= 2;
-        return nice * pxPerUnit;
-    }
-
-    // =========================================================================
     // UI state helpers
     // =========================================================================
-    private void swapToImageView() {
+    public void swapToImageView() {
         if (dropHintPanel.getParent() == layeredPane) layeredPane.remove(dropHintPanel);
         if (viewportPanel.getParent() == null) {
             int w = layeredPane.getWidth()  > 0 ? layeredPane.getWidth()  : 860;
@@ -2270,7 +1607,7 @@ public class SelectiveAlphaEditor extends JFrame {
         nextNavButton.setEnabled(currentImageIndex < directoryImages.size() - 1);
     }
 
-    private void updateTitle() {
+    public void updateTitle() {
         if (sourceFile == null) { setTitle("Selective Alpha Editor"); return; }
         String dirty = hasUnsavedChanges ? " •" : "";
         String mode  = appMode == AppMode.PAINT ? "[Paint]"
@@ -2278,31 +1615,21 @@ public class SelectiveAlphaEditor extends JFrame {
         setTitle("Selective Alpha Editor  " + mode + "  –  " + sourceFile.getName() + dirty);
     }
 
-    private void updateStatus() {
+    public void updateStatus() {
         if (sourceFile == null) { statusLabel.setText("Keine Datei geladen"); return; }
         statusLabel.setText(sourceFile.getName()
                 + "   |   " + (currentImageIndex + 1) + " / " + directoryImages.size()
                 + "   |   " + workingImage.getWidth() + " × " + workingImage.getHeight() + " px");
     }
 
-    private void setBottomButtonsEnabled(boolean enabled) {
+    public void setBottomButtonsEnabled(boolean enabled) {
         boolean sel = !floodfillMode && appMode == AppMode.ALPHA_EDITOR;
         applyButton.setEnabled(enabled && sel);
         clearSelectionsButton.setEnabled(enabled && sel);
-        JPanel ap = findActionPanel();
-        if (ap == null) return;
-        for (java.awt.Component c : ap.getComponents())
+        if (actionPanel == null) return;
+        for (java.awt.Component c : actionPanel.getComponents())
             if (c instanceof JButton btn && ("resetButton".equals(btn.getName()) || "saveButton".equals(btn.getName())))
                 btn.setEnabled(enabled);
-    }
-
-    private JPanel findActionPanel() {
-        java.awt.Container south = (java.awt.Container)
-                ((BorderLayout) getContentPane().getLayout()).getLayoutComponent(BorderLayout.SOUTH);
-        if (south == null) return null;
-        for (java.awt.Component c : south.getComponents())
-            if (c instanceof JPanel p && "actionPanel".equals(p.getName())) return p;
-        return null;
     }
 
     // =========================================================================
@@ -2319,9 +1646,9 @@ public class SelectiveAlphaEditor extends JFrame {
         content.add(Box.createVerticalStrut(18));
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         row.setOpaque(false);
-        JButton sBtn = buildButton("Speichern",  AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
-        JButton dBtn = buildButton("Verwerfen",  AppColors.DANGER,  AppColors.DANGER_HOVER);
-        JButton cBtn = buildButton("Abbrechen",  AppColors.BTN_BG,  AppColors.BTN_HOVER);
+        JButton sBtn = UIComponentFactory.buildButton("Speichern",  AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
+        JButton dBtn = UIComponentFactory.buildButton("Verwerfen",  AppColors.DANGER,  AppColors.DANGER_HOVER);
+        JButton cBtn = UIComponentFactory.buildButton("Abbrechen",  AppColors.BTN_BG,  AppColors.BTN_HOVER);
         sBtn.setForeground(Color.WHITE); dBtn.setForeground(Color.WHITE);
         sBtn.addActionListener(e -> { result[0] = 0; dialog.dispose(); });
         dBtn.addActionListener(e -> { result[0] = 1; dialog.dispose(); });
@@ -2337,7 +1664,7 @@ public class SelectiveAlphaEditor extends JFrame {
         JDialog dialog = createBaseDialog(title, 440, 215);
         JPanel content = centeredColumnPanel(20, 28, 16);
         JLabel msgLbl = htmlLabel(message.replace("\n","<br>"), AppColors.TEXT, 12);
-        JButton ok = buildButton("OK", AppColors.DANGER, AppColors.DANGER_HOVER);
+        JButton ok = UIComponentFactory.buildButton("OK", AppColors.DANGER, AppColors.DANGER_HOVER);
         ok.setForeground(Color.WHITE); ok.setAlignmentX(CENTER_ALIGNMENT);
         ok.addActionListener(e -> dialog.dispose());
         content.add(styledLabel("✕", 26, AppColors.DANGER, Font.BOLD));
@@ -2354,7 +1681,7 @@ public class SelectiveAlphaEditor extends JFrame {
         JDialog dialog = createBaseDialog(title, 400, 200);
         JPanel content = centeredColumnPanel(20, 28, 16);
         JLabel msgLbl = htmlLabel(message.replace("\n","<br>"), AppColors.TEXT, 13);
-        JButton ok = buildButton("OK", AppColors.ACCENT, AppColors.ACCENT_HOVER);
+        JButton ok = UIComponentFactory.buildButton("OK", AppColors.ACCENT, AppColors.ACCENT_HOVER);
         ok.setForeground(Color.WHITE); ok.setAlignmentX(CENTER_ALIGNMENT);
         ok.addActionListener(e -> dialog.dispose());
         content.add(styledLabel("ℹ", 26, AppColors.ACCENT, Font.PLAIN));
@@ -2397,87 +1724,14 @@ public class SelectiveAlphaEditor extends JFrame {
         l.setAlignmentX(CENTER_ALIGNMENT); return l;
     }
 
-    // =========================================================================
-    // Button factories
-    // =========================================================================
-    private JButton buildButton(String text, Color bg, Color hover) {
-        JButton btn = new JButton(text) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getModel().isRollover() ? hover : (isEnabled() ? bg : AppColors.BTN_BG.darker()));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                super.paintComponent(g);
-            }
-        };
-        btn.setForeground(AppColors.TEXT);
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        btn.setFocusPainted(false);
-        btn.setBorderPainted(false);
-        btn.setContentAreaFilled(false);
-        btn.setOpaque(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
-        btn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-        btn.setMinimumSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-        return btn;
-    }
-
-    private JToggleButton buildModeToggleBtn(String symbol, String tooltip) {
-        JToggleButton btn = new JToggleButton(symbol) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                Color bg = isSelected() ? AppColors.ACCENT_ACTIVE
-                        : (getModel().isRollover() ? AppColors.BTN_HOVER : AppColors.BTN_BG);
-                g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                if (isSelected()) {
-                    g2.setColor(AppColors.ACCENT);
-                    g2.setStroke(new BasicStroke(2f));
-                    g2.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 8, 8);
-                }
-                super.paintComponent(g);
-            }
-        };
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 16));
-        btn.setForeground(AppColors.TEXT);
-        btn.setFocusPainted(false); btn.setBorderPainted(false);
-        btn.setContentAreaFilled(false); btn.setOpaque(false);
-        btn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-        btn.setToolTipText(tooltip);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        return btn;
-    }
-
-    private JButton buildNavButton(String symbol) {
-        JButton btn = new JButton() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(!isEnabled() ? new Color(0,0,0,30)
-                        : getModel().isRollover() ? new Color(255,255,255,55) : new Color(0,0,0,110));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
-                g2.setColor(isEnabled() ? AppColors.TEXT : AppColors.TEXT_MUTED);
-                g2.setFont(new Font("SansSerif", Font.PLAIN, 30));
-                FontMetrics fm = g2.getFontMetrics();
-                int tx = (getWidth() - fm.stringWidth(symbol)) / 2;
-                int ty = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
-                g2.drawString(symbol, tx, ty);
-            }
-        };
-        btn.setFocusPainted(false); btn.setBorderPainted(false);
-        btn.setContentAreaFilled(false); btn.setOpaque(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        return btn;
-    }
+    // Note: buildButton(), buildModeToggleBtn(), buildNavButton() are now in UIComponentFactory.java
 
     // =========================================================================
     // Element helpers
     // =========================================================================
 
     /** Screen-space rectangle for an element, accounting for current zoom. */
-    private Rectangle elemRectScreen(Element el) {
+    @Override public Rectangle elemRectScreen(Element el) {
         return new Rectangle(
             (int) Math.round(el.x()      * zoom),
             (int) Math.round(el.y()      * zoom),
@@ -2538,9 +1792,12 @@ public class SelectiveAlphaEditor extends JFrame {
         return false;
     }
 
-    private BufferedImage deepCopy(BufferedImage src) {
+    public BufferedImage deepCopy(BufferedImage src) {
         BufferedImage c = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        c.createGraphics().drawImage(src, 0, 0, null); return c;
+        Graphics2D g2 = c.createGraphics();
+        g2.drawImage(src, 0, 0, null);
+        g2.dispose();
+        return c;
     }
 
     private void copyInto(BufferedImage src, BufferedImage dst) {
@@ -2549,4 +1806,98 @@ public class SelectiveAlphaEditor extends JFrame {
         g2.drawImage(src, 0, 0, null);
         g2.dispose();
     }
+
+    // =========================================================================
+    // CanvasCallbacks Implementation (for CanvasPanel)
+    // =========================================================================
+    @Override public BufferedImage getWorkingImage() { return workingImage; }
+    @Override public AppMode getAppMode() { return appMode; }
+    @Override public boolean isFloodfillMode() { return floodfillMode; }
+    @Override public double getZoom() { return zoom; }
+    @Override public JScrollPane getScrollPane() { return scrollPane; }
+
+    @Override public List<Rectangle> getSelectedAreas() { return selectedAreas; }
+    @Override public boolean isSelecting() { return isSelecting; }
+    @Override public void setSelecting(boolean selecting) { isSelecting = selecting; }
+    @Override public Point getSelectionStart() { return selectionStart; }
+    @Override public void setSelectionStart(Point p) { selectionStart = p; }
+    @Override public Point getSelectionEnd() { return selectionEnd; }
+    @Override public void setSelectionEnd(Point p) { selectionEnd = p; }
+
+    @Override public List<Element> getActiveElements() { return activeElements; }
+    @Override public Element getSelectedElement() { return selectedElement; }
+    @Override public void setSelectedElement(Element el) { selectedElement = el; }
+
+    @Override public BufferedImage getFloatingImage() { return floatingImg; }
+    @Override public Rectangle getFloatRect() { return floatRect; }
+    @Override public boolean isDraggingFloat() { return isDraggingFloat; }
+    @Override public void setDraggingFloat(boolean dragging) { isDraggingFloat = dragging; }
+    @Override public Point getFloatDragAnchor() { return floatDragAnchor; }
+    @Override public void setFloatDragAnchor(Point p) { floatDragAnchor = p; }
+    @Override public int getActiveHandle() { return activeHandle; }
+    @Override public void setActiveHandle(int handle) { activeHandle = handle; }
+    @Override public Rectangle getScaleBaseRect() { return scaleBaseRect; }
+    @Override public void setScaleBaseRect(Rectangle r) { scaleBaseRect = r; }
+    @Override public Point getScaleDragStart() { return scaleDragStart; }
+    @Override public void setScaleDragStart(Point p) { scaleDragStart = p; }
+
+    @Override public Point getLastPaintPoint() { return lastPaintPoint; }
+    @Override public void setLastPaintPoint(Point p) { lastPaintPoint = p; }
+    @Override public Point getShapeStartPoint() { return shapeStartPoint; }
+    @Override public void setShapeStartPoint(Point p) { shapeStartPoint = p; }
+    @Override public BufferedImage getPaintSnapshot() { return paintSnapshot; }
+    @Override public void setPaintSnapshot(BufferedImage img) { paintSnapshot = img; }
+
+    @Override public int getElemActiveHandle() { return elemActiveHandle; }
+    @Override public void setElemActiveHandle(int handle) { elemActiveHandle = handle; }
+    @Override public Rectangle getElemScaleBase() { return elemScaleBase; }
+    @Override public void setElemScaleBase(Rectangle r) { elemScaleBase = r; }
+    @Override public Point getElemScaleStart() { return elemScaleStart; }
+    @Override public void setElemScaleStart(Point p) { elemScaleStart = p; }
+    @Override public boolean isDraggingElement() { return draggingElement; }
+    @Override public void setDraggingElement(boolean dragging) { draggingElement = dragging; }
+    @Override public Point getElemDragAnchor() { return elemDragAnchor; }
+    @Override public void setElemDragAnchor(Point p) { elemDragAnchor = p; }
+
+    @Override public PaintToolbar getPaintToolbar() { return paintToolbar; }
+
+    @Override public void repaintCanvas() { canvasPanel.repaint(); }
+
+    @Override public void paintDot(Point imagePt) {
+        boolean aa = paintToolbar != null && paintToolbar.isAntialiasing();
+        PaintEngine.drawPencil(workingImage, imagePt, imagePt,
+                paintToolbar.getPrimaryColor(),
+                paintToolbar.getStrokeWidth(),
+                paintToolbar.getBrushShape(), aa);
+        markDirty();
+    }
+
+    @Override public void updateSelectedElement(Element el) {
+        if (el != null && selectedElement != null) {
+            int idx = activeElements.indexOf(selectedElement);
+            if (idx >= 0) {
+                selectedElement = el;
+                activeElements.set(idx, el);
+                markDirty();
+            }
+        }
+    }
+
+    // =========================================================================
+    // Public API for EditorDialogs
+    // =========================================================================
+    // Note: getWorkingImage() is in CanvasCallbacks Implementation section
+    public void setWorkingImage(BufferedImage img) { workingImage = img; }
+    public BufferedImage getOriginalImage() { return originalImage; }
+    public void setOriginalImage(BufferedImage img) { originalImage = img; }
+    public File getSourceFile() { return sourceFile; }
+    public void setSourceFile(File f) { sourceFile = f; }
+    public JPanel getCanvasWrapper() { return canvasWrapper; }
+    public JPanel getCanvasPanel() { return canvasPanel; }
+    public JLabel getZoomLabel() { return zoomLabel; }
+    public Color getCanvasBg1() { return canvasBg1; }
+    public Color getCanvasBg2() { return canvasBg2; }
+    public void setCanvasBg1(Color c) { canvasBg1 = c; }
+    public void setCanvasBg2(Color c) { canvasBg2 = c; }
+    public RulerUnit getRulerUnit() { return rulerUnit; }
 }

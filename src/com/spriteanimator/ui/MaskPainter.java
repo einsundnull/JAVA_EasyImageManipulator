@@ -1,17 +1,34 @@
 package com.spriteanimator.ui;
 
-import com.spriteanimator.model.AppState;
-import com.spriteanimator.model.Tile;
-
-import javax.swing.*;
-import java.awt.*;
+import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.PointerInfo;
+import java.awt.RenderingHints;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.dnd.*;
-import java.awt.event.*;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDropEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.List;
+
 import javax.imageio.ImageIO;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.TransferHandler;
+
+import com.spriteanimator.model.AppState;
+import com.spriteanimator.model.Tile;
 
 /**
  * Zoomable mask-painting canvas with:

@@ -1,13 +1,26 @@
 package com.spriteanimator.ui;
 
-import com.spriteanimator.export.ExportEngine;
-import com.spriteanimator.model.AppState;
-
-import javax.imageio.ImageIO;
-import javax.swing.*;
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
+
+import javax.imageio.ImageIO;
+import javax.swing.ButtonGroup;
+import javax.swing.JButton;
+import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JSlider;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
+import javax.swing.JToggleButton;
+import javax.swing.JToolBar;
+import javax.swing.SpinnerNumberModel;
+
+import com.spriteanimator.export.ExportEngine;
+import com.spriteanimator.model.AppState;
 
 /**
  * Top toolbar:
