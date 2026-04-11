@@ -937,14 +937,22 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     }
 
     private void resetImage() {
-        pushUndo();
+        if (originalImage == null) return;
+
         workingImage = deepCopy(originalImage);
+        undoStack.clear();
+        redoStack.clear();
         selectedAreas.clear();
-        floatingImg = null; floatRect = null;
-        isDraggingFloat = false; floatDragAnchor = null;
-        activeHandle = -1; scaleBaseRect = null; scaleDragStart = null;
+        floatingImg = null;
+        floatRect = null;
+        activeElements.clear();
+        selectedElements.clear();
+
         hasUnsavedChanges = false;
+        if (sourceFile != null) dirtyFiles.remove(sourceFile);
         updateTitle();
+        updateDirtyUI();
+        elementLayerPanel.refresh(activeElements);
         canvasPanel.repaint();
     }
 
@@ -991,8 +999,16 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     }
 
     private void afterUndoRedo() {
-        hasUnsavedChanges = true;
+        // If undo stack is empty, we've undone all changes back to original state
+        if (undoStack.isEmpty()) {
+            hasUnsavedChanges = false;
+            if (sourceFile != null) dirtyFiles.remove(sourceFile);
+        } else {
+            hasUnsavedChanges = true;
+            if (sourceFile != null) dirtyFiles.add(sourceFile);
+        }
         updateTitle();
+        updateDirtyUI();
         canvasWrapper.revalidate();
         canvasPanel.repaint();
         if (showRuler) { hRuler.repaint(); vRuler.repaint(); }
@@ -1976,17 +1992,44 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 if (sourceFile != null) saveCurrentState();
                 workingImage      = new BufferedImage(nw, nh, BufferedImage.TYPE_INT_ARGB);
                 originalImage     = deepCopy(workingImage);
-                sourceFile        = null;
-                hasUnsavedChanges = false;
                 activeElements    = new ArrayList<>();
                 selectedElements.clear();
                 undoStack.clear(); redoStack.clear();
                 selectedAreas.clear();
                 floatingImg = null; floatRect = null;
+
+                // Create and save new file
+                File saveDir = lastIndexedDir != null ? lastIndexedDir : new File(System.getProperty("user.home"));
+                int counter = 1;
+                File newFile;
+                do {
+                    newFile = new File(saveDir, "Untitled_" + counter + ".png");
+                    counter++;
+                } while (newFile.exists());
+
+                try {
+                    ImageIO.write(workingImage, "PNG", newFile);
+                    sourceFile = newFile;
+                    hasUnsavedChanges = false;
+                    dirtyFiles.remove(sourceFile);
+
+                    // Update tile gallery
+                    if (!directoryImages.contains(newFile)) {
+                        directoryImages.add(newFile);
+                        tileGallery.addFiles(Arrays.asList(newFile));
+                    }
+                    tileGallery.setActiveFile(newFile);
+                    currentImageIndex = directoryImages.indexOf(newFile);
+                } catch (IOException ex) {
+                    showErrorDialog("Speicherfehler", "Neue Bitmap konnte nicht gespeichert werden:\n" + ex.getMessage());
+                    return;
+                }
+
                 swapToImageView();
                 SwingUtilities.invokeLater(this::fitToViewport);
                 updateTitle();
                 updateStatus();
+                updateDirtyUI();
                 setBottomButtonsEnabled(true);
             } catch (NumberFormatException ex) {
                 showErrorDialog("Ungültige Eingabe", "Bitte ganzzahlige Pixelwerte eingeben.");
@@ -2017,6 +2060,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         JButton btn1 = UIComponentFactory.buildButton("Farbe 1", AppColors.BTN_BG, AppColors.BTN_HOVER);
         JButton btn2 = UIComponentFactory.buildButton("Farbe 2", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton btnBoth = UIComponentFactory.buildButton("Beide", AppColors.BTN_BG, AppColors.BTN_HOVER);
+
         btn1.addActionListener(e -> {
             Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe 1", canvasBg1);
             if (c != null) { canvasBg1 = c; preview.repaint(); canvasPanel.repaint(); }
@@ -2025,14 +2070,18 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe 2", canvasBg2);
             if (c != null) { canvasBg2 = c; preview.repaint(); canvasPanel.repaint(); }
         });
+        btnBoth.addActionListener(e -> {
+            Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe", canvasBg1);
+            if (c != null) { canvasBg1 = c; canvasBg2 = c; preview.repaint(); canvasPanel.repaint(); }
+        });
 
-        JDialog dialog = createBaseDialog("Canvas-Hintergrund", 320, 240);
+        JDialog dialog = createBaseDialog("Canvas-Hintergrund", 380, 240);
         JPanel content = centeredColumnPanel(16, 20, 12);
         content.add(preview);
         content.add(Box.createVerticalStrut(12));
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
         row.setOpaque(false);
-        row.add(btn1); row.add(btn2);
+        row.add(btn1); row.add(btn2); row.add(btnBoth);
         content.add(row);
         content.add(Box.createVerticalStrut(12));
         JButton closeBtn = UIComponentFactory.buildButton("Schließen", AppColors.BTN_BG, AppColors.BTN_HOVER);

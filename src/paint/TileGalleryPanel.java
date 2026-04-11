@@ -3,6 +3,7 @@ package paint;
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -17,6 +18,8 @@ import java.awt.Shape;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
@@ -35,6 +38,7 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
@@ -313,6 +317,7 @@ public class TileGalleryPanel extends JPanel {
         private BufferedImage thumbnail;
         boolean isActive      = false;
         boolean isInSelection = false;
+        boolean isClicked     = false;
         private final JCheckBox checkbox;
 
         // For drag detection
@@ -326,6 +331,7 @@ public class TileGalleryPanel extends JPanel {
             setMaximumSize (new Dimension(TILE_W, TILE_H));
             setMinimumSize (new Dimension(TILE_W, TILE_H));
             setOpaque(false);
+            setFocusable(true);
 
             // Checkbox – top-right corner
             checkbox = new JCheckBox();
@@ -372,7 +378,16 @@ public class TileGalleryPanel extends JPanel {
                     dragStart = null;
                 }
                 @Override public void mouseClicked(MouseEvent e) {
+                    // Clear clicked state from other tiles and set this one
+                    for (TilePanel t : tiles) {
+                        if (t != TilePanel.this) {
+                            t.isClicked = false;
+                        }
+                    }
+                    TilePanel.this.isClicked = true;
+                    TilePanel.this.requestFocus();
                     onTileClicked(TilePanel.this, e.isShiftDown());
+                    repaint();
                 }
                 @Override public void mouseEntered(MouseEvent e) { repaint(); }
                 @Override public void mouseExited (MouseEvent e) { repaint(); }
@@ -389,6 +404,15 @@ public class TileGalleryPanel extends JPanel {
                     }
                 }
             });
+
+            addKeyListener(new KeyAdapter() {
+                @Override public void keyPressed(KeyEvent e) {
+                    if (e.getKeyCode() == KeyEvent.VK_DELETE) {
+                        deleteTile();
+                    }
+                }
+            });
+
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
             loadThumbAsync();
@@ -397,6 +421,37 @@ public class TileGalleryPanel extends JPanel {
         void setActive(boolean a)        { isActive = a; }
         void setSelected(boolean s)      { isInSelection = s; checkbox.setSelected(s); }
         void showCheckbox(boolean show)  { checkbox.setVisible(show); }
+
+        private void deleteTile() {
+            int result = JOptionPane.showConfirmDialog(
+                    TileGalleryPanel.this,
+                    "Möchten Sie dieses Element wirklich löschen?",
+                    "Bestätigung",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE);
+
+            if (result == JOptionPane.YES_OPTION) {
+                // Find and remove this tile
+                int tileIndex = tiles.indexOf(this);
+                if (tileIndex >= 0) {
+                    tiles.remove(tileIndex);
+                    // Remove tile and its strut from container
+                    int compIndex = tilesContainer.getComponentZOrder(this);
+                    if (compIndex >= 0) {
+                        tilesContainer.remove(compIndex);
+                        // Also remove the strut after it if present
+                        if (compIndex < tilesContainer.getComponentCount()) {
+                            Component nextComp = tilesContainer.getComponent(compIndex);
+                            if (nextComp instanceof Box.Filler) {
+                                tilesContainer.remove(compIndex);
+                            }
+                        }
+                    }
+                    tilesContainer.revalidate();
+                    tilesContainer.repaint();
+                }
+            }
+        }
 
         private void loadThumbAsync() {
             new SwingWorker<BufferedImage, Void>() {
@@ -478,11 +533,14 @@ public class TileGalleryPanel extends JPanel {
                 g2.drawRoundRect(0, 0, TILE_W - 2, TILE_H - 2, 8, 8);
                 g2.setColor(AppColors.SUCCESS);
                 g2.drawRoundRect(2, 2, TILE_W - 6, TILE_H - 6, 6, 6);
-            } else if (isActive) {
-                g2.setColor(AppColors.SUCCESS);           // green
-                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
             } else if (isDirty) {
                 g2.setColor(AppColors.DANGER);            // red – ungespeicherte Änderungen
+                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
+            } else if (isClicked) {
+                g2.setColor(new Color(255, 255, 0));      // yellow – clicked state
+                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
+            } else if (isActive) {
+                g2.setColor(AppColors.SUCCESS);           // green
                 g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
             } else if (isInSelection) {
                 g2.setColor(AppColors.SELECTION);

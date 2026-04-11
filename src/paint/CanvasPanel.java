@@ -1515,6 +1515,17 @@ public class CanvasPanel extends JPanel {
 
 		int cw = (int) Math.round(callbacks.getWorkingImage().getWidth() * callbacks.getZoom());
 		int ch = (int) Math.round(callbacks.getWorkingImage().getHeight() * callbacks.getZoom());
+
+		// ── Draw checkerboard background ──────────────────────────────────────
+		int cellSize = 16;
+		for (int y = 0; y < ch; y += cellSize) {
+			for (int x = 0; x < cw; x += cellSize) {
+				boolean even = ((x / cellSize) + (y / cellSize)) % 2 == 0;
+				g2.setColor(even ? callbacks.getCanvasBg1() : callbacks.getCanvasBg2());
+				g2.fillRect(x, y, Math.min(cellSize, cw - x), Math.min(cellSize, ch - y));
+			}
+		}
+
 		g2.drawImage(callbacks.getWorkingImage(), 0, 0, cw, ch, null);
 
 		// ── Canvas sub-mode draw overlay (in-progress stroke preview) ────────

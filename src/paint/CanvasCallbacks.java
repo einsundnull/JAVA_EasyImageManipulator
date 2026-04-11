@@ -1,5 +1,6 @@
 package paint;
 
+import java.awt.Color;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -120,4 +121,8 @@ public interface CanvasCallbacks {
     Rectangle[] handleRects(Rectangle screenRect);
     Rectangle getActiveSelection();
     BufferedImage deepCopy(BufferedImage src);
+
+    // Canvas background colors
+    Color getCanvasBg1();
+    Color getCanvasBg2();
 }
