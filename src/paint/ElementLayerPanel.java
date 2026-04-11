@@ -28,6 +28,8 @@ public class ElementLayerPanel extends JPanel {
         void deleteElement(Layer el);
         /** Burn (merge) the layer permanently into the canvas image. */
         void burnElement(Layer el);
+        /** Export layer as an image file in the same directory as the source image. */
+        void exportElementAsImage(Layer el);
         void repaintCanvas();
         void onCloseRequested();
         /** Called when the mouse enters/leaves a layer tile. id=-1 = no tile. */
