@@ -6,8 +6,10 @@ import java.awt.Color;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.util.Stack;
@@ -317,6 +319,81 @@ public class PaintEngine {
         g2.drawImage(img, 0, 0, newW, newH, null);
         g2.dispose();
         return result;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Polygon operations (for PathLayer fill/clear operations)
+    // ────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Clears all pixels inside the polygon (sets alpha to 0).
+     * xs/ys are image-space coordinates.
+     */
+    public static void clearPolygon(BufferedImage img, int[] xs, int[] ys) {
+        if (img == null || xs == null || ys == null || xs.length < 3) return;
+        Graphics2D g2 = img.createGraphics();
+        g2.setComposite(AlphaComposite.Clear);
+        g2.fillPolygon(xs, ys, xs.length);
+        g2.dispose();
+    }
+
+    /**
+     * Clears all pixels OUTSIDE the polygon (inside → opaque, outside → alpha 0).
+     */
+    public static void clearOutsidePolygon(BufferedImage img, int[] xs, int[] ys) {
+        if (img == null || xs == null || ys == null || xs.length < 3) return;
+        Graphics2D g2 = img.createGraphics();
+        Area fullArea = new Area(new Rectangle(0, 0, img.getWidth(), img.getHeight()));
+        Area polyArea = new Area(new Polygon(xs, ys, xs.length));
+        fullArea.subtract(polyArea);
+        g2.setComposite(AlphaComposite.Clear);
+        g2.fill(fullArea);
+        g2.dispose();
+    }
+
+    /**
+     * Returns a new ARGB BufferedImage containing pixels inside the polygon.
+     * Bounding box is computed from min/max x,y values.
+     */
+    public static BufferedImage cropPolygon(BufferedImage img, int[] xs, int[] ys) {
+        if (img == null || xs == null || ys == null || xs.length < 3) return null;
+
+        int minX = xs[0], maxX = xs[0];
+        int minY = ys[0], maxY = ys[0];
+        for (int v : xs) { minX = Math.min(minX, v); maxX = Math.max(maxX, v); }
+        for (int v : ys) { minY = Math.min(minY, v); maxY = Math.max(maxY, v); }
+
+        int w = Math.max(1, maxX - minX + 1);
+        int h = Math.max(1, maxY - minY + 1);
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+
+        Graphics2D g2 = out.createGraphics();
+        int[] relXs = xs.clone();
+        int[] relYs = ys.clone();
+        for (int i = 0; i < relXs.length; i++) {
+            relXs[i] -= minX;
+            relYs[i] -= minY;
+        }
+        g2.setClip(new Polygon(relXs, relYs, relXs.length));
+        g2.drawImage(img, -minX, -minY, null);
+        g2.dispose();
+        return out;
+    }
+
+    /**
+     * Returns a new ARGB BufferedImage containing pixels OUTSIDE the polygon.
+     */
+    public static BufferedImage cropOutsidePolygon(BufferedImage img, int[] xs, int[] ys) {
+        if (img == null || xs == null || ys == null || xs.length < 3) return null;
+
+        BufferedImage out = new BufferedImage(img.getWidth(), img.getHeight(),
+                BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = out.createGraphics();
+        g2.drawImage(img, 0, 0, null);
+        g2.setComposite(AlphaComposite.Clear);
+        g2.fillPolygon(xs, ys, xs.length);
+        g2.dispose();
+        return out;
     }
 
     // Helpers

@@ -169,6 +169,32 @@ public final class PathLayer extends Layer {
         return new PathLayer(id, points, image, newClosed, x, y, width, height);
     }
 
+    // ── Polygon operations ────────────────────────────────────────────────────
+
+    /**
+     * Returns absolute image-space X coordinates of all points.
+     * Combines layer origin x() + relative point x coordinates.
+     */
+    public int[] absXPoints() {
+        int[] arr = new int[points.size()];
+        for (int i = 0; i < points.size(); i++) {
+            arr[i] = (int) Math.round(x() + points.get(i).x);
+        }
+        return arr;
+    }
+
+    /**
+     * Returns absolute image-space Y coordinates of all points.
+     * Combines layer origin y() + relative point y coordinates.
+     */
+    public int[] absYPoints() {
+        int[] arr = new int[points.size()];
+        for (int i = 0; i < points.size(); i++) {
+            arr[i] = (int) Math.round(y() + points.get(i).y);
+        }
+        return arr;
+    }
+
     // ── Convenience ───────────────────────────────────────────────────────────
 
     @Override

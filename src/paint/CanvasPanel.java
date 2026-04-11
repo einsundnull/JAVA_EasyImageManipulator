@@ -205,6 +205,18 @@ public class CanvasPanel extends JPanel {
 						repaint();
 						return;
 					}
+
+					// NEW: Click inside polygon area → select path + start drag
+					if (isInsidePathPolygon(pl, e.getPoint())) {
+						callbacks.setDraggingElement(true);
+						elemLastImgPt = imgPt;
+						repaint();
+						return;
+					}
+
+					// No point hit, no polygon hit → deselect path
+					callbacks.setSelectedElement(null);
+					selectedPathPointIndex = -1;
 				}
 
 				if (!callbacks.getActiveElements().isEmpty() && callbacks.getFloatingImage() == null) {
@@ -826,8 +838,12 @@ public class CanvasPanel extends JPanel {
 						repaint();
 						return;
 					}
-					double zoomStep = 0.06;
-					double newZoom = callbacks.getZoom() - (e.getWheelRotation() * zoomStep);
+					// Progressive zoom: factor-based instead of step-based
+					// Wheel up = zoom in, wheel down = zoom out
+					// This makes zooming to pixel level much faster
+					double currentZoom = callbacks.getZoom();
+					double zoomFactor = 1.08;  // 8% per notch (configurable)
+					double newZoom = currentZoom * Math.pow(zoomFactor, -e.getWheelRotation());
 					callbacks.setZoom(newZoom, e.getPoint());
 				} else if ((e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0) {
 					callbacks.getScrollPane().getHorizontalScrollBar()
@@ -901,13 +917,22 @@ public class CanvasPanel extends JPanel {
 				Layer primary = callbacks.getSelectedElement();
 				if (primary instanceof PathLayer pl) {
 					int code = ke.getKeyCode();
-					if (code == KeyEvent.VK_DELETE && selectedPathPointIndex >= 0) {
-						// DEL: remove selected point
-						System.err.println("[DEBUG] DELETE point at index " + selectedPathPointIndex);
-						PathLayer updated = pl.withRemovedPoint(selectedPathPointIndex);
-						callbacks.updateSelectedElement(updated);
-						selectedPathPointIndex = -1;
-						ke.consume(); repaint(); return;
+					if (code == KeyEvent.VK_DELETE) {
+						if (selectedPathPointIndex >= 0) {
+							// DEL: remove selected point
+							System.err.println("[DEBUG] DELETE point at index " + selectedPathPointIndex);
+							PathLayer updated = pl.withRemovedPoint(selectedPathPointIndex);
+							callbacks.updateSelectedElement(updated);
+							selectedPathPointIndex = -1;
+							ke.consume(); repaint(); return;
+						} else {
+							// NEW: DEL without point selection → clear pixels inside polygon
+							callbacks.pushUndo();
+							PaintEngine.clearPolygon(callbacks.getWorkingImage(),
+									pl.absXPoints(), pl.absYPoints());
+							callbacks.markDirty();
+							ke.consume(); repaint(); return;
+						}
 					}
 					// Check for PLUS key (VK_PLUS or VK_ADD for numpad, or character '=' with shift)
 					boolean isPlusKey = (code == KeyEvent.VK_PLUS || code == KeyEvent.VK_ADD ||
@@ -1426,6 +1451,24 @@ public class CanvasPanel extends JPanel {
 	}
 
 	/** Returns the topmost layer at screen point, or null. */
+	/**
+	 * Checks if a screen-space point is inside the polygon of the given PathLayer.
+	 * Used to detect click/drag inside the path area (not just on control points).
+	 */
+	private boolean isInsidePathPolygon(PathLayer pl, Point screenPt) {
+		if (pl == null) return false;
+		double zoom = callbacks.getZoom();
+		int[] xs = pl.absXPoints();
+		int[] ys = pl.absYPoints();
+		int[] sxs = new int[xs.length];
+		int[] sys = new int[ys.length];
+		for (int i = 0; i < xs.length; i++) {
+			sxs[i] = (int) Math.round(xs[i] * zoom);
+			sys[i] = (int) Math.round(ys[i] * zoom);
+		}
+		return new java.awt.Polygon(sxs, sys, sxs.length).contains(screenPt);
+	}
+
 	private Layer hitElement(Point screenPt) {
 		java.util.List<Layer> els = callbacks.getActiveElements();
 		for (int i = els.size() - 1; i >= 0; i--) {
@@ -1510,11 +1553,18 @@ public class CanvasPanel extends JPanel {
 			return;
 
 		Graphics2D g2 = (Graphics2D) g;
-		g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		double zoom = callbacks.getZoom();
+		// Bei hohem Zoom (Pixel-Level): NEAREST_NEIGHBOR für schnelleres Rendering
+		// Bei normalem Zoom: BICUBIC für glattes Rendering
+		if (zoom > 2.0) {
+			g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+		} else {
+			g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+		}
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
-		int cw = (int) Math.round(callbacks.getWorkingImage().getWidth() * callbacks.getZoom());
-		int ch = (int) Math.round(callbacks.getWorkingImage().getHeight() * callbacks.getZoom());
+		int cw = (int) Math.round(callbacks.getWorkingImage().getWidth() * zoom);
+		int ch = (int) Math.round(callbacks.getWorkingImage().getHeight() * zoom);
 
 		// ── Draw checkerboard background ──────────────────────────────────────
 		int cellSize = 16;
@@ -1556,7 +1606,6 @@ public class CanvasPanel extends JPanel {
 				// (to the left/above the origin), so elemRectScreen gives the wrong rect.
 				Rectangle frameRect = sr;
 				if (el instanceof PathLayer pl) {
-					double zoom = callbacks.getZoom();
 					double fMinX = Double.MAX_VALUE, fMaxX = -Double.MAX_VALUE;
 					double fMinY = Double.MAX_VALUE, fMaxY = -Double.MAX_VALUE;
 					for (Point3D p : pl.points()) {

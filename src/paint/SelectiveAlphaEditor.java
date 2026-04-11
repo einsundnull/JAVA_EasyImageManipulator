@@ -88,14 +88,16 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     // ── Constants ─────────────────────────────────────────────────────────────
     private static final String[] SUPPORTED_EXTENSIONS = { "png", "jpg", "jpeg", "bmp", "gif" };
     private static final int    MAX_UNDO  = 50;
-    private static final double ZOOM_MIN  = 0.05;
-    private static final double ZOOM_MAX  = 32.0;
-    private static final double ZOOM_STEP = 0.10;
+
+    // Zoom settings (non-final for runtime adjustment)
+    private double ZOOM_MIN  = 0.05;
+    private double ZOOM_MAX  = 16.0;        // max: 16x16 pixels
+    private double ZOOM_STEP = 0.10;
+    private double ZOOM_FACTOR = 1.08;      // progressive zoom: 8% per notch
 
     private static final int GRID_CELL    = 16;   // image-space pixels per grid cell
     private static final int RULER_THICK  = 20;   // pixels wide/tall for ruler strip
     private static final double SCREEN_DPI = 96.0;
-    private static final double ZOOM_WHEEL = 0.16; // per notch for mouse-wheel zoom
 
     private static final int TOPBAR_BTN_W      = 36;
     private static final int TOPBAR_BTN_H      = 36;
@@ -1661,6 +1663,14 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     /** CTRL+C — copy INSIDE selection → Element layer (or full image if no selection). */
     private void doCopy() {
         if (workingImage == null) return;
+
+        // NEW: PathLayer support
+        if (!selectedElements.isEmpty() && selectedElements.get(0) instanceof PathLayer pl) {
+            clipboard = PaintEngine.cropPolygon(workingImage, pl.absXPoints(), pl.absYPoints());
+            if (clipboard != null) copyToSystemClipboard(clipboard);
+            return;
+        }
+
         Rectangle sel = getActiveSelection();
         if (sel != null) {
             clipboard = PaintEngine.cropRegion(workingImage, sel);
@@ -1675,6 +1685,14 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     /** CTRL+SHIFT+C — copy OUTSIDE selection → Element layer (full-size, inside punched out). */
     private void doCopyOutside() {
         if (workingImage == null) return;
+
+        // NEW: PathLayer support
+        if (!selectedElements.isEmpty() && selectedElements.get(0) instanceof PathLayer pl) {
+            clipboard = PaintEngine.cropOutsidePolygon(workingImage, pl.absXPoints(), pl.absYPoints());
+            if (clipboard != null) copyToSystemClipboard(clipboard);
+            return;
+        }
+
         Rectangle sel = getActiveSelection();
         if (sel != null) {
             clipboard = PaintEngine.cropOutside(workingImage, sel);
@@ -1690,6 +1708,17 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     /** CTRL+X — cut INSIDE selection → Element layer + clear canvas pixels. */
     private void doCut() {
         if (workingImage == null) return;
+
+        // NEW: PathLayer support
+        if (!selectedElements.isEmpty() && selectedElements.get(0) instanceof PathLayer pl) {
+            pushUndo();
+            clipboard = PaintEngine.cropPolygon(workingImage, pl.absXPoints(), pl.absYPoints());
+            if (clipboard != null) copyToSystemClipboard(clipboard);
+            PaintEngine.clearPolygon(workingImage, pl.absXPoints(), pl.absYPoints());
+            markDirty();
+            return;
+        }
+
         Rectangle sel = getActiveSelection();
         if (sel != null) {
             pushUndo();
@@ -1712,6 +1741,17 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     /** CTRL+SHIFT+X — cut OUTSIDE selection → Element layer (full-size) + clear canvas outside. */
     private void doCutOutside() {
         if (workingImage == null) return;
+
+        // NEW: PathLayer support
+        if (!selectedElements.isEmpty() && selectedElements.get(0) instanceof PathLayer pl) {
+            pushUndo();
+            clipboard = PaintEngine.cropOutsidePolygon(workingImage, pl.absXPoints(), pl.absYPoints());
+            if (clipboard != null) copyToSystemClipboard(clipboard);
+            PaintEngine.clearOutsidePolygon(workingImage, pl.absXPoints(), pl.absYPoints());
+            markDirty();
+            return;
+        }
+
         Rectangle sel = getActiveSelection();
         if (sel != null) {
             pushUndo();
@@ -1853,7 +1893,12 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             else { selectedAreas.clear(); isSelecting = false; selectionStart = null; selectionEnd = null; canvasPanel.repaint(); }
         }});
         am.put("deleteInside", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
-            if (!selectedElements.isEmpty()) {
+            // NEW: PathLayer support
+            if (!selectedElements.isEmpty() && selectedElements.get(0) instanceof PathLayer pl) {
+                pushUndo();
+                PaintEngine.clearPolygon(workingImage, pl.absXPoints(), pl.absYPoints());
+                markDirty();
+            } else if (!selectedElements.isEmpty()) {
                 deleteSelectedElements();
             } else if (!selectedAreas.isEmpty() && workingImage != null) {
                 pushUndo();
