@@ -109,7 +109,6 @@ public class CanvasPanel extends JPanel {
 		this.callbacks = callbacks;
 		setOpaque(false);
 		setFocusable(true);
-		System.err.println("[DEBUG] CanvasPanel created, focusable=" + isFocusable());
 		setupMouseHandling();
 		setupKeyBindings();
 	}
@@ -168,7 +167,6 @@ public class CanvasPanel extends JPanel {
 		MouseAdapter handler = new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
-				System.err.println("[DEBUG] mousePressed called! Button=" + e.getButton() + ", Point=" + e.getPoint());
 				requestFocusInWindow();
 
 				boolean isMiddle = (e.getButton() == MouseEvent.BUTTON2);
@@ -260,7 +258,6 @@ public class CanvasPanel extends JPanel {
 					// CHECK DOUBLE-CLICK ON TEXTLAYER FIRST (before any other element handling)
 					Layer hit = hitElement(e.getPoint());
 					if (hit instanceof TextLayer && e.getClickCount() == 2) {
-						System.err.println("[DEBUG] Double-click on TextLayer detected!");
 						enterTextEditMode(hit);
 						return;
 					}
@@ -494,7 +491,6 @@ public class CanvasPanel extends JPanel {
 
 			@Override
 			public void mouseDragged(MouseEvent e) {
-				System.err.println("[DEBUG] mouseDragged called! Point=" + e.getPoint());
 				if (panStart != null) {
 					Point curVp = SwingUtilities.convertPoint(CanvasPanel.this, e.getPoint(),
 							callbacks.getScrollPane().getViewport());
@@ -684,7 +680,6 @@ public class CanvasPanel extends JPanel {
 						}
 					} else if (tool == PaintEngine.Tool.SELECT) {
 						// SELECT tool in PAINT mode: draw selection frame
-						System.err.println("[DEBUG] Selection drag (PAINT mode): imgPt=" + imgPt);
 						callbacks.setSelectionEnd(imgPt);
 						callbacks.repaintCanvas();
 					} else if (tool == PaintEngine.Tool.TEXT && textDragStart != null) {
@@ -698,8 +693,6 @@ public class CanvasPanel extends JPanel {
 						repaint();
 					}
 				} else {
-					System.err.println("[DEBUG] Selection drag: imgPt=" + imgPt + ", start="
-							+ callbacks.getSelectionStart() + ", end=" + callbacks.getSelectionEnd() + " -> " + imgPt);
 					callbacks.setSelectionEnd(imgPt);
 					callbacks.repaintCanvas();
 				}
@@ -923,8 +916,6 @@ public class CanvasPanel extends JPanel {
 				}
 			}
 		});
-		System.err.println("[DEBUG] Mouse listeners registered! Focusable=" + isFocusable() + ", Enabled=" + isEnabled()
-				+ ", Visible=" + isVisible());
 	}
 
 	private void setupKeyBindings() {
@@ -1804,9 +1795,6 @@ public class CanvasPanel extends JPanel {
 			int y = Math.min(callbacks.getSelectionStart().y, callbacks.getSelectionEnd().y);
 			int w = Math.abs(callbacks.getSelectionEnd().x - callbacks.getSelectionStart().x);
 			int h = Math.abs(callbacks.getSelectionEnd().y - callbacks.getSelectionStart().y);
-			System.err.println("[DEBUG PAINT] Drawing selection: imgCoords=(" + x + "," + y + "," + w + "," + h
-					+ "), zoom=" + callbacks.getZoom());
-
 			g2.setColor(new Color(0, 200, 255, 60));
 			g2.fillRect((int) Math.round(x * callbacks.getZoom()), (int) Math.round(y * callbacks.getZoom()),
 					(int) Math.round(w * callbacks.getZoom()), (int) Math.round(h * callbacks.getZoom()));
