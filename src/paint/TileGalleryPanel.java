@@ -72,6 +72,8 @@ public class TileGalleryPanel extends JPanel {
         void onTileOpened(File file);
         void onSelectionChanged(List<File> selectedFiles);
         default void onFilesAdded(List<File> files) {}
+        default void onDragStarted(File file) {}
+        default void onDragEnded() {}
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -376,6 +378,7 @@ public class TileGalleryPanel extends JPanel {
                 }
                 @Override public void mouseReleased(MouseEvent e) {
                     dragStart = null;
+                    callbacks.onDragEnded();
                 }
                 @Override public void mouseClicked(MouseEvent e) {
                     // Clear clicked state from other tiles and set this one
@@ -399,6 +402,7 @@ public class TileGalleryPanel extends JPanel {
                         int dy = Math.abs(e.getY() - dragStart.y);
                         if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
                             dragStart = null;
+                            callbacks.onDragStarted(imageFile);
                             getTransferHandler().exportAsDrag(TilePanel.this, e, TransferHandler.COPY);
                         }
                     }

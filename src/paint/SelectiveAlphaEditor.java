@@ -58,6 +58,7 @@ import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.JViewport;
@@ -208,6 +209,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     // ── Filmstrip sidebar ─────────────────────────────────────────────────────
     private JPanel        galleryWrapper;
     private JToggleButton filmstripBtn;
+    private JToggleButton secondCanvasBtn;
+    private JToggleButton secondGalleryBtn;
 
     // ── Element layer panel (right sidebar, shown in Canvas mode) ─────────────
     private ElementLayerPanel elementLayerPanel;
@@ -225,6 +228,33 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     private JPanel        dropHintPanel;
     private JLayeredPane  layeredPane;
     private JPanel        actionPanel;    // Holds apply/clear/reset/save buttons
+
+    // ── Second canvas ─────────────────────────────────────────────────────────
+    private JPanel           rightArea;         // wrapper: layeredPane2 + tileGallery2
+    private JLayeredPane     layeredPane2;
+    private JPanel           viewportPanel2;
+    private JPanel           canvasWrapper2;
+    private JScrollPane      scrollPane2;
+    private CanvasPanel      canvasPanel2;
+    private TileGalleryPanel tileGallery2;
+    private JPanel           dropHintPanel2;
+    private JPanel           rightDropZone;     // drag-activation overlay
+    private JButton          prevNavButton2;
+    private JButton          nextNavButton2;
+    private JSplitPane       centerSplitPane;
+
+    private BufferedImage                       workingImage2;
+    private File                                sourceFile2;
+    private final ArrayDeque<BufferedImage>     undoStack2  = new ArrayDeque<>();
+    private final ArrayDeque<BufferedImage>     redoStack2  = new ArrayDeque<>();
+    private final Map<File, CanvasState>        fileStateCache2 = new LinkedHashMap<>();
+    private List<Layer>                         activeElements2 = new ArrayList<>();
+    private final Set<Layer>                    selectedElements2 = new HashSet<>();
+
+    private boolean secondCanvasActive = false;
+    private List<File> directoryImages2 = new ArrayList<>();
+    private File lastIndexedDir2 = null;
+    private int currentImageIndex2 = -1;
 
     private JLabel  statusLabel;
     private JLabel  modeLabel;
@@ -439,6 +469,33 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             centerCanvas();
         });
 
+        secondCanvasBtn = UIComponentFactory.buildModeToggleBtn("2", "2. Canvas ein-/ausblenden");
+        secondCanvasBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+        secondCanvasBtn.setSelected(false);
+        secondCanvasBtn.setEnabled(false);
+        secondCanvasBtn.addActionListener(e -> {
+            if (layeredPane2 != null) {
+                boolean isVisible = secondCanvasBtn.isSelected();
+                layeredPane2.setVisible(isVisible);
+                if (centerSplitPane != null) {
+                    centerSplitPane.setDividerSize(isVisible ? 4 : 0);  // Show/hide divider
+                }
+                if (!isVisible) centerCanvas();  // Auto-center when hiding
+                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
+            }
+        });
+
+        secondGalleryBtn = UIComponentFactory.buildModeToggleBtn("B", "2. Filmstreifen ein-/ausblenden");
+        secondGalleryBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+        secondGalleryBtn.setSelected(false);
+        secondGalleryBtn.setEnabled(false);
+        secondGalleryBtn.addActionListener(e -> {
+            if (tileGallery2 != null) {
+                tileGallery2.setVisible(secondGalleryBtn.isSelected());
+                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
+            }
+        });
+
         modeLabel = new JLabel("Modus: Selective Alpha");
         modeLabel.setForeground(AppColors.TEXT_MUTED);
         modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -449,6 +506,8 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         statusLabel.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
 
         left.add(filmstripBtn);
+        left.add(secondCanvasBtn);
+        left.add(secondGalleryBtn);
         left.add(modeLabel);
         left.add(statusLabel);
         bar.add(left, BorderLayout.WEST);
@@ -681,6 +740,7 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
                 if (viewportPanel.getParent() == layeredPane)
                     viewportPanel.setBounds(0, 0, w, h);
                 repositionNavButtons();
+                repositionRightDropZone();
             }
         });
 
@@ -688,10 +748,26 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
 
         elementLayerPanel = new ElementLayerPanel(buildElementLayerCallbacks());
 
+        // Build second canvas area (initially hidden)
+        rightArea = buildSecondArea();
+        rightArea.setVisible(false);
+
+        // Wrap both canvases in a split pane
+        centerSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, layeredPane, rightArea);
+        centerSplitPane.setDividerSize(0);  // Initially hidden until second canvas is activated
+        centerSplitPane.setResizeWeight(0.5);
+        centerSplitPane.setBorder(null);
+        centerSplitPane.setBackground(AppColors.BG_DARK);
+
+        // Build right drag-drop activation zone (overlay on layeredPane)
+        rightDropZone = buildRightDropZone();
+        layeredPane.add(rightDropZone, JLayeredPane.PALETTE_LAYER);
+        rightDropZone.setVisible(false);
+
         galleryWrapper = new JPanel(new BorderLayout());
         galleryWrapper.setBackground(AppColors.BG_DARK);
         galleryWrapper.add(tileGallery, BorderLayout.WEST);
-        galleryWrapper.add(layeredPane, BorderLayout.CENTER);
+        galleryWrapper.add(centerSplitPane, BorderLayout.CENTER);
         // elementLayerPanel is added to EAST only when Canvas mode is active
         return galleryWrapper;
     }
@@ -790,6 +866,177 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
     private void handleFileDropped(File file) {
         // State is cached — just load the new file (dirty files keep their red border)
         loadFile(file);
+    }
+
+    // =========================================================================
+    // Second Canvas / Split Screen
+    // =========================================================================
+
+    private JPanel buildSecondArea() {
+        canvasPanel2    = new CanvasPanel(buildSecondCanvasCallbacks());
+        dropHintPanel2  = buildDropHintPanel();
+        setupDropTargetSecond(dropHintPanel2);
+
+        canvasWrapper2  = new JPanel(null);
+        canvasWrapper2.setBackground(AppColors.BG_DARK);
+        canvasWrapper2.add(canvasPanel2);
+
+        scrollPane2     = new JScrollPane(canvasWrapper2);
+        scrollPane2.setBorder(null);
+        TileGalleryPanel.applyDarkScrollBar(scrollPane2.getVerticalScrollBar());
+        TileGalleryPanel.applyDarkScrollBar(scrollPane2.getHorizontalScrollBar());
+
+        viewportPanel2  = new JPanel(new BorderLayout());
+        viewportPanel2.setBackground(AppColors.BG_DARK);
+        viewportPanel2.add(scrollPane2, BorderLayout.CENTER);
+
+        layeredPane2 = new JLayeredPane();
+        layeredPane2.setBackground(AppColors.BG_DARK);
+        layeredPane2.setOpaque(true);
+
+        dropHintPanel2.setBounds(0, 0, 430, 560);
+        layeredPane2.add(dropHintPanel2, JLayeredPane.DEFAULT_LAYER);
+
+        prevNavButton2 = UIComponentFactory.buildNavButton("‹");
+        nextNavButton2 = UIComponentFactory.buildNavButton("›");
+        prevNavButton2.setEnabled(false);
+        nextNavButton2.setEnabled(false);
+        prevNavButton2.addActionListener(e -> navigateImageSecond(-1));
+        nextNavButton2.addActionListener(e -> navigateImageSecond(+1));
+        layeredPane2.add(prevNavButton2, JLayeredPane.PALETTE_LAYER);
+        layeredPane2.add(nextNavButton2, JLayeredPane.PALETTE_LAYER);
+
+        layeredPane2.addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                int w = layeredPane2.getWidth(), h = layeredPane2.getHeight();
+                dropHintPanel2.setBounds(0, 0, w, h);
+                if (viewportPanel2.getParent() == layeredPane2)
+                    viewportPanel2.setBounds(0, 0, w, h);
+                repositionNavButtons2();
+            }
+        });
+
+        tileGallery2 = new TileGalleryPanel(buildGalleryCallbacks2());
+
+        JButton closeSecondBtn = UIComponentFactory.buildNavButton("✕");
+        closeSecondBtn.setToolTipText("Zweiten Canvas schließen");
+        closeSecondBtn.addActionListener(e -> closeSecondCanvas());
+        closeSecondBtn.setPreferredSize(new Dimension(36, 36));
+
+        JPanel rightHeaderPanel = new JPanel(new BorderLayout());
+        rightHeaderPanel.setBackground(AppColors.BG_DARK);
+        rightHeaderPanel.setPreferredSize(new Dimension(0, 36));
+        rightHeaderPanel.add(closeSecondBtn, BorderLayout.EAST);
+
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.setBackground(AppColors.BG_DARK);
+        rightPanel.add(rightHeaderPanel, BorderLayout.NORTH);
+        rightPanel.add(layeredPane2, BorderLayout.CENTER);
+        rightPanel.add(tileGallery2, BorderLayout.EAST);
+
+        return rightPanel;
+    }
+
+    private JPanel buildRightDropZone() {
+        JPanel zone = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int w = getWidth(), h = getHeight();
+                g2.setColor(new Color(0, 0, 0, 160));
+                g2.fillRoundRect(0, 0, w, h, 12, 12);
+                float[] dash = { 8f, 5f };
+                g2.setColor(AppColors.ACCENT);
+                g2.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, dash, 0));
+                g2.drawRoundRect(4, 4, w - 9, h - 9, 10, 10);
+                g2.setStroke(new BasicStroke(2));
+                // Arrow right symbol
+                int cx = w / 2, cy = h / 2;
+                g2.drawLine(cx - 12, cy, cx + 12, cy);
+                g2.drawLine(cx + 4, cy - 8, cx + 12, cy);
+                g2.drawLine(cx + 4, cy + 8, cx + 12, cy);
+                g2.setColor(AppColors.TEXT);
+                g2.setFont(new Font("SansSerif", Font.BOLD, 11));
+                String t = "2. Canvas";
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(t, cx - fm.stringWidth(t) / 2, cy + 28);
+            }
+        };
+        zone.setOpaque(false);
+        zone.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        setupDropTargetSecond(zone);
+        return zone;
+    }
+
+    private void repositionRightDropZone() {
+        if (rightDropZone == null || workingImage == null) return;
+        int imgRightInCanvas = (int)(canvasPanel.getX() + workingImage.getWidth() * zoom);
+        int vpX = imgRightInCanvas - scrollPane.getViewport().getViewPosition().x;
+        int x = vpX + 16;
+        int y = layeredPane.getHeight() / 2 - 60;
+        int w = 90, h = 120;
+        if (x + w < layeredPane.getWidth()) {
+            rightDropZone.setBounds(x, y, w, h);
+        } else {
+            rightDropZone.setVisible(false);
+        }
+    }
+
+    private void setupDropTargetSecond(java.awt.Component target) {
+        new java.awt.dnd.DropTarget(target, java.awt.dnd.DnDConstants.ACTION_COPY,
+            new java.awt.dnd.DropTargetAdapter() {
+                @Override public void drop(java.awt.dnd.DropTargetDropEvent ev) {
+                    try {
+                        ev.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY);
+                        @SuppressWarnings("unchecked")
+                        List<File> files = (List<File>) ev.getTransferable()
+                                .getTransferData(DataFlavor.javaFileListFlavor);
+                        if (!files.isEmpty()) {
+                            File f = files.get(0);
+                            if (isSupportedFile(f)) loadFileSecond(f);
+                            else showErrorDialog("Format nicht unterstützt",
+                                    "Erlaubt: PNG, JPG, BMP, GIF\nDatei: " + f.getName());
+                        }
+                        ev.dropComplete(true);
+                    } catch (Exception ex) {
+                        ev.dropComplete(false);
+                        showErrorDialog("Drop-Fehler", ex.getMessage());
+                    }
+                }
+            }, true);
+    }
+
+    private void closeSecondCanvas() {
+        secondCanvasActive = false;
+        rightArea.setVisible(false);
+        rightDropZone.setVisible(false);
+        if (centerSplitPane != null) {
+            centerSplitPane.setDividerLocation(1.0);
+            centerSplitPane.setDividerSize(0);  // Hide divider
+        }
+        if (secondCanvasBtn != null) {
+            secondCanvasBtn.setEnabled(false);
+            secondCanvasBtn.setSelected(false);
+        }
+        if (secondGalleryBtn != null) {
+            secondGalleryBtn.setEnabled(false);
+            secondGalleryBtn.setSelected(false);
+        }
+        centerCanvas();  // Auto-center the original canvas
+        galleryWrapper.revalidate();
+        galleryWrapper.repaint();
+    }
+
+    private void repositionRightDropZone2() {
+        // Similar to repositionRightDropZone but for second canvas
+        if (rightDropZone == null || workingImage2 == null) return;
+        // Position to right of second canvas image
+        int imgRightInCanvas = (int)(canvasPanel2.getX() + workingImage2.getWidth() * zoom);
+        int vpX = imgRightInCanvas - scrollPane2.getViewport().getViewPosition().x;
+        int x = vpX + 16;
+        int y = layeredPane2.getHeight() / 2 - 60;
+        // (Would be used for further extension)
     }
 
     // =========================================================================
@@ -927,6 +1174,155 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
         // Gallery does not auto-scroll on setActiveFile; scroll explicitly here
         // so the nav-button target tile becomes visible in the filmstrip.
         tileGallery.scrollToActive();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Second Canvas File Loading
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private void loadFileSecond(File file) {
+        // Activate split view if not already done
+        if (!secondCanvasActive) {
+            secondCanvasActive = true;
+            rightArea.setVisible(true);
+            if (centerSplitPane != null) {
+                centerSplitPane.setDividerSize(4);  // Show divider
+                centerSplitPane.setDividerLocation(0.5);
+            }
+            rightDropZone.setVisible(false);
+            if (secondCanvasBtn != null) {
+                secondCanvasBtn.setEnabled(true);
+                secondCanvasBtn.setSelected(true);
+            }
+            if (secondGalleryBtn != null) {
+                secondGalleryBtn.setEnabled(true);
+                secondGalleryBtn.setSelected(true);
+            }
+            galleryWrapper.revalidate();
+            galleryWrapper.repaint();
+        }
+
+        // Save second canvas current state
+        if (sourceFile2 != null) saveCurrentStateSecond();
+
+        // Load image (same cache logic as loadFile())
+        CanvasState cached = fileStateCache2.get(file);
+        if (cached != null) {
+            workingImage2 = cached.image;
+            undoStack2.clear();  undoStack2.addAll(cached.undoStack);
+            redoStack2.clear();  redoStack2.addAll(cached.redoStack);
+            activeElements2 = cached.elements;
+        } else {
+            try {
+                BufferedImage img = ImageIO.read(file);
+                if (img == null) { showErrorDialog("Ladefehler", "Bild konnte nicht geladen werden:\n" + file.getName()); return; }
+                workingImage2 = normalizeImage(img);
+                undoStack2.clear();
+                redoStack2.clear();
+                activeElements2 = new ArrayList<>();
+                CanvasState cs2 = new CanvasState(workingImage2);
+                fileStateCache2.put(file, cs2);
+            } catch (IOException e) {
+                showErrorDialog("Ladefehler", "Fehler:\n" + e.getMessage());
+                return;
+            }
+        }
+
+        sourceFile2 = file;
+
+        // Reset transient state
+        if (canvasPanel2 != null) canvasPanel2.resetInputState();
+
+        // Index directory for second gallery
+        indexDirectorySecond(file);
+        swapToImageView2();
+
+        SwingUtilities.invokeLater(this::fitToViewportSecond);
+        updateTitle();
+    }
+
+    private void saveCurrentStateSecond() {
+        if (sourceFile2 == null || workingImage2 == null) return;
+        CanvasState cs = fileStateCache2.computeIfAbsent(sourceFile2, k -> new CanvasState(workingImage2));
+        cs.image = workingImage2;
+        cs.undoStack.clear(); cs.undoStack.addAll(undoStack2);
+        cs.redoStack.clear(); cs.redoStack.addAll(redoStack2);
+        cs.elements.clear();  cs.elements.addAll(activeElements2);
+    }
+
+    private void indexDirectorySecond(File file) {
+        File dir = file.getParentFile();
+        if (dir == null) return;
+        boolean sameDir = dir.equals(lastIndexedDir2);
+        if (!sameDir) {
+            File[] files = dir.listFiles(f -> f.isFile() && isSupportedFile(f));
+            if (files == null) return;
+            Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+            directoryImages2 = new ArrayList<>(Arrays.asList(files));
+            lastIndexedDir2  = dir;
+            tileGallery2.setFiles(directoryImages2, file);
+        } else {
+            tileGallery2.setActiveFile(file);
+        }
+        currentImageIndex2 = directoryImages2.indexOf(file);
+    }
+
+    private void navigateImageSecond(int dir) {
+        if (directoryImages2.isEmpty()) return;
+        int ni = currentImageIndex2 + dir;
+        if (ni < 0 || ni >= directoryImages2.size()) return;
+        currentImageIndex2 = ni;
+        loadFileSecond(directoryImages2.get(currentImageIndex2));
+        tileGallery2.scrollToActive();
+    }
+
+    public void swapToImageView2() {
+        if (dropHintPanel2.getParent() == layeredPane2) layeredPane2.remove(dropHintPanel2);
+        if (viewportPanel2.getParent() == null) {
+            int w = Math.max(layeredPane2.getWidth(), 430);
+            int h = Math.max(layeredPane2.getHeight(), 560);
+            viewportPanel2.setBounds(0, 0, w, h);
+            layeredPane2.add(viewportPanel2, JLayeredPane.DEFAULT_LAYER);
+            setupDropTargetSecond(viewportPanel2);
+            setupDropTargetSecond(canvasPanel2);
+        }
+        viewportPanel2.setVisible(true);
+        repositionNavButtons2();
+        layeredPane2.revalidate();
+        layeredPane2.repaint();
+    }
+
+    private void repositionNavButtons2() {
+        if (prevNavButton2 == null) return;
+        int h = layeredPane2.getHeight(), bh = 80, bw = 36;
+        int y = Math.max(0, (h - bh) / 2);
+        prevNavButton2.setBounds(8, y, bw, bh);
+        nextNavButton2.setBounds(layeredPane2.getWidth() - bw - 8, y, bw, bh);
+    }
+
+    public void fitToViewportSecond() {
+        if (workingImage2 == null || scrollPane2 == null) return;
+        Dimension vd = scrollPane2.getViewport().getExtentSize();
+        if (vd.width <= 0 || vd.height <= 0) { SwingUtilities.invokeLater(this::fitToViewportSecond); return; }
+        // Fit zoom calculation (same as fitToViewport)
+        double zw = (double) vd.width / workingImage2.getWidth();
+        double zh = (double) vd.height / workingImage2.getHeight();
+        double newZoom = Math.min(zw, zh);
+        newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+        zoom = newZoom;
+        updateZoomLabel();
+        centerCanvasSecond();
+    }
+
+    public void centerCanvasSecond() {
+        if (canvasPanel2 == null || scrollPane2 == null || workingImage2 == null) return;
+        Dimension vd = scrollPane2.getViewport().getExtentSize();
+        int cw = (int)(workingImage2.getWidth() * zoom);
+        int ch = (int)(workingImage2.getHeight() * zoom);
+        int x = Math.max(0, (vd.width - cw) / 2);
+        int y = Math.max(0, (vd.height - ch) / 2);
+        canvasPanel2.setBounds(x, y, cw, ch);
+        canvasWrapper2.revalidate();
     }
 
     // =========================================================================
@@ -1820,8 +2216,136 @@ public class SelectiveAlphaEditor extends JFrame implements CanvasCallbacks, Rul
             public void onSelectionChanged(List<File> files) {
                 selectedImages = files;
             }
+            @Override public void onDragStarted(File file) {
+                if (!secondCanvasActive && workingImage != null) {
+                    repositionRightDropZone();
+                    rightDropZone.setVisible(true);
+                    layeredPane.repaint();
+                }
+            }
+            @Override public void onDragEnded() {
+                rightDropZone.setVisible(false);
+                layeredPane.repaint();
+            }
         };
     }
+
+    private TileGalleryPanel.Callbacks buildGalleryCallbacks2() {
+        return new TileGalleryPanel.Callbacks() {
+            @Override public void onTileOpened(File f) {
+                loadFileSecond(f);
+            }
+            @Override public void onSelectionChanged(List<File> files) {
+                // Optional: secondary selection
+            }
+        };
+    }
+
+    private CanvasCallbacks buildSecondCanvasCallbacks() {
+        return new CanvasCallbacks() {
+            // ── Image & state ──
+            @Override public BufferedImage getWorkingImage() { return workingImage2; }
+            @Override public AppMode getAppMode() { return appMode; }
+            @Override public boolean isFloodfillMode() { return floodfillMode; }
+            @Override public double getZoom() { return zoom; }
+            @Override public void setZoom(double nz, Point anchor) { zoom = nz; updateZoomLabel(); centerCanvasSecond(); }
+            @Override public JScrollPane getScrollPane() { return scrollPane2; }
+            @Override public Point screenToImage(Point screenPt) { return new Point(screenPt.x, screenPt.y); /* simplified */ }
+
+            // ── Selection ──
+            @Override public List<Rectangle> getSelectedAreas() { return new ArrayList<>(); }
+            @Override public boolean isSelecting() { return false; }
+            @Override public void setSelecting(boolean s) { }
+            @Override public Point getSelectionStart() { return null; }
+            @Override public void setSelectionStart(Point p) { }
+            @Override public Point getSelectionEnd() { return null; }
+            @Override public void setSelectionEnd(Point p) { }
+
+            // ── Layers ──
+            @Override public List<Layer> getActiveElements() { return activeElements2; }
+            @Override public Layer getSelectedElement() { return selectedElements2.isEmpty() ? null : selectedElements2.iterator().next(); }
+            @Override public void setSelectedElement(Layer el) { selectedElements2.clear(); if (el != null) selectedElements2.add(el); }
+            @Override public List<Layer> getSelectedElements() { return new ArrayList<>(selectedElements2); }
+            @Override public void setSelectedElements(List<Layer> els) { selectedElements2.clear(); selectedElements2.addAll(els); }
+            @Override public void toggleElementSelection(Layer el) { if (selectedElements2.contains(el)) selectedElements2.remove(el); else selectedElements2.add(el); }
+            @Override public void moveSelectedElements(int dx, int dy) { /* not implemented for secondary canvas */ }
+            @Override public int getNextElementId() { return (int)(System.nanoTime() % Integer.MAX_VALUE); }
+            @Override public void addElement(Layer el) { activeElements2.add(el); }
+
+            // ── Float ──
+            @Override public BufferedImage getFloatingImage() { return null; }
+            @Override public Rectangle getFloatRect() { return null; }
+            @Override public boolean isDraggingFloat() { return false; }
+            @Override public void setDraggingFloat(boolean d) { }
+            @Override public Point getFloatDragAnchor() { return null; }
+            @Override public void setFloatDragAnchor(Point p) { }
+            @Override public int getActiveHandle() { return -1; }
+            @Override public void setActiveHandle(int h) { }
+            @Override public Rectangle getScaleBaseRect() { return null; }
+            @Override public void setScaleBaseRect(Rectangle r) { }
+            @Override public Point getScaleDragStart() { return null; }
+            @Override public void setScaleDragStart(Point p) { }
+
+            // ── Paint ──
+            @Override public Point getLastPaintPoint() { return null; }
+            @Override public void setLastPaintPoint(Point p) { }
+            @Override public Point getShapeStartPoint() { return null; }
+            @Override public void setShapeStartPoint(Point p) { }
+            @Override public BufferedImage getPaintSnapshot() { return null; }
+            @Override public void setPaintSnapshot(BufferedImage img) { }
+
+            // ── Layer elem ──
+            @Override public int getElemActiveHandle() { return -1; }
+            @Override public void setElemActiveHandle(int h) { }
+            @Override public Rectangle getElemScaleBase() { return null; }
+            @Override public void setElemScaleBase(Rectangle r) { }
+            @Override public Point getElemScaleStart() { return null; }
+            @Override public void setElemScaleStart(Point p) { }
+            @Override public boolean isDraggingElement() { return false; }
+            @Override public void setDraggingElement(boolean d) { }
+            @Override public Point getElemDragAnchor() { return null; }
+            @Override public void setElemDragAnchor(Point p) { }
+
+            // ── Toolbar ──
+            @Override public PaintToolbar getPaintToolbar() { return paintToolbar; }
+
+            // ── Layer panel ──
+            @Override public boolean isShowAllLayerOutlines() { return false; }
+            @Override public void commitTextAsElement(BufferedImage img, int x, int y) { }
+            @Override public void commitTextLayer(int id, String text, String font, int size, boolean bold, boolean italic, Color c, int x, int y) { }
+
+            // ── Actions ──
+            @Override public void pushUndo() { if (workingImage2 != null) undoStack2.push(deepCopy(workingImage2)); }
+            @Override public void markDirty() { if (sourceFile2 != null) dirtyFiles.add(sourceFile2); hasUnsavedChanges = true; }
+            @Override public void performFloodfill(Point screenPt) { }
+            @Override public void paintDot(Point imagePt) { }
+            @Override public void commitFloat() { }
+            @Override public void repaintCanvas() { if (canvasPanel2 != null) canvasPanel2.repaint(); }
+            @Override public void onCanvasElementHover(int id) { }
+            @Override public void clearSelection() { }
+            @Override public void liftSelectionToFloat() { }
+            @Override public boolean isCanvasSubMode() { return false; }
+            @Override public void liftSelectionToElement(Rectangle sel) { }
+            @Override public void deleteSelection() { }
+            @Override public void updateSelectedElement(Layer el) { }
+
+            // ── Utilities ──
+            @Override public int hitHandle(Point screenPt) { return -1; }
+            @Override public Rectangle floatRectScreen() { return null; }
+            @Override public Rectangle elemRectScreen(Layer el) { return null; }
+            @Override public Rectangle[] handleRects(Rectangle r) { return new Rectangle[0]; }
+            @Override public Rectangle getActiveSelection() { return null; }
+            @Override public BufferedImage deepCopy(BufferedImage src) { return SelectiveAlphaEditor.this.deepCopy(src); }
+
+            // ── Colors ──
+            @Override public Color getCanvasBg1() { return canvasBg1; }
+            @Override public Color getCanvasBg2() { return canvasBg2; }
+        };
+    }
+
+    private void doUndoSecond() { if (!undoStack2.isEmpty()) { BufferedImage img = undoStack2.pop(); redoStack2.push(deepCopy(workingImage2)); workingImage2 = img; repaintCanvas2(); } }
+    private void doRedoSecond() { if (!redoStack2.isEmpty()) { BufferedImage img = redoStack2.pop(); undoStack2.push(deepCopy(workingImage2)); workingImage2 = img; repaintCanvas2(); } }
+    private void repaintCanvas2() { if (canvasPanel2 != null) canvasPanel2.repaint(); }
 
     // =========================================================================
     // Clipboard operations
