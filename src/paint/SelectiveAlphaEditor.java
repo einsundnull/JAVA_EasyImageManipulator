@@ -701,8 +701,17 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         // Canvas panel with callbacks
         c.canvasPanel = new CanvasPanel(buildCanvasCallbacks(idx));
 
-        // Canvas wrapper (null-layout for absolute positioning)
-        c.canvasWrapper = new JPanel(null);
+        // Canvas wrapper (null-layout for absolute positioning) with centering
+        c.canvasWrapper = new JPanel(null) {
+            @Override public void doLayout() {
+                if (c.canvasPanel == null) return;
+                Dimension cs = c.canvasPanel.getPreferredSize();
+                Dimension ws = getSize();
+                int x = Math.max(0, (ws.width  - cs.width)  / 2);
+                int y = Math.max(0, (ws.height - cs.height) / 2);
+                c.canvasPanel.setBounds(x, y, cs.width, cs.height);
+            }
+        };
         c.canvasWrapper.setBackground(AppColors.BG_DARK);
         c.canvasWrapper.add(c.canvasPanel);
 
@@ -728,6 +737,24 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         scrollSpacer.setBackground(AppColors.BG_DARK);
         scrollSpacer.setPreferredSize(new Dimension(0, 16));
         c.viewportPanel.add(scrollSpacer, BorderLayout.SOUTH);
+
+        // Listener to trigger fitToViewport when viewport size becomes known
+        c.viewportPanel.addComponentListener(new ComponentAdapter() {
+            @Override public void componentShown(ComponentEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    Dimension vd = c.scrollPane.getViewport().getSize();
+                    if (vd.width > 0 && vd.height > 0 && c.workingImage != null && !c.userHasManuallyZoomed) {
+                        fitToViewport(idx);
+                    }
+                });
+            }
+            @Override public void componentResized(ComponentEvent e) {
+                if (c.workingImage != null && !c.userHasManuallyZoomed && c.viewportPanel.isVisible()) {
+                    // Re-fit on resize for better responsiveness
+                    SwingUtilities.invokeLater(() -> fitToViewport(idx));
+                }
+            }
+        });
 
         // Layered pane for nav button overlay
         c.layeredPane = new JLayeredPane();
@@ -759,6 +786,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     c.viewportPanel.setBounds(0, 0, w, h);
                 repositionNavButtons(idx);
                 if (idx == 0) repositionRightDropZone();
+
+                // Re-fit when canvas size changes (e.g., split pane divider moved)
+                if (c.workingImage != null && !c.userHasManuallyZoomed && c.viewportPanel.isVisible()) {
+                    SwingUtilities.invokeLater(() -> fitToViewport(idx));
+                }
             }
         });
 
@@ -1071,6 +1103,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             setupDropTarget(c.canvasPanel, idx);
         }
         c.viewportPanel.setVisible(true);
+
+        // If loading into canvas 1, show the right area
+        if (idx == 1) {
+            rightArea.setVisible(true);
+            rightDropZone.setVisible(false);
+            centerSplitPane.setDividerSize(4);  // Show divider
+        }
+
         repositionNavButtons(idx);
         c.layeredPane.revalidate();
         c.layeredPane.repaint();
@@ -1084,8 +1124,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             SwingUtilities.invokeLater(() -> fitToViewport(idx));
             return;
         }
-        double nz = Math.min((double) vd.width  / c.workingImage.getWidth(),
-                             (double) vd.height / c.workingImage.getHeight() * 0.98);
+        // Reserve space for navigation buttons (36px wide on each side, 80px tall)
+        double effectiveWidth = vd.width - 80;   // Left + Right button margin
+        double effectiveHeight = vd.height - 80; // Button height margin
+
+        // Calculate zoom to fit entire image in viewport while maintaining aspect ratio
+        double zoomWidth = effectiveWidth / c.workingImage.getWidth();
+        double zoomHeight = effectiveHeight / c.workingImage.getHeight();
+        double nz = Math.min(zoomWidth, zoomHeight) * 0.98;  // 0.98 for small padding
         setZoomInstant(nz, idx);
         centerCanvas(idx);
     }
