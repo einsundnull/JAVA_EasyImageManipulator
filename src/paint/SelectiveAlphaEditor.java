@@ -1162,7 +1162,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             c.workingImage = cached.image;
             c.undoStack.clear(); c.undoStack.addAll(cached.undoStack);
             c.redoStack.clear(); c.redoStack.addAll(cached.redoStack);
-            c.activeElements = cached.elements;
+            c.activeElements = new ArrayList<>(cached.elements);
         } else {
             // Load fresh from disk
             try {
@@ -1198,7 +1198,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         try {
             if (projectManager.getProjectName() != null) {
                 List<Layer> savedLayers = projectManager.loadScene(file);
-                if (savedLayers != null) {
+                if (savedLayers != null && !savedLayers.isEmpty()) {
                     c.activeElements = savedLayers;
                     c.selectedElements.clear();
                 }
@@ -2861,7 +2861,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             // ── Utilities ──
             @Override public int hitHandle(Point screenPt) { return SelectiveAlphaEditor.this.hitHandle(screenPt); }
             @Override public Rectangle floatRectScreen() { return SelectiveAlphaEditor.this.floatRectScreen(); }
-            @Override public Rectangle elemRectScreen(Layer el) { return SelectiveAlphaEditor.this.elemRectScreen(el); }
+            @Override public Rectangle elemRectScreen(Layer el) { return SelectiveAlphaEditor.this.elemRectScreen(el, ci(idx).zoom); }
             @Override public Rectangle[] handleRects(Rectangle r) { return SelectiveAlphaEditor.this.handleRects(r); }
             @Override public Rectangle getActiveSelection() { return SelectiveAlphaEditor.this.getActiveSelection(); }
             @Override public BufferedImage deepCopy(BufferedImage src) { return SelectiveAlphaEditor.this.deepCopy(src); }
@@ -3769,9 +3769,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     // Element helpers
     // =========================================================================
 
-    /** Screen-space rectangle for a layer, accounting for current zoom. */
+    /** Screen-space rectangle for a layer, accounting for current zoom (uses active canvas zoom). */
     public Rectangle elemRectScreen(Layer el) {
-        double z = ci().zoom;
+        return elemRectScreen(el, ci().zoom);
+    }
+
+    /** Screen-space rectangle for a layer, with explicit zoom value. */
+    public Rectangle elemRectScreen(Layer el, double zoom) {
+        double z = zoom;
         if (el instanceof PathLayer pl && !pl.points().isEmpty()) {
             // PathLayer: compute padded visual bounding box from actual points
             // (matches the frameRect drawn in CanvasPanel.paintComponent)
