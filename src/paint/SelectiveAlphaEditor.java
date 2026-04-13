@@ -144,7 +144,6 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     // ── NEW: State Managers (Modularization) ───────────────────────────────────
     private ZoomState         zoomState              = new ZoomState();
     private FloatSelectionState floatSelectionState  = new FloatSelectionState();
-    private ElementLayerState elementLayerState      = new ElementLayerState();
     private FileStateCache    fileCacheManager       = new FileStateCache();
 
     // ── Element layers ────────────────────────────────────────────────────────
@@ -1052,7 +1051,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     /** Creates a copy of {@code src} with a new ID. Returns null for unsupported types. */
     private Layer copyLayerWithNewId(Layer src, int newId) {
         if (src instanceof ImageLayer il) {
-            return new ImageLayer(newId, deepCopy(il.image()), il.x(), il.y(), il.width(), il.height());
+            BufferedImage normalized = normalizeImage(il.image());
+            return new ImageLayer(newId, normalized, il.x(), il.y(), normalized.getWidth(), normalized.getHeight());
         } else if (src instanceof TextLayer tl) {
             return TextLayer.of(newId, tl.text(), tl.fontName(), tl.fontSize(),
                     tl.fontBold(), tl.fontItalic(), tl.fontColor(), tl.x(), tl.y());
@@ -1060,6 +1060,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             return PathLayer.of(newId, pl.points(), pl.image(), pl.isClosed(), pl.x(), pl.y());
         }
         return null;
+    }
+
+    /** Converts a visual drop index (0 = top) to a list insert index.
+     *  Since display is reversed (top = last element), insertIdx = listSize - visualIdx. */
+    private static int visualToInsertIndex(int visualIdx, int listSize) {
+        return Math.max(0, Math.min(listSize, listSize - visualIdx));
     }
 
     // =========================================================================
@@ -1147,6 +1153,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 c.undoStack.clear();
                 c.redoStack.clear();
                 c.activeElements = new ArrayList<>();
+                c.selectedElements.clear();
                 CanvasInstance.CanvasFileState cs = new CanvasInstance.CanvasFileState(c.workingImage);
                 c.fileCache.put(file, cs);
             } catch (IOException e) {
@@ -1173,6 +1180,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 List<Layer> savedLayers = projectManager.loadScene(file);
                 if (savedLayers != null) {
                     c.activeElements = savedLayers;
+                    c.selectedElements.clear();
                 }
 
                 double savedZoom = projectManager.loadSceneZoom(file);
@@ -1725,6 +1733,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
     /** Enter element-edit mode: load the element as a temp image into the target canvas. */
     private void activateElementEditMode(int targetIdx, Layer sourceLayer, int sourceIdx) {
+        // Guard: only allow one element edit at a time
+        if (elementEditSourceLayer != null) {
+            showErrorDialog("Bearbeitung aktiv",
+                "Schließe zuerst die aktuelle Bearbeitung ab.");
+            return;
+        }
         elementEditSourceLayer = sourceLayer;
         elementEditSourceIdx   = sourceIdx;
         elementEditTargetIdx   = targetIdx;
@@ -1785,8 +1799,16 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         for (int i = 0; i < els.size(); i++) {
             if (els.get(i).id() == elementEditSourceLayer.id()) {
                 ImageLayer old = (ImageLayer) els.get(i);
-                els.set(i, new ImageLayer(old.id(), img,
-                        old.x(), old.y(), img.getWidth(), img.getHeight()));
+                ImageLayer replacement = new ImageLayer(old.id(), img,
+                        old.x(), old.y(), img.getWidth(), img.getHeight());
+                els.set(i, replacement);
+                // Keep selectedElements in sync with activeElements
+                for (int j = 0; j < src.selectedElements.size(); j++) {
+                    if (src.selectedElements.get(j).id() == old.id()) {
+                        src.selectedElements.set(j, replacement);
+                        break;
+                    }
+                }
                 break;
             }
         }
@@ -2189,9 +2211,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 CanvasInstance c = c();
                 Layer copy = copyLayerWithNewId(layer, c.nextElementId++);
                 if (copy == null) return;
-                // Display is reversed: visual 0 = top = last in activeElements
-                int insertIdx = Math.max(0, Math.min(c.activeElements.size() - visualIdx,
-                                                     c.activeElements.size()));
+                int insertIdx = visualToInsertIndex(visualIdx, c.activeElements.size());
                 c.activeElements.add(insertIdx, copy);
                 c.selectedElements.clear();
                 c.selectedElements.add(copy);
@@ -2212,8 +2232,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     int cy = Math.max(0, (c.workingImage.getHeight() - img.getHeight()) / 2);
                     ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy,
                                                      img.getWidth(), img.getHeight());
-                    int insertIdx = Math.max(0, Math.min(c.activeElements.size() - visualIdx,
-                                                         c.activeElements.size()));
+                    int insertIdx = visualToInsertIndex(visualIdx, c.activeElements.size());
                     c.activeElements.add(insertIdx, layer);
                     c.selectedElements.clear();
                     c.selectedElements.add(layer);
