@@ -1742,6 +1742,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         if (c.sourceFile != null) dirtyFiles.add(c.sourceFile);
         updateTitle();
         updateDirtyUI();
+        refreshElementPanel();
         c.canvasPanel.repaint();
         if (showRuler && idx == 0) { hRuler.repaint(); vRuler.repaint(); }
     }
@@ -2006,44 +2007,54 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             }
 
             @Override public void openElementInOtherCanvas(Layer el) {
-                // Render the element to a BufferedImage
-                BufferedImage img = null;
-                if (el instanceof ImageLayer il) {
-                    img = il.image();
-                } else if (el instanceof TextLayer tl) {
-                    img = renderTextLayerToImage(tl);
-                }
-                if (img == null) return;
-
-                try {
-                    java.io.File tmp = java.io.File.createTempFile("element_" + el.id() + "_", ".png");
-                    tmp.deleteOnExit();
-                    ImageIO.write(img, "PNG", tmp);
-
-                    int targetIdx = 1 - idx;
-                    activeCanvasIndex = targetIdx;
-
-                    // Make sure the target canvas area is visible
-                    if (targetIdx == 1 && rightArea != null && !rightArea.isVisible()) {
-                        rightArea.setVisible(true);
-                        centerSplitPane.setDividerSize(4);
-                        if (savedDividerLocation > 0)
-                            centerSplitPane.setDividerLocation(savedDividerLocation);
-                        else
-                            centerSplitPane.setDividerLocation(0.5);
-                        secondCanvasBtn.setEnabled(true);
-                        secondCanvasBtn.setSelected(true);
-                        updateCanvasFocusBorder();
-                        if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
-                    }
-
-                    loadFile(tmp, targetIdx);
-                    activateElementEditMode(targetIdx, el, idx);
-                } catch (IOException ex) {
-                    showErrorDialog("Fehler", "Element konnte nicht geöffnet werden:\n" + ex.getMessage());
-                }
+                doOpenImageLayerInOtherCanvas(idx, el);
+            }
+            @Override public void openTextLayerForEditing(Layer el) {
+                // Focus the owning canvas and enter text-edit mode directly
+                if (!(el instanceof TextLayer)) return;
+                activeCanvasIndex = idx;
+                updateCanvasFocusBorder();
+                CanvasInstance ci = c();
+                if (ci.canvasPanel != null) ci.canvasPanel.enterTextEditMode(el);
             }
         };
+    }
+
+    /** Opens an ImageLayer (or any renderable layer) in the other canvas for full pixel editing. */
+    private void doOpenImageLayerInOtherCanvas(int sourceIdx, Layer el) {
+        BufferedImage img = null;
+        if (el instanceof ImageLayer il) {
+            img = il.image();
+        } else if (el instanceof TextLayer tl) {
+            img = renderTextLayerToImage(tl);
+        }
+        if (img == null) return;
+        try {
+            java.io.File tmp = java.io.File.createTempFile("element_" + el.id() + "_", ".png");
+            tmp.deleteOnExit();
+            ImageIO.write(img, "PNG", tmp);
+
+            int targetIdx = 1 - sourceIdx;
+            activeCanvasIndex = targetIdx;
+
+            if (targetIdx == 1 && rightArea != null && !rightArea.isVisible()) {
+                rightArea.setVisible(true);
+                centerSplitPane.setDividerSize(4);
+                if (savedDividerLocation > 0)
+                    centerSplitPane.setDividerLocation(savedDividerLocation);
+                else
+                    centerSplitPane.setDividerLocation(0.5);
+                secondCanvasBtn.setEnabled(true);
+                secondCanvasBtn.setSelected(true);
+                updateCanvasFocusBorder();
+                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
+            }
+
+            loadFile(tmp, targetIdx);
+            activateElementEditMode(targetIdx, el, sourceIdx);
+        } catch (IOException ex) {
+            showErrorDialog("Fehler", "Element konnte nicht geöffnet werden:\n" + ex.getMessage());
+        }
     }
 
     // =========================================================================
@@ -2521,8 +2532,35 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
             // ── Layer panel ──
             @Override public boolean isShowAllLayerOutlines() { return false; }
-            @Override public void commitTextAsElement(BufferedImage img, int x, int y) { }
-            @Override public void commitTextLayer(int id, String text, String font, int size, boolean bold, boolean italic, Color col, int x, int y) { }
+            @Override public void commitTextAsElement(BufferedImage img, int x, int y) {
+                if (img == null) return;
+                CanvasInstance ci = c();
+                Layer el = new ImageLayer(ci.nextElementId++, deepCopy(img), x, y, img.getWidth(), img.getHeight());
+                ci.activeElements.add(el);
+                ci.selectedElements.clear();
+                ci.selectedElements.add(el);
+                refreshElementPanel();
+                if (ci.canvasPanel != null) ci.canvasPanel.repaint();
+            }
+            @Override public void commitTextLayer(int id, String text, String font, int size,
+                                                  boolean bold, boolean italic, Color col, int x, int y) {
+                CanvasInstance ci = c();
+                TextLayer updated = (id >= 0)
+                        ? TextLayer.of(id, text, font, size, bold, italic, col, x, y)
+                        : TextLayer.of(ci.nextElementId++, text, font, size, bold, italic, col, x, y);
+                // Replace in activeElements if present; otherwise add (element removed during editing)
+                boolean found = false;
+                for (int i = 0; i < ci.activeElements.size(); i++) {
+                    if (ci.activeElements.get(i).id() == updated.id()) {
+                        ci.activeElements.set(i, updated); found = true; break;
+                    }
+                }
+                if (!found) ci.activeElements.add(updated);
+                ci.selectedElements.clear();
+                ci.selectedElements.add(updated);
+                refreshElementPanel();
+                if (ci.canvasPanel != null) ci.canvasPanel.repaint();
+            }
 
             // ── Actions ──
             @Override public void pushUndo() { if (c().workingImage != null) c().undoStack.push(deepCopy(c().workingImage)); }
@@ -2535,9 +2573,38 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             @Override public void clearSelection() { c().selectedAreas.clear(); c().isSelecting = false; }
             @Override public void liftSelectionToFloat() { }
             @Override public boolean isCanvasSubMode() { return canvasModeBtn.isSelected(); }
-            @Override public void liftSelectionToElement(Rectangle sel) { }
+            @Override public void liftSelectionToElement(Rectangle sel) {
+                CanvasInstance ci = c();
+                if (sel == null || ci.workingImage == null) return;
+                BufferedImage src = PaintEngine.cropRegion(ci.workingImage, sel);
+                if (src == null) return;
+                Layer el = new ImageLayer(ci.nextElementId++, src, sel.x, sel.y, src.getWidth(), src.getHeight());
+                ci.activeElements.add(el);
+                ci.selectedElements.clear();
+                ci.selectedElements.add(el);
+                ci.selectedAreas.clear();
+                ci.isSelecting = false;
+                refreshElementPanel();
+                if (ci.canvasPanel != null) ci.canvasPanel.repaint();
+            }
             @Override public void deleteSelection() { }
-            @Override public void updateSelectedElement(Layer el) { }
+            @Override public void updateSelectedElement(Layer el) {
+                if (el == null) return;
+                CanvasInstance ci = c();
+                for (int i = 0; i < ci.selectedElements.size(); i++) {
+                    if (ci.selectedElements.get(i).id() == el.id()) {
+                        ci.selectedElements.set(i, el); break;
+                    }
+                }
+                for (int i = 0; i < ci.activeElements.size(); i++) {
+                    if (ci.activeElements.get(i).id() == el.id()) {
+                        ci.activeElements.set(i, el); break;
+                    }
+                }
+            }
+            @Override public void openImageLayerForEditing(Layer el) {
+                doOpenImageLayerInOtherCanvas(idx, el);
+            }
 
             // ── Utilities ──
             @Override public int hitHandle(Point screenPt) { return SelectiveAlphaEditor.this.hitHandle(screenPt); }

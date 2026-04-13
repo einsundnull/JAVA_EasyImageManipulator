@@ -255,10 +255,15 @@ public class CanvasPanel extends JPanel {
 						return;
 					}
 
-					// CHECK DOUBLE-CLICK ON TEXTLAYER FIRST (before any other element handling)
+					// Double-click dispatch by layer type
 					Layer hit = hitElement(e.getPoint());
-					if (hit instanceof TextLayer && e.getClickCount() == 2) {
-						enterTextEditMode(hit);
+					if (e.getClickCount() == 2 && hit != null) {
+						if (hit instanceof TextLayer) {
+							enterTextEditMode(hit);
+						} else if (hit instanceof ImageLayer) {
+							callbacks.openImageLayerForEditing(hit);
+						}
+						// PathLayer: ignore double-click here (handled via path editor dialog in panel)
 						return;
 					}
 
@@ -304,6 +309,23 @@ public class CanvasPanel extends JPanel {
 						// Return here so we don't fall through to the TEXT case in the tool switch below.
 						if (callbacks.getAppMode() == AppMode.PAINT
 								&& callbacks.getPaintToolbar().getActiveTool() == PaintEngine.Tool.TEXT) {
+							return;
+						}
+					}
+				}
+
+				// DOUBLE-CLICK on an active selection → instantly lift selection to element
+				if (e.getClickCount() >= 2 && callbacks.getFloatingImage() == null) {
+					Rectangle dblSel = callbacks.getActiveSelection();
+					if (dblSel != null && dblSel.width > 0 && dblSel.height > 0) {
+						double z = callbacks.getZoom();
+						Rectangle dblScr = new Rectangle(
+								(int) Math.round(dblSel.x * z),
+								(int) Math.round(dblSel.y * z),
+								(int) Math.round(dblSel.width  * z),
+								(int) Math.round(dblSel.height * z));
+						if (dblScr.contains(e.getPoint())) {
+							callbacks.liftSelectionToElement(dblSel);
 							return;
 						}
 					}
@@ -751,8 +773,10 @@ public class CanvasPanel extends JPanel {
 					return;
 				}
 
+				boolean wasScaling = callbacks.getElemActiveHandle() >= 0;
 				callbacks.setDraggingElement(false);
 				callbacks.setElemActiveHandle(-1);
+				if (wasScaling) { callbacks.markDirty(); repaint(); return; }
 
 				if (callbacks.isDraggingFloat()) {
 					callbacks.setDraggingFloat(false);
@@ -1353,7 +1377,7 @@ public class CanvasPanel extends JPanel {
 	 *  – populates textBuffer + textOrigin + font settings
 	 *  – records the original element so cancel can restore it
 	 */
-	private void enterTextEditMode(Layer el) {
+	public void enterTextEditMode(Layer el) {
 		commitText(); // flush any in-progress text first
 		// Load font settings from element (el must be a TextLayer here)
 		TextLayer tl = (TextLayer) el;

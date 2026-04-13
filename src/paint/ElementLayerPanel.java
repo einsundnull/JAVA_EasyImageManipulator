@@ -55,8 +55,10 @@ public class ElementLayerPanel extends JPanel {
         void onCloseRequested();
         /** Called when the mouse enters/leaves a layer tile. id=-1 = no tile. */
         void onLayerPanelElementHover(int elementId);
-        /** Double-click on an ImageLayer/TextLayer tile: open it in the other canvas for editing. */
+        /** Double-click on an ImageLayer tile: open it in the other canvas for pixel editing. */
         void openElementInOtherCanvas(Layer el);
+        /** Double-click on a TextLayer tile: enter text-edit mode on the owning canvas. */
+        void openTextLayerForEditing(Layer el);
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
@@ -311,9 +313,12 @@ public class ElementLayerPanel extends JPanel {
                     if (e.getClickCount() == 2 && layer instanceof PathLayer pl) {
                         // Double-click on PathLayer: open path editor dialog
                         openPathEditorDialog(pl);
-                    } else if (e.getClickCount() == 2 && (layer instanceof ImageLayer || layer instanceof TextLayer)) {
-                        // Double-click on image/text layer: open in other canvas for editing
+                    } else if (e.getClickCount() == 2 && layer instanceof ImageLayer) {
+                        // Double-click on ImageLayer: open in other canvas for pixel editing
                         cb.openElementInOtherCanvas(layer);
+                    } else if (e.getClickCount() == 2 && layer instanceof TextLayer) {
+                        // Double-click on TextLayer: enter text-edit mode on the owning canvas
+                        cb.openTextLayerForEditing(layer);
                     } else if (e.isShiftDown()) {
                         cb.toggleElementSelection(layer);
                     } else {

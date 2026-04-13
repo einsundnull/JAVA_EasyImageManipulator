@@ -113,6 +113,8 @@ public interface CanvasCallbacks {
     /** Delete selected area pixels (or discard float if one is active). */
     void deleteSelection();
     void updateSelectedElement(Layer el);
+    /** Double-click on an ImageLayer on the canvas: open it in the other canvas for pixel editing. */
+    void openImageLayerForEditing(Layer el);
 
     // Utilities
     int hitHandle(Point screenPt);
