@@ -188,7 +188,7 @@ public class ElementLayerPanel extends JPanel {
         };
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));
         tilesContainer.setBackground(new Color(36, 36, 36));
-        tilesContainer.setBorder(BorderFactory.createEmptyBorder(6, 9, 6, 9));
+        tilesContainer.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
 
         // ── Drop target: accept Layer and image-file-as-element drags ─────────
         new DropTarget(tilesContainer, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
@@ -286,7 +286,7 @@ public class ElementLayerPanel extends JPanel {
             Layer layer = layers.get(i);
             boolean sel = selectedEls.stream().anyMatch(s -> s.id() == layer.id());
             tilesContainer.add(new LayerTile(layer, sel));
-            tilesContainer.add(Box.createVerticalStrut(4));
+            tilesContainer.add(Box.createVerticalStrut(5));
         }
 
         // "Keine Ebenen" placeholder
