@@ -3,9 +3,6 @@ package book;
 import java.io.File;
 import java.io.IOException;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-
 public class JsonStorage {
     private final ObjectMapper mapper;
     private final File directory;
