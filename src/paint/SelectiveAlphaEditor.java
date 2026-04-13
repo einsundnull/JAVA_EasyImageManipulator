@@ -63,6 +63,8 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
+import java.awt.KeyboardFocusManager;
+
 import book.PaperFormat;
 
 /**
@@ -145,6 +147,18 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private ZoomState         zoomState              = new ZoomState();
     private FloatSelectionState floatSelectionState  = new FloatSelectionState();
     private FileStateCache    fileCacheManager       = new FileStateCache();
+
+    // ── Secondary Canvas Window (F1/F2/F3/F4/F5) ──────────────────────────────
+    private enum PreviewMode { SNAPSHOT, LIVE_ALL, LIVE_ALL_EDIT }
+    private enum AlwaysOnTopMode { TO_FRONT, NORMAL, TO_BACKGROUND }
+    private JFrame        secWin;
+    private SecondaryPanel secPanel;
+    private PreviewMode   secMode    = PreviewMode.SNAPSHOT;
+    private BufferedImage secSnapshot;
+    private javax.swing.Timer secTimer;
+    private boolean       secFullscreen = false;
+    private AlwaysOnTopMode secAlwaysOnTop = AlwaysOnTopMode.NORMAL;
+    private int           secOldX, secOldY, secOldW, secOldH;  // For fullscreen restoration
 
     // ── Element layers ────────────────────────────────────────────────────────
     // All per-canvas element state now in CanvasInstance
@@ -325,6 +339,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             }
         });
 
+        initSecondaryWindow();
         setVisible(true);
     }
 
@@ -380,6 +395,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             settings.save();
         } catch (IOException e) {
             System.err.println("[ERROR] Fehler beim Speichern der Einstellungen: " + e.getMessage());
+        }
+
+        // Stop secondary window timer
+        if (secTimer != null && secTimer.isRunning()) {
+            secTimer.stop();
+        }
+        if (secWin != null) {
+            secWin.dispose();
         }
 
         // Normal beenden
@@ -3226,6 +3249,356 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     }
 
     // =========================================================================
+    // Secondary Canvas Window – SecondaryPanel inner class
+    // =========================================================================
+    private class SecondaryPanel extends JPanel {
+        private static final int HANDLE_SIZE = 8;
+        private int dragStartX, dragStartY;
+        private int dragStartWinX, dragStartWinY, dragStartWinW, dragStartWinH;
+        private String resizeEdge = null;  // "tl", "t", "tr", "l", "r", "bl", "b", "br", or null for drag
+
+        SecondaryPanel() {
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    dragStartX = e.getXOnScreen();
+                    dragStartY = e.getYOnScreen();
+                    dragStartWinX = secWin.getX();
+                    dragStartWinY = secWin.getY();
+                    dragStartWinW = secWin.getWidth();
+                    dragStartWinH = secWin.getHeight();
+                    resizeEdge = getResizeEdgeAt(e.getX(), e.getY());
+                }
+            });
+            addMouseMotionListener(new MouseAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    String edge = getResizeEdgeAt(e.getX(), e.getY());
+                    updateCursor(edge);
+                }
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    if (secWin == null || secFullscreen) return;
+                    int dx = e.getXOnScreen() - dragStartX;
+                    int dy = e.getYOnScreen() - dragStartY;
+
+                    if (resizeEdge == null) {
+                        // Window drag
+                        secWin.setLocation(dragStartWinX + dx, dragStartWinY + dy);
+                    } else {
+                        // Window resize
+                        int newX = dragStartWinX, newY = dragStartWinY;
+                        int newW = dragStartWinW, newH = dragStartWinH;
+
+                        if (resizeEdge.contains("l")) newX += dx;
+                        if (resizeEdge.contains("r")) newW += dx;
+                        if (resizeEdge.contains("t")) newY += dy;
+                        if (resizeEdge.contains("b")) newH += dy;
+
+                        newW = Math.max(200, newW);
+                        newH = Math.max(150, newH);
+
+                        secWin.setBounds(newX, newY, newW, newH);
+                    }
+                }
+            });
+        }
+
+        private String getResizeEdgeAt(int x, int y) {
+            int w = getWidth(), h = getHeight();
+            boolean nearLeft   = x < HANDLE_SIZE;
+            boolean nearRight  = x >= w - HANDLE_SIZE;
+            boolean nearTop    = y < HANDLE_SIZE;
+            boolean nearBottom = y >= h - HANDLE_SIZE;
+
+            if (nearTop && nearLeft)   return "tl";
+            if (nearTop && nearRight)  return "tr";
+            if (nearBottom && nearLeft)  return "bl";
+            if (nearBottom && nearRight) return "br";
+            if (nearTop)    return "t";
+            if (nearBottom) return "b";
+            if (nearLeft)   return "l";
+            if (nearRight)  return "r";
+            return null;
+        }
+
+        private void updateCursor(String edge) {
+            if (edge == null) {
+                setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+            } else {
+                int cursorType = switch (edge) {
+                    case "tl", "br" -> Cursor.NW_RESIZE_CURSOR;
+                    case "tr", "bl" -> Cursor.NE_RESIZE_CURSOR;
+                    case "t", "b"   -> Cursor.N_RESIZE_CURSOR;
+                    case "l", "r"   -> Cursor.W_RESIZE_CURSOR;
+                    default -> Cursor.DEFAULT_CURSOR;
+                };
+                setCursor(Cursor.getPredefinedCursor(cursorType));
+            }
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+
+            // Determine source canvas
+            BufferedImage src;
+            List<Layer> elements;
+            if (secMode == PreviewMode.SNAPSHOT) {
+                if (secSnapshot == null) return;
+                src      = secSnapshot;
+                elements = List.of();
+            } else {
+                int srcIdx   = activeCanvasIndex;  // Show ACTIVE canvas
+                CanvasInstance ci = canvases[srcIdx];
+                if (ci.workingImage == null) return;
+                src      = ci.workingImage;
+                elements = ci.activeElements;
+            }
+
+            // Scale-to-fit (maintain aspect ratio)
+            int pw = getWidth(), ph = getHeight();
+            int iw = src.getWidth(), ih = src.getHeight();
+            double scale = Math.min((double) pw / iw, (double) ph / ih);
+            int dw = (int)(iw * scale), dh = (int)(ih * scale);
+            int ox = (pw - dw) / 2, oy = (ph - dh) / 2;
+
+            // Checkerboard background
+            int cell = 16;
+            for (int cy = 0; cy < ph; cy += cell) {
+                for (int cx = 0; cx < pw; cx += cell) {
+                    g2.setColor(((cx/cell + cy/cell) % 2 == 0)
+                        ? new Color(180, 180, 180) : new Color(220, 220, 220));
+                    g2.fillRect(cx, cy, cell, cell);
+                }
+            }
+
+            // Draw main image
+            g2.drawImage(src, ox, oy, dw, dh, null);
+
+            // Draw elements (LIVE_ALL + LIVE_ALL_EDIT)
+            if (secMode != PreviewMode.SNAPSHOT) {
+                for (Layer el : elements) {
+                    if (el instanceof ImageLayer il) {
+                        int ex = ox + (int)Math.round(il.x() * scale);
+                        int ey = oy + (int)Math.round(il.y() * scale);
+                        int ew = (int)Math.round(il.width()  * scale);
+                        int eh = (int)Math.round(il.height() * scale);
+                        g2.drawImage(il.image(), ex, ey, ew, eh, null);
+                    }
+                    // PathLayer only in LIVE_ALL_EDIT
+                    if (secMode == PreviewMode.LIVE_ALL_EDIT && el instanceof PathLayer pl) {
+                        renderPathLayerPreview(g2, pl, ox, oy, scale);
+                    }
+                }
+                // Element borders only in LIVE_ALL_EDIT
+                if (secMode == PreviewMode.LIVE_ALL_EDIT) {
+                    g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
+                        BasicStroke.JOIN_MITER, 10, new float[]{4, 3}, 0));
+                    g2.setColor(new Color(0, 180, 255));
+                    for (Layer el : elements) {
+                        int ex = ox + (int)Math.round(el.x() * scale);
+                        int ey = oy + (int)Math.round(el.y() * scale);
+                        int ew = (int)Math.round(el.width()  * scale);
+                        int eh = (int)Math.round(el.height() * scale);
+                        g2.drawRect(ex, ey, ew, eh);
+                    }
+                }
+            }
+        }
+    }
+
+    private void renderPathLayerPreview(Graphics2D g2, PathLayer pl, int ox, int oy, double scale) {
+        List<Point3D> pts = pl.points();
+        if (pts.isEmpty()) return;
+        g2.setColor(new Color(0, 200, 255));
+        g2.setStroke(new BasicStroke(1.5f));
+        for (int i = 1; i < pts.size(); i++) {
+            int x1 = ox + (int)Math.round(pts.get(i-1).x * scale);
+            int y1 = oy + (int)Math.round(pts.get(i-1).y * scale);
+            int x2 = ox + (int)Math.round(pts.get(i).x   * scale);
+            int y2 = oy + (int)Math.round(pts.get(i).y   * scale);
+            g2.drawLine(x1, y1, x2, y2);
+        }
+        g2.setColor(Color.WHITE);
+        for (Point3D p : pts) {
+            int px = ox + (int)Math.round(p.x * scale) - 3;
+            int py = oy + (int)Math.round(p.y * scale) - 3;
+            g2.fillOval(px, py, 6, 6);
+        }
+    }
+
+    // =========================================================================
+    // Secondary Canvas Window – Control Methods
+    // =========================================================================
+    private void initSecondaryWindow() {
+        secPanel = new SecondaryPanel();
+        secPanel.setBackground(Color.BLACK);
+        secWin = new JFrame();
+        secWin.setUndecorated(true);
+        secWin.setSize(640, 480);
+        secWin.setLocationRelativeTo(this);
+        secWin.getContentPane().add(secPanel);
+        secWin.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+        secTimer = new javax.swing.Timer(33, e -> secPanel.repaint());
+    }
+
+    private void toggleSecondaryWindow() {
+        if (secWin == null) initSecondaryWindow();
+        if (secWin.isVisible()) {
+            secTimer.stop();
+            secWin.setVisible(false);
+        } else {
+            if (secMode != PreviewMode.SNAPSHOT) secTimer.start();
+            secWin.setVisible(true);
+            secPanel.repaint();
+        }
+    }
+
+    private void cyclePreviewMode() {
+        if (secWin == null) initSecondaryWindow();
+        secMode = switch (secMode) {
+            case SNAPSHOT     -> PreviewMode.LIVE_ALL;
+            case LIVE_ALL     -> PreviewMode.LIVE_ALL_EDIT;
+            case LIVE_ALL_EDIT -> PreviewMode.SNAPSHOT;
+        };
+        if (secWin.isVisible()) {
+            if (secMode == PreviewMode.SNAPSHOT) secTimer.stop();
+            else                                 secTimer.start();
+            secPanel.repaint();
+        }
+        ToastNotification.show(SelectiveAlphaEditor.this, "Preview: " + secMode.name());
+    }
+
+    private void refreshSnapshot() {
+        if (secWin == null) initSecondaryWindow();
+        // Composite: workingImage + all elements flattened
+        BufferedImage src = ci().workingImage;
+        if (src == null) return;
+        secSnapshot = new BufferedImage(src.getWidth(), src.getHeight(),
+                                        BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = secSnapshot.createGraphics();
+        g2.drawImage(src, 0, 0, null);
+        for (Layer el : ci().activeElements) {
+            if (el instanceof ImageLayer il)
+                g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+        }
+        g2.dispose();
+        if (secWin != null && secWin.isVisible()) secPanel.repaint();
+        ToastNotification.show(SelectiveAlphaEditor.this, "Snapshot updated");
+    }
+
+    private void toggleSecondaryFullscreen() {
+        if (secWin == null) initSecondaryWindow();
+        if (!secWin.isVisible()) {
+            secWin.setVisible(true);
+        }
+
+        if (secFullscreen) {
+            // Exit fullscreen
+            secWin.setExtendedState(JFrame.NORMAL);
+            secWin.setBounds(secOldX, secOldY, secOldW, secOldH);
+            secFullscreen = false;
+            ToastNotification.show(SelectiveAlphaEditor.this, "Fullscreen: OFF");
+        } else {
+            // Enter fullscreen
+            secOldX = secWin.getX();
+            secOldY = secWin.getY();
+            secOldW = secWin.getWidth();
+            secOldH = secWin.getHeight();
+            secWin.setExtendedState(JFrame.MAXIMIZED_BOTH);
+            secFullscreen = true;
+            ToastNotification.show(SelectiveAlphaEditor.this, "Fullscreen: ON");
+        }
+    }
+
+    private void cycleAlwaysOnTop() {
+        if (secWin == null) initSecondaryWindow();
+        if (!secWin.isVisible()) {
+            secWin.setVisible(true);
+        }
+
+        secAlwaysOnTop = switch (secAlwaysOnTop) {
+            case TO_FRONT -> AlwaysOnTopMode.NORMAL;
+            case NORMAL -> AlwaysOnTopMode.TO_BACKGROUND;
+            case TO_BACKGROUND -> AlwaysOnTopMode.TO_FRONT;
+        };
+
+        switch (secAlwaysOnTop) {
+            case TO_FRONT:
+                secWin.setAlwaysOnTop(true);
+                ToastNotification.show(SelectiveAlphaEditor.this, "Window: Always on Top");
+                break;
+            case NORMAL:
+                secWin.setAlwaysOnTop(false);
+                ToastNotification.show(SelectiveAlphaEditor.this, "Window: Normal");
+                break;
+            case TO_BACKGROUND:
+                secWin.setAlwaysOnTop(false);
+                // Send to back by requesting focus for main window
+                SelectiveAlphaEditor.this.toFront();
+                SelectiveAlphaEditor.this.requestFocus();
+                ToastNotification.show(SelectiveAlphaEditor.this, "Window: Behind Main");
+                break;
+        }
+    }
+
+    private void applySecondaryWindowToCanvas() {
+        if (secWin == null || !secWin.isVisible()) {
+            ToastNotification.show(SelectiveAlphaEditor.this, "Secondary window not open");
+            return;
+        }
+
+        // Get the image to apply (from the currently shown canvas)
+        BufferedImage imageToApply = null;
+
+        if (secMode == PreviewMode.SNAPSHOT) {
+            if (secSnapshot == null) {
+                ToastNotification.show(SelectiveAlphaEditor.this, "No snapshot available");
+                return;
+            }
+            imageToApply = deepCopy(secSnapshot);
+        } else {
+            // LIVE_ALL or LIVE_ALL_EDIT: get the ACTIVE canvas's working image
+            CanvasInstance srcCi = ci();  // Active canvas
+            if (srcCi.workingImage == null) {
+                ToastNotification.show(SelectiveAlphaEditor.this, "Active canvas has no image");
+                return;
+            }
+            imageToApply = deepCopy(srcCi.workingImage);
+        }
+
+        // Apply to Canvas II (index 1)
+        CanvasInstance targetCi = ci(1);
+        targetCi.workingImage = normalizeImage(imageToApply);
+        targetCi.undoStack.clear();
+        targetCi.redoStack.clear();
+        targetCi.activeElements = new ArrayList<>();
+        targetCi.selectedElements.clear();
+        targetCi.zoom = 1.0;
+        targetCi.userHasManuallyZoomed = false;
+
+        // Update Canvas II display
+        if (targetCi.canvasPanel != null) {
+            targetCi.canvasPanel.repaint();
+        }
+        if (elementLayerPanel2 != null) {
+            refreshElementPanel();
+        }
+
+        // Switch to Canvas II to see the result
+        activeCanvasIndex = 1;
+        secondCanvasBtn.setSelected(true);
+        secondCanvasBtn.setEnabled(true);
+        updateLayoutVisibility();
+        centerCanvas(1);
+
+        ToastNotification.show(SelectiveAlphaEditor.this, "Image applied to Canvas II");
+    }
+
+    // =========================================================================
     // Keyboard shortcuts
     // =========================================================================
     private void setupKeyBindings() {
@@ -3308,6 +3681,20 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         am.put("mergeElement", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             if (!ci().selectedElements.isEmpty()) mergeSelectedElements();
         }});
+
+        // Global F1/F2/F3/F4/F5/F6 key dispatcher for secondary window control
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
+            if (e.getID() != KeyEvent.KEY_PRESSED) return false;
+            switch (e.getKeyCode()) {
+                case KeyEvent.VK_F1 -> { toggleSecondaryWindow();      return true; }
+                case KeyEvent.VK_F2 -> { cyclePreviewMode();           return true; }
+                case KeyEvent.VK_F3 -> { refreshSnapshot();            return true; }
+                case KeyEvent.VK_F4 -> { toggleSecondaryFullscreen();  return true; }
+                case KeyEvent.VK_F5 -> { cycleAlwaysOnTop();           return true; }
+                case KeyEvent.VK_F6 -> { applySecondaryWindowToCanvas(); return true; }
+            }
+            return false;
+        });
     }
 
     // =========================================================================
