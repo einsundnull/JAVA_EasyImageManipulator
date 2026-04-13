@@ -7,5 +7,7 @@ package paint;
  */
 public enum AppMode {
     ALPHA_EDITOR,
-    PAINT
+    PAINT,
+    BOOK,
+    SCENE
 }

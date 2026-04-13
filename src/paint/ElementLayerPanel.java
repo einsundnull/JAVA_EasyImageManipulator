@@ -62,10 +62,12 @@ public class ElementLayerPanel extends JPanel {
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
-    public  static final int PANEL_W = 160;
-    private static final int TILE_W  = 140;
-    private static final int TILE_H  = 106;
-    private static final int THUMB_H =  74;
+    private static  int TILE_W  = 140;
+    private static  int PADDING = 18;  // 9px left + 9px right
+    private static  int SCROLLBAR = 16;
+    public  static  int PANEL_W = TILE_W + PADDING + SCROLLBAR;  // 174
+    private static  int TILE_H  = 106;
+    private static  int THUMB_H =  74;
 
     private final Callbacks      cb;
     private final JPanel         tilesContainer;
@@ -140,7 +142,16 @@ public class ElementLayerPanel extends JPanel {
         add(header, BorderLayout.NORTH);
 
         // ── Tiles container ───────────────────────────────────────────────────
-        tilesContainer = new JPanel();
+        // Override getPreferredSize so JViewport sizes this panel to the viewport width,
+        // which causes BoxLayout Y_AXIS to resize tiles accordingly.
+        tilesContainer = new JPanel() {
+            @Override public java.awt.Dimension getPreferredSize() {
+                java.awt.Dimension d = super.getPreferredSize();
+                if (getParent() != null && getParent().getWidth() > 0)
+                    d.width = getParent().getWidth();
+                return d;
+            }
+        };
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));
         tilesContainer.setBackground(new Color(36, 36, 36));
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(6, 9, 6, 9));
@@ -206,19 +217,19 @@ public class ElementLayerPanel extends JPanel {
 
         private final Layer   layer;
         private final boolean selected;
+        private JLabel toImage, burn, del, lbl;
 
         LayerTile(Layer layer, boolean selected) {
             this.layer    = layer;
             this.selected = selected;
             setLayout(null);
             setPreferredSize(new Dimension(TILE_W, TILE_H));
-            setMaximumSize (new Dimension(TILE_W, TILE_H));
-            setMinimumSize (new Dimension(TILE_W, TILE_H));
+            // Don't set MaximumSize/MinimumSize — let tiles scale with panel width
             setOpaque(false);
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
             // ── Blue "zu image" (📥) button – export as image file ───────────────
-            JLabel toImage = new JLabel("↓", JLabel.CENTER);
+            toImage = new JLabel("↓", JLabel.CENTER);
             toImage.setForeground(new Color(60, 140, 220));
             toImage.setFont(new Font("SansSerif", Font.BOLD, 11));
             toImage.setBounds(TILE_W - 55, 4, 16, 16);
@@ -246,7 +257,7 @@ public class ElementLayerPanel extends JPanel {
             add(toImage);
 
             // ── Orange burn (⊕) button – second from top-right ───────────────
-            JLabel burn = new JLabel("⊕", JLabel.CENTER);
+            burn = new JLabel("⊕", JLabel.CENTER);
             burn.setForeground(new Color(220, 140, 30));
             burn.setFont(new Font("SansSerif", Font.BOLD, 11));
             burn.setBounds(TILE_W - 37, 4, 16, 16);
@@ -274,7 +285,7 @@ public class ElementLayerPanel extends JPanel {
             add(burn);
 
             // ── Red (×) delete button – top-right corner ──────────────────────
-            JLabel del = new JLabel("✕", JLabel.CENTER);
+            del = new JLabel("✕", JLabel.CENTER);
             del.setForeground(new Color(220, 60, 60));
             del.setFont(new Font("SansSerif", Font.BOLD, 10));
             del.setBounds(TILE_W - 19, 4, 16, 16);
@@ -301,11 +312,14 @@ public class ElementLayerPanel extends JPanel {
             add(del);
 
             // ── Layer label at bottom ──────────────────────────────────────────
-            JLabel lbl = new JLabel(layer.displayName(), JLabel.CENTER);
+            lbl = new JLabel(layer.displayName(), JLabel.CENTER);
             lbl.setForeground(AppColors.TEXT_MUTED);
             lbl.setFont(new Font("SansSerif", Font.PLAIN, 10));
             lbl.setBounds(0, TILE_H - 18, TILE_W, 16);
             add(lbl);
+
+            // Initial layout at TILE_W so children have valid bounds immediately
+            doLayout();
 
             // Tile click: select layer on canvas
             addMouseListener(new MouseAdapter() {
@@ -340,19 +354,29 @@ public class ElementLayerPanel extends JPanel {
         }
 
         @Override
+        public void doLayout() {
+            int w = getWidth() > 0 ? getWidth() : TILE_W;
+            toImage.setBounds(w - 55, 4, 16, 16);
+            burn   .setBounds(w - 37, 4, 16, 16);
+            del    .setBounds(w - 19, 4, 16, 16);
+            lbl    .setBounds(0, TILE_H - 18, w, 16);
+        }
+
+        @Override
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            int w = getWidth();
 
             // Hover = mouse over THIS tile OR canvas hover matches this layer
             boolean hovered = hoveredElementId == layer.id();
 
             // Tile background – slightly lighter on hover
             g2.setColor(hovered ? new Color(58, 54, 44) : new Color(44, 44, 44));
-            g2.fillRoundRect(0, 0, TILE_W, TILE_H, 6, 6);
+            g2.fillRoundRect(0, 0, w, TILE_H, 6, 6);
 
             // Checkerboard for transparency indication
-            int tx = 5, ty = 4, tw = TILE_W - 10, th = THUMB_H;
+            int tx = 5, ty = 4, tw = w - 10, th = THUMB_H;
             paintCheckerboard(g2, tx, ty, tw, th);
 
             // Layer thumbnail (aspect-fit)
@@ -459,16 +483,16 @@ public class ElementLayerPanel extends JPanel {
             if (selected) {
                 g2.setColor(AppColors.ACCENT);
                 g2.setStroke(new BasicStroke(2f));
-                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 6, 6);
+                g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 6, 6);
             } else if (hovered) {
                 // Warm amber hover border — mirrors the canvas hover outline colour
                 g2.setColor(new Color(255, 200, 80));
                 g2.setStroke(new BasicStroke(1.5f));
-                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 6, 6);
+                g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 6, 6);
             } else {
                 g2.setColor(new Color(62, 62, 62));
                 g2.setStroke(new BasicStroke(1f));
-                g2.drawRoundRect(0, 0, TILE_W - 1, TILE_H - 1, 6, 6);
+                g2.drawRoundRect(0, 0, w - 1, TILE_H - 1, 6, 6);
             }
 
             g2.dispose();

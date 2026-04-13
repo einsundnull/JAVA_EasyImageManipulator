@@ -132,7 +132,16 @@ public class TileGalleryPanel extends JPanel {
         add(north, BorderLayout.NORTH);
 
         // ── Tiles container inside scroll pane ────────────────────────────────
-        tilesContainer = new JPanel();
+        // Override getPreferredSize so JViewport sizes this panel to the viewport width,
+        // which causes BoxLayout Y_AXIS to resize tiles accordingly.
+        tilesContainer = new JPanel() {
+            @Override public java.awt.Dimension getPreferredSize() {
+                java.awt.Dimension d = super.getPreferredSize();
+                if (getParent() != null && getParent().getWidth() > 0)
+                    d.width = getParent().getWidth();
+                return d;
+            }
+        };
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));
         tilesContainer.setBackground(new Color(36, 36, 36));
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
@@ -330,8 +339,7 @@ public class TileGalleryPanel extends JPanel {
             this.imageFile = f;
             setLayout(null);
             setPreferredSize(new Dimension(TILE_W, TILE_H));
-            setMaximumSize (new Dimension(TILE_W, TILE_H));
-            setMinimumSize (new Dimension(TILE_W, TILE_H));
+            // Don't set MaximumSize/MinimumSize — let tiles scale with gallery width
             setOpaque(false);
             setFocusable(true);
 
@@ -422,6 +430,12 @@ public class TileGalleryPanel extends JPanel {
             loadThumbAsync();
         }
 
+        @Override
+        public void doLayout() {
+            int w = getWidth() > 0 ? getWidth() : TILE_W;
+            checkbox.setBounds(w - 22, 3, 18, 18);
+        }
+
         void setActive(boolean a)        { isActive = a; }
         void setSelected(boolean s)      { isInSelection = s; checkbox.setSelected(s); }
         void showCheckbox(boolean show)  { checkbox.setVisible(show); }
@@ -486,6 +500,7 @@ public class TileGalleryPanel extends JPanel {
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            int w = getWidth();
 
             boolean hover = getMousePosition() != null;
 
@@ -494,27 +509,27 @@ public class TileGalleryPanel extends JPanel {
                      : hover   ? AppColors.TILE_HOVER_BG
                      : AppColors.TILE_DEFAULT_BG;
             g2.setColor(bg);
-            g2.fillRoundRect(0, 0, TILE_W - 1, TILE_H - 1, 8, 8);
+            g2.fillRoundRect(0, 0, w - 1, TILE_H - 1, 8, 8);
 
             // ── Thumbnail ────────────────────────────────────────────────────
             int thumbTop = 4;
             if (thumbnail != null) {
-                int tx = (TILE_W - thumbnail.getWidth())  / 2;
+                int tx = (w - thumbnail.getWidth())  / 2;
                 int ty = thumbTop + (THUMB_H - thumbnail.getHeight()) / 2;
                 Shape clip = new java.awt.geom.RoundRectangle2D.Float(
-                        3, thumbTop, TILE_W - 6, THUMB_H, 4, 4);
+                        3, thumbTop, w - 6, THUMB_H, 4, 4);
                 g2.clip(clip);
                 g2.drawImage(thumbnail, tx, ty, null);
                 g2.setClip(null);
             } else {
                 // Placeholder while loading
                 g2.setColor(AppColors.TILE_PLACEHOLDER);
-                g2.fillRoundRect(3, thumbTop, TILE_W - 6, THUMB_H, 4, 4);
+                g2.fillRoundRect(3, thumbTop, w - 6, THUMB_H, 4, 4);
                 g2.setColor(AppColors.TEXT_MUTED);
                 g2.setFont(new Font("SansSerif", Font.PLAIN, 11));
                 String ph = "Lädt…";
                 FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(ph, (TILE_W - fm.stringWidth(ph)) / 2,
+                g2.drawString(ph, (w - fm.stringWidth(ph)) / 2,
                         thumbTop + THUMB_H / 2 + fm.getAscent() / 2);
             }
 
@@ -524,9 +539,9 @@ public class TileGalleryPanel extends JPanel {
             g2.setColor(hover ? AppColors.TEXT : AppColors.TEXT_MUTED);
             FontMetrics fm = g2.getFontMetrics();
             // Truncate
-            while (name.length() > 4 && fm.stringWidth(name) > TILE_W - 10)
+            while (name.length() > 4 && fm.stringWidth(name) > w - 10)
                 name = name.substring(0, name.length() - 5) + "…";
-            g2.drawString(name, (TILE_W - fm.stringWidth(name)) / 2,
+            g2.drawString(name, (w - fm.stringWidth(name)) / 2,
                     thumbTop + THUMB_H + 15);
 
             // ── Border ───────────────────────────────────────────────────────
@@ -534,25 +549,25 @@ public class TileGalleryPanel extends JPanel {
             g2.setStroke(new BasicStroke(2f));
             if (isActive && isDirty) {
                 g2.setColor(AppColors.DANGER);
-                g2.drawRoundRect(0, 0, TILE_W - 2, TILE_H - 2, 8, 8);
+                g2.drawRoundRect(0, 0, w - 2, TILE_H - 2, 8, 8);
                 g2.setColor(AppColors.SUCCESS);
-                g2.drawRoundRect(2, 2, TILE_W - 6, TILE_H - 6, 6, 6);
+                g2.drawRoundRect(2, 2, w - 6, TILE_H - 6, 6, 6);
             } else if (isDirty) {
                 g2.setColor(AppColors.DANGER);            // red – ungespeicherte Änderungen
-                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
+                g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (isClicked) {
                 g2.setColor(new Color(255, 255, 0));      // yellow – clicked state
-                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
+                g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (isActive) {
                 g2.setColor(AppColors.SUCCESS);           // green
-                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
+                g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (isInSelection) {
                 g2.setColor(AppColors.SELECTION);
-                g2.drawRoundRect(1, 1, TILE_W - 3, TILE_H - 3, 8, 8);
+                g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (hover) {
                 g2.setStroke(new BasicStroke(1f));
                 g2.setColor(AppColors.BORDER);
-                g2.drawRoundRect(0, 0, TILE_W - 2, TILE_H - 2, 8, 8);
+                g2.drawRoundRect(0, 0, w - 2, TILE_H - 2, 8, 8);
             }
 
             g2.dispose();

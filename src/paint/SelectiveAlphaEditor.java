@@ -48,6 +48,7 @@ import javax.swing.BoxLayout;
 import javax.swing.InputMap;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
@@ -55,13 +56,14 @@ import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
+
+import book.PaperFormat;
 
 /**
  * Main application window.
@@ -101,6 +103,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private static final int TOPBAR_BTN_H      = 36;
     private static final int TOPBAR_ZOOM_BTN_W = 36;
     private static final int TOPBAR_ZOOM_BTN_H = 36;
+
+    // ── Gallery shrinking behavior ─────────────────────────────────────────────
+    // true  → galleries shrink when both canvases shown, tiles scale to fit
+    // false → canvases shrink to preserve gallery widths
+    private static final boolean SHRINK_GALLERY = true;
 
     // ── Ruler unit ────────────────────────────────────────────────────────────
     // RulerUnit is now defined in RulerUnit.java (extracted as separate enum)
@@ -170,10 +177,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private JPanel        rulerCorner;
     private JPanel        rulerNorthBar;   // container for rulerCorner + hRuler
     private JPanel        actionPanel;     // Holds apply/clear/reset/save buttons
-    private JPanel        rightArea;       // wrapper for second canvas area
     private JPanel        rightDropZone;   // drag-activation overlay
-    private JSplitPane    centerSplitPane;
-    private int           savedDividerLocation = -1;  // Save divider position when hiding second canvas
+    private JToggleButton firstCanvasBtn;  // Toggle for ci(0).layeredPane visibility
+    private JPanel        mainDividerPanel; // Thin vertical separator between Canvas 1 and 2
 
     private JLabel  statusLabel;
     private JLabel  modeLabel;
@@ -184,6 +190,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private JButton nextNavButton;
     private JToggleButton paintModeBtn;
     private JToggleButton canvasModeBtn;
+    private JToggleButton bookModeBtn;
+    private JToggleButton sceneModeBtn;
 
     private PaintToolbar paintToolbar;
 
@@ -392,43 +400,24 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         // \u2261 (≡) is in Basic Multilingual Plane — safe on all Windows systems
         filmstripBtn = UIComponentFactory.buildModeToggleBtn("\u2261", "Filmstreifen ein-/ausblenden");
         filmstripBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-        filmstripBtn.setSelected(true);
+        filmstripBtn.setSelected(false);  // Start hidden, only drop zone visible
         filmstripBtn.addActionListener(e -> {
             ci(0).tileGallery.setVisible(filmstripBtn.isSelected());
-            if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
+            updateLayoutVisibility();
             centerCanvas(0);
         });
+
+        firstCanvasBtn = UIComponentFactory.buildModeToggleBtn("1", "1. Canvas ein-/ausblenden");
+        firstCanvasBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+        firstCanvasBtn.setSelected(true);   // Canvas 1 starts visible
+        firstCanvasBtn.setEnabled(false);   // Enabled once canvas 0 has content
+        firstCanvasBtn.addActionListener(e -> updateLayoutVisibility());
 
         secondCanvasBtn = UIComponentFactory.buildModeToggleBtn("2", "2. Canvas ein-/ausblenden");
         secondCanvasBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
         secondCanvasBtn.setSelected(false);
         secondCanvasBtn.setEnabled(false);
-        secondCanvasBtn.addActionListener(e -> {
-            if (rightArea != null && centerSplitPane != null) {
-                boolean isVisible = secondCanvasBtn.isSelected();
-
-                if (isVisible) {
-                    // Showing second canvas: restore divider position
-                    rightArea.setVisible(true);
-                    centerSplitPane.setDividerSize(4);
-                    if (savedDividerLocation > 0) {
-                        centerSplitPane.setDividerLocation(savedDividerLocation);
-                    } else {
-                        // Default to 50/50 split if no saved position
-                        centerSplitPane.setDividerLocation(0.5);
-                    }
-                } else {
-                    // Hiding second canvas: save divider position
-                    savedDividerLocation = centerSplitPane.getDividerLocation();
-                    rightArea.setVisible(false);
-                    centerSplitPane.setDividerSize(0);
-                    centerCanvas(0);  // Auto-center when hiding
-                }
-
-                updateCanvasFocusBorder();  // Update border visibility
-                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
-            }
-        });
+        secondCanvasBtn.addActionListener(e -> updateLayoutVisibility());
 
         secondGalleryBtn = UIComponentFactory.buildModeToggleBtn("B", "2. Filmstreifen ein-/ausblenden");
         secondGalleryBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
@@ -437,8 +426,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         secondGalleryBtn.addActionListener(e -> {
             if (ci(1).tileGallery != null) {
                 ci(1).tileGallery.setVisible(secondGalleryBtn.isSelected());
-                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
             }
+            updateLayoutVisibility();
         });
 
         firstElementsBtn = UIComponentFactory.buildModeToggleBtn("E1", "1. Ebenen ein-/ausblenden");
@@ -448,8 +437,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         firstElementsBtn.addActionListener(e -> {
             if (elementLayerPanel != null) {
                 elementLayerPanel.setVisible(firstElementsBtn.isSelected());
-                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
             }
+            updateLayoutVisibility();
         });
 
         secondElementsBtn = UIComponentFactory.buildModeToggleBtn("E2", "2. Ebenen ein-/ausblenden");
@@ -459,8 +448,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         secondElementsBtn.addActionListener(e -> {
             if (elementLayerPanel2 != null) {
                 elementLayerPanel2.setVisible(secondElementsBtn.isSelected());
-                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
             }
+            updateLayoutVisibility();
         });
 
         modeLabel = new JLabel("Modus: Selective Alpha");
@@ -473,6 +462,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         statusLabel.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
 
         left.add(filmstripBtn);
+        left.add(firstCanvasBtn);
         left.add(firstElementsBtn);
         left.add(secondCanvasBtn);
         left.add(secondGalleryBtn);
@@ -556,6 +546,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         paintModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
         paintModeBtn.addActionListener(e -> togglePaintMode());
 
+        bookModeBtn = UIComponentFactory.buildModeToggleBtn("Book", "Buch-Modus aktivieren / deaktivieren");
+        bookModeBtn.setPreferredSize(new Dimension(50, TOPBAR_BTN_H));
+        bookModeBtn.addActionListener(e -> toggleBookMode());
+
+        sceneModeBtn = UIComponentFactory.buildModeToggleBtn("Scene", "Szenen-Modus aktivieren / deaktivieren");
+        sceneModeBtn.setPreferredSize(new Dimension(50, TOPBAR_BTN_H));
+        sceneModeBtn.addActionListener(e -> toggleSceneMode());
+
         // — Zoom controls —
         JButton zoomOutBtn   = UIComponentFactory.buildButton("\u2212", AppColors.BTN_BG, AppColors.BTN_HOVER);
         JButton zoomInBtn    = UIComponentFactory.buildButton("+",      AppColors.BTN_BG, AppColors.BTN_HOVER);
@@ -597,6 +595,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         right.add(Box.createHorizontalStrut(4));
         right.add(canvasModeBtn);
         right.add(paintModeBtn);
+        right.add(bookModeBtn);
+        right.add(sceneModeBtn);
         right.add(Box.createHorizontalStrut(4));
         right.add(zoomOutBtn);
         right.add(zoomLabel);
@@ -636,46 +636,80 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         elementLayerPanel2 = new ElementLayerPanel(buildElementLayerCallbacks(1));
         elementLayerPanel2.setVisible(false);  // Hide until canvas 2 has content
 
-        // Right area for second canvas: canvas-B + gallery B + elements B (initially hidden)
-        // Layout inside rightArea: [canvas-B (CENTER)] [IB+EB (EAST)]
-        JPanel rightSidePanel = new JPanel(new BorderLayout());
-        rightSidePanel.setBackground(AppColors.BG_DARK);
-        rightSidePanel.add(ci(1).tileGallery,  BorderLayout.WEST);
-        rightSidePanel.add(elementLayerPanel2, BorderLayout.EAST);
+        // Canvas drawing areas: flexible width (take all available space)
+        ci(0).layeredPane.setMinimumSize(new Dimension(0, 0));
+        ci(0).layeredPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        ci(0).layeredPane.setAlignmentY(Component.CENTER_ALIGNMENT);
 
-        rightArea = new JPanel(new BorderLayout());
-        rightArea.setBackground(AppColors.BG_DARK);
-        rightArea.add(ci(1).layeredPane, BorderLayout.CENTER);
-        rightArea.add(rightSidePanel,    BorderLayout.EAST);
-        rightArea.setVisible(false);
+        ci(1).layeredPane.setMinimumSize(new Dimension(0, 0));
+        ci(1).layeredPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        ci(1).layeredPane.setVisible(false);  // Hidden until canvas 2 is loaded
+        ci(1).layeredPane.setAlignmentY(Component.CENTER_ALIGNMENT);
 
-        // Hide second canvas gallery and elements initially
-        ci(1).tileGallery.setVisible(false);
+        // Gallery panels: fixed width (no growth beyond preferred)
+        // NOTE: When SHRINK_GALLERY = false, remove setMaximumSize() calls below
+        // so galleries keep full width and canvases shrink instead
+        ci(0).tileGallery.setVisible(false);  // Start hidden, show on filmstrip toggle
+        if (SHRINK_GALLERY) {
+            ci(0).tileGallery.setMaximumSize(new Dimension(TileGalleryPanel.GALLERY_W, Integer.MAX_VALUE));
+        }
+        ci(0).tileGallery.setAlignmentY(Component.CENTER_ALIGNMENT);
+
+        if (SHRINK_GALLERY) {
+            elementLayerPanel.setMaximumSize(new Dimension(ElementLayerPanel.PANEL_W, Integer.MAX_VALUE));
+        }
+        elementLayerPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
+
+        if (SHRINK_GALLERY) {
+            elementLayerPanel2.setMaximumSize(new Dimension(ElementLayerPanel.PANEL_W, Integer.MAX_VALUE));
+        }
+        elementLayerPanel2.setAlignmentY(Component.CENTER_ALIGNMENT);
+
+        ci(1).tileGallery.setVisible(false);  // Start hidden, show on gallery 2 toggle
+        if (SHRINK_GALLERY) {
+            ci(1).tileGallery.setMaximumSize(new Dimension(TileGalleryPanel.GALLERY_W, Integer.MAX_VALUE));
+        }
+        ci(1).tileGallery.setAlignmentY(Component.CENTER_ALIGNMENT);
+
+        // Vertical divider between Canvas1 and Canvas2
+        mainDividerPanel = new JPanel();
+        mainDividerPanel.setBackground(AppColors.BORDER);
+        mainDividerPanel.setPreferredSize(new Dimension(2, 0));
+        mainDividerPanel.setMaximumSize(new Dimension(2, Integer.MAX_VALUE));
+        mainDividerPanel.setMinimumSize(new Dimension(2, 0));
+        mainDividerPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
+        mainDividerPanel.setVisible(false);  // Only visible when both canvases are shown
 
         // Right drop zone overlay (for dragging tiles to activate second canvas)
         rightDropZone = buildRightDropZone();
         ci(0).layeredPane.add(rightDropZone, JLayeredPane.PALETTE_LAYER);
         rightDropZone.setVisible(false);
 
-        // Left canvas area: EA element panel (WEST) + canvas-A (CENTER)
-        // → single-canvas layout: IA | EA | canvas-A
-        JPanel leftPane = new JPanel(new BorderLayout());
-        leftPane.setBackground(AppColors.BG_DARK);
-        leftPane.add(ci(0).layeredPane, BorderLayout.CENTER);
-        leftPane.add(elementLayerPanel,  BorderLayout.WEST);
-
-        // Split pane between canvas 0 area and canvas 1 area
-        centerSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPane, rightArea);
-        centerSplitPane.setDividerSize(0);  // Initially hidden until second canvas is activated
-        centerSplitPane.setResizeWeight(0.5);
-        centerSplitPane.setBorder(null);
-        centerSplitPane.setBackground(AppColors.BG_DARK);
-
-        // Gallery wrapper: IA | [canvas-A | EA || canvas-B | IB | EB]
-        galleryWrapper = new JPanel(new BorderLayout());
+        // Gallery wrapper: BoxLayout X_AXIS — invisible components take NO space
+        galleryWrapper = new JPanel();
+        galleryWrapper.setLayout(new BoxLayout(galleryWrapper, BoxLayout.X_AXIS));
         galleryWrapper.setBackground(AppColors.BG_DARK);
-        galleryWrapper.add(ci(0).tileGallery, BorderLayout.WEST);
-        galleryWrapper.add(centerSplitPane,   BorderLayout.CENTER);
+
+        // Order: Gallery1 | Elements1 | Canvas1 | Divider | Canvas2 | Elements2 | Gallery2
+        galleryWrapper.add(ci(0).tileGallery);
+        galleryWrapper.add(elementLayerPanel);
+        galleryWrapper.add(ci(0).layeredPane);
+        galleryWrapper.add(mainDividerPanel);
+        galleryWrapper.add(ci(1).layeredPane);
+        galleryWrapper.add(elementLayerPanel2);
+        galleryWrapper.add(ci(1).tileGallery);
+
+        // Auto-fit canvas when layout changes (panels hidden, divider moved, etc.)
+        galleryWrapper.addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                // Re-fit the active canvas to the new available space
+                CanvasInstance activeCanvas = ci();
+                if (activeCanvas.workingImage != null && activeCanvas.viewportPanel.isVisible()
+                        && !activeCanvas.userHasManuallyZoomed) {
+                    SwingUtilities.invokeLater(() -> fitToViewport(activeCanvasIndex));
+                }
+            }
+        });
 
         return galleryWrapper;
     }
@@ -705,8 +739,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
     /** Updates focus borders and element panel: active canvas gets green border only when second canvas is visible. */
     private void updateCanvasFocusBorder() {
-        // Only show focus border if second canvas is actually visible
-        boolean showBorder = rightArea != null && rightArea.isVisible();
+        // Only show focus border if both canvas drawing areas are visible
+        boolean showBorder = secondCanvasBtn.isEnabled()
+                          && firstCanvasBtn.isSelected()
+                          && secondCanvasBtn.isSelected();
 
         for (int i = 0; i < 2; i++) {
             CanvasInstance c = ci(i);
@@ -727,6 +763,23 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
         // Update element panels
         refreshElementPanel();
+    }
+
+    /** Updates visibility of all 7 layout elements independently. */
+    private void updateLayoutVisibility() {
+        // Canvas drawing areas follow their buttons
+        if (ci(0).layeredPane != null)
+            ci(0).layeredPane.setVisible(firstCanvasBtn.isSelected());
+        if (ci(1).layeredPane != null)
+            ci(1).layeredPane.setVisible(secondCanvasBtn.isSelected());
+
+        // Divider only visible when both canvas drawing areas are shown
+        if (mainDividerPanel != null)
+            mainDividerPanel.setVisible(
+                firstCanvasBtn.isSelected() && secondCanvasBtn.isSelected());
+
+        updateCanvasFocusBorder();
+        if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
     }
 
     // ── Build canvas area (for index 0 or 1) ──────────────────────────────────
@@ -1162,23 +1215,27 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         }
         c.viewportPanel.setVisible(true);
 
-        // Enable canvas-0 element button as soon as canvas 0 has content
+        // Enable canvas-0 element and canvas buttons as soon as canvas 0 has content
         if (idx == 0) {
             firstElementsBtn.setEnabled(true);
+            firstCanvasBtn.setEnabled(true);
         }
 
-        // If loading into canvas 1, show the right area and enable toggle buttons
+        // If loading into canvas 1, manage visibility via buttons
         if (idx == 1) {
-            rightArea.setVisible(true);
+            boolean firstActivation = !secondCanvasBtn.isEnabled();
             rightDropZone.setVisible(false);
-            centerSplitPane.setDividerSize(4);  // Show divider
-            // Set divider location: restore saved position or default to 50/50
-            if (savedDividerLocation > 0) {
-                centerSplitPane.setDividerLocation(savedDividerLocation);
-            } else {
-                centerSplitPane.setDividerLocation(0.5);
+
+            if (firstActivation) {
+                // First load: auto-activate canvas button
+                secondCanvasBtn.setSelected(true);
+            } else if (!secondCanvasBtn.isSelected()) {
+                // Canvas was explicitly hidden by user → loading new image re-activates it
+                secondCanvasBtn.setSelected(true);
             }
-            updateCanvasFocusBorder();  // Update border visibility
+
+            updateLayoutVisibility();
+            updateCanvasFocusBorder();
 
             // Canvas II: only enable buttons — user decides visibility explicitly
             secondCanvasBtn.setEnabled(true);
@@ -1781,9 +1838,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         }
         // Canvas sub-mode button is only meaningful inside Paint
         canvasModeBtn.setEnabled(entering);
-        modeLabel.setText(entering
-                ? (canvasModeBtn.isSelected() ? "Modus: Paint / Canvas" : "Modus: Paint")
-                : (floodfillMode ? "Modus: Floodfill" : "Modus: Selective Alpha"));
+        updateModeLabel();
         if (entering) {
             paintToolbar.showToolbar();
             applyButton.setEnabled(false);
@@ -1824,7 +1879,35 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         } else {
             setElementPanelVisible(false);
         }
-        modeLabel.setText(entering ? "Modus: Paint / Canvas" : "Modus: Paint");
+        updateModeLabel();
+        ci().canvasPanel.repaint();
+    }
+
+    /** Book mode: toggle paper layout editor. Paint, Canvas, and Book can coexist. */
+    private void toggleBookMode() {
+        boolean entering = bookModeBtn.isSelected();
+        if (entering) {
+            // Scene and Book are mutually exclusive
+            if (sceneModeBtn.isSelected()) {
+                sceneModeBtn.setSelected(false);
+            }
+        }
+        // appMode stays unchanged (PAINT or ALPHA_EDITOR)
+        updateModeLabel();
+        ci().canvasPanel.repaint();
+    }
+
+    /** Scene mode: toggle scene editor. Paint, Canvas, and Scene can coexist. */
+    private void toggleSceneMode() {
+        boolean entering = sceneModeBtn.isSelected();
+        if (entering) {
+            // Book and Scene are mutually exclusive
+            if (bookModeBtn.isSelected()) {
+                bookModeBtn.setSelected(false);
+            }
+        }
+        // appMode stays unchanged (PAINT or ALPHA_EDITOR)
+        updateModeLabel();
         ci().canvasPanel.repaint();
     }
 
@@ -1847,6 +1930,24 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         }
         galleryWrapper.revalidate();
         galleryWrapper.repaint();
+    }
+
+    /** Updates modeLabel to show all active mode flags dynamically. */
+    private void updateModeLabel() {
+        if (appMode == AppMode.PAINT) {
+            StringBuilder sb = new StringBuilder("Modus: Paint");
+            if (canvasModeBtn.isSelected()) sb.append(" / Canvas");
+            if (bookModeBtn.isSelected())   sb.append(" / Buch");
+            if (sceneModeBtn.isSelected())  sb.append(" / Szene");
+            modeLabel.setText(sb.toString());
+        } else {
+            // ALPHA_EDITOR base mode
+            StringBuilder sb = new StringBuilder(
+                "Modus: " + (floodfillMode ? "Floodfill" : "Selective Alpha"));
+            if (bookModeBtn.isSelected())  sb.append(" / Buch");
+            if (sceneModeBtn.isSelected()) sb.append(" / Szene");
+            modeLabel.setText(sb.toString());
+        }
     }
 
     /** Rebuilds the element layer panel tiles from the current activeElements. */
@@ -2033,16 +2134,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             int targetIdx = 1 - sourceIdx;
             activeCanvasIndex = targetIdx;
 
-            if (targetIdx == 1 && rightArea != null && !rightArea.isVisible()) {
-                rightArea.setVisible(true);
-                centerSplitPane.setDividerSize(4);
-                if (savedDividerLocation > 0)
-                    centerSplitPane.setDividerLocation(savedDividerLocation);
-                else
-                    centerSplitPane.setDividerLocation(0.5);
+            if (targetIdx == 1) {
                 secondCanvasBtn.setEnabled(true);
                 secondCanvasBtn.setSelected(true);
-                updateCanvasFocusBorder();
+                updateLayoutVisibility();
                 if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
             }
 
@@ -2629,7 +2724,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 selectedImages = files;
             }
             @Override public void onDragStarted(File file) {
-                if (idx == 0 && !rightArea.isVisible() && ci(0).workingImage != null) {
+                if (idx == 0 && !secondCanvasBtn.isSelected() && ci(0).workingImage != null) {
                     repositionRightDropZone();
                     rightDropZone.setVisible(true);
                     ci(0).layeredPane.repaint();
@@ -3087,6 +3182,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
     /** Creates a new blank ARGB bitmap after asking for dimensions. */
     private void doNewBitmap() {
+        if (bookModeBtn.isSelected()) { doNewBookSheet(); return; }
+
         JTextField wField = new JTextField("1024", 5);
         JTextField hField = new JTextField("1024", 5);
         for (JTextField f : new JTextField[]{wField, hField}) {
@@ -3164,6 +3261,117 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         });
         can.addActionListener(e -> dialog.dispose());
         row.add(ok); row.add(can);
+        content.add(row);
+        dialog.add(content);
+        dialog.setVisible(true);
+    }
+
+    /** Creates a new sheet with paper format, orientation, and margin guides. */
+    private void doNewBookSheet() {
+        // Show paper format dialog
+        PaperFormat.Format[] formats = PaperFormat.Format.values();
+        String[] formatLabels = new String[formats.length];
+        for (int i = 0; i < formats.length; i++) {
+            formatLabels[i] = formats[i].toString();
+        }
+        JComboBox<String> formatCombo = new JComboBox<>(formatLabels);
+        formatCombo.setSelectedIndex(4); // A4 as default
+        formatCombo.setBackground(AppColors.BTN_BG);
+        formatCombo.setForeground(AppColors.TEXT);
+
+        // Create orientation combobox
+        String[] orientations = {"Hochformat", "Querformat"};
+        JComboBox<String> orientCombo = new JComboBox<>(orientations);
+        orientCombo.setSelectedIndex(0); // Portrait as default
+        orientCombo.setBackground(AppColors.BTN_BG);
+        orientCombo.setForeground(AppColors.TEXT);
+
+        // Create margins checkbox
+        JCheckBox marginsCheckBox = new JCheckBox("Mit Rändern", true);
+        marginsCheckBox.setOpaque(false);
+        marginsCheckBox.setForeground(AppColors.TEXT);
+
+        // Create form grid
+        JPanel grid = new JPanel(new GridLayout(3, 2, 6, 4));
+        grid.setOpaque(false);
+
+        JLabel formatLabel = new JLabel("Format:");
+        formatLabel.setForeground(AppColors.TEXT);
+        grid.add(formatLabel);
+        grid.add(formatCombo);
+
+        JLabel orientLabel = new JLabel("Ausrichtung:");
+        orientLabel.setForeground(AppColors.TEXT);
+        grid.add(orientLabel);
+        grid.add(orientCombo);
+
+        JLabel marginsLabel = new JLabel("");
+        marginsLabel.setForeground(AppColors.TEXT);
+        grid.add(marginsLabel);
+        grid.add(marginsCheckBox);
+
+        // Create dialog
+        JDialog dialog = createBaseDialog("Neues Blatt", 320, 240);
+        JPanel content = centeredColumnPanel(16, 20, 12);
+        content.add(grid);
+        content.add(Box.createVerticalStrut(12));
+
+        // Create buttons
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        row.setOpaque(false);
+        JButton okBtn = UIComponentFactory.buildButton("Erstellen", AppColors.ACCENT, AppColors.ACCENT_HOVER);
+        JButton cancelBtn = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        okBtn.setForeground(Color.WHITE);
+
+        okBtn.addActionListener(e -> {
+            PaperFormat.Format selectedFormat = formats[formatCombo.getSelectedIndex()];
+            boolean landscape = orientCombo.getSelectedIndex() == 1;
+            boolean withMargins = marginsCheckBox.isSelected();
+
+            // Convert mm → pixels at 96 DPI (1 mm = 96/25.4 px ≈ 3.7795 px)
+            final double PX_PER_MM = 96.0 / 25.4;
+            int wPx = (int) Math.round((landscape ? selectedFormat.getWidthLandscape() : selectedFormat.getWidthPortrait()) * PX_PER_MM);
+            int hPx = (int) Math.round((landscape ? selectedFormat.getHeightLandscape() : selectedFormat.getHeightPortrait()) * PX_PER_MM);
+
+            // Build the Sheet image
+            BufferedImage img = new BufferedImage(wPx, hPx, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = img.createGraphics();
+            g2.setColor(Color.WHITE);
+            g2.fillRect(0, 0, wPx, hPx);
+
+            if (withMargins) {
+                int mTop    = (int) Math.round(selectedFormat.getMarginTop()    * PX_PER_MM);
+                int mBottom = (int) Math.round(selectedFormat.getMarginBottom() * PX_PER_MM);
+                int mLeft   = (int) Math.round(selectedFormat.getMarginInner()  * PX_PER_MM);
+                int mRight  = (int) Math.round(selectedFormat.getMarginOuter()  * PX_PER_MM);
+                g2.setColor(new Color(0, 120, 220, 180)); // semi-transparent blue
+                float[] dash = { 6f, 4f };
+                g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
+                g2.drawRect(mLeft, mTop, wPx - mLeft - mRight, hPx - mTop - mBottom);
+            }
+            g2.dispose();
+
+            // Load into canvas (same pattern as doNewBitmap)
+            CanvasInstance c = ci();
+            c.workingImage  = img;
+            c.originalImage = deepCopy(img);
+            c.activeElements = new ArrayList<>();
+            c.selectedElements.clear();
+            c.undoStack.clear(); c.redoStack.clear();
+            c.selectedAreas.clear();
+            c.floatingImg = null; c.floatRect = null;
+
+            swapToImageView(activeCanvasIndex);
+            SwingUtilities.invokeLater(() -> fitToViewport(activeCanvasIndex));
+            updateTitle(); updateStatus();
+            setBottomButtonsEnabled(true);
+            dialog.dispose();
+        });
+
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        row.add(okBtn);
+        row.add(cancelBtn);
         content.add(row);
         dialog.add(content);
         dialog.setVisible(true);
