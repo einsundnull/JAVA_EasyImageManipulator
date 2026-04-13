@@ -21,7 +21,6 @@ import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -167,11 +166,7 @@ public class PaintToolbar extends JPanel {
     public void                   setActiveTool(PaintEngine.Tool tool) {
         activeTool = tool;
         if (cb != null) cb.onToolChanged(tool);
-        // Update button visual state
-        JToggleButton btn = toolButtons.get(tool);
-        if (btn != null) {
-            btn.setSelected(true);
-        }
+        toolButtons.forEach((t, b) -> b.setSelected(t == tool && tool != null));
     }
     public Color                  getPrimaryColor()   { return primaryColor; }
     public Color                  getSecondaryColor() { return secondaryColor; }
@@ -292,13 +287,24 @@ public class PaintToolbar extends JPanel {
     // ── Tool buttons ──────────────────────────────────────────────────────────
     private JPanel buildToolButtons() {
         JPanel p = hBox();
-        ButtonGroup group = new ButtonGroup();
         for (PaintEngine.Tool tool : PaintEngine.Tool.values()) {
             String[] st = symbolAndTip(tool);
             JToggleButton btn = toolBtn(st[0], st[1]);
-            btn.addActionListener(e -> { activeTool = tool; cb.onToolChanged(tool); });
-            group.add(btn);
-            toolButtons.put(tool, btn);  // Store button for later access
+            btn.addActionListener(e -> {
+                if (activeTool == tool) {
+                    // Toggle off — deselect current tool
+                    activeTool = null;
+                    btn.setSelected(false);
+                    cb.onToolChanged(null);
+                } else {
+                    // Deselect all other tool buttons
+                    toolButtons.forEach((t, b) -> { if (t != tool) b.setSelected(false); });
+                    activeTool = tool;
+                    btn.setSelected(true);
+                    cb.onToolChanged(tool);
+                }
+            });
+            toolButtons.put(tool, btn);
             p.add(btn);
             p.add(Box.createHorizontalStrut(GAP));
             if (tool == PaintEngine.Tool.PENCIL) btn.setSelected(true);

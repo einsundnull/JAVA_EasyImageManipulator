@@ -95,6 +95,8 @@ public class CanvasPanel extends JPanel {
 	// ── Hover highlight (bidirectional with ElementLayerPanel) ───────────────
 	/** Id of the element the mouse is currently over, or -1. Used for bidirectional hover. */
 	private int hoveredElementId = -1;
+	/** Index (0-7) of the scale handle the mouse is over on the primary element, or -1. */
+	private int hoveredHandleIndex = -1;
 
 	// ── Canvas-submode draw overlay ───────────────────────────────────────────
 	/** Transparent scratch image used when drawing in Canvas sub-mode (becomes an Element on release). */
@@ -160,6 +162,7 @@ public class CanvasPanel extends JPanel {
 		canvasDrawOverlay = null; overlayLastPt = null; overlayShapeStart = null;
 		// Hover state
 		hoveredElementId = -1;
+		hoveredHandleIndex = -1;
 	}
 
 	private void setupMouseHandling() {
@@ -194,15 +197,25 @@ public class CanvasPanel extends JPanel {
 
 				Point imgPt = callbacks.screenToImage(e.getPoint());
 
-				// ── PathLayer point selection ────────────────────────────────────
+				// ── PathLayer interaction ────────────────────────────────────────
 				Layer primaryEl = callbacks.getSelectedElement();
 				if (primaryEl instanceof PathLayer pl) {
-					Rectangle sr = callbacks.elemRectScreen(pl);
-					Point screenPt = e.getPoint();
-					// Convert screen-relative offset to image-space by dividing by zoom
+					// 1. Scale handles (outermost priority — must not be swallowed by deselect)
+					Rectangle[] plHandles = callbacks.handleRects(callbacks.elemRectScreen(pl));
+					for (int hi = 0; hi < plHandles.length; hi++) {
+						if (plHandles[hi].contains(e.getPoint())) {
+							callbacks.setElemActiveHandle(hi);
+							callbacks.setElemScaleBase(new Rectangle(pl.x(), pl.y(), pl.width(), pl.height()));
+							callbacks.setElemScaleStart(e.getPoint());
+							return;
+						}
+					}
+
+					// 2. Control-point hit (for individual point editing)
+					// Use layer origin directly — elemRectScreen has padding that would offset coords.
 					double zoom = callbacks.getZoom();
-					double layerX = (screenPt.x - sr.x) / zoom;
-					double layerY = (screenPt.y - sr.y) / zoom;
+					double layerX = e.getPoint().x / zoom - pl.x();
+					double layerY = e.getPoint().y / zoom - pl.y();
 
 					java.util.List<Point3D> points = pl.points();
 					int hitRadius = 12;
@@ -210,19 +223,15 @@ public class CanvasPanel extends JPanel {
 					for (int i = 0; i < points.size(); i++) {
 						Point3D p = points.get(i);
 						double dist = Math.sqrt(Math.pow(layerX - p.x, 2) + Math.pow(layerY - p.y, 2));
-						if (dist <= hitRadius) {
-							hitPoint = i;
-							break;
-						}
+						if (dist <= hitRadius) { hitPoint = i; break; }
 					}
-
 					if (hitPoint >= 0) {
 						selectedPathPointIndex = hitPoint;
 						repaint();
 						return;
 					}
 
-					// NEW: Click inside polygon area → select path + start drag
+					// 3. Click inside polygon → drag whole path
 					if (isInsidePathPolygon(pl, e.getPoint())) {
 						callbacks.setDraggingElement(true);
 						elemLastImgPt = imgPt;
@@ -230,7 +239,7 @@ public class CanvasPanel extends JPanel {
 						return;
 					}
 
-					// No point hit, no polygon hit → deselect path
+					// 4. Click outside everything → deselect
 					callbacks.setSelectedElement(null);
 					selectedPathPointIndex = -1;
 				}
@@ -253,7 +262,7 @@ public class CanvasPanel extends JPanel {
 						return;
 					}
 
-					// Double-click dispatch by layer type
+					// Double-click dispatch by layer type (all tools)
 					Layer hit = hitElement(e.getPoint());
 					if (e.getClickCount() == 2 && hit != null) {
 						if (hit instanceof TextLayer) {
@@ -297,17 +306,11 @@ public class CanvasPanel extends JPanel {
 						repaint();
 						return;
 					} else {
-						// Click on empty area → deselect all
+						// Click on empty area → deselect all, then fall through to tool switch
+						// (TEXT tool: TEXT case sets textDragStart; other tools: handle their own logic)
 						if (!callbacks.getSelectedElements().isEmpty()) {
 							callbacks.setSelectedElement(null);
 							repaint();
-						}
-						// With TEXT tool: a bare click on empty space is NOT a rubber-band start;
-						// only a real drag (handled in mouseDragged → mouseReleased) should create a frame.
-						// Return here so we don't fall through to the TEXT case in the tool switch below.
-						if (callbacks.getAppMode() == AppMode.PAINT
-								&& callbacks.getPaintToolbar().getActiveTool() == PaintEngine.Tool.TEXT) {
-							return;
 						}
 					}
 				}
@@ -348,6 +351,7 @@ public class CanvasPanel extends JPanel {
 
 				if (callbacks.getAppMode() == AppMode.PAINT) {
 					PaintEngine.Tool tool = callbacks.getPaintToolbar().getActiveTool();
+					if (tool == null) return;
 					switch (tool) {
 					case PENCIL, ERASER -> {
 						if (callbacks.isCanvasSubMode() && tool == PaintEngine.Tool.PENCIL) {
@@ -527,31 +531,6 @@ public class CanvasPanel extends JPanel {
 				Layer primary = callbacks.getSelectedElement();
 				if (primary instanceof PathLayer pl && selectedPathPointIndex >= 0) {
 					PathLayer updated = pl.withMovedPoint(selectedPathPointIndex, imgPt.x - pl.x(), imgPt.y - pl.y());
-
-					// ── DEBUG: print all point coords + frame bounds after move ──
-					java.util.List<Point3D> dbgPts = updated.points();
-					double dbgMinX = Double.MAX_VALUE, dbgMaxX = -Double.MAX_VALUE;
-					double dbgMinY = Double.MAX_VALUE, dbgMaxY = -Double.MAX_VALUE;
-					StringBuilder sb = new StringBuilder();
-					sb.append("[PATH-DRAG] dragged=").append(selectedPathPointIndex).append("\n");
-					for (int di = 0; di < dbgPts.size(); di++) {
-						Point3D dp = dbgPts.get(di);
-						if (dp.x < dbgMinX) dbgMinX = dp.x;
-						if (dp.x > dbgMaxX) dbgMaxX = dp.x;
-						if (dp.y < dbgMinY) dbgMinY = dp.y;
-						if (dp.y > dbgMaxY) dbgMaxY = dp.y;
-						sb.append("  point[").append(di).append("] x=")
-						  .append(String.format("%.1f", dp.x))
-						  .append(" y=").append(String.format("%.1f", dp.y));
-						if (di == selectedPathPointIndex) sb.append(" <-- dragged");
-						sb.append("\n");
-					}
-					sb.append("  frame: left=").append(String.format("%.1f", dbgMinX - 8))
-					  .append(" right=").append(String.format("%.1f", dbgMaxX + 8))
-					  .append(" top=").append(String.format("%.1f", dbgMinY - 8))
-					  .append(" bottom=").append(String.format("%.1f", dbgMaxY + 8));
-					System.err.println(sb);
-
 					callbacks.updateSelectedElement(updated);
 					repaint();
 					return;
@@ -885,6 +864,15 @@ public class CanvasPanel extends JPanel {
 									+ e.getWheelRotation() * mouseWheelSensitivityInPx);
 				}
 			}
+
+			@Override
+			public void mouseExited(MouseEvent e) {
+				if (hoveredHandleIndex >= 0) {
+					hoveredHandleIndex = -1;
+					setCursor(Cursor.getDefaultCursor());
+					repaint();
+				}
+			}
 		};
 
 		addMouseListener(handler);
@@ -900,12 +888,10 @@ public class CanvasPanel extends JPanel {
 				Layer primary = callbacks.getSelectedElement();
 				int newPathPointHover = -1;
 				if (primary instanceof PathLayer pl) {
-					Rectangle sr = callbacks.elemRectScreen(pl);
-					Point screenPt = e.getPoint();
-					// Convert screen-relative offset to image-space by dividing by zoom
+					// Use layer origin directly — elemRectScreen has padding that would offset coords.
 					double zoom = callbacks.getZoom();
-					double layerX = (screenPt.x - sr.x) / zoom;
-					double layerY = (screenPt.y - sr.y) / zoom;
+					double layerX = e.getPoint().x / zoom - pl.x();
+					double layerY = e.getPoint().y / zoom - pl.y();
 
 					java.util.List<Point3D> points = pl.points();
 					int hitRadius = 12;  // Larger hit area for points
@@ -921,7 +907,37 @@ public class CanvasPanel extends JPanel {
 
 				if (newPathPointHover != hoveredPathPointIndex) {
 					hoveredPathPointIndex = newPathPointHover;
-					repaint();  // Redraw point highlights
+					repaint();
+				}
+
+				// Check scale-handle hover on the primary selected element
+				int newHoveredHandle = -1;
+				if (primary != null) {
+					Rectangle[] hrs = callbacks.handleRects(callbacks.elemRectScreen(primary));
+					for (int hi = 0; hi < hrs.length; hi++) {
+						if (hrs[hi].contains(e.getPoint())) { newHoveredHandle = hi; break; }
+					}
+				}
+				if (newHoveredHandle != hoveredHandleIndex) {
+					hoveredHandleIndex = newHoveredHandle;
+					// Update resize cursor
+					if (newHoveredHandle >= 0) {
+						int cur = switch (newHoveredHandle) {
+							case 0 -> Cursor.NW_RESIZE_CURSOR;
+							case 1 -> Cursor.N_RESIZE_CURSOR;
+							case 2 -> Cursor.NE_RESIZE_CURSOR;
+							case 3 -> Cursor.W_RESIZE_CURSOR;
+							case 4 -> Cursor.E_RESIZE_CURSOR;
+							case 5 -> Cursor.SW_RESIZE_CURSOR;
+							case 6 -> Cursor.S_RESIZE_CURSOR;
+							case 7 -> Cursor.SE_RESIZE_CURSOR;
+							default -> Cursor.DEFAULT_CURSOR;
+						};
+						setCursor(Cursor.getPredefinedCursor(cur));
+					} else {
+						setCursor(Cursor.getDefaultCursor());
+					}
+					repaint();
 				}
 
 				Layer hit = hitElement(e.getPoint());
@@ -929,7 +945,7 @@ public class CanvasPanel extends JPanel {
 				if (newId != hoveredElementId) {
 					hoveredElementId = newId;
 					callbacks.onCanvasElementHover(newId);
-					repaint(); // redraw hover outline on canvas
+					repaint();
 				}
 			}
 		});
@@ -1365,6 +1381,8 @@ public class CanvasPanel extends JPanel {
 	 *  – records the original element so cancel can restore it
 	 */
 	public void enterTextEditMode(Layer el) {
+		// Guard against re-entry while already editing this element
+		if (editingTextElementId >= 0 && editingTextElementId == el.id()) return;
 		commitText(); // flush any in-progress text first
 		// Load font settings from element (el must be a TextLayer here)
 		TextLayer tl = (TextLayer) el;
@@ -1485,7 +1503,11 @@ public class CanvasPanel extends JPanel {
 	private Layer hitElement(Point screenPt) {
 		java.util.List<Layer> els = callbacks.getActiveElements();
 		for (int i = els.size() - 1; i >= 0; i--) {
-			if (callbacks.elemRectScreen(els.get(i)).contains(screenPt)) return els.get(i);
+			Layer el = els.get(i);
+			// Never hit the element being text-edited — it is visually replaced by the live preview
+			// and must not re-trigger enterTextEditMode mid-session.
+			if (editingTextElementId >= 0 && el.id() == editingTextElementId) continue;
+			if (callbacks.elemRectScreen(el).contains(screenPt)) return el;
 		}
 		return null;
 	}
@@ -1665,10 +1687,14 @@ public class CanvasPanel extends JPanel {
 					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
 					if (isPrimary) {
 						g2.setStroke(new BasicStroke(1f));
-						for (Rectangle hr : callbacks.handleRects(frameRect)) {
-							g2.setColor(Color.WHITE);
+						Rectangle[] hrs = callbacks.handleRects(frameRect);
+						for (int hi = 0; hi < hrs.length; hi++) {
+							Rectangle hr = hrs[hi];
+							boolean hov = (hi == hoveredHandleIndex);
+							g2.setColor(hov ? new Color(255, 220, 60) : Color.WHITE);
 							g2.fillRect(hr.x, hr.y, hr.width, hr.height);
-							g2.setColor(AppColors.ACCENT);
+							g2.setColor(hov ? new Color(200, 140, 0) : AppColors.ACCENT);
+							g2.setStroke(new BasicStroke(hov ? 1.5f : 1f));
 							g2.drawRect(hr.x, hr.y, hr.width, hr.height);
 						}
 					}
@@ -1846,6 +1872,11 @@ public class CanvasPanel extends JPanel {
 		java.util.List<Point3D> points = pl.points();
 		if (points.isEmpty()) return;
 
+		// Screen origin of the layer (independent of the padded elemRectScreen / sr).
+		// All point screen coords are computed as (pl.x() + p.x) * zoom.
+		final int ox = (int) Math.round(pl.x() * zoom);
+		final int oy = (int) Math.round(pl.y() * zoom);
+
 		// Render optional image (if present)
 		if (pl.image() != null) {
 			g2.drawImage(pl.image(), sr.x, sr.y, sr.width, sr.height, null);
@@ -1854,17 +1885,15 @@ public class CanvasPanel extends JPanel {
 		int pointRadius = 8;  // Pixel radius for point rendering
 
 		// ── Draw lines connecting points ──
-		// sr is in screen space (image coords * zoom); point coords are image-space,
-		// so multiply by zoom before adding to sr to get correct screen position.
 		g2.setColor(new Color(0, 200, 255, 180));  // Cyan
 		g2.setStroke(new BasicStroke(1.5f));
 		for (int i = 0; i < points.size() - 1; i++) {
 			Point3D p1 = points.get(i);
 			Point3D p2 = points.get(i + 1);
-			int x1 = sr.x + (int) Math.round(p1.x * zoom);
-			int y1 = sr.y + (int) Math.round(p1.y * zoom);
-			int x2 = sr.x + (int) Math.round(p2.x * zoom);
-			int y2 = sr.y + (int) Math.round(p2.y * zoom);
+			int x1 = ox + (int) Math.round(p1.x * zoom);
+			int y1 = oy + (int) Math.round(p1.y * zoom);
+			int x2 = ox + (int) Math.round(p2.x * zoom);
+			int y2 = oy + (int) Math.round(p2.y * zoom);
 			g2.drawLine(x1, y1, x2, y2);
 		}
 
@@ -1872,18 +1901,18 @@ public class CanvasPanel extends JPanel {
 		if (pl.isClosed() && points.size() >= 2) {
 			Point3D p1 = points.get(points.size() - 1);
 			Point3D p2 = points.get(0);
-			int x1 = sr.x + (int) Math.round(p1.x * zoom);
-			int y1 = sr.y + (int) Math.round(p1.y * zoom);
-			int x2 = sr.x + (int) Math.round(p2.x * zoom);
-			int y2 = sr.y + (int) Math.round(p2.y * zoom);
+			int x1 = ox + (int) Math.round(p1.x * zoom);
+			int y1 = oy + (int) Math.round(p1.y * zoom);
+			int x2 = ox + (int) Math.round(p2.x * zoom);
+			int y2 = oy + (int) Math.round(p2.y * zoom);
 			g2.drawLine(x1, y1, x2, y2);
 		}
 
 		// ── Draw point markers ──
 		for (int i = 0; i < points.size(); i++) {
 			Point3D p = points.get(i);
-			int px = sr.x + (int) Math.round(p.x * zoom);
-			int py = sr.y + (int) Math.round(p.y * zoom);
+			int px = ox + (int) Math.round(p.x * zoom);
+			int py = oy + (int) Math.round(p.y * zoom);
 
 			boolean isHovered = isPrimary && (i == hoveredPathPointIndex);
 			boolean isSelected = isPrimary && (i == selectedPathPointIndex);

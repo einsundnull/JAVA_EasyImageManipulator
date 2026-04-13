@@ -354,7 +354,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 settings.setSecondaryColor(paintToolbar.getSecondaryColor().getRGB());
                 settings.setStrokeWidth(paintToolbar.getStrokeWidth());
                 settings.setAntialias(paintToolbar.isAntialiasing());
-                settings.setActiveTool(paintToolbar.getActiveTool().toString());
+                if (paintToolbar.getActiveTool() != null)
+                    settings.setActiveTool(paintToolbar.getActiveTool().toString());
                 settings.setFillMode(paintToolbar.getFillMode().toString());
                 settings.setBrushShape(paintToolbar.getBrushShape().toString());
             }
@@ -3358,6 +3359,23 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     /** Screen-space rectangle for a layer, accounting for current zoom. */
     public Rectangle elemRectScreen(Layer el) {
         double z = ci().zoom;
+        if (el instanceof PathLayer pl && !pl.points().isEmpty()) {
+            // PathLayer: compute padded visual bounding box from actual points
+            // (matches the frameRect drawn in CanvasPanel.paintComponent)
+            double fMinX = Double.MAX_VALUE, fMaxX = -Double.MAX_VALUE;
+            double fMinY = Double.MAX_VALUE, fMaxY = -Double.MAX_VALUE;
+            for (Point3D p : pl.points()) {
+                if (p.x < fMinX) fMinX = p.x;
+                if (p.x > fMaxX) fMaxX = p.x;
+                if (p.y < fMinY) fMinY = p.y;
+                if (p.y > fMaxY) fMaxY = p.y;
+            }
+            int fx = (int) Math.round((pl.x() + fMinX - 8) * z);
+            int fy = (int) Math.round((pl.y() + fMinY - 8) * z);
+            int fw = (int) Math.round((fMaxX - fMinX + 16) * z);
+            int fh = (int) Math.round((fMaxY - fMinY + 16) * z);
+            return new Rectangle(fx, fy, Math.max(1, fw), Math.max(1, fh));
+        }
         return new Rectangle(
             (int) Math.round(el.x()      * z),
             (int) Math.round(el.y()      * z),
