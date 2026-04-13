@@ -905,6 +905,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         // Focus listener: clicking activates this canvas
         c.canvasPanel.addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) {
+                if (activeCanvasIndex != idx) resetElementDragState(activeCanvasIndex);
                 activeCanvasIndex = idx;
                 updateCanvasFocusBorder();
             }
@@ -914,6 +915,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         c.tileGallery = new TileGalleryPanel(buildGalleryCallbacks(idx));
         c.tileGallery.addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) {
+                if (activeCanvasIndex != idx) resetElementDragState(activeCanvasIndex);
                 activeCanvasIndex = idx;
                 updateCanvasFocusBorder();
             }
@@ -1033,9 +1035,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             BufferedImage img = javax.imageio.ImageIO.read(f);
             if (img == null) return;
             img = normalizeImage(img);
-            int cx = Math.max(0, (c.workingImage.getWidth()  - img.getWidth())  / 2);
-            int cy = Math.max(0, (c.workingImage.getHeight() - img.getHeight()) / 2);
-            ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy, img.getWidth(), img.getHeight());
+            int[] size = fitElementSize(img.getWidth(), img.getHeight(),
+                                        c.workingImage.getWidth(), c.workingImage.getHeight());
+            int cx = Math.max(0, (c.workingImage.getWidth()  - size[0]) / 2);
+            int cy = Math.max(0, (c.workingImage.getHeight() - size[1]) / 2);
+            ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy, size[0], size[1]);
             c.activeElements.add(layer);
             c.selectedElements.clear();
             c.selectedElements.add(layer);
@@ -1066,6 +1070,22 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
      *  Since display is reversed (top = last element), insertIdx = listSize - visualIdx. */
     private static int visualToInsertIndex(int visualIdx, int listSize) {
         return Math.max(0, Math.min(listSize, listSize - visualIdx));
+    }
+
+    /** Max fraction of the canvas dimensions an auto-inserted element may occupy. */
+    private static final float MAX_ELEM_RATIO = 0.40f;
+
+    /**
+     * Returns {renderW, renderH} for a freshly dropped element layer.
+     * Fits the image proportionally into MAX_ELEM_RATIO of the canvas size.
+     * Never upscales (if image is already smaller, keeps original size).
+     */
+    private static int[] fitElementSize(int imgW, int imgH, int canvasW, int canvasH) {
+        float maxW  = canvasW * MAX_ELEM_RATIO;
+        float maxH  = canvasH * MAX_ELEM_RATIO;
+        float scale = Math.min(1.0f, Math.min(maxW / imgW, maxH / imgH));
+        return new int[]{ Math.max(1, Math.round(imgW * scale)),
+                          Math.max(1, Math.round(imgH * scale)) };
     }
 
     // =========================================================================
@@ -1758,6 +1778,16 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         c.layeredPane.repaint();
     }
 
+    /** Resets element drag/scale state for the given canvas when switching away. */
+    private void resetElementDragState(int canvasIdx) {
+        CanvasInstance c = ci(canvasIdx);
+        c.draggingElement = false;
+        c.elemDragAnchor  = null;
+        c.elemActiveHandle = -1;
+        c.elemScaleBase   = null;
+        c.elemScaleStart  = null;
+    }
+
     // ── Button actions ────────────────────────────────────────────────────────
 
     /** Add the current workingImage of the target canvas as a new layer on the source canvas. */
@@ -2228,10 +2258,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     BufferedImage img = javax.imageio.ImageIO.read(file);
                     if (img == null) return;
                     img = normalizeImage(img);
-                    int cx = Math.max(0, (c.workingImage.getWidth()  - img.getWidth())  / 2);
-                    int cy = Math.max(0, (c.workingImage.getHeight() - img.getHeight()) / 2);
+                    int[] size = fitElementSize(img.getWidth(), img.getHeight(),
+                                                c.workingImage.getWidth(), c.workingImage.getHeight());
+                    int cx = Math.max(0, (c.workingImage.getWidth()  - size[0]) / 2);
+                    int cy = Math.max(0, (c.workingImage.getHeight() - size[1]) / 2);
                     ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy,
-                                                     img.getWidth(), img.getHeight());
+                                                     size[0], size[1]);
                     int insertIdx = visualToInsertIndex(visualIdx, c.activeElements.size());
                     c.activeElements.add(insertIdx, layer);
                     c.selectedElements.clear();
