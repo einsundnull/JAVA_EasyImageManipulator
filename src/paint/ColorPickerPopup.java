@@ -32,11 +32,11 @@ import javax.swing.event.ChangeListener;
  * Photoshop-style floating color picker popup.
  *
  * Layout:
- *   ┌──────────────────────────────────┐
- *   │  [SV-Square]  [Hue-Strip]        │
- *   │  Alpha ──────────────────── [  ] │
- *   │  Hex: #RRGGBBAA    [Preview]     │
- *   └──────────────────────────────────┘
+ *   +----------------------------------+
+ *   |  [SV-Square]  [Hue-Strip]        |
+ *   |  Alpha ──────────────────── [  ] |
+ *   |  Hex: #RRGGBBAA    [Preview]     |
+ *   +----------------------------------+
  *
  * Owned by a parent JComponent; shown as undecorated JWindow near that component.
  */

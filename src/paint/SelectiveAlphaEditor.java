@@ -153,8 +153,16 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private JToggleButton secondCanvasBtn;
     private JToggleButton secondGalleryBtn;
 
-    // ── Element layer panel (right sidebar, shown in Canvas mode) ─────────────
-    private ElementLayerPanel elementLayerPanel;
+    // ── Element layer panels (shown in Canvas mode) ──────────────────────────
+    private ElementLayerPanel elementLayerPanel;    // For canvas 0
+    private ElementLayerPanel elementLayerPanel2;   // For canvas 1
+    private JToggleButton firstElementsBtn;         // Toggle for elementLayerPanel
+    private JToggleButton secondElementsBtn;        // Toggle for elementLayerPanel2
+
+    // ── Element-edit mode (double-click on layer tile) ────────────────────────
+    private Layer elementEditSourceLayer;   // the layer being edited
+    private int   elementEditSourceIdx;     // canvas that owns the layer
+    private int   elementEditTargetIdx;     // canvas where the temp image is loaded
 
     // ── Shared UI components ───────────────────────────────────────────────────
     private HRulerPanel   hRuler;
@@ -165,6 +173,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private JPanel        rightArea;       // wrapper for second canvas area
     private JPanel        rightDropZone;   // drag-activation overlay
     private JSplitPane    centerSplitPane;
+    private int           savedDividerLocation = -1;  // Save divider position when hiding second canvas
 
     private JLabel  statusLabel;
     private JLabel  modeLabel;
@@ -394,14 +403,28 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         secondCanvasBtn.setSelected(false);
         secondCanvasBtn.setEnabled(false);
         secondCanvasBtn.addActionListener(e -> {
-            if (ci(1).layeredPane != null) {
+            if (rightArea != null && centerSplitPane != null) {
                 boolean isVisible = secondCanvasBtn.isSelected();
-                ci(1).layeredPane.setVisible(isVisible);
-                if (centerSplitPane != null) {
-                    centerSplitPane.setDividerSize(isVisible ? 4 : 0);  // Show/hide divider
+
+                if (isVisible) {
+                    // Showing second canvas: restore divider position
+                    rightArea.setVisible(true);
+                    centerSplitPane.setDividerSize(4);
+                    if (savedDividerLocation > 0) {
+                        centerSplitPane.setDividerLocation(savedDividerLocation);
+                    } else {
+                        // Default to 50/50 split if no saved position
+                        centerSplitPane.setDividerLocation(0.5);
+                    }
+                } else {
+                    // Hiding second canvas: save divider position
+                    savedDividerLocation = centerSplitPane.getDividerLocation();
+                    rightArea.setVisible(false);
+                    centerSplitPane.setDividerSize(0);
+                    centerCanvas(0);  // Auto-center when hiding
                 }
+
                 updateCanvasFocusBorder();  // Update border visibility
-                if (!isVisible) centerCanvas(0);  // Auto-center when hiding
                 if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
             }
         });
@@ -417,6 +440,28 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             }
         });
 
+        firstElementsBtn = UIComponentFactory.buildModeToggleBtn("E1", "1. Ebenen ein-/ausblenden");
+        firstElementsBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+        firstElementsBtn.setSelected(false);
+        firstElementsBtn.setEnabled(false);
+        firstElementsBtn.addActionListener(e -> {
+            if (elementLayerPanel != null) {
+                elementLayerPanel.setVisible(firstElementsBtn.isSelected());
+                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
+            }
+        });
+
+        secondElementsBtn = UIComponentFactory.buildModeToggleBtn("E2", "2. Ebenen ein-/ausblenden");
+        secondElementsBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+        secondElementsBtn.setSelected(false);
+        secondElementsBtn.setEnabled(false);
+        secondElementsBtn.addActionListener(e -> {
+            if (elementLayerPanel2 != null) {
+                elementLayerPanel2.setVisible(secondElementsBtn.isSelected());
+                if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
+            }
+        });
+
         modeLabel = new JLabel("Modus: Selective Alpha");
         modeLabel.setForeground(AppColors.TEXT_MUTED);
         modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -427,8 +472,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         statusLabel.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
 
         left.add(filmstripBtn);
+        left.add(firstElementsBtn);
         left.add(secondCanvasBtn);
         left.add(secondGalleryBtn);
+        left.add(secondElementsBtn);
         left.add(modeLabel);
         left.add(statusLabel);
         bar.add(left, BorderLayout.WEST);
@@ -498,8 +545,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         actionPanel.add(resetButton);
         actionPanel.add(saveButton);
 
-        // — Mode toggle buttons —
-        // \u25a1 (□) = white square  \u270f (✏) = pencil — both BMP, safe
+        // Mode toggle buttons
         canvasModeBtn = UIComponentFactory.buildModeToggleBtn("\u25a6", "Canvas-Modus: Layer-Verwaltung – nur im Paint-Modus (STRG+A = Alle auswählen)");
         canvasModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
         canvasModeBtn.setEnabled(false); // enabled only while Paint mode is active
@@ -563,7 +609,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
     // ── Center: ruler panels + scrollPane ────────────────────────────────────
     private JPanel buildCenter() {
-        // Build both canvas areas
+        // Build both canvas areas (handles all UI setup for both canvases)
         buildCanvasArea(0);
         buildCanvasArea(1);
 
@@ -583,84 +629,52 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         rulerNorthBar.add(rulerCorner, BorderLayout.WEST);
         rulerNorthBar.add(hRuler,     BorderLayout.CENTER);
 
-        // Create CanvasWrapper for canvas 0 (the main one - special because it's embedded in rules)
-        ci(0).canvasWrapper = new JPanel(null) {
-            @Override public Dimension getPreferredSize() {
-                if (ci(0).workingImage == null) return new Dimension(1, 1);
-                int cw = (int) Math.ceil(ci(0).workingImage.getWidth()  * ci(0).zoom);
-                int ch = (int) Math.ceil(ci(0).workingImage.getHeight() * ci(0).zoom);
-                Dimension vd = ci(0).scrollPane != null ? ci(0).scrollPane.getViewport().getSize()
-                                                  : new Dimension(cw, ch);
-                return new Dimension(Math.max(cw, vd.width), Math.max(ch, vd.height));
-            }
-            @Override public void doLayout() {
-                if (ci(0).canvasPanel == null) return;
-                Dimension cs = ci(0).canvasPanel.getPreferredSize();
-                Dimension ws = getSize();
-                int x = Math.max(0, (ws.width  - cs.width)  / 2);
-                int y = Math.max(0, (ws.height - cs.height) / 2);
-                ci(0).canvasPanel.setBounds(x, y, cs.width, cs.height);
-            }
-        };
-        ci(0).canvasWrapper.setBackground(AppColors.BG_DARK);
-        ci(0).canvasWrapper.setOpaque(true);
-        ci(0).canvasWrapper.add(ci(0).canvasPanel);
+        // Element layer panels (both initially hidden)
+        elementLayerPanel = new ElementLayerPanel(buildElementLayerCallbacks(0));
+        elementLayerPanel.setVisible(false);  // Hide initially, show only in Canvas mode
+        elementLayerPanel2 = new ElementLayerPanel(buildElementLayerCallbacks(1));
+        elementLayerPanel2.setVisible(false);  // Hide until canvas 2 has content
 
-        // Create ScrollPane for canvas 0
-        ci(0).scrollPane = new JScrollPane(ci(0).canvasWrapper,
-                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        ci(0).scrollPane.setBorder(null);
-        ci(0).scrollPane.getViewport().setBackground(AppColors.BG_DARK);
-        ci(0).scrollPane.setBackground(AppColors.BG_DARK);
-        ci(0).scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        ci(0).scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
-        TileGalleryPanel.applyDarkScrollBar(ci(0).scrollPane.getVerticalScrollBar());
-        TileGalleryPanel.applyDarkScrollBar(ci(0).scrollPane.getHorizontalScrollBar());
-        ci(0).scrollPane.getViewport().addChangeListener(e -> {
-            if (showRuler) { hRuler.repaint(); vRuler.repaint(); }
-            ci(0).canvasWrapper.revalidate();
-        });
+        // Right area for second canvas: canvas-B + gallery B + elements B (initially hidden)
+        // Layout inside rightArea: [canvas-B (CENTER)] [IB+EB (EAST)]
+        JPanel rightSidePanel = new JPanel(new BorderLayout());
+        rightSidePanel.setBackground(AppColors.BG_DARK);
+        rightSidePanel.add(ci(1).tileGallery,  BorderLayout.WEST);
+        rightSidePanel.add(elementLayerPanel2, BorderLayout.EAST);
 
-        // Viewport for canvas 0
-        ci(0).viewportPanel = new JPanel(new BorderLayout());
-        ci(0).viewportPanel.setBackground(AppColors.BG_DARK);
-        ci(0).viewportPanel.setVisible(false);
-        ci(0).viewportPanel.add(ci(0).scrollPane, BorderLayout.CENTER);
-        JPanel scrollSpacer = new JPanel();
-        scrollSpacer.setOpaque(true);
-        scrollSpacer.setBackground(AppColors.BG_DARK);
-        scrollSpacer.setPreferredSize(new Dimension(0, 16));
-        ci(0).viewportPanel.add(scrollSpacer, BorderLayout.SOUTH);
-
-        // Element layer panel
-        elementLayerPanel = new ElementLayerPanel(buildElementLayerCallbacks());
-
-        // Right area for second canvas (initially hidden)
         rightArea = new JPanel(new BorderLayout());
         rightArea.setBackground(AppColors.BG_DARK);
         rightArea.add(ci(1).layeredPane, BorderLayout.CENTER);
-        rightArea.add(ci(1).tileGallery, BorderLayout.EAST);
+        rightArea.add(rightSidePanel,    BorderLayout.EAST);
         rightArea.setVisible(false);
+
+        // Hide second canvas gallery and elements initially
+        ci(1).tileGallery.setVisible(false);
 
         // Right drop zone overlay (for dragging tiles to activate second canvas)
         rightDropZone = buildRightDropZone();
         ci(0).layeredPane.add(rightDropZone, JLayeredPane.PALETTE_LAYER);
         rightDropZone.setVisible(false);
 
-        // Split pane between canvas 0 and canvas 1
-        centerSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, ci(0).layeredPane, rightArea);
+        // Left canvas area: EA element panel (WEST) + canvas-A (CENTER)
+        // → single-canvas layout: IA | EA | canvas-A
+        JPanel leftPane = new JPanel(new BorderLayout());
+        leftPane.setBackground(AppColors.BG_DARK);
+        leftPane.add(ci(0).layeredPane, BorderLayout.CENTER);
+        leftPane.add(elementLayerPanel,  BorderLayout.WEST);
+
+        // Split pane between canvas 0 area and canvas 1 area
+        centerSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPane, rightArea);
         centerSplitPane.setDividerSize(0);  // Initially hidden until second canvas is activated
         centerSplitPane.setResizeWeight(0.5);
         centerSplitPane.setBorder(null);
         centerSplitPane.setBackground(AppColors.BG_DARK);
 
-        // Gallery wrapper (left sidebar + center)
+        // Gallery wrapper: IA | [canvas-A | EA || canvas-B | IB | EB]
         galleryWrapper = new JPanel(new BorderLayout());
         galleryWrapper.setBackground(AppColors.BG_DARK);
         galleryWrapper.add(ci(0).tileGallery, BorderLayout.WEST);
-        galleryWrapper.add(centerSplitPane, BorderLayout.CENTER);
-        // elementLayerPanel is added to EAST only when Canvas mode is active
+        galleryWrapper.add(centerSplitPane,   BorderLayout.CENTER);
 
         return galleryWrapper;
     }
@@ -710,10 +724,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             }
         }
 
-        // Update element panel to show active canvas's elements
-        if (elementLayerPanel != null) {
-            elementLayerPanel.refresh(ci().activeElements);
-        }
+        // Update element panels
+        refreshElementPanel();
     }
 
     // ── Build canvas area (for index 0 or 1) ──────────────────────────────────
@@ -725,6 +737,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
         // Canvas wrapper (null-layout for absolute positioning) with centering
         c.canvasWrapper = new JPanel(null) {
+            @Override public Dimension getPreferredSize() {
+                if (c.workingImage == null) return new Dimension(1, 1);
+                int cw = (int) Math.ceil(c.workingImage.getWidth()  * c.zoom);
+                int ch = (int) Math.ceil(c.workingImage.getHeight() * c.zoom);
+                Dimension vd = c.scrollPane != null ? c.scrollPane.getViewport().getSize()
+                                                      : new Dimension(cw, ch);
+                return new Dimension(Math.max(cw, vd.width), Math.max(ch, vd.height));
+            }
             @Override public void doLayout() {
                 if (c.canvasPanel == null) return;
                 Dimension cs = c.canvasPanel.getPreferredSize();
@@ -735,13 +755,20 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             }
         };
         c.canvasWrapper.setBackground(AppColors.BG_DARK);
+        c.canvasWrapper.setOpaque(true);
         c.canvasWrapper.add(c.canvasPanel);
 
         // Scroll pane
         c.scrollPane = new JScrollPane(c.canvasWrapper);
         c.scrollPane.setBorder(null);
+        if (idx == 0) {
+            c.scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+            c.scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
+        }
         TileGalleryPanel.applyDarkScrollBar(c.scrollPane.getVerticalScrollBar());
         TileGalleryPanel.applyDarkScrollBar(c.scrollPane.getHorizontalScrollBar());
+        c.scrollPane.getViewport().setBackground(AppColors.BG_DARK);
+        c.scrollPane.setBackground(AppColors.BG_DARK);
         c.scrollPane.getViewport().addChangeListener(e -> {
             if (showRuler && idx == 0) { hRuler.repaint(); vRuler.repaint(); }
             c.canvasWrapper.revalidate();
@@ -799,6 +826,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         c.layeredPane.add(c.prevNavButton, JLayeredPane.PALETTE_LAYER);
         c.layeredPane.add(c.nextNavButton, JLayeredPane.PALETTE_LAYER);
 
+        // Element-edit action bar (hidden until a layer is opened for editing)
+        c.elementEditBar = buildElementEditBar(idx);
+        c.elementEditBar.setVisible(false);
+        c.layeredPane.add(c.elementEditBar, JLayeredPane.MODAL_LAYER);
+
         // Component listener for resizing
         c.layeredPane.addComponentListener(new ComponentAdapter() {
             @Override public void componentResized(ComponentEvent e) {
@@ -807,6 +839,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 if (c.viewportPanel.getParent() == c.layeredPane)
                     c.viewportPanel.setBounds(0, 0, w, h);
                 repositionNavButtons(idx);
+                repositionElementEditBar(idx);
                 if (idx == 0) repositionRightDropZone();
 
                 // Re-fit when canvas size changes (e.g., split pane divider moved)
@@ -1038,15 +1071,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         activeCanvasIndex = idx;
         updateCanvasFocusBorder();
 
-        indexDirectory(file, idx);
+        // Don't index temp files (element-edit mode) — would pollute nav with /tmp
+        if (!file.getParentFile().equals(new java.io.File(System.getProperty("java.io.tmpdir"))))
+            indexDirectory(file, idx);
         swapToImageView(idx);
-        SwingUtilities.invokeLater(() -> {
-            if (c.userHasManuallyZoomed) {
-                centerCanvas(idx);
-            } else {
-                fitToViewport(idx);
-            }
-        });
+        SwingUtilities.invokeLater(() -> fitToViewport(idx));
         refreshElementPanel();
         updateNavigationButtons();
         updateTitle();
@@ -1132,12 +1161,28 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         }
         c.viewportPanel.setVisible(true);
 
-        // If loading into canvas 1, show the right area
+        // Enable canvas-0 element button as soon as canvas 0 has content
+        if (idx == 0) {
+            firstElementsBtn.setEnabled(true);
+        }
+
+        // If loading into canvas 1, show the right area and enable toggle buttons
         if (idx == 1) {
             rightArea.setVisible(true);
             rightDropZone.setVisible(false);
             centerSplitPane.setDividerSize(4);  // Show divider
+            // Set divider location: restore saved position or default to 50/50
+            if (savedDividerLocation > 0) {
+                centerSplitPane.setDividerLocation(savedDividerLocation);
+            } else {
+                centerSplitPane.setDividerLocation(0.5);
+            }
             updateCanvasFocusBorder();  // Update border visibility
+
+            // Canvas II: only enable buttons — user decides visibility explicitly
+            secondCanvasBtn.setEnabled(true);
+            secondGalleryBtn.setEnabled(true);
+            secondElementsBtn.setEnabled(true);
         }
 
         repositionNavButtons(idx);
@@ -1153,16 +1198,35 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             SwingUtilities.invokeLater(() -> fitToViewport(idx));
             return;
         }
-        // Reserve space for navigation buttons (36px wide on each side, 80px tall)
-        double effectiveWidth = vd.width - 80;   // Left + Right button margin
-        double effectiveHeight = vd.height - 80; // Button height margin
 
-        // Calculate zoom to fit entire image in viewport while maintaining aspect ratio
-        double zoomWidth = effectiveWidth / c.workingImage.getWidth();
-        double zoomHeight = effectiveHeight / c.workingImage.getHeight();
-        double nz = Math.min(zoomWidth, zoomHeight) * 0.98;  // 0.98 for small padding
-        setZoomInstant(nz, idx);
-        centerCanvas(idx);
+        // Stop any running animation and set zoom synchronously
+        if (c.zoomTimer != null) { c.zoomTimer.stop(); c.zoomTimer = null; }
+        c.userHasManuallyZoomed = false;
+        c.zoomImgPt   = null;
+        c.zoomVpMouse = null;
+
+        double nz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX,
+                Math.min((vd.width  - 80.0) / c.workingImage.getWidth(),
+                         (vd.height - 80.0) / c.workingImage.getHeight()) * 0.98));
+        c.zoom = c.zoomTarget = nz;
+        c.canvasWrapper.revalidate();
+
+        // Single invokeLater — layout has settled by the time this runs,
+        // so viewport size is accurate and centering is correct.
+        SwingUtilities.invokeLater(() -> {
+            if (c.workingImage == null || c.scrollPane == null) return;
+            c.canvasWrapper.revalidate();
+            c.canvasWrapper.validate();
+            JViewport   vp    = c.scrollPane.getViewport();
+            Dimension   vpSz  = vp.getSize();
+            int cw = (int) Math.ceil(c.workingImage.getWidth()  * c.zoom);
+            int ch = (int) Math.ceil(c.workingImage.getHeight() * c.zoom);
+            vp.setViewPosition(new Point(
+                    Math.max(0, (cw - vpSz.width)  / 2),
+                    Math.max(0, (ch - vpSz.height) / 2)));
+            c.canvasWrapper.repaint();
+            if (zoomLabel != null) zoomLabel.setText(Math.round(c.zoom * 100) + "%");
+        });
     }
 
     public void centerCanvas(int idx) {
@@ -1386,7 +1450,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         if (c.sourceFile != null) dirtyFiles.remove(c.sourceFile);
         updateTitle();
         updateDirtyUI();
-        elementLayerPanel.refresh(c.activeElements);
+        refreshElementPanel();
         c.canvasPanel.repaint();
     }
 
@@ -1465,6 +1529,182 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         if (showRuler && idx == 0) { hRuler.repaint(); vRuler.repaint(); }
     }
 
+    /** CTRL+ALT+S: overwrite the original source file directly, no suffix, no dialog. */
+    private void saveImageToOriginal() {
+        CanvasInstance c = ci();
+        if (c.sourceFile == null || c.workingImage == null) return;
+        try {
+            ImageIO.write(c.workingImage, "PNG", c.sourceFile);
+            c.hasUnsavedChanges = false;
+            dirtyFiles.remove(c.sourceFile);
+            updateTitle();
+            updateDirtyUI();
+            ToastNotification.show(this, "Gespeichert: " + c.sourceFile.getName());
+            SwingUtilities.invokeLater(this::ensureElementEditBarVisible);
+        } catch (IOException e) { showErrorDialog("Speicherfehler", e.getMessage()); }
+    }
+
+    // =========================================================================
+    // Element-edit mode (double-click on layer tile → open in other canvas)
+    // =========================================================================
+
+    /** Builds the floating action bar shown in a canvas when it is in element-edit mode. */
+    private JPanel buildElementEditBar(int idx) {
+        // Non-opaque panel with manual alpha-background paint — avoids JLayeredPane transparency glitch
+        JPanel bar = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 6, 6)) {
+            @Override protected void paintComponent(java.awt.Graphics g) {
+                java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
+                g2.setColor(getBackground());
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        bar.setOpaque(false);
+        bar.setBackground(new Color(30, 30, 30, 220));
+        bar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppColors.BORDER));
+
+        JButton btnNewLayer  = UIComponentFactory.buildButton("Als neues Layer",           AppColors.ACCENT,   AppColors.ACCENT_HOVER);
+        JButton btnThisLayer = UIComponentFactory.buildButton("In diesem Layer übernehmen", new Color(60,140,60), new Color(40,110,40));
+        JButton btnNewImage  = UIComponentFactory.buildButton("Als neues Image",            AppColors.BTN_BG,   AppColors.BTN_HOVER);
+        JButton btnAbort     = UIComponentFactory.buildButton("Abbrechen",                  new Color(160,50,50), new Color(130,30,30));
+        JButton btnClose     = UIComponentFactory.buildButton("Close",                      AppColors.BTN_BG,   AppColors.BTN_HOVER);
+
+        for (JButton b : new JButton[]{btnNewLayer, btnThisLayer, btnNewImage, btnAbort, btnClose})
+            b.setForeground(Color.WHITE);
+
+        btnNewLayer.addActionListener(e -> elementEditAsNewLayer(idx));
+        btnThisLayer.addActionListener(e -> elementEditIntoSourceLayer(idx));
+        btnNewImage.addActionListener(e -> elementEditAsNewImage(idx));
+        btnAbort.addActionListener(e -> elementEditAbort(idx));
+        btnClose.addActionListener(e -> elementEditClose(idx));
+
+        bar.add(btnNewLayer);
+        bar.add(btnThisLayer);
+        bar.add(btnNewImage);
+        bar.add(btnAbort);
+        bar.add(btnClose);
+        return bar;
+    }
+
+    private void repositionElementEditBar(int idx) {
+        CanvasInstance c = ci(idx);
+        if (c.elementEditBar == null) return;
+        int w = c.layeredPane.getWidth();
+        int h = c.layeredPane.getHeight();
+        int bh = 44;
+        c.elementEditBar.setBounds(0, h - bh, w, bh);
+    }
+
+    /** Enter element-edit mode: load the element as a temp image into the target canvas. */
+    private void activateElementEditMode(int targetIdx, Layer sourceLayer, int sourceIdx) {
+        elementEditSourceLayer = sourceLayer;
+        elementEditSourceIdx   = sourceIdx;
+        elementEditTargetIdx   = targetIdx;
+
+        CanvasInstance c = ci(targetIdx);
+        repositionElementEditBar(targetIdx);
+        c.elementEditBar.setVisible(true);
+        c.layeredPane.revalidate();
+        c.layeredPane.repaint();
+    }
+
+    /** Exit element-edit mode without any transfer. */
+    private void exitElementEditMode(int targetIdx) {
+        elementEditSourceLayer = null;
+        CanvasInstance c = ci(targetIdx);
+        c.elementEditBar.setVisible(false);
+        c.layeredPane.repaint();
+    }
+
+    // ── Button actions ────────────────────────────────────────────────────────
+
+    /** Add the current workingImage of the target canvas as a new layer on the source canvas. */
+    private void elementEditAsNewLayer(int targetIdx) {
+        if (elementEditSourceLayer == null) return;
+        CanvasInstance src = ci(elementEditSourceIdx);
+        CanvasInstance tgt = ci(targetIdx);
+        if (tgt.workingImage == null) { exitElementEditMode(targetIdx); return; }
+
+        BufferedImage img = deepCopy(tgt.workingImage);
+        ImageLayer newLayer = new ImageLayer(src.nextElementId++, img,
+                elementEditSourceLayer.x(), elementEditSourceLayer.y(),
+                img.getWidth(), img.getHeight());
+        src.activeElements.add(newLayer);
+        src.selectedElements.clear();
+        src.selectedElements.add(newLayer);
+        src.hasUnsavedChanges = true;
+        markDirty(elementEditSourceIdx);
+        refreshElementPanel();
+        if (src.canvasPanel != null) src.canvasPanel.repaint();
+        exitElementEditMode(targetIdx);
+        ToastNotification.show(this, "Als neues Layer eingefügt");
+    }
+
+    /** Replace the source layer's image with the current workingImage of the target canvas. */
+    private void elementEditIntoSourceLayer(int targetIdx) {
+        if (elementEditSourceLayer == null) return;
+        CanvasInstance src = ci(elementEditSourceIdx);
+        CanvasInstance tgt = ci(targetIdx);
+        if (tgt.workingImage == null) { exitElementEditMode(targetIdx); return; }
+
+        if (!(elementEditSourceLayer instanceof ImageLayer)) {
+            showErrorDialog("Nicht möglich", "Nur ImageLayer können überschrieben werden.");
+            return;
+        }
+        BufferedImage img = deepCopy(tgt.workingImage);
+        // Replace layer in-place: find it by id and swap the image
+        List<Layer> els = src.activeElements;
+        for (int i = 0; i < els.size(); i++) {
+            if (els.get(i).id() == elementEditSourceLayer.id()) {
+                ImageLayer old = (ImageLayer) els.get(i);
+                els.set(i, new ImageLayer(old.id(), img,
+                        old.x(), old.y(), img.getWidth(), img.getHeight()));
+                break;
+            }
+        }
+        src.hasUnsavedChanges = true;
+        markDirty(elementEditSourceIdx);
+        refreshElementPanel();
+        if (src.canvasPanel != null) src.canvasPanel.repaint();
+        exitElementEditMode(targetIdx);
+        ToastNotification.show(this, "Layer übernommen");
+    }
+
+    /** Keep the target canvas as a normal standalone image — just exit edit mode. */
+    private void elementEditAsNewImage(int targetIdx) {
+        exitElementEditMode(targetIdx);
+        ToastNotification.show(this, "Als neues Image behalten");
+    }
+
+    /** Discard changes: clear the target canvas and exit edit mode. */
+    private void elementEditAbort(int targetIdx) {
+        CanvasInstance c = ci(targetIdx);
+        c.workingImage     = null;
+        c.originalImage    = null;
+        c.sourceFile       = null;
+        c.undoStack.clear();
+        c.redoStack.clear();
+        c.activeElements.clear();
+        c.selectedElements.clear();
+        c.hasUnsavedChanges = false;
+        c.viewportPanel.setVisible(false);
+        if (c.viewportPanel.getParent() != null) c.layeredPane.remove(c.viewportPanel);
+        c.layeredPane.add(c.dropHintPanel, JLayeredPane.DEFAULT_LAYER);
+        int w = c.layeredPane.getWidth(), h = c.layeredPane.getHeight();
+        c.dropHintPanel.setBounds(0, 0, Math.max(w,1), Math.max(h,1));
+        exitElementEditMode(targetIdx);
+        refreshElementPanel();
+        updateTitle();
+        c.layeredPane.revalidate();
+        c.layeredPane.repaint();
+    }
+
+    /** Close the edit bar without any action (keep the canvas as-is). */
+    private void elementEditClose(int targetIdx) {
+        exitElementEditMode(targetIdx);
+    }
+
     /** CTRL+S: save silently without any confirmation dialog. */
     private void saveImageSilent() {
         CanvasInstance c = ci();
@@ -1478,7 +1718,18 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             updateTitle();
             updateDirtyUI();
             ToastNotification.show(this, "Gespeichert");
+            SwingUtilities.invokeLater(this::ensureElementEditBarVisible);
         } catch (IOException e) { showErrorDialog("Speicherfehler", e.getMessage()); }
+    }
+
+    /** Re-asserts element-edit bar visibility after any operation that might disturb it. */
+    private void ensureElementEditBarVisible() {
+        if (elementEditSourceLayer == null) return;
+        CanvasInstance tc = canvases[elementEditTargetIdx];
+        if (tc.elementEditBar == null) return;
+        repositionElementEditBar(elementEditTargetIdx);
+        tc.elementEditBar.setVisible(true);
+        tc.layeredPane.repaint();
     }
 
     public void markDirty() {
@@ -1575,15 +1826,22 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         ci().canvasPanel.repaint();
     }
 
-    /** Shows or hides the element layer panel on the right side of the canvas. */
+    /** Shows or hides the element layer panels based on active canvas and mode. */
     private void setElementPanelVisible(boolean visible) {
         if (visible) {
-            if (elementLayerPanel.getParent() != galleryWrapper) {
-                galleryWrapper.add(elementLayerPanel, BorderLayout.EAST);
+            // Show appropriate element panel based on active canvas
+            if (activeCanvasIndex == 0) {
+                elementLayerPanel.setVisible(true);
+                if (elementLayerPanel2 != null) elementLayerPanel2.setVisible(false);
+            } else {
+                elementLayerPanel.setVisible(false);
+                if (elementLayerPanel2 != null) elementLayerPanel2.setVisible(true);
             }
             refreshElementPanel();
         } else {
-            galleryWrapper.remove(elementLayerPanel);
+            // Hide both panels
+            elementLayerPanel.setVisible(false);
+            if (elementLayerPanel2 != null) elementLayerPanel2.setVisible(false);
         }
         galleryWrapper.revalidate();
         galleryWrapper.repaint();
@@ -1591,36 +1849,41 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
     /** Rebuilds the element layer panel tiles from the current activeElements. */
     private void refreshElementPanel() {
-        if (elementLayerPanel != null && elementLayerPanel.isShowing()) {
-            elementLayerPanel.refresh(ci().activeElements);
-        }
+        if (elementLayerPanel  != null && elementLayerPanel.isShowing())
+            elementLayerPanel.refresh(ci(0).activeElements);
+        if (elementLayerPanel2 != null && elementLayerPanel2.isShowing())
+            elementLayerPanel2.refresh(ci(1).activeElements);
     }
 
-    /** Builds the callbacks for the ElementLayerPanel. */
-    private ElementLayerPanel.Callbacks buildElementLayerCallbacks() {
+    /** Builds the callbacks for the ElementLayerPanel, bound to a specific canvas index.
+     *  Panel operations (delete, burn, …) always affect that panel's own canvas.
+     *  Paste/insert uses ci() separately and is unaffected by this binding. */
+    private ElementLayerPanel.Callbacks buildElementLayerCallbacks(int idx) {
         return new ElementLayerPanel.Callbacks() {
-            @Override public List<Layer> getActiveElements()   { return ci().activeElements; }
-            @Override public List<Layer> getSelectedElements() { return ci().selectedElements; }
+            private CanvasInstance c() { return canvases[idx]; }
+
+            @Override public List<Layer> getActiveElements()   { return c().activeElements; }
+            @Override public List<Layer> getSelectedElements() { return c().selectedElements; }
             @Override public void setSelectedElement(Layer el) {
-                ci().selectedElements.clear();
-                if (el != null) ci().selectedElements.add(el);
-                if (ci().canvasPanel != null) ci().canvasPanel.repaint();
+                c().selectedElements.clear();
+                if (el != null) c().selectedElements.add(el);
+                if (c().canvasPanel != null) c().canvasPanel.repaint();
             }
             @Override public void toggleElementSelection(Layer el) {
                 doToggleElementSelection(el);
-                if (ci().canvasPanel != null) ci().canvasPanel.repaint();
+                if (c().canvasPanel != null) c().canvasPanel.repaint();
             }
             @Override public void deleteElement(Layer el) {
-                ci().activeElements.removeIf(e -> e.id() == el.id());
-                ci().selectedElements.removeIf(e -> e.id() == el.id());
+                c().activeElements.removeIf(e -> e.id() == el.id());
+                c().selectedElements.removeIf(e -> e.id() == el.id());
                 markDirty();
                 refreshElementPanel();
-                if (ci().canvasPanel != null) ci().canvasPanel.repaint();
+                if (c().canvasPanel != null) c().canvasPanel.repaint();
             }
             @Override public void burnElement(Layer el) {
-                if (ci().workingImage == null) return;
+                if (c().workingImage == null) return;
                 // Tile holds a snapshot — look up live layer so position/scale are current
-                Layer live = ci().activeElements.stream()
+                Layer live = c().activeElements.stream()
                         .filter(e -> e.id() == el.id()).findFirst().orElse(el);
                 pushUndo();
                 BufferedImage imgToBurn;
@@ -1631,20 +1894,20 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     imgToBurn = PaintEngine.scale(
                             il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
                 }
-                PaintEngine.pasteRegion(ci().workingImage, imgToBurn, new java.awt.Point(live.x(), live.y()));
-                ci().activeElements.removeIf(e -> e.id() == el.id());
-                ci().selectedElements.removeIf(e -> e.id() == el.id());
+                PaintEngine.pasteRegion(c().workingImage, imgToBurn, new java.awt.Point(live.x(), live.y()));
+                c().activeElements.removeIf(e -> e.id() == el.id());
+                c().selectedElements.removeIf(e -> e.id() == el.id());
                 markDirty();
                 refreshElementPanel();
-                if (ci().canvasPanel != null) ci().canvasPanel.repaint();
+                if (c().canvasPanel != null) c().canvasPanel.repaint();
             }
 
             @Override public void exportElementAsImage(Layer el) {
-                if (ci().workingImage == null || ci().sourceFile == null) return;
+                if (c().workingImage == null || c().sourceFile == null) return;
                 System.err.println("[DEBUG] exportElementAsImage called for layer id=" + el.id());
 
                 // Get live layer
-                Layer live = ci().activeElements.stream()
+                Layer live = c().activeElements.stream()
                         .filter(e -> e.id() == el.id()).findFirst().orElse(el);
 
                 // Render element to image
@@ -1658,14 +1921,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 }
 
                 // Generate default filename: originalName + _layer_<id>
-                String sourceName = ci().sourceFile.getName();
+                String sourceName = c().sourceFile.getName();
                 int lastDot = sourceName.lastIndexOf('.');
                 String baseName = lastDot > 0 ? sourceName.substring(0, lastDot) : sourceName;
                 String extension = lastDot > 0 ? sourceName.substring(lastDot) : ".png";
                 String defaultName = baseName + "_layer_" + live.id() + extension;
 
                 // Find unique filename if file already exists
-                File exportDir = ci().sourceFile.getParentFile();
+                File exportDir = c().sourceFile.getParentFile();
                 File targetFile = new File(exportDir, defaultName);
                 int counter = 1;
                 while (targetFile.exists()) {
@@ -1712,11 +1975,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     javax.imageio.ImageIO.write(img, "PNG", file);
                     System.err.println("[DEBUG] Element exported to: " + file.getAbsolutePath());
 
-                    // Add the new image to the tile gallery
-                    if (ci(0).tileGallery != null) {
+                    // Add the new image to the gallery of this canvas
+                    if (c().tileGallery != null) {
                         java.util.List<File> newFiles = new java.util.ArrayList<>();
                         newFiles.add(file);
-                        ci(0).tileGallery.addFiles(newFiles);
+                        c().tileGallery.addFiles(newFiles);
                         System.err.println("[DEBUG] Added new image to gallery: " + file.getName());
                     }
 
@@ -1731,7 +1994,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             }
 
             @Override public void repaintCanvas() {
-                if (ci().canvasPanel != null) ci().canvasPanel.repaint();
+                if (c().canvasPanel != null) c().canvasPanel.repaint();
             }
             @Override public void onCloseRequested() {
                 canvasModeBtn.setSelected(false);
@@ -1739,7 +2002,46 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             }
             @Override public void onLayerPanelElementHover(int elementId) {
                 // Forward tile hover to canvas so it can highlight the matching element
-                if (ci().canvasPanel != null) ci().canvasPanel.setHoveredElementId(elementId);
+                if (c().canvasPanel != null) c().canvasPanel.setHoveredElementId(elementId);
+            }
+
+            @Override public void openElementInOtherCanvas(Layer el) {
+                // Render the element to a BufferedImage
+                BufferedImage img = null;
+                if (el instanceof ImageLayer il) {
+                    img = il.image();
+                } else if (el instanceof TextLayer tl) {
+                    img = renderTextLayerToImage(tl);
+                }
+                if (img == null) return;
+
+                try {
+                    java.io.File tmp = java.io.File.createTempFile("element_" + el.id() + "_", ".png");
+                    tmp.deleteOnExit();
+                    ImageIO.write(img, "PNG", tmp);
+
+                    int targetIdx = 1 - idx;
+                    activeCanvasIndex = targetIdx;
+
+                    // Make sure the target canvas area is visible
+                    if (targetIdx == 1 && rightArea != null && !rightArea.isVisible()) {
+                        rightArea.setVisible(true);
+                        centerSplitPane.setDividerSize(4);
+                        if (savedDividerLocation > 0)
+                            centerSplitPane.setDividerLocation(savedDividerLocation);
+                        else
+                            centerSplitPane.setDividerLocation(0.5);
+                        secondCanvasBtn.setEnabled(true);
+                        secondCanvasBtn.setSelected(true);
+                        updateCanvasFocusBorder();
+                        if (galleryWrapper != null) { galleryWrapper.revalidate(); galleryWrapper.repaint(); }
+                    }
+
+                    loadFile(tmp, targetIdx);
+                    activateElementEditMode(targetIdx, el, idx);
+                } catch (IOException ex) {
+                    showErrorDialog("Fehler", "Element konnte nicht geöffnet werden:\n" + ex.getMessage());
+                }
             }
         };
     }
@@ -2309,12 +2611,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         Rectangle sel = getActiveSelection();
         if (sel != null) {
             clipboard = PaintEngine.cropRegion(c.workingImage, sel);
-            clipboardLayers = null;  // No layers, just image
             copyToSystemClipboard(clipboard);
             addElementFromClipboard(clipboard, sel.x, sel.y);
+            clipboardLayers = new ArrayList<>(c.selectedElements);  // carry layer to other canvas
         } else {
             clipboard = deepCopy(c.workingImage);
-            clipboardLayers = null;  // No layers, just image
+            clipboardLayers = null;
             copyToSystemClipboard(clipboard);
         }
     }
@@ -2336,9 +2638,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             clipboard = PaintEngine.cropOutside(c.workingImage, sel);
             copyToSystemClipboard(clipboard);
             addElementFromClipboard(clipboard, 0, 0);
+            clipboardLayers = new ArrayList<>(c.selectedElements);  // carry layer to other canvas
         } else {
             // No selection: same as normal copy
             clipboard = deepCopy(c.workingImage);
+            clipboardLayers = null;
             copyToSystemClipboard(clipboard);
         }
     }
@@ -2388,11 +2692,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         if (sel != null) {
             pushUndo();
             clipboard = PaintEngine.cropRegion(c.workingImage, sel);
-            clipboardLayers = null;
             copyToSystemClipboard(clipboard);
             PaintEngine.clearRegion(c.workingImage, sel);
             markDirty();
             addElementFromClipboard(clipboard, sel.x, sel.y);
+            clipboardLayers = new ArrayList<>(c.selectedElements);  // carry layer to other canvas
         } else {
             // No selection: cut entire image
             pushUndo();
@@ -2568,6 +2872,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
         int CTRL       = InputEvent.CTRL_DOWN_MASK;
         int CTRL_SHIFT = InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+        int CTRL_ALT   = InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, CTRL),        "copy");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, CTRL_SHIFT),  "copyOutside");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, CTRL),        "cut");
@@ -2577,6 +2882,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, CTRL),        "undo");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, CTRL),        "redo");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL),        "save");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT),   "saveOriginal");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE,    0),   "escape");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE,    0),   "deleteInside");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0),  "deleteOutside");
@@ -2601,7 +2907,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             if (c.floatingImg != null) cancelFloat(); else doUndo();
         }});
         am.put("redo",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRedo(); } });
-        am.put("save",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageSilent(); } });
+        am.put("save",         new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageSilent(); } });
+        am.put("saveOriginal", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageToOriginal(); } });
         am.put("escape",      new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             CanvasInstance c = ci();
             if (c.floatingImg != null) { cancelFloat(); }

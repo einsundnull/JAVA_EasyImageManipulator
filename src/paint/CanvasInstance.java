@@ -84,6 +84,7 @@ public class CanvasInstance {
     public TileGalleryPanel tileGallery;
     public JButton          prevNavButton;
     public JButton          nextNavButton;
+    public JPanel           elementEditBar;  // floating action bar shown when editing a layer
 
     // ── Inner file-cache entry ────────────────────────────────────────────────
     public static class CanvasFileState {

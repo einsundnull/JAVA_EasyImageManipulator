@@ -401,8 +401,8 @@ public class PaintToolbar extends JPanel {
             cb.onColorChanged(primaryColor, secondaryColor);
         });
 
-        p.add(miniLabel("● Stärke")); p.add(strokeSlider); p.add(strokeLabel);
-        p.add(miniLabel("α Alpha"));  p.add(alphaSlider);  p.add(alphaLabel);
+        p.add(miniLabel("* Staerke")); p.add(strokeSlider); p.add(strokeLabel);
+        p.add(miniLabel("a Alpha"));  p.add(alphaSlider);  p.add(alphaLabel);
         return p;
     }
 
@@ -527,11 +527,11 @@ public class PaintToolbar extends JPanel {
 
     private String[] symbolAndTip(PaintEngine.Tool tool) {
         return switch (tool) {
-            case PENCIL     -> new String[]{ "✏", "Stift (P)"      };
-            case FLOODFILL  -> new String[]{ "▓", "Fülleimer (F)"  };
-            case LINE       -> new String[]{ "╱", "Linie (L)"      };
-            case CIRCLE     -> new String[]{ "○", "Ellipse (E)"    };
-            case RECT       -> new String[]{ "□", "Rechteck (R)"   };
+            case PENCIL     -> new String[]{ "P", "Stift (P)"      };
+            case FLOODFILL  -> new String[]{ "F", "Fuelleimer (F)" };
+            case LINE       -> new String[]{ "/", "Linie (L)"      };
+            case CIRCLE     -> new String[]{ "O", "Ellipse (E)"    };
+            case RECT       -> new String[]{ "R", "Rechteck (R)"   };
             case ERASER     -> new String[]{ "⌫", "Radierer (X)"   };
             case EYEDROPPER -> new String[]{ "✦", "Pipette (I)"    };
             case SELECT     -> new String[]{ "⬚", "Auswahl (S)"    };
