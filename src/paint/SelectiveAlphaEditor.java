@@ -978,19 +978,88 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             @Override public void drop(java.awt.dnd.DropTargetDropEvent ev) {
                 try {
                     ev.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY);
-                    @SuppressWarnings("unchecked")
-                    List<File> files = (List<File>) ev.getTransferable()
-                            .getTransferData(DataFlavor.javaFileListFlavor);
-                    if (!files.isEmpty()) {
-                        File f = files.get(0);
-                        if (isSupportedFile(f)) loadFile(f, idx);
-                        else showErrorDialog("Format nicht unterstützt",
-                                "Erlaubt: PNG, JPG, BMP, GIF\nDatei: " + f.getName());
+                    java.awt.datatransfer.Transferable t = ev.getTransferable();
+                    if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
+                        // Case 1: LayerTile dragged onto canvas → copy as element
+                        Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
+                        insertLayerCopyToCanvas(layer, idx);
+                        ev.dropComplete(true);
+                    } else if (t.isDataFlavorSupported(TileGalleryPanel.FILE_AS_ELEMENT_FLAVOR)) {
+                        // Case 3: right-drag from TileGallery onto canvas → insert as element
+                        TileGalleryPanel.FileForElement ffe = (TileGalleryPanel.FileForElement)
+                                t.getTransferData(TileGalleryPanel.FILE_AS_ELEMENT_FLAVOR);
+                        insertFileAsElement(ffe.file, idx);
+                        ev.dropComplete(true);
+                    } else if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                        @SuppressWarnings("unchecked")
+                        List<File> files = (List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
+                        if (!files.isEmpty()) {
+                            File f = files.get(0);
+                            if (isSupportedFile(f)) loadFile(f, idx);
+                            else showErrorDialog("Format nicht unterstützt",
+                                    "Erlaubt: PNG, JPG, BMP, GIF\nDatei: " + f.getName());
+                        }
+                        ev.dropComplete(true);
+                    } else {
+                        ev.dropComplete(false);
                     }
-                    ev.dropComplete(true);
                 } catch (Exception ex) { ev.dropComplete(false); showErrorDialog("Drop-Fehler", ex.getMessage()); }
             }
         }, true);
+    }
+
+    /** Case 1: Copy a layer onto a canvas as a new element. */
+    private void insertLayerCopyToCanvas(Layer source, int targetIdx) {
+        CanvasInstance c = ci(targetIdx);
+        if (c.workingImage == null) return;
+        Layer copy = copyLayerWithNewId(source, c.nextElementId++);
+        if (copy == null) return;
+        c.activeElements.add(copy);
+        c.selectedElements.clear();
+        c.selectedElements.add(copy);
+        markDirty(targetIdx);
+        refreshElementPanel();
+        if (c.canvasPanel != null) c.canvasPanel.repaint();
+        ToastNotification.show(this, "Layer kopiert");
+    }
+
+    /** Case 3: Load an image file and insert it as a new element on the canvas. */
+    private void insertFileAsElement(File f, int targetIdx) {
+        CanvasInstance c = ci(targetIdx);
+        if (c.workingImage == null) {
+            if (isSupportedFile(f)) loadFile(f, targetIdx);
+            return;
+        }
+        try {
+            BufferedImage img = javax.imageio.ImageIO.read(f);
+            if (img == null) return;
+            img = normalizeImage(img);
+            int cx = Math.max(0, (c.workingImage.getWidth()  - img.getWidth())  / 2);
+            int cy = Math.max(0, (c.workingImage.getHeight() - img.getHeight()) / 2);
+            ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy, img.getWidth(), img.getHeight());
+            c.activeElements.add(layer);
+            c.selectedElements.clear();
+            c.selectedElements.add(layer);
+            markDirty(targetIdx);
+            refreshElementPanel();
+            if (c.canvasPanel != null) c.canvasPanel.repaint();
+            ToastNotification.show(this, "Bild als Element eingefügt");
+        } catch (Exception ex) {
+            showErrorDialog("Fehler", "Bild konnte nicht geladen werden: " + ex.getMessage());
+        }
+    }
+
+    /** Creates a copy of {@code src} with a new ID. Returns null for unsupported types. */
+    private Layer copyLayerWithNewId(Layer src, int newId) {
+        if (src instanceof ImageLayer il) {
+            return new ImageLayer(newId, deepCopy(il.image()), il.x(), il.y(), il.width(), il.height());
+        } else if (src instanceof TextLayer tl) {
+            return TextLayer.of(newId, tl.text(), tl.fontName(), tl.fontSize(),
+                    tl.fontBold(), tl.fontItalic(), tl.fontColor(), tl.x(), tl.y());
+        } else if (src instanceof PathLayer pl) {
+            return PathLayer.of(newId, pl.points(), pl.image(), pl.isClosed(), pl.x(), pl.y());
+        }
+        return null;
     }
 
     // =========================================================================
@@ -2114,6 +2183,47 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 CanvasInstance ci = c();
                 if (ci.canvasPanel != null) ci.canvasPanel.enterTextEditMode(el);
             }
+
+            // ── Case 2: LayerTile dropped onto another ElementLayerPanel ─────
+            @Override public void insertLayerCopyAt(Layer layer, int visualIdx) {
+                CanvasInstance c = c();
+                Layer copy = copyLayerWithNewId(layer, c.nextElementId++);
+                if (copy == null) return;
+                // Display is reversed: visual 0 = top = last in activeElements
+                int insertIdx = Math.max(0, Math.min(c.activeElements.size() - visualIdx,
+                                                     c.activeElements.size()));
+                c.activeElements.add(insertIdx, copy);
+                c.selectedElements.clear();
+                c.selectedElements.add(copy);
+                markDirty(idx);
+                if (c.canvasPanel != null) c.canvasPanel.repaint();
+                SwingUtilities.invokeLater(() -> refreshElementPanel());
+            }
+
+            // ── Case 4: TileGallery right-drag dropped onto ElementLayerPanel ─
+            @Override public void insertFileAsLayerAt(File file, int visualIdx) {
+                CanvasInstance c = c();
+                if (c.workingImage == null) return;
+                try {
+                    BufferedImage img = javax.imageio.ImageIO.read(file);
+                    if (img == null) return;
+                    img = normalizeImage(img);
+                    int cx = Math.max(0, (c.workingImage.getWidth()  - img.getWidth())  / 2);
+                    int cy = Math.max(0, (c.workingImage.getHeight() - img.getHeight()) / 2);
+                    ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy,
+                                                     img.getWidth(), img.getHeight());
+                    int insertIdx = Math.max(0, Math.min(c.activeElements.size() - visualIdx,
+                                                         c.activeElements.size()));
+                    c.activeElements.add(insertIdx, layer);
+                    c.selectedElements.clear();
+                    c.selectedElements.add(layer);
+                    markDirty(idx);
+                    if (c.canvasPanel != null) c.canvasPanel.repaint();
+                    SwingUtilities.invokeLater(() -> refreshElementPanel());
+                } catch (Exception ex) {
+                    showErrorDialog("Fehler", "Bild konnte nicht geladen werden: " + ex.getMessage());
+                }
+            }
         };
     }
 
@@ -2734,6 +2844,50 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 if (idx == 0) {
                     rightDropZone.setVisible(false);
                     ci(0).layeredPane.repaint();
+                }
+            }
+
+            // ── Case 5: LayerTile dropped onto TileGallery → save as PNG ─────
+            @Override public void onLayerDropped(Layer layer) {
+                CanvasInstance c = canvases[idx];
+                if (c.sourceFile == null) return;
+                // Render layer to image
+                BufferedImage img = null;
+                Layer live = c.activeElements.stream()
+                        .filter(e -> e.id() == layer.id()).findFirst().orElse(layer);
+                if (live instanceof ImageLayer il) {
+                    img = PaintEngine.scale(il.image(),
+                            Math.max(1, live.width()), Math.max(1, live.height()));
+                } else if (live instanceof TextLayer tl) {
+                    img = renderTextLayerToImage(tl);
+                } else {
+                    return; // PathLayer not supported for image export
+                }
+                // Auto-generate unique filename (same logic as exportElementAsImage)
+                String sourceName = c.sourceFile.getName();
+                int lastDot = sourceName.lastIndexOf('.');
+                String baseName  = lastDot > 0 ? sourceName.substring(0, lastDot) : sourceName;
+                String extension = lastDot > 0 ? sourceName.substring(lastDot)    : ".png";
+                String name = baseName + "_layer_" + live.id() + extension;
+                File exportDir = c.sourceFile.getParentFile();
+                File target = new File(exportDir, name);
+                int counter = 1;
+                while (target.exists()) {
+                    target = new File(exportDir, baseName + "_layer_" + live.id() + "_" + counter + extension);
+                    counter++;
+                }
+                final File finalTarget = target;
+                final BufferedImage finalImg = img;
+                // saveElementAsImageFile lives in buildElementLayerCallbacks – replicate inline
+                try {
+                    javax.imageio.ImageIO.write(finalImg, "PNG", finalTarget);
+                    List<File> added = new java.util.ArrayList<>();
+                    added.add(finalTarget);
+                    canvases[idx].tileGallery.addFiles(added);
+                    ToastNotification.show(SelectiveAlphaEditor.this,
+                            "Gespeichert: " + finalTarget.getName());
+                } catch (Exception ex) {
+                    showErrorDialog("Fehler", "Speichern fehlgeschlagen: " + ex.getMessage());
                 }
             }
         };

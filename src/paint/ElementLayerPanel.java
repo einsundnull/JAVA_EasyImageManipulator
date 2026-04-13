@@ -1,18 +1,33 @@
 package paint;
 
+import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.datatransfer.UnsupportedFlavorException;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DragSource;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDragEvent;
+import java.awt.dnd.DropTargetDropEvent;
+import java.awt.dnd.DropTargetEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -40,6 +55,9 @@ import javax.swing.SwingUtilities;
  */
 public class ElementLayerPanel extends JPanel {
 
+    // ── DnD flavor for dragging a Layer between panels / onto a canvas ────────
+    public static final DataFlavor LAYER_FLAVOR = new DataFlavor(Layer.class, "Layer");
+
     // ── Callback interface ────────────────────────────────────────────────────
     public interface Callbacks {
         List<Layer> getActiveElements();
@@ -59,6 +77,10 @@ public class ElementLayerPanel extends JPanel {
         void openElementInOtherCanvas(Layer el);
         /** Double-click on a TextLayer tile: enter text-edit mode on the owning canvas. */
         void openTextLayerForEditing(Layer el);
+        /** Insert a copy of {@code layer} at visual index {@code visualIdx} (0 = top). */
+        void insertLayerCopyAt(Layer layer, int visualIdx);
+        /** Insert the image at {@code file} as a new layer at visual index {@code visualIdx}. */
+        void insertFileAsLayerAt(File file, int visualIdx);
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
@@ -74,6 +96,8 @@ public class ElementLayerPanel extends JPanel {
     private boolean              showAllOutlines = false;
     /** Id of the layer whose tile is currently hovered in this panel, or -1. */
     private int                  hoveredElementId = -1;
+    /** Y-coordinate of the drop indicator line in tilesContainer, or -1 if none. */
+    private int                  dropIndicatorY   = -1;
 
     // =========================================================================
     // Constructor
@@ -151,10 +175,53 @@ public class ElementLayerPanel extends JPanel {
                     d.width = getParent().getWidth();
                 return d;
             }
+            @Override public void paint(Graphics g) {
+                super.paint(g);
+                if (dropIndicatorY >= 0) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setColor(AppColors.ACCENT);
+                    g2.setStroke(new BasicStroke(2f));
+                    g2.drawLine(0, dropIndicatorY, getWidth(), dropIndicatorY);
+                    g2.dispose();
+                }
+            }
         };
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));
         tilesContainer.setBackground(new Color(36, 36, 36));
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(6, 9, 6, 9));
+
+        // ── Drop target: accept Layer and image-file-as-element drags ─────────
+        new DropTarget(tilesContainer, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
+            @Override public void dragOver(DropTargetDragEvent dtde) {
+                dropIndicatorY = computeDropIndicatorY(dtde.getLocation().y);
+                tilesContainer.repaint();
+            }
+            @Override public void dragExit(DropTargetEvent dte) {
+                dropIndicatorY = -1;
+                tilesContainer.repaint();
+            }
+            @Override public void drop(DropTargetDropEvent dtde) {
+                dropIndicatorY = -1;
+                tilesContainer.repaint();
+                dtde.acceptDrop(DnDConstants.ACTION_COPY);
+                int vIdx = computeVisualDropIndex(dtde.getLocation().y);
+                try {
+                    Transferable t = dtde.getTransferable();
+                    if (t.isDataFlavorSupported(LAYER_FLAVOR)) {
+                        Layer layer = (Layer) t.getTransferData(LAYER_FLAVOR);
+                        cb.insertLayerCopyAt(layer, vIdx);
+                        dtde.dropComplete(true);
+                    } else if (t.isDataFlavorSupported(TileGalleryPanel.FILE_AS_ELEMENT_FLAVOR)) {
+                        TileGalleryPanel.FileForElement ffe = (TileGalleryPanel.FileForElement)
+                                t.getTransferData(TileGalleryPanel.FILE_AS_ELEMENT_FLAVOR);
+                        cb.insertFileAsLayerAt(ffe.file, vIdx);
+                        dtde.dropComplete(true);
+                    } else {
+                        dtde.dropComplete(false);
+                    }
+                } catch (Exception ex) { dtde.dropComplete(false); }
+            }
+        }, true);
 
         JScrollPane scroll = new JScrollPane(tilesContainer,
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
@@ -170,6 +237,32 @@ public class ElementLayerPanel extends JPanel {
     // Public API
     // =========================================================================
     public boolean isShowAllOutlines() { return showAllOutlines; }
+
+    // ── Drop-indicator helpers ────────────────────────────────────────────────
+
+    /** Returns the visual insert index (0 = top) for a drop at pixel y in tilesContainer. */
+    private int computeVisualDropIndex(int y) {
+        int idx = 0;
+        for (Component c : tilesContainer.getComponents()) {
+            if (c instanceof LayerTile) {
+                Rectangle b = c.getBounds();
+                if (y < b.y + b.height / 2) return idx;
+                idx++;
+            }
+        }
+        return idx;
+    }
+
+    /** Returns the y-pixel of the drop indicator line for a drag at pixel y. */
+    private int computeDropIndicatorY(int y) {
+        for (Component c : tilesContainer.getComponents()) {
+            if (c instanceof LayerTile) {
+                Rectangle b = c.getBounds();
+                if (y < b.y + b.height / 2) return b.y;
+            }
+        }
+        return tilesContainer.getHeight() - tilesContainer.getInsets().bottom;
+    }
 
     /**
      * Called by the canvas when the mouse moves over/off a layer.
@@ -351,6 +444,33 @@ public class ElementLayerPanel extends JPanel {
                     repaint();
                 }
             });
+
+            // ── Drag source: left-drag exports this layer as LAYER_FLAVOR ─────
+            DragSource.getDefaultDragSource().createDefaultDragGestureRecognizer(
+                this, DnDConstants.ACTION_COPY,
+                dge -> {
+                    java.awt.event.InputEvent trigger = dge.getTriggerEvent();
+                    if (!(trigger instanceof MouseEvent me) || !SwingUtilities.isLeftMouseButton(me)) return;
+                    int iw = Math.max(1, getWidth()), ih = Math.max(1, getHeight());
+                    BufferedImage dragImg = new BufferedImage(iw, ih, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D dg = dragImg.createGraphics();
+                    dg.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.75f));
+                    paint(dg);
+                    dg.dispose();
+                    Transferable t = new Transferable() {
+                        @Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[]{LAYER_FLAVOR}; }
+                        @Override public boolean isDataFlavorSupported(DataFlavor f) { return LAYER_FLAVOR.equals(f); }
+                        @Override public Object getTransferData(DataFlavor f) throws UnsupportedFlavorException {
+                            if (!LAYER_FLAVOR.equals(f)) throw new UnsupportedFlavorException(f);
+                            return layer;
+                        }
+                    };
+                    try {
+                        dge.startDrag(DragSource.DefaultCopyDrop, dragImg,
+                                new Point(iw / 2, ih / 2), t, null);
+                    } catch (java.awt.dnd.InvalidDnDOperationException ignored) {}
+                }
+            );
         }
 
         @Override

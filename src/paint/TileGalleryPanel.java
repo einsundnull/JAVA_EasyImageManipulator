@@ -18,6 +18,10 @@ import java.awt.Shape;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -67,6 +71,14 @@ public class TileGalleryPanel extends JPanel {
     private static final int TILE_H    = 118;
     private static final int THUMB_H   = 88;
 
+    // ── DnD: wrapper class so FILE_AS_ELEMENT_FLAVOR is unambiguous ──────────
+    static final class FileForElement {
+        final File file;
+        FileForElement(File f) { file = f; }
+    }
+    public static final DataFlavor FILE_AS_ELEMENT_FLAVOR =
+            new DataFlavor(FileForElement.class, "FileAsElement");
+
     // ── Callback interface ────────────────────────────────────────────────────
     public interface Callbacks {
         void onTileOpened(File file);
@@ -74,6 +86,8 @@ public class TileGalleryPanel extends JPanel {
         default void onFilesAdded(List<File> files) {}
         default void onDragStarted(File file) {}
         default void onDragEnded() {}
+        /** A LayerTile was dropped on this gallery – save it as a PNG image file. */
+        default void onLayerDropped(Layer layer) {}
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -168,6 +182,23 @@ public class TileGalleryPanel extends JPanel {
                 }
             }
         });
+
+        // ── Drop target: accept Layer drags (Case 5: save layer as image) ────
+        new DropTarget(tilesContainer, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
+            @Override public void drop(DropTargetDropEvent dtde) {
+                dtde.acceptDrop(DnDConstants.ACTION_COPY);
+                try {
+                    Transferable t = dtde.getTransferable();
+                    if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
+                        Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
+                        callbacks.onLayerDropped(layer);
+                        dtde.dropComplete(true);
+                    } else {
+                        dtde.dropComplete(false);
+                    }
+                } catch (Exception ex) { dtde.dropComplete(false); }
+            }
+        }, true);
 
         galleryScroll = new JScrollPane(tilesContainer,
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
@@ -332,7 +363,9 @@ public class TileGalleryPanel extends JPanel {
         private final JCheckBox checkbox;
 
         // For drag detection
-        private Point dragStart = null;
+        private Point   dragStart       = null;
+        private boolean rightButtonDown = false;
+        private boolean rightDrag       = false; // set before exportAsDrag to pick correct flavor
         private static final int DRAG_THRESHOLD = 6;
 
         TilePanel(File f) {
@@ -352,40 +385,43 @@ public class TileGalleryPanel extends JPanel {
             checkbox.addActionListener(e -> onTileClicked(this, true));
             add(checkbox);
 
-            // DnD: export this tile's file as javaFileListFlavor
+            // DnD: left-drag → javaFileListFlavor; right-drag → FILE_AS_ELEMENT_FLAVOR
             setTransferHandler(new TransferHandler() {
-                @Override
-                public int getSourceActions(JComponent c) {
-                    return COPY;
-                }
-                @Override
-                protected Transferable createTransferable(JComponent c) {
-                    return new Transferable() {
-                        @Override
-                        public DataFlavor[] getTransferDataFlavors() {
-                            return new DataFlavor[]{ DataFlavor.javaFileListFlavor };
-                        }
-                        @Override
-                        public boolean isDataFlavorSupported(DataFlavor flavor) {
-                            return DataFlavor.javaFileListFlavor.equals(flavor);
-                        }
-                        @Override
-                        public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException {
-                            if (!isDataFlavorSupported(flavor)) throw new UnsupportedFlavorException(flavor);
-                            List<File> list = new ArrayList<>();
-                            list.add(imageFile);
-                            return list;
-                        }
-                    };
+                @Override public int getSourceActions(JComponent c) { return COPY; }
+                @Override protected Transferable createTransferable(JComponent c) {
+                    if (rightDrag) {
+                        FileForElement ffe = new FileForElement(imageFile);
+                        return new Transferable() {
+                            @Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[]{FILE_AS_ELEMENT_FLAVOR}; }
+                            @Override public boolean isDataFlavorSupported(DataFlavor f) { return FILE_AS_ELEMENT_FLAVOR.equals(f); }
+                            @Override public Object getTransferData(DataFlavor f) throws UnsupportedFlavorException {
+                                if (!FILE_AS_ELEMENT_FLAVOR.equals(f)) throw new UnsupportedFlavorException(f);
+                                return ffe;
+                            }
+                        };
+                    } else {
+                        return new Transferable() {
+                            @Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[]{DataFlavor.javaFileListFlavor}; }
+                            @Override public boolean isDataFlavorSupported(DataFlavor f) { return DataFlavor.javaFileListFlavor.equals(f); }
+                            @Override public Object getTransferData(DataFlavor f) throws UnsupportedFlavorException {
+                                if (!DataFlavor.javaFileListFlavor.equals(f)) throw new UnsupportedFlavorException(f);
+                                List<File> list = new ArrayList<>();
+                                list.add(imageFile);
+                                return list;
+                            }
+                        };
+                    }
                 }
             });
 
             addMouseListener(new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e) {
-                    dragStart = e.getPoint();
+                    dragStart       = e.getPoint();
+                    rightButtonDown = SwingUtilities.isRightMouseButton(e);
                 }
                 @Override public void mouseReleased(MouseEvent e) {
-                    dragStart = null;
+                    dragStart       = null;
+                    rightButtonDown = false;
                     callbacks.onDragEnded();
                 }
                 @Override public void mouseClicked(MouseEvent e) {
@@ -409,9 +445,12 @@ public class TileGalleryPanel extends JPanel {
                         int dx = Math.abs(e.getX() - dragStart.x);
                         int dy = Math.abs(e.getY() - dragStart.y);
                         if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
-                            dragStart = null;
+                            boolean wasRight = rightButtonDown;
+                            dragStart = null; rightButtonDown = false;
                             callbacks.onDragStarted(imageFile);
+                            rightDrag = wasRight;
                             getTransferHandler().exportAsDrag(TilePanel.this, e, TransferHandler.COPY);
+                            rightDrag = false;
                         }
                     }
                 }
