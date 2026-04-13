@@ -219,7 +219,6 @@ public class CanvasPanel extends JPanel {
 
 					if (hitPoint >= 0) {
 						selectedPathPointIndex = hitPoint;
-						System.err.println("[DEBUG] Selected path point " + hitPoint);
 						repaint();
 						return;
 					}
@@ -491,7 +490,6 @@ public class CanvasPanel extends JPanel {
 							// Deselect PATH tool after creating path (switch to SELECT to prevent accidental path creation)
 							callbacks.getPaintToolbar().setActiveTool(PaintEngine.Tool.SELECT);
 
-							System.err.println("[DEBUG] Created new path with triangle at " + imgPt);
 						}
 						repaint();
 					}
@@ -502,8 +500,6 @@ public class CanvasPanel extends JPanel {
 						callbacks.performFloodfill(e.getPoint());
 					} else {
 						// Start a new selection (Shift adds to existing)
-						System.err.println("[DEBUG] Started selection at " + imgPt + ", appMode="
-								+ callbacks.getAppMode() + ", floodfill=" + callbacks.isFloodfillMode());
 						callbacks.setSelecting(true);
 						callbacks.setSelectionStart(imgPt);
 						callbacks.setSelectionEnd(imgPt);
@@ -859,8 +855,6 @@ public class CanvasPanel extends JPanel {
 
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
-				System.err.println("[DEBUG] mouseWheelMoved called! Rotation=" + e.getWheelRotation() + ", Ctrl="
-						+ ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0));
 				if ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0) {
 					// CTRL+wheel on a selected TextLayer → adjust font size instead of global zoom
 					Layer primary = callbacks.getSelectedElement();
@@ -955,7 +949,6 @@ public class CanvasPanel extends JPanel {
 					if (code == KeyEvent.VK_DELETE) {
 						if (selectedPathPointIndex >= 0) {
 							// DEL: remove selected point
-							System.err.println("[DEBUG] DELETE point at index " + selectedPathPointIndex);
 							PathLayer updated = pl.withRemovedPoint(selectedPathPointIndex);
 							callbacks.updateSelectedElement(updated);
 							selectedPathPointIndex = -1;
@@ -974,7 +967,6 @@ public class CanvasPanel extends JPanel {
 					                    (code == KeyEvent.VK_EQUALS && ke.isShiftDown()));
 					if (isPlusKey && selectedPathPointIndex >= 0) {
 						// PLUS: add new point after selected point
-						System.err.println("[DEBUG] ADD point after index " + selectedPathPointIndex + ", keyCode=" + code);
 						Point3D current = pl.getPoint(selectedPathPointIndex);
 						Point3D next;
 						// For closed paths, wrap around to first point; otherwise use next point or offset
@@ -989,7 +981,6 @@ public class CanvasPanel extends JPanel {
 						PathLayer updated = pl.withAddedPoint(selectedPathPointIndex + 1, new Point3D(newX, newY));
 						callbacks.updateSelectedElement(updated);
 						selectedPathPointIndex++;  // Auto-select new point
-						System.err.println("[DEBUG] Added point, new pointCount=" + updated.pointCount());
 						ke.consume(); repaint(); return;
 					}
 				}
@@ -1007,10 +998,7 @@ public class CanvasPanel extends JPanel {
 					ke.consume(); repaint(); return;
 				}
 				if (code == KeyEvent.VK_ESCAPE) {
-					// Cancel edit: restore original element if we were editing one
-					if (editingOriginalElement != null) {
-						callbacks.getActiveElements().add(editingOriginalElement);
-					}
+					// Cancel edit: element stays in activeElements unchanged (was never removed)
 					textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
 					textBuffer.setLength(0);
 					editingTextElementId = -1; editingOriginalElement = null;
@@ -1038,7 +1026,7 @@ public class CanvasPanel extends JPanel {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				if (textBoundingBox != null) {
-					if (editingOriginalElement != null) callbacks.getActiveElements().add(editingOriginalElement);
+					// Element stays in activeElements unchanged (was never removed)
 					textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
 					textBuffer.setLength(0);
 					editingTextElementId = -1; editingOriginalElement = null;
@@ -1392,9 +1380,9 @@ public class CanvasPanel extends JPanel {
 		textDrawingBox  = false;
 		editingTextElementId   = el.id();
 		editingOriginalElement = el;
-		// Remove from active elements while editing (prevents duplication with the preview)
+		// Element stays in activeElements — paintComponent skips it while editingTextElementId matches,
+		// so the live preview (textBoundingBox) is shown instead without duplication.
 		callbacks.setSelectedElement(null);
-		callbacks.getActiveElements().removeIf(e -> e.id() == el.id());
 		syncTextChooserFromFields();
 		ensureTextChooserVisible();
 		// Set focus to text area so cursor is visible and user can type immediately
@@ -1456,24 +1444,15 @@ public class CanvasPanel extends JPanel {
 	 * Clears text state afterwards.
 	 */
 	private void commitText() {
-		System.err.println("[DEBUG] commitText: textBoundingBox=" + textBoundingBox + ", textBuffer.length()=" + textBuffer.length());
-		if (textBoundingBox == null) {
-			System.err.println("[DEBUG] commitText: RETURNING (no textBoundingBox)");
-			return;
-		}
+		if (textBoundingBox == null) return;
 		if (textBuffer.length() == 0) {
-			// Nothing typed: if editing, restore original; otherwise just clear
-			System.err.println("[DEBUG] commitText: Empty text buffer, restoring original element if exists");
-			if (editingOriginalElement != null) {
-				callbacks.getActiveElements().add(editingOriginalElement);
-			}
+			// Nothing typed: element stays in activeElements unchanged (was never removed)
 			textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
 			textBuffer.setLength(0);
 			editingTextElementId = -1; editingOriginalElement = null;
 			repaint();
 			return;
 		}
-		System.err.println("[DEBUG] commitText: Calling commitTextLayer with text='" + textBuffer.toString() + "'");
 		callbacks.commitTextLayer(
 				editingTextElementId,
 				textBuffer.toString(),
@@ -1632,6 +1611,8 @@ public class CanvasPanel extends JPanel {
 				boolean isPrimary = primaryEl != null && primaryEl.id() == el.id();
 				if (pass == 0 && isPrimary) continue;  // skip primary on first pass
 				if (pass == 1 && !isPrimary) continue; // skip others on second pass
+				// Skip the element currently being text-edited — the live preview replaces it
+				if (editingTextElementId >= 0 && el.id() == editingTextElementId) continue;
 
 				Rectangle sr = callbacks.elemRectScreen(el);
 

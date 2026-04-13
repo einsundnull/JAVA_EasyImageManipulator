@@ -1905,8 +1905,6 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
             @Override public void exportElementAsImage(Layer el) {
                 if (c().workingImage == null || c().sourceFile == null) return;
-                System.err.println("[DEBUG] exportElementAsImage called for layer id=" + el.id());
-
                 // Get live layer
                 Layer live = c().activeElements.stream()
                         .filter(e -> e.id() == el.id()).findFirst().orElse(el);
@@ -1952,7 +1950,6 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
                 // Allow Enter key to save immediately
                 fileNameField.addActionListener(ev -> {
-                    System.err.println("[DEBUG] Enter pressed in filename dialog");
                     String fileName = fileNameField.getText().trim();
                     if (!fileName.isEmpty()) {
                         saveElementAsImageFile(imgToExport, new File(exportDirFinal, fileName));
@@ -1974,14 +1971,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             private void saveElementAsImageFile(BufferedImage img, File file) {
                 try {
                     javax.imageio.ImageIO.write(img, "PNG", file);
-                    System.err.println("[DEBUG] Element exported to: " + file.getAbsolutePath());
 
                     // Add the new image to the gallery of this canvas
                     if (c().tileGallery != null) {
                         java.util.List<File> newFiles = new java.util.ArrayList<>();
                         newFiles.add(file);
                         c().tileGallery.addFiles(newFiles);
-                        System.err.println("[DEBUG] Added new image to gallery: " + file.getName());
                     }
 
                     javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this, "Bild gespeichert:\n" + file.getName(),
@@ -2548,7 +2543,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 TextLayer updated = (id >= 0)
                         ? TextLayer.of(id, text, font, size, bold, italic, col, x, y)
                         : TextLayer.of(ci.nextElementId++, text, font, size, bold, italic, col, x, y);
-                // Replace in activeElements if present; otherwise add (element removed during editing)
+                // Replace in activeElements if present (element stays in list during editing); add if new
                 boolean found = false;
                 for (int i = 0; i < ci.activeElements.size(); i++) {
                     if (ci.activeElements.get(i).id() == updated.id()) {
