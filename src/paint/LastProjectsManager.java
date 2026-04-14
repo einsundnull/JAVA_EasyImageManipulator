@@ -13,6 +13,7 @@ public class LastProjectsManager {
     public static final String CAT_BOOKS    = "books";
     public static final String CAT_GAMES    = "games";
     public static final String CAT_IMAGES   = "images";
+    public static final String CAT_MAPS     = "maps";
 
     private static final int MAX_RECENT = 10;
 
@@ -86,6 +87,7 @@ public class LastProjectsManager {
         result.put(CAT_BOOKS,    load(CAT_BOOKS));
         result.put(CAT_GAMES,    load(CAT_GAMES));
         result.put(CAT_IMAGES,   load(CAT_IMAGES));
+        result.put(CAT_MAPS,     load(CAT_MAPS));
         return result;
     }
 
@@ -98,6 +100,7 @@ public class LastProjectsManager {
         if (path.contains("teaching")) return CAT_TEACHING;
         if (path.contains("book")) return CAT_BOOKS;
         if (path.contains("game")) return CAT_GAMES;
+        if (path.contains("map")) return CAT_MAPS;
         return CAT_IMAGES;
     }
 
