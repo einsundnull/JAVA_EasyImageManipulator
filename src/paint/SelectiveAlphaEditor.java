@@ -2447,13 +2447,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             for (int i = 0; i < c.selectedElements.size(); i++) {
                 Layer el = c.selectedElements.get(i);
                 if (el instanceof ImageLayer il) {
-                    BufferedImage rotated = PaintEngine.rotate(il.image(), angleDeg);
-                    // Adjust position: center rotation around element center
-                    double oldCenterX = il.x() + il.width() / 2.0;
-                    double oldCenterY = il.y() + il.height() / 2.0;
-                    double newX = oldCenterX - rotated.getWidth() / 2.0;
-                    double newY = oldCenterY - rotated.getHeight() / 2.0;
-                    ImageLayer updated = new ImageLayer(il.id(), rotated, (int) Math.round(newX), (int) Math.round(newY), rotated.getWidth(), rotated.getHeight());
+                    // Add angle to existing rotation (metadata, no pixel manipulation)
+                    double newAngle = il.rotationAngle() + angleDeg;
+                    ImageLayer updated = il.withRotation(newAngle);
                     c.selectedElements.set(i, updated);
                     // Also update in activeElements
                     for (int j = 0; j < c.activeElements.size(); j++) {
@@ -3543,7 +3539,17 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     int ey = oy + (int)Math.round(il.y() * scale);
                     int ew = (int)Math.round(il.width()  * scale);
                     int eh = (int)Math.round(il.height() * scale);
-                    g2.drawImage(il.image(), ex, ey, ew, eh, null);
+                    // Draw with rotation if needed
+                    if (Math.abs(il.rotationAngle()) > 0.001) {
+                        java.awt.geom.AffineTransform orig = g2.getTransform();
+                        double cx = ex + ew / 2.0;
+                        double cy = ey + eh / 2.0;
+                        g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
+                        g2.drawImage(il.image(), ex, ey, ew, eh, null);
+                        g2.setTransform(orig);
+                    } else {
+                        g2.drawImage(il.image(), ex, ey, ew, eh, null);
+                    }
                 } else if (el instanceof TextLayer tl) {
                     // Render TextLayer with scaled font size
                     int tstyle = (tl.fontBold() ? java.awt.Font.BOLD : 0) | (tl.fontItalic() ? java.awt.Font.ITALIC : 0);

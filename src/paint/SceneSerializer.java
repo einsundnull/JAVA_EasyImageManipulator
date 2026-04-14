@@ -91,8 +91,8 @@ public class SceneSerializer {
             }
             return String.format(
                 "{\"type\":\"ImageLayer\",\"id\":%d,\"x\":%d,\"y\":%d,\"width\":%d,\"height\":%d," +
-                "\"imageData\":\"%s\"}",
-                il.id(), il.x(), il.y(), il.width(), il.height(), imageData
+                "\"rotationAngle\":%.6f,\"imageData\":\"%s\"}",
+                il.id(), il.x(), il.y(), il.width(), il.height(), il.rotationAngle(), imageData
             );
         } else if (layer instanceof PathLayer pl) {
             StringBuilder pointsJson = new StringBuilder("[");
@@ -143,7 +143,10 @@ public class SceneSerializer {
                 if (imageData != null && !imageData.isEmpty()) {
                     img = base64ToImage(imageData);
                 }
-                return new ImageLayer(id, img, x, y, w, h);
+                // Parse rotationAngle (default 0.0 for backward compatibility with old saved files)
+                String rotStr = extractField(json, "rotationAngle");
+                double rotAngle = (rotStr != null && !rotStr.isEmpty()) ? Double.parseDouble(rotStr) : 0.0;
+                return new ImageLayer(id, img, x, y, w, h, rotAngle);
             } else if ("PathLayer".equals(type)) {
                 boolean closed = "true".equals(extractField(json, "closed"));
                 List<Point3D> points = extractPoints(json);

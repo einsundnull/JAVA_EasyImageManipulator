@@ -16,26 +16,39 @@ import java.awt.image.BufferedImage;
 public final class ImageLayer extends Layer {
 
     private final BufferedImage image;
+    private final double rotationAngle;
 
+    // Legacy constructor (for backward compatibility, rotationAngle defaults to 0)
     public ImageLayer(int id, BufferedImage image, int x, int y, int w, int h) {
-        super(id, x, y, Math.max(1, w), Math.max(1, h));
-        this.image = image;
+        this(id, image, x, y, w, h, 0.0);
     }
 
-    // ── Accessor ──────────────────────────────────────────────────────────────
+    // Full constructor with rotation angle
+    public ImageLayer(int id, BufferedImage image, int x, int y, int w, int h, double rotationAngle) {
+        super(id, x, y, Math.max(1, w), Math.max(1, h));
+        this.image = image;
+        this.rotationAngle = rotationAngle;
+    }
+
+    // ── Accessors ─────────────────────────────────────────────────────────────
 
     public BufferedImage image() { return image; }
+    public double rotationAngle() { return rotationAngle; }
 
     // ── Mutations (return new instances) ──────────────────────────────────────
 
     @Override
     public ImageLayer withPosition(int nx, int ny) {
-        return new ImageLayer(id, image, nx, ny, width, height);
+        return new ImageLayer(id, image, nx, ny, width, height, rotationAngle);
     }
 
     @Override
     public ImageLayer withBounds(int nx, int ny, int nw, int nh) {
-        return new ImageLayer(id, image, nx, ny, nw, nh);
+        return new ImageLayer(id, image, nx, ny, nw, nh, rotationAngle);
+    }
+
+    public ImageLayer withRotation(double newAngle) {
+        return new ImageLayer(id, image, x, y, width, height, newAngle);
     }
 
     // ── Convenience ───────────────────────────────────────────────────────────

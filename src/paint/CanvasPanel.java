@@ -43,6 +43,11 @@ public class CanvasPanel extends JPanel {
 	// Delta-based multi-drag: last image-space drag point
 	private Point elemLastImgPt = null;
 
+	// ── Element rotation state ────────────────────────────────────────────────
+	private boolean isDraggingRotation = false;
+	private double  rotDragStartAngle  = 0.0;  // atan2 angle at press
+	private double  rotDragBaseAngle   = 0.0;  // element.rotationAngle at press
+
 	// ── Text tool state ───────────────────────────────────────────────────────
 	private static final int TEXT_PADDING = 4;
 
@@ -199,16 +204,17 @@ public class CanvasPanel extends JPanel {
 
 				// ── Rotation handle for selected element (highest priority) ─────────
 				Layer primaryEl = callbacks.getSelectedElement();
-				if (primaryEl != null && primaryEl instanceof ImageLayer) {
+				if (primaryEl != null && primaryEl instanceof ImageLayer il) {
 					Rectangle elemRectSc = callbacks.elemRectScreen(primaryEl);
 					Rectangle rotHandleRect = callbacks.getRotationHandleRect(elemRectSc);
 					if (rotHandleRect.contains(e.getPoint())) {
-						// Rotate clockwise on normal click, counter-clockwise on Shift+click
-						if ((e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0) {
-							callbacks.rotateSelectedElements(-90.0);
-						} else {
-							callbacks.rotateSelectedElements(90.0);
-						}
+						// Start free-rotation drag
+						isDraggingRotation = true;
+						double cx = elemRectSc.x + elemRectSc.width / 2.0;
+						double cy = elemRectSc.y + elemRectSc.height / 2.0;
+						rotDragStartAngle = Math.toDegrees(Math.atan2(e.getY() - cy, e.getX() - cx));
+						rotDragBaseAngle = il.rotationAngle();
+						callbacks.pushUndo();
 						return;
 					}
 				}
@@ -539,6 +545,21 @@ public class CanvasPanel extends JPanel {
 					return;
 				}
 
+				// ── Rotation drag ──────────────────────────────────────────────────
+				if (isDraggingRotation) {
+					Layer el = callbacks.getSelectedElement();
+					if (el instanceof ImageLayer il) {
+						Rectangle sr = callbacks.elemRectScreen(el);
+						double cx = sr.x + sr.width / 2.0;
+						double cy = sr.y + sr.height / 2.0;
+						double currentAngle = Math.toDegrees(Math.atan2(e.getY() - cy, e.getX() - cx));
+						double newAngle = rotDragBaseAngle + (currentAngle - rotDragStartAngle);
+						callbacks.updateSelectedElement(il.withRotation(newAngle));
+						repaint();
+					}
+					return;
+				}
+
 				if (callbacks.getWorkingImage() == null)
 					return;
 				Point imgPt = callbacks.screenToImage(e.getPoint());
@@ -715,6 +736,13 @@ public class CanvasPanel extends JPanel {
 				panStart = null;
 				panViewPos = null;
 				elemLastImgPt = null;
+
+				// Finalize rotation drag
+				if (isDraggingRotation) {
+					isDraggingRotation = false;
+					callbacks.markDirty();
+					return;
+				}
 
 				if (callbacks.getWorkingImage() == null)
 					return;
@@ -1687,7 +1715,17 @@ public class CanvasPanel extends JPanel {
 				}
 
 				if (el instanceof ImageLayer il) {
-					g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
+					// Draw with rotation if needed
+					if (Math.abs(il.rotationAngle()) > 0.001) {
+						java.awt.geom.AffineTransform orig = g2.getTransform();
+						double cx = sr.x + sr.width / 2.0;
+						double cy = sr.y + sr.height / 2.0;
+						g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
+						g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
+						g2.setTransform(orig);
+					} else {
+						g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
+					}
 				} else if (el instanceof TextLayer tl) {
 					// TextLayer: render glyphs live — integer pt size for metric consistency with TextLayer.of()
 					int tstyle = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
