@@ -155,11 +155,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private JFrame        secWin;
     private SecondaryPanel secPanel;
     private PreviewMode   secMode    = PreviewMode.LIVE_ALL;
-    private CanvasDisplayMode secCanvasMode = CanvasDisplayMode.SHOW_ACTIVE_CANVAS;
+    private CanvasDisplayMode secCanvasMode = CanvasDisplayMode.SHOW_CANVAS_I_ONLY;
     private BufferedImage secSnapshot;
     private javax.swing.Timer secTimer;
     private boolean       secFullscreen = true;
-    private AlwaysOnTopMode secAlwaysOnTop = AlwaysOnTopMode.NORMAL;
+    private AlwaysOnTopMode secAlwaysOnTop = AlwaysOnTopMode.TO_BACKGROUND;
     private int           secOldX, secOldY, secOldW, secOldH;  // For fullscreen restoration
 
     // ── Element layers ────────────────────────────────────────────────────────
