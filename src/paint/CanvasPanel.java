@@ -36,6 +36,9 @@ public class CanvasPanel extends JPanel {
 	private Point panViewPos = null;
 	public int mouseWheelSensitivityInPx = 16;
 
+	// Key state tracking for modifier combinations
+	private boolean[] keyState = new boolean[256];
+
 	// Element multi-select: rubber-band state (screen coords)
 	private Point elemBandStart = null;
 	private Point elemBandEnd   = null;
@@ -924,6 +927,24 @@ public class CanvasPanel extends JPanel {
 
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
+				// Check if ALT+T is held (for opacity control)
+				boolean altPressed = (e.getModifiersEx() & (InputEvent.ALT_DOWN_MASK | InputEvent.ALT_GRAPH_DOWN_MASK)) != 0;
+				boolean tPressed = keyState != null && keyState[KeyEvent.VK_T];
+
+				if (altPressed && tPressed) {
+					// ALT+T + wheel → adjust opacity of selected ImageLayer
+					Layer primary = callbacks.getSelectedElement();
+					if (primary instanceof ImageLayer il) {
+						e.consume();
+						int delta = e.getWheelRotation(); // up = more opaque, down = more transparent
+						int newOpacity = Math.max(1, Math.min(100, il.opacity() + delta * 2));
+						ImageLayer updated = il.withOpacity(newOpacity);
+						callbacks.updateSelectedElement(updated);
+						repaint();
+						return;
+					}
+				}
+
 				if ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0) {
 					// CTRL+wheel on a selected TextLayer → adjust font size instead of global zoom
 					Layer primary = callbacks.getSelectedElement();
@@ -1060,6 +1081,12 @@ public class CanvasPanel extends JPanel {
 		addKeyListener(new java.awt.event.KeyAdapter() {
 			@Override
 			public void keyPressed(java.awt.event.KeyEvent ke) {
+				// Track key state for modifier combinations (e.g., ALT+T)
+				int keyCode = ke.getKeyCode();
+				if (keyCode >= 0 && keyCode < keyState.length) {
+					keyState[keyCode] = true;
+				}
+
 				// ── PathLayer point editing ────────────────────────────────────
 				Layer primary = callbacks.getSelectedElement();
 				if (primary instanceof PathLayer pl) {
@@ -1136,6 +1163,15 @@ public class CanvasPanel extends JPanel {
 				if (c == '\r' || c == '\n' || c == '\u001b' || c == '\b') return; // handled in keyPressed
 				textBuffer.append(c);
 				ke.consume(); repaint();
+			}
+
+			@Override
+			public void keyReleased(java.awt.event.KeyEvent ke) {
+				// Track key state for modifier combinations
+				int keyCode = ke.getKeyCode();
+				if (keyCode >= 0 && keyCode < keyState.length) {
+					keyState[keyCode] = false;
+				}
 			}
 		});
 
@@ -1827,6 +1863,13 @@ public class CanvasPanel extends JPanel {
 				}
 
 				if (el instanceof ImageLayer il) {
+					// Set opacity (alpha composite)
+					java.awt.Composite origComposite = g2.getComposite();
+					float alpha = il.opacity() / 100.0f;
+					if (alpha < 1.0f) {
+						g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha));
+					}
+
 					// Draw with rotation if needed
 					if (Math.abs(il.rotationAngle()) > 0.001) {
 						java.awt.geom.AffineTransform orig = g2.getTransform();
@@ -1837,6 +1880,11 @@ public class CanvasPanel extends JPanel {
 						g2.setTransform(orig);
 					} else {
 						g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
+					}
+
+					// Restore original composite
+					if (alpha < 1.0f) {
+						g2.setComposite(origComposite);
 					}
 				} else if (el instanceof TextLayer tl) {
 					// TextLayer: render glyphs live — integer pt size for metric consistency with TextLayer.of()

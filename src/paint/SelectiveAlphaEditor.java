@@ -47,21 +47,25 @@ import javax.swing.ActionMap;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
 import javax.swing.InputMap;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.JViewport;
 import javax.swing.KeyStroke;
+import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
@@ -185,6 +189,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     // ── Maps panel (toggle-able list view) ─────────────────────────────────────
     private MapsPanel mapsPanel;
     private JToggleButton mapsBtn;                  // Toggle for mapsPanel
+
+    // ── Quick open and drop zone toggle ────────────────────────────────────────
+    private JButton quickOpenBtn;                   // Quick open recent projects
+    private JToggleButton toggleDropZoneBtn;        // Toggle drop zone visibility for canvas 2
 
     // ── Element-edit mode (double-click on layer tile) ────────────────────────
     private Layer elementEditSourceLayer;   // the layer being edited
@@ -516,6 +524,21 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             updateLayoutVisibility();
         });
 
+        quickOpenBtn = UIComponentFactory.buildButton("📂", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        quickOpenBtn.setToolTipText("Schnellauswahl: Recent Projekte");
+        quickOpenBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+        quickOpenBtn.setForeground(AppColors.TEXT);
+        quickOpenBtn.addActionListener(e -> showQuickOpenDialog());
+
+        toggleDropZoneBtn = UIComponentFactory.buildModeToggleBtn("⬇", "Drop-Feld für 2. Canvas");
+        toggleDropZoneBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+        toggleDropZoneBtn.setSelected(false);
+        toggleDropZoneBtn.addActionListener(e -> {
+            if (rightDropZone != null) {
+                rightDropZone.setVisible(toggleDropZoneBtn.isSelected());
+            }
+        });
+
         modeLabel = new JLabel("Modus: Selective Alpha");
         modeLabel.setForeground(AppColors.TEXT_MUTED);
         modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -532,6 +555,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         left.add(secondGalleryBtn);
         left.add(secondElementsBtn);
         left.add(mapsBtn);
+        left.add(quickOpenBtn);
+        left.add(toggleDropZoneBtn);
         left.add(modeLabel);
         left.add(statusLabel);
         bar.add(left, BorderLayout.WEST);
@@ -1211,6 +1236,15 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         };
         zone.setOpaque(false);
         zone.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        // Click handler: open quick select dialog for canvas 2
+        zone.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                e.consume();
+                showQuickOpenDialog(1);  // Load into canvas 2 (index 1)
+            }
+        });
+
         setupDropTarget(zone, 1);
         return zone;
     }
@@ -1999,6 +2033,156 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         } catch (IOException e) { showErrorDialog("Speicherfehler", e.getMessage()); }
     }
 
+    /** CTRL+SHIFT+S: burn visible elements, save as copy with new name. */
+    private void saveBurnedElementsCopy() {
+        CanvasInstance c = ci();
+        if (c.sourceFile == null || c.workingImage == null) return;
+
+        // Burn elements into canvas
+        BufferedImage burned = burnVisibleElements();
+        if (burned == null) return;
+
+        // Show save dialog
+        String suffix = "_burned";
+        String outPath = WhiteToAlphaConverter.getOutputPath(c.sourceFile, suffix);
+        File suggestedFile = new File(outPath);
+
+        javax.swing.JFileChooser chooser = new javax.swing.JFileChooser();
+        chooser.setSelectedFile(suggestedFile);
+        chooser.setAcceptAllFileFilterUsed(false);
+        chooser.addChoosableFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("PNG Images", "png"));
+
+        int result = chooser.showSaveDialog(this);
+        if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
+            try {
+                File target = chooser.getSelectedFile();
+                if (!target.getName().toLowerCase().endsWith(".png")) {
+                    target = new File(target.getAbsolutePath() + ".png");
+                }
+                ImageIO.write(burned, "PNG", target);
+                ToastNotification.show(this, "Mit Elementen gespeichert: " + target.getName());
+            } catch (IOException e) {
+                showErrorDialog("Speicherfehler", e.getMessage());
+            }
+        }
+    }
+
+    /** CTRL+SHIFT+ALT+S: burn visible elements, save with same name (overwrite). */
+    private void saveBurnedElementsOriginal() {
+        CanvasInstance c = ci();
+        if (c.sourceFile == null || c.workingImage == null) return;
+
+        // Burn elements into canvas
+        BufferedImage burned = burnVisibleElements();
+        if (burned == null) return;
+
+        // Confirm overwrite
+        int result = javax.swing.JOptionPane.showConfirmDialog(this,
+                "Elemente einbrennen und Originaldatei überschreiben?\n" + c.sourceFile.getName(),
+                "Bestätigung", javax.swing.JOptionPane.OK_CANCEL_OPTION, javax.swing.JOptionPane.WARNING_MESSAGE);
+
+        if (result == javax.swing.JOptionPane.OK_OPTION) {
+            try {
+                ImageIO.write(burned, "PNG", c.sourceFile);
+                c.hasUnsavedChanges = false;
+                dirtyFiles.remove(c.sourceFile);
+                updateTitle();
+                updateDirtyUI();
+                ToastNotification.show(this, "Mit Elementen gespeichert: " + c.sourceFile.getName());
+            } catch (IOException e) {
+                showErrorDialog("Speicherfehler", e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Burns all active elements into the canvas image.
+     * Merges all layers (ImageLayer, TextLayer, PathLayer) into the working image.
+     * Returns a new BufferedImage with burned elements, or null on error.
+     */
+    private BufferedImage burnVisibleElements() {
+        CanvasInstance c = ci();
+        if (c.workingImage == null || c.activeElements.isEmpty()) {
+            return c.workingImage;  // No elements to burn
+        }
+
+        try {
+            // Create a copy of the working image
+            BufferedImage result = new BufferedImage(
+                    c.workingImage.getWidth(), c.workingImage.getHeight(),
+                    BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = result.createGraphics();
+
+            // Draw the base canvas
+            g2.drawImage(c.workingImage, 0, 0, null);
+
+            // Draw all active elements on top
+            for (Layer el : c.activeElements) {
+                if (el instanceof ImageLayer il) {
+                    // Get opacity as alpha
+                    float alpha = il.opacity() / 100.0f;
+                    java.awt.Composite origComposite = g2.getComposite();
+                    if (alpha < 1.0f) {
+                        g2.setComposite(java.awt.AlphaComposite.getInstance(
+                                java.awt.AlphaComposite.SRC_OVER, alpha));
+                    }
+
+                    // Draw with rotation if needed
+                    if (Math.abs(il.rotationAngle()) > 0.001) {
+                        java.awt.geom.AffineTransform orig = g2.getTransform();
+                        double cx = il.x() + il.width() / 2.0;
+                        double cy = il.y() + il.height() / 2.0;
+                        g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
+                        g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+                        g2.setTransform(orig);
+                    } else {
+                        g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+                    }
+
+                    if (alpha < 1.0f) {
+                        g2.setComposite(origComposite);
+                    }
+                } else if (el instanceof TextLayer tl) {
+                    // Render TextLayer
+                    int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
+                    Font font = new Font(tl.fontName(), style, tl.fontSize());
+                    g2.setFont(font);
+                    g2.setColor(tl.fontColor());
+                    String[] lines = tl.text().split("\n", -1);
+                    FontMetrics fm = g2.getFontMetrics();
+                    for (int i = 0; i < lines.length; i++) {
+                        g2.drawString(lines[i], tl.x() + 4, tl.y() + fm.getAscent() + i * fm.getHeight() + 4);
+                    }
+                } else if (el instanceof PathLayer pl) {
+                    // Render PathLayer (simple polygon outline)
+                    java.util.List<Point3D> points = pl.points();
+                    if (!points.isEmpty()) {
+                        int[] xs = new int[points.size()];
+                        int[] ys = new int[points.size()];
+                        for (int i = 0; i < points.size(); i++) {
+                            xs[i] = (int) points.get(i).x;
+                            ys[i] = (int) points.get(i).y;
+                        }
+                        g2.setColor(new Color(100, 150, 200));
+                        g2.setStroke(new BasicStroke(2));
+                        if (pl.isClosed()) {
+                            g2.drawPolygon(xs, ys, points.size());
+                        } else {
+                            g2.drawPolyline(xs, ys, points.size());
+                        }
+                    }
+                }
+            }
+
+            g2.dispose();
+            return result;
+        } catch (Exception ex) {
+            System.err.println("[ERROR] Failed to burn elements: " + ex.getMessage());
+            ex.printStackTrace();
+            return null;
+        }
+    }
+
     /** Re-asserts element-edit bar visibility after any operation that might disturb it. */
     private void ensureElementEditBarVisible() {
         if (elementEditSourceLayer == null) return;
@@ -2021,12 +2205,23 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         updateDirtyUI();
         refreshElementPanel();
         refreshGalleryThumbnail();
+        // Refresh all panels
+        if (mapsPanel != null) {
+            try {
+                mapsPanel.refreshMapsList();
+            } catch (Exception ex) {
+                System.err.println("[WARN] Failed to refresh maps panel: " + ex.getMessage());
+            }
+        }
         c.canvasPanel.repaint();
         if (showRuler && idx == 0) { hRuler.repaint(); vRuler.repaint(); }
     }
 
     private void updateDirtyUI() {
         ci(0).tileGallery.setDirtyFiles(dirtyFiles);
+        if (ci(1).tileGallery != null) {
+            ci(1).tileGallery.setDirtyFiles(dirtyFiles);
+        }
     }
 
     // =========================================================================
@@ -3980,8 +4175,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK), "selectAllElements");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, CTRL),                       "undo");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, CTRL),        "redo");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL),        "save");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT),   "saveOriginal");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL),                           "save");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT),                      "saveOriginal");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL | InputEvent.SHIFT_DOWN_MASK),      "saveBurnedCopy");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT | InputEvent.SHIFT_DOWN_MASK), "saveBurnedOriginal");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, 0),           "rotateCW");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.SHIFT_DOWN_MASK), "rotateCCW");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE,    0),   "escape");
@@ -4017,6 +4214,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         am.put("redo",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRedo(); } });
         am.put("save",         new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageSilent(); } });
         am.put("saveOriginal", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageToOriginal(); } });
+        am.put("saveBurnedCopy",      new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveBurnedElementsCopy(); } });
+        am.put("saveBurnedOriginal",  new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveBurnedElementsOriginal(); } });
         am.put("rotateCW",     new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRotate(90.0); } });
         am.put("rotateCCW",    new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRotate(-90.0); } });
         am.put("escape",      new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
@@ -4474,6 +4673,94 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         dialog.add(content);
         dialog.setVisible(true);
         return result[0];
+    }
+
+    /** Show quick open dialog with recent projects and browse option (loads into active canvas). */
+    private void showQuickOpenDialog() {
+        showQuickOpenDialog(activeCanvasIndex);
+    }
+
+    /** Show quick open dialog with recent projects and browse option. */
+    private void showQuickOpenDialog(int canvasIdx) {
+        try {
+            java.util.Map<String, java.util.List<String>> recent = LastProjectsManager.loadAll();
+
+            JDialog dialog = new JDialog(this, "Schnellauswahl", true);
+            dialog.setSize(400, 350);
+            dialog.setLocationRelativeTo(this);
+            dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+
+            JPanel content = UIComponentFactory.centeredColumnPanel(12, 16, 8);
+
+            JLabel titleLbl = new JLabel("Zuletzt verwendet:");
+            titleLbl.setForeground(AppColors.TEXT);
+            titleLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+            content.add(titleLbl);
+
+            DefaultListModel<String> listModel = new DefaultListModel<>();
+            for (java.util.List<String> files : recent.values()) {
+                for (String f : files) {
+                    listModel.addElement(new File(f).getName() + " (" + f + ")");
+                }
+            }
+
+            JList<String> list = new JList<>(listModel);
+            list.setBackground(AppColors.BTN_BG);
+            list.setForeground(AppColors.TEXT);
+            list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            JScrollPane scroll = new JScrollPane(list);
+            scroll.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
+            content.add(scroll);
+
+            JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+            btnPanel.setOpaque(false);
+            JButton openBtn = UIComponentFactory.buildButton("Öffnen", AppColors.ACCENT, AppColors.ACCENT_HOVER);
+            JButton browseBtn = UIComponentFactory.buildButton("Durchsuchen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+            JButton cancelBtn = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+
+            openBtn.setForeground(Color.WHITE);
+            browseBtn.setForeground(AppColors.TEXT);
+            cancelBtn.setForeground(AppColors.TEXT);
+
+            openBtn.addActionListener(e -> {
+                int idx = list.getSelectedIndex();
+                if (idx >= 0) {
+                    String selected = listModel.getElementAt(idx);
+                    // Extract full path from "name (path)"
+                    int parenIdx = selected.lastIndexOf('(');
+                    if (parenIdx > 0) {
+                        String fullPath = selected.substring(parenIdx + 1, selected.length() - 1);
+                        loadFile(new File(fullPath), canvasIdx);
+                        dialog.dispose();
+                    }
+                }
+            });
+
+            browseBtn.addActionListener(e -> {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                chooser.setAcceptAllFileFilterUsed(false);
+                chooser.addChoosableFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                        "Images", "png", "jpg", "jpeg", "gif", "bmp"));
+                int result = chooser.showOpenDialog(dialog);
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    loadFile(chooser.getSelectedFile(), canvasIdx);
+                    dialog.dispose();
+                }
+            });
+
+            cancelBtn.addActionListener(e -> dialog.dispose());
+
+            btnPanel.add(openBtn);
+            btnPanel.add(browseBtn);
+            btnPanel.add(cancelBtn);
+            content.add(btnPanel);
+
+            dialog.add(content);
+            dialog.setVisible(true);
+        } catch (Exception ex) {
+            showErrorDialog("Fehler", "Schnellauswahl konnte nicht geöffnet werden:\n" + ex.getMessage());
+        }
     }
 
     private void showErrorDialog(String title, String message) {

@@ -469,7 +469,12 @@ public class ElementLayerPanel extends JPanel {
             }
 
             // ── Layer label at bottom ──────────────────────────────────────────
-            lbl = new JLabel(layer.displayName(), JLabel.CENTER);
+            String displayName = layer.displayName();
+            if (layer instanceof ImageLayer il) {
+                // Show opacity for ImageLayers (never 100% transparent so we can see them)
+                displayName = displayName + " " + Math.max(1, il.opacity()) + "%";
+            }
+            lbl = new JLabel(displayName, JLabel.CENTER);
             lbl.setForeground(AppColors.TEXT_MUTED);
             lbl.setFont(new Font("SansSerif", Font.PLAIN, 10));
             lbl.setBounds(0, TILE_H - 18, TILE_W, 16);
