@@ -3375,15 +3375,16 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             // Determine source canvas
             BufferedImage src;
             List<Layer> elements;
+            int srcIdx = activeCanvasIndex;  // Always use active canvas
+            CanvasInstance ci = canvases[srcIdx];
+            if (ci.workingImage == null) return;
+            src = ci.workingImage;
+
             if (secMode == PreviewMode.SNAPSHOT) {
-                if (secSnapshot == null) return;
-                src      = secSnapshot;
-                elements = List.of();
+                // In SNAPSHOT mode, render elements on top of snapshot base
+                elements = ci.activeElements;
             } else {
-                int srcIdx   = activeCanvasIndex;  // Show ACTIVE canvas
-                CanvasInstance ci = canvases[srcIdx];
-                if (ci.workingImage == null) return;
-                src      = ci.workingImage;
+                // In LIVE modes, render all elements
                 elements = ci.activeElements;
             }
 
@@ -3409,33 +3410,45 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             // Draw main image
             g2.drawImage(src, ox, oy, dw, dh, null);
 
-            // Draw elements (LIVE_ALL + LIVE_ALL_EDIT)
-            if (secMode != PreviewMode.SNAPSHOT) {
-                for (Layer el : elements) {
-                    if (el instanceof ImageLayer il) {
-                        int ex = ox + (int)Math.round(il.x() * scale);
-                        int ey = oy + (int)Math.round(il.y() * scale);
-                        int ew = (int)Math.round(il.width()  * scale);
-                        int eh = (int)Math.round(il.height() * scale);
-                        g2.drawImage(il.image(), ex, ey, ew, eh, null);
+            // Draw elements (all modes with GameLoop rendering)
+            for (Layer el : elements) {
+                if (el instanceof ImageLayer il) {
+                    int ex = ox + (int)Math.round(il.x() * scale);
+                    int ey = oy + (int)Math.round(il.y() * scale);
+                    int ew = (int)Math.round(il.width()  * scale);
+                    int eh = (int)Math.round(il.height() * scale);
+                    g2.drawImage(il.image(), ex, ey, ew, eh, null);
+                } else if (el instanceof TextLayer tl) {
+                    // Render TextLayer with scaled font size
+                    int tstyle = (tl.fontBold() ? java.awt.Font.BOLD : 0) | (tl.fontItalic() ? java.awt.Font.ITALIC : 0);
+                    int scaledFontSize = Math.max(1, (int) Math.round(tl.fontSize() * scale));
+                    java.awt.Font tfont = new java.awt.Font(tl.fontName(), tstyle, scaledFontSize);
+                    g2.setFont(tfont);
+                    g2.setColor(tl.fontColor());
+                    java.awt.FontMetrics tfm = g2.getFontMetrics();
+                    String[] tLines = tl.text().split("\n", -1);
+                    int tpx = ox + (int)Math.round((tl.x() + TextLayer.TEXT_PADDING) * scale);
+                    int tpy = oy + (int)Math.round((tl.y() + TextLayer.TEXT_PADDING) * scale);
+                    for (int li = 0; li < tLines.length; li++) {
+                        g2.drawString(tLines[li], tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
                     }
+                } else if (el instanceof PathLayer pl && secMode == PreviewMode.LIVE_ALL_EDIT) {
                     // PathLayer only in LIVE_ALL_EDIT
-                    if (secMode == PreviewMode.LIVE_ALL_EDIT && el instanceof PathLayer pl) {
-                        renderPathLayerPreview(g2, pl, ox, oy, scale);
-                    }
+                    renderPathLayerPreview(g2, pl, ox, oy, scale);
                 }
-                // Element borders only in LIVE_ALL_EDIT
-                if (secMode == PreviewMode.LIVE_ALL_EDIT) {
-                    g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
-                        BasicStroke.JOIN_MITER, 10, new float[]{4, 3}, 0));
-                    g2.setColor(new Color(0, 180, 255));
-                    for (Layer el : elements) {
-                        int ex = ox + (int)Math.round(el.x() * scale);
-                        int ey = oy + (int)Math.round(el.y() * scale);
-                        int ew = (int)Math.round(el.width()  * scale);
-                        int eh = (int)Math.round(el.height() * scale);
-                        g2.drawRect(ex, ey, ew, eh);
-                    }
+            }
+
+            // Element borders only in LIVE_ALL_EDIT
+            if (secMode == PreviewMode.LIVE_ALL_EDIT) {
+                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
+                    BasicStroke.JOIN_MITER, 10, new float[]{4, 3}, 0));
+                g2.setColor(new Color(0, 180, 255));
+                for (Layer el : elements) {
+                    int ex = ox + (int)Math.round(el.x() * scale);
+                    int ey = oy + (int)Math.round(el.y() * scale);
+                    int ew = (int)Math.round(el.width()  * scale);
+                    int eh = (int)Math.round(el.height() * scale);
+                    g2.drawRect(ex, ey, ew, eh);
                 }
             }
         }
@@ -3473,7 +3486,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         secWin.setLocationRelativeTo(this);
         secWin.getContentPane().add(secPanel);
         secWin.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
-        secTimer = new javax.swing.Timer(33, e -> secPanel.repaint());
+        // GameLoop: 60 FPS (16ms per frame) for smooth rendering
+        secTimer = new javax.swing.Timer(16, e -> secPanel.repaint());
     }
 
     private void toggleSecondaryWindow() {
