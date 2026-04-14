@@ -715,18 +715,36 @@ public class CanvasPanel extends JPanel {
 						if (callbacks.isCanvasSubMode() && tool == PaintEngine.Tool.PENCIL
 								&& canvasDrawOverlay != null) {
 							// Canvas sub-mode: draw on overlay
-							PaintEngine.drawPencil(canvasDrawOverlay,
-									overlayLastPt != null ? overlayLastPt : imgPt, imgPt,
-									callbacks.getPaintToolbar().getPrimaryColor(),
-									callbacks.getPaintToolbar().getStrokeWidth(),
-									callbacks.getPaintToolbar().getBrushShape(), aa);
+							java.awt.Color primaryColor = callbacks.getPaintToolbar().getPrimaryColor();
+							if (primaryColor.getAlpha() == 0) {
+								// Alpha = 0 → transparent painting
+								PaintEngine.drawEraser(canvasDrawOverlay,
+										overlayLastPt != null ? overlayLastPt : imgPt, imgPt,
+										callbacks.getPaintToolbar().getStrokeWidth(), aa);
+							} else {
+								// Normal pencil with color
+								PaintEngine.drawPencil(canvasDrawOverlay,
+										overlayLastPt != null ? overlayLastPt : imgPt, imgPt,
+										primaryColor,
+										callbacks.getPaintToolbar().getStrokeWidth(),
+										callbacks.getPaintToolbar().getBrushShape(), aa);
+							}
 							overlayLastPt = imgPt;
 							repaint();
 						} else if (tool == PaintEngine.Tool.PENCIL) {
-							PaintEngine.drawPencil(callbacks.getWorkingImage(), callbacks.getLastPaintPoint(), imgPt,
-									callbacks.getPaintToolbar().getPrimaryColor(),
-									callbacks.getPaintToolbar().getStrokeWidth(),
-									callbacks.getPaintToolbar().getBrushShape(), aa);
+							// Check if alpha is 0: if so, use eraser instead
+							java.awt.Color primaryColor = callbacks.getPaintToolbar().getPrimaryColor();
+							if (primaryColor.getAlpha() == 0) {
+								// Alpha = 0 → transparent painting
+								PaintEngine.drawEraser(callbacks.getWorkingImage(), callbacks.getLastPaintPoint(), imgPt,
+										callbacks.getPaintToolbar().getStrokeWidth(), aa);
+							} else {
+								// Normal pencil with color
+								PaintEngine.drawPencil(callbacks.getWorkingImage(), callbacks.getLastPaintPoint(), imgPt,
+										primaryColor,
+										callbacks.getPaintToolbar().getStrokeWidth(),
+										callbacks.getPaintToolbar().getBrushShape(), aa);
+							}
 							callbacks.setLastPaintPoint(imgPt);
 							callbacks.markDirty();
 						} else {
@@ -767,6 +785,16 @@ public class CanvasPanel extends JPanel {
 						int bh = Math.max(2, Math.abs(imgPt.y - textDragStart.y));
 						textBoundingBox = new Rectangle(bx, by, bw, bh);
 						repaint();
+					}
+				} else if (callbacks.isAlphaPaintMode()) {
+					// Alpha Paint mode: draw transparent strokes with eraser-like tool
+					if (callbacks.getWorkingImage() != null) {
+						Point lastPt = callbacks.getLastPaintPoint();
+						if (lastPt == null) lastPt = imgPt;
+						PaintEngine.drawEraser(callbacks.getWorkingImage(), lastPt, imgPt,
+								20, true);  // Fixed stroke width of 20, antialiasing on
+						callbacks.setLastPaintPoint(imgPt);
+						callbacks.markDirty();
 					}
 				} else {
 					callbacks.setSelectionEnd(imgPt);

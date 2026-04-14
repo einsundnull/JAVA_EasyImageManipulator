@@ -339,6 +339,7 @@ public class ElementLayerPanel extends JPanel {
             toImage.setToolTipText("Als Bild exportieren");
             toImage.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() > 1) return;  // Let double-clicks through
                     e.consume();
                     cb.exportElementAsImage(layer);
                 }
@@ -367,6 +368,7 @@ public class ElementLayerPanel extends JPanel {
             burn.setToolTipText("Layer einbrennen (auf Canvas anwenden)");
             burn.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() > 1) return;  // Let double-clicks through
                     e.consume();
                     cb.burnElement(layer);
                 }
@@ -394,6 +396,7 @@ public class ElementLayerPanel extends JPanel {
             del.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
             del.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() > 1) return;  // Let double-clicks through
                     e.consume();
                     cb.deleteElement(layer);
                 }
@@ -423,6 +426,7 @@ public class ElementLayerPanel extends JPanel {
                 resetRot.setToolTipText("Rotation zurücksetzen");
                 resetRot.addMouseListener(new MouseAdapter() {
                     @Override public void mouseClicked(MouseEvent e) {
+                        if (e.getClickCount() > 1) return;  // Let double-clicks through
                         e.consume();
                         cb.resetElementRotation(layer);
                     }
@@ -457,6 +461,7 @@ public class ElementLayerPanel extends JPanel {
             vis.setToolTipText(hidden ? "Sichtbar machen" : "Ausblenden");
             vis.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() > 1) return;  // Let double-clicks through
                     e.consume();
                     cb.toggleElementVisibility(layer);
                 }
@@ -493,6 +498,7 @@ public class ElementLayerPanel extends JPanel {
                 mapBtn.setToolTipText("Als Translation Map exportieren");
                 mapBtn.addMouseListener(new MouseAdapter() {
                     @Override public void mouseClicked(MouseEvent e) {
+                        if (e.getClickCount() > 1) return;  // Let double-clicks through
                         e.consume();
                         cb.exportElementAsMap(layer);
                     }

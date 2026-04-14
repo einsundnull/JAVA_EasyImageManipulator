@@ -133,6 +133,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
     private AppMode  appMode           = AppMode.ALPHA_EDITOR;
     private boolean  floodfillMode     = false;
+    private boolean  alphaPaintMode    = false;  // true = Pinsel-basiertes Alpha-Malen
     private boolean  showGrid          = false;
     private boolean  showRuler         = false;
     private RulerUnit rulerUnit        = RulerUnit.PX;
@@ -2230,12 +2231,27 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private void toggleAlphaMode() {
         CanvasInstance c = ci();
         if (appMode != AppMode.ALPHA_EDITOR) return;
-        floodfillMode = !floodfillMode;
-        modeLabel.setText("Modus: " + (floodfillMode ? "Floodfill" : "Selective Alpha"));
-        boolean sel = !floodfillMode;
+        // Cycle through 3 modes: Selective Alpha → Floodfill → Alpha Paint → Selective Alpha
+        if (!floodfillMode && !alphaPaintMode) {
+            // Was Selective Alpha → switch to Floodfill
+            floodfillMode = true;
+            modeLabel.setText("Modus: Floodfill");
+        } else if (floodfillMode && !alphaPaintMode) {
+            // Was Floodfill → switch to Alpha Paint
+            floodfillMode = false;
+            alphaPaintMode = true;
+            modeLabel.setText("Modus: Alpha Paint (Pinsel)");
+        } else {
+            // Was Alpha Paint → switch to Selective Alpha
+            alphaPaintMode = false;
+            modeLabel.setText("Modus: Selective Alpha");
+        }
+        boolean sel = !floodfillMode && !alphaPaintMode;
         applyButton.setEnabled(sel && c.sourceFile != null);
         clearSelectionsButton.setEnabled(sel && c.sourceFile != null);
-        c.selectedAreas.clear(); c.canvasPanel.repaint();
+        c.selectedAreas.clear();
+        c.lastPaintPoint = null;  // Reset paint point for alpha paint mode
+        c.canvasPanel.repaint();
     }
 
     private void togglePaintMode() {
@@ -3030,6 +3046,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         c.activeHandle = -1;  c.scaleBaseRect = null; c.scaleDragStart = null;
         c.selectedAreas.clear();
         markDirty();
+        refreshElementPanel();  // Ensure ListView is updated in all modes
     }
 
     /** Discard the float and undo to the state before it was lifted. */
@@ -3214,6 +3231,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             @Override public BufferedImage getWorkingImage() { return c().workingImage; }
             @Override public AppMode getAppMode() { return appMode; }
             @Override public boolean isFloodfillMode() { return floodfillMode; }
+            @Override public boolean isAlphaPaintMode() { return alphaPaintMode; }
             @Override public double getZoom() { return c().zoom; }
             @Override public void setZoom(double nz, Point anchor) {
                 c().userHasManuallyZoomed = true;

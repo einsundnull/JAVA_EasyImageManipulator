@@ -218,6 +218,44 @@ public class TileGalleryPanel extends JPanel {
                         Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
                         callbacks.onLayerDropped(layer);
                         dtde.dropComplete(true);
+                    } else if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                        // Handle file drops from external sources or other galleries
+                        @SuppressWarnings("unchecked")
+                        java.util.List<File> droppedFiles = (java.util.List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
+                        if (droppedFiles != null && !droppedFiles.isEmpty()) {
+                            Point dropPt = dtde.getLocation();
+                            int insertIndex = calculateInsertIndex(dropPt);
+                            // Copy files from external source to current gallery directory
+                            for (File sourceFile : droppedFiles) {
+                                if (sourceFile.isFile()) {
+                                    try {
+                                        File destDir = getTileGalleryDirectory();
+                                        if (destDir == null) {
+                                            dtde.dropComplete(false);
+                                            return;
+                                        }
+                                        // Copy file to destination directory
+                                        File destFile = new File(destDir, sourceFile.getName());
+                                        int counter = 1;
+                                        while (destFile.exists()) {
+                                            String name = sourceFile.getName();
+                                            int lastDot = name.lastIndexOf('.');
+                                            String baseName = lastDot > 0 ? name.substring(0, lastDot) : name;
+                                            String ext = lastDot > 0 ? name.substring(lastDot) : "";
+                                            destFile = new File(destDir, baseName + "_copy_" + counter + ext);
+                                            counter++;
+                                        }
+                                        copyFileToDestination(sourceFile, destFile);
+                                        callbacks.onFileCopied(destFile, insertIndex);
+                                    } catch (Exception ex) {
+                                        System.err.println("[ERROR] Failed to copy file: " + ex.getMessage());
+                                    }
+                                }
+                            }
+                            dtde.dropComplete(true);
+                            return;
+                        }
+                        dtde.dropComplete(false);
                     } else {
                         dtde.dropComplete(false);
                     }
@@ -413,6 +451,19 @@ public class TileGalleryPanel extends JPanel {
                 break;
             }
         }
+    }
+
+    /**
+     * Get the current gallery directory from the tiles.
+     */
+    private File getTileGalleryDirectory() {
+        if (activeFile != null) {
+            return activeFile.getParentFile();
+        }
+        if (!tiles.isEmpty()) {
+            return tiles.get(0).imageFile.getParentFile();
+        }
+        return null;
     }
 
     /**

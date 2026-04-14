@@ -17,6 +17,7 @@ public interface CanvasCallbacks {
     BufferedImage getWorkingImage();
     AppMode getAppMode();
     boolean isFloodfillMode();
+    boolean isAlphaPaintMode();
     double getZoom();
     void setZoom(double newZoom, Point anchorCanvas);
     JScrollPane getScrollPane();
