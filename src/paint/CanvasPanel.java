@@ -191,8 +191,25 @@ public class CanvasPanel extends JPanel {
 					return;
 				}
 
-				if (!SwingUtilities.isLeftMouseButton(e) || callbacks.getWorkingImage() == null)
+				boolean isLeft = SwingUtilities.isLeftMouseButton(e);
+				boolean isRight = SwingUtilities.isRightMouseButton(e);
+				if ((!isLeft && !isRight) || callbacks.getWorkingImage() == null)
 					return;
+
+				// ── Right-click snap-drag: start snap element drag (before text commit) ────
+				if (isRight) {
+					Point imgPt = callbacks.screenToImage(e.getPoint());
+					Layer hit = hitElement(e.getPoint());
+					if (hit != null) {
+						if (!callbacks.getSelectedElements().contains(hit)) {
+							callbacks.setSelectedElement(hit);
+						}
+						isSnapDragging = true;
+						elemLastImgPt = imgPt;
+						callbacks.pushUndo();
+					}
+					return;
+				}
 
 				// Commit any open text session when clicking elsewhere
 				if (textBoundingBox != null && !textDrawingBox) {
@@ -205,21 +222,6 @@ public class CanvasPanel extends JPanel {
 				}
 
 				Point imgPt = callbacks.screenToImage(e.getPoint());
-
-				// ── Right-click snap-drag: start snap element drag ────────────────────
-				if (SwingUtilities.isRightMouseButton(e)) {
-					if (callbacks.getWorkingImage() == null) return;
-					Layer hit = hitElement(e.getPoint());
-					if (hit != null) {
-						if (!callbacks.getSelectedElements().contains(hit)) {
-							callbacks.setSelectedElement(hit);
-						}
-						isSnapDragging = true;
-						elemLastImgPt = imgPt;
-						callbacks.pushUndo();
-					}
-					return;
-				}
 
 				// ── Rotation handle for selected element (highest priority) ─────────
 				Layer primaryEl = callbacks.getSelectedElement();
@@ -1789,6 +1791,9 @@ public class CanvasPanel extends JPanel {
 		float[] selDash = { 5f, 3f };
 		float[] dimDash = { 3f, 3f };
 
+		// Show all outlines during snap-drag so user can see snap targets
+		boolean showOutlinesDuringSnap = showOutlines || isSnapDragging;
+
 		// Draw all non-primary elements first; primary draws last (on top)
 		for (int pass = 0; pass < 2; pass++) {
 			for (Layer el : activeEls) {
@@ -1882,8 +1887,8 @@ public class CanvasPanel extends JPanel {
 					g2.setColor(new Color(255, 200, 80, 200));
 					g2.setStroke(new BasicStroke(1.5f));
 					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
-				} else if (showOutlines) {
-					// Dim outline for unselected layers when toggle is on
+				} else if (showOutlinesDuringSnap) {
+					// Dim outline for unselected layers when toggle is on or during snap-drag
 					g2.setColor(new Color(160, 160, 160, 140));
 					g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dimDash, 0f));
 					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
