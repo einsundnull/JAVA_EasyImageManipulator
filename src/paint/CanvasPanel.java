@@ -197,8 +197,24 @@ public class CanvasPanel extends JPanel {
 
 				Point imgPt = callbacks.screenToImage(e.getPoint());
 
-				// ── PathLayer interaction ────────────────────────────────────────
+				// ── Rotation handle for selected element (highest priority) ─────────
 				Layer primaryEl = callbacks.getSelectedElement();
+				if (primaryEl != null && primaryEl instanceof ImageLayer) {
+					Rectangle elemRectSc = callbacks.elemRectScreen(primaryEl);
+					Rectangle rotHandleRect = callbacks.getRotationHandleRect(elemRectSc);
+					if (rotHandleRect.contains(e.getPoint())) {
+						// Rotate clockwise on normal click, counter-clockwise on Shift+click
+						if ((e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0) {
+							callbacks.rotateSelectedElements(-90.0);
+						} else {
+							callbacks.rotateSelectedElements(90.0);
+						}
+						return;
+					}
+				}
+
+				// ── PathLayer interaction ────────────────────────────────────────
+				primaryEl = callbacks.getSelectedElement();
 				if (primaryEl instanceof PathLayer pl) {
 					// 1. Scale handles (outermost priority — must not be swallowed by deselect)
 					Rectangle[] plHandles = callbacks.handleRects(callbacks.elemRectScreen(pl));
@@ -910,9 +926,18 @@ public class CanvasPanel extends JPanel {
 					repaint();
 				}
 
-				// Check scale-handle hover on the primary selected element
+				// Check rotation-handle hover first (for ImageLayer only)
 				int newHoveredHandle = -1;
-				if (primary != null) {
+				if (primary != null && primary instanceof ImageLayer) {
+					Rectangle elemRectSc = callbacks.elemRectScreen(primary);
+					Rectangle rotHandleRect = callbacks.getRotationHandleRect(elemRectSc);
+					if (rotHandleRect.contains(e.getPoint())) {
+						newHoveredHandle = -2;  // Special code for rotation handle
+					}
+				}
+
+				// If not over rotation handle, check scale-handle hover on the primary selected element
+				if (newHoveredHandle == -1 && primary != null) {
 					Rectangle[] hrs = callbacks.handleRects(callbacks.elemRectScreen(primary));
 					for (int hi = 0; hi < hrs.length; hi++) {
 						if (hrs[hi].contains(e.getPoint())) { newHoveredHandle = hi; break; }
@@ -920,8 +945,11 @@ public class CanvasPanel extends JPanel {
 				}
 				if (newHoveredHandle != hoveredHandleIndex) {
 					hoveredHandleIndex = newHoveredHandle;
-					// Update resize cursor
-					if (newHoveredHandle >= 0) {
+					// Update cursor
+					if (newHoveredHandle == -2) {
+						// Rotation handle: rotation cursor
+						setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+					} else if (newHoveredHandle >= 0) {
 						int cur = switch (newHoveredHandle) {
 							case 0 -> Cursor.NW_RESIZE_CURSOR;
 							case 1 -> Cursor.N_RESIZE_CURSOR;
@@ -1698,6 +1726,12 @@ public class CanvasPanel extends JPanel {
 							g2.drawRect(hr.x, hr.y, hr.width, hr.height);
 						}
 					}
+					// Draw rotation handle (circle above center of element)
+					Point rotPos = callbacks.getRotationHandlePos(frameRect);
+					g2.setColor(hoveredHandleIndex == -2 ? new Color(255, 180, 0) : new Color(100, 180, 255));
+					g2.setStroke(new BasicStroke(1.5f));
+					g2.drawOval(rotPos.x - 6, rotPos.y - 6, 12, 12);
+					g2.fillOval(rotPos.x - 3, rotPos.y - 3, 6, 6);
 				} else if (isHov) {
 					// Hover outline: brighter, solid
 					g2.setColor(new Color(255, 200, 80, 200));

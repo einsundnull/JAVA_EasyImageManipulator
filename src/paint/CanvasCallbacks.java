@@ -101,6 +101,7 @@ public interface CanvasCallbacks {
     void paintDot(Point imagePt);
     void commitFloat();
     void repaintCanvas();
+    void rotateSelectedElements(double angleDeg);
     /** Called when the mouse enters/leaves a layer on the canvas. id=-1 means no layer. */
     void onCanvasElementHover(int elementId);
     void clearSelection();
@@ -121,6 +122,8 @@ public interface CanvasCallbacks {
     Rectangle floatRectScreen();
     Rectangle elemRectScreen(Layer el);
     Rectangle[] handleRects(Rectangle screenRect);
+    Point getRotationHandlePos(Rectangle sr);
+    Rectangle getRotationHandleRect(Rectangle sr);
     Rectangle getActiveSelection();
     BufferedImage deepCopy(BufferedImage src);
 

@@ -2435,6 +2435,44 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         // Apply to canvas
         Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
         pushUndo();
+    }
+
+    private void doRotate(double angleDeg) {
+        CanvasInstance c = ci();
+        if (c.workingImage == null) return;
+
+        // Apply to selected elements first
+        if (!c.selectedElements.isEmpty()) {
+            pushUndo();
+            for (int i = 0; i < c.selectedElements.size(); i++) {
+                Layer el = c.selectedElements.get(i);
+                if (el instanceof ImageLayer il) {
+                    BufferedImage rotated = PaintEngine.rotate(il.image(), angleDeg);
+                    // Adjust position: center rotation around element center
+                    double oldCenterX = il.x() + il.width() / 2.0;
+                    double oldCenterY = il.y() + il.height() / 2.0;
+                    double newX = oldCenterX - rotated.getWidth() / 2.0;
+                    double newY = oldCenterY - rotated.getHeight() / 2.0;
+                    ImageLayer updated = new ImageLayer(il.id(), rotated, (int) Math.round(newX), (int) Math.round(newY), rotated.getWidth(), rotated.getHeight());
+                    c.selectedElements.set(i, updated);
+                    // Also update in activeElements
+                    for (int j = 0; j < c.activeElements.size(); j++) {
+                        if (c.activeElements.get(j).id() == updated.id()) {
+                            c.activeElements.set(j, updated);
+                            break;
+                        }
+                    }
+                }
+            }
+            markDirty();
+            refreshElementPanel();
+            if (c.canvasPanel != null) c.canvasPanel.repaint();
+            return;
+        }
+
+        // Apply to canvas
+        Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
+        pushUndo();
         if (sel != null) {
             PaintEngine.flipVerticalInRegion(c.workingImage, sel);
         } else {
@@ -2658,6 +2696,20 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             new Rectangle(mx - hs, by - hs, hs*2, hs*2), // 6 BC
             new Rectangle(rx - hs, by - hs, hs*2, hs*2), // 7 BR
         };
+    }
+
+    /** Returns rotation handle position for selected element (30px above center). */
+    public Point getRotationHandlePos(Rectangle sr) {
+        int mx = sr.x + sr.width / 2;
+        int ty = sr.y - 30; // 30 pixels above top
+        return new Point(mx, ty);
+    }
+
+    /** Returns rotation handle hit rect (8×8 around handle position). */
+    public Rectangle getRotationHandleRect(Rectangle sr) {
+        Point p = getRotationHandlePos(sr);
+        int hs = 4;
+        return new Rectangle(p.x - hs, p.y - hs, hs*2, hs*2);
     }
 
     /** Returns 0-7 if {@code pt} (canvasPanel coords) hits a handle, else -1. */
@@ -2940,6 +2992,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             @Override public void paintDot(Point imagePt) { }
             @Override public void commitFloat() { }
             @Override public void repaintCanvas() { if (c().canvasPanel != null) c().canvasPanel.repaint(); }
+            @Override public void rotateSelectedElements(double angleDeg) { doRotate(angleDeg); }
             @Override public void onCanvasElementHover(int id) { }
             @Override public void clearSelection() { c().selectedAreas.clear(); c().isSelecting = false; }
             @Override public void liftSelectionToFloat() { }
@@ -2982,6 +3035,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             @Override public Rectangle floatRectScreen() { return SelectiveAlphaEditor.this.floatRectScreen(); }
             @Override public Rectangle elemRectScreen(Layer el) { return SelectiveAlphaEditor.this.elemRectScreen(el, ci(idx).zoom); }
             @Override public Rectangle[] handleRects(Rectangle r) { return SelectiveAlphaEditor.this.handleRects(r); }
+            @Override public Point getRotationHandlePos(Rectangle sr) { return SelectiveAlphaEditor.this.getRotationHandlePos(sr); }
+            @Override public Rectangle getRotationHandleRect(Rectangle sr) { return SelectiveAlphaEditor.this.getRotationHandleRect(sr); }
             @Override public Rectangle getActiveSelection() { return SelectiveAlphaEditor.this.getActiveSelection(); }
             @Override public BufferedImage deepCopy(BufferedImage src) { return SelectiveAlphaEditor.this.deepCopy(src); }
 
@@ -3759,6 +3814,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, CTRL),        "redo");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL),        "save");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT),   "saveOriginal");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, 0),           "rotateCW");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.SHIFT_DOWN_MASK), "rotateCCW");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE,    0),   "escape");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE,    0),   "deleteInside");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0),  "deleteOutside");
@@ -3792,6 +3849,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         am.put("redo",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRedo(); } });
         am.put("save",         new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageSilent(); } });
         am.put("saveOriginal", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveImageToOriginal(); } });
+        am.put("rotateCW",     new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRotate(90.0); } });
+        am.put("rotateCCW",    new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRotate(-90.0); } });
         am.put("escape",      new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             CanvasInstance c = ci();
             if (c.floatingImg != null) { cancelFloat(); }
