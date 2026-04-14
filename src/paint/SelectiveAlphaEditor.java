@@ -2862,6 +2862,20 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 if (!found) ci.activeElements.add(updated);
                 ci.selectedElements.clear();
                 ci.selectedElements.add(updated);
+
+                // Persist text font settings
+                AppSettings settings = AppSettings.getInstance();
+                settings.setFontName(font);
+                settings.setFontSize(size);
+                settings.setTextBold(bold);
+                settings.setTextItalic(italic);
+                settings.setFontColor(col.getRGB());
+                try {
+                    settings.save();
+                } catch (IOException e) {
+                    System.err.println("[WARN] Konnte Schriftart-Einstellungen nicht speichern: " + e.getMessage());
+                }
+
                 refreshElementPanel();
                 if (ci.canvasPanel != null) ci.canvasPanel.repaint();
             }
