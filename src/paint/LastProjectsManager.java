@@ -100,4 +100,18 @@ public class LastProjectsManager {
         if (path.contains("game")) return CAT_GAMES;
         return CAT_IMAGES;
     }
+
+    /**
+     * Entfernt einen Eintrag aus der Kategorie-Liste und speichert.
+     */
+    public static void removeRecent(String category, String path) throws IOException {
+        if (path == null || path.trim().isEmpty()) {
+            return;
+        }
+        path = path.trim();
+
+        List<String> recent = load(category);
+        recent.remove(path);
+        save(category, recent);
+    }
 }

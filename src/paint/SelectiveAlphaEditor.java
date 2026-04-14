@@ -350,8 +350,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 dlg.setVisible(true);
                 File chosen = dlg.getSelectedPath();
                 if (chosen != null && chosen.isDirectory()) {
-                    // TODO: Open directory in gallery (integrate with TileGalleryPanel)
-                    System.out.println("[INFO] Selected project: " + chosen.getAbsolutePath());
+                    // Open directory in gallery - find and load first image
+                    File[] images = chosen.listFiles(f -> f.isFile() && isSupportedFile(f));
+                    if (images != null && images.length > 0) {
+                        java.util.Arrays.sort(images, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+                        indexDirectory(images[0], activeCanvasIndex);
+                    }
                 }
             } catch (IOException e) {
                 System.err.println("[WARN] Konnte lastProjects nicht laden: " + e.getMessage());
@@ -1319,6 +1323,13 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             c.directoryImages = new ArrayList<>(Arrays.asList(files));
             c.lastIndexedDir  = dir;
             c.tileGallery.setFiles(c.directoryImages, file);
+
+            // Track last opened image directory
+            try {
+                LastProjectsManager.addRecent(LastProjectsManager.CAT_IMAGES, dir.getAbsolutePath());
+            } catch (IOException e) {
+                System.err.println("[WARN] Konnte lastProjects nicht speichern: " + e.getMessage());
+            }
         } else {
             c.tileGallery.setActiveFile(file);
         }
@@ -3383,12 +3394,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             int dw = (int)(iw * scale), dh = (int)(ih * scale);
             int ox = (pw - dw) / 2, oy = (ph - dh) / 2;
 
-            // Checkerboard background
+            // Checkerboard background - use canvas settings colors
+            AppSettings settings = AppSettings.getInstance();
             int cell = 16;
+            Color bg1Color = new Color(settings.getBg1(), true);
+            Color bg2Color = new Color(settings.getBg2(), true);
             for (int cy = 0; cy < ph; cy += cell) {
                 for (int cx = 0; cx < pw; cx += cell) {
-                    g2.setColor(((cx/cell + cy/cell) % 2 == 0)
-                        ? new Color(180, 180, 180) : new Color(220, 220, 220));
+                    g2.setColor(((cx/cell + cy/cell) % 2 == 0) ? bg1Color : bg2Color);
                     g2.fillRect(cx, cy, cell, cell);
                 }
             }

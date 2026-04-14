@@ -3,12 +3,17 @@ package paint;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.List;
+import javax.swing.BorderFactory;
+import java.awt.RenderingHints;
 
 /**
  * Startup-Dialog: "Zuletzt verwendet" - zeigt Projekte pro Kategorie in Tabs.
+ * Styled mit AppColors (dunkles Theme).
  */
 public class StartupDialog extends JDialog {
 
@@ -24,20 +29,22 @@ public class StartupDialog extends JDialog {
     private void initUI() {
         setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         setResizable(false);
-        setSize(500, 400);
+        setSize(600, 450);
         setLocationRelativeTo(getOwner());
 
-        // Main panel
+        // Main panel with dark background
         JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        mainPanel.setBackground(AppColors.BG_DARK);
+        mainPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
 
         // Title
         JLabel titleLabel = new JLabel("Zuletzt geöffnete Projekte");
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 14f));
+        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16f));
+        titleLabel.setForeground(AppColors.TEXT);
         mainPanel.add(titleLabel, BorderLayout.NORTH);
 
-        // Tabs
-        JTabbedPane tabPane = new JTabbedPane();
+        // Tabs with custom styling
+        JTabbedPane tabPane = createStyledTabbedPane();
 
         String[] categories = {
             LastProjectsManager.CAT_TEACHING,
@@ -48,18 +55,23 @@ public class StartupDialog extends JDialog {
 
         for (String cat : categories) {
             List<String> paths = recentByCategory.getOrDefault(cat, new ArrayList<>());
-            JPanel tabPanel = createCategoryTab(paths);
+            JPanel tabPanel = (cat.equals(LastProjectsManager.CAT_IMAGES))
+                    ? createImagesPanel(paths)
+                    : createCategoryTab(paths, cat);
             tabPane.addTab(capitalize(cat), tabPanel);
         }
 
         JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.setBackground(AppColors.BG_DARK);
         centerPanel.add(tabPane, BorderLayout.CENTER);
         mainPanel.add(centerPanel, BorderLayout.CENTER);
 
         // Buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        JButton newProjectBtn = new JButton("Neues Projekt");
-        JButton skipBtn = new JButton("Überspringen");
+        buttonPanel.setBackground(AppColors.BG_DARK);
+
+        JButton newProjectBtn = createStyledButton("Neues Projekt", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
+        JButton skipBtn = createStyledButton("Überspringen", AppColors.BTN_BG, AppColors.BTN_HOVER);
 
         newProjectBtn.addActionListener(e -> {
             // TODO: Open new project dialog
@@ -76,35 +88,366 @@ public class StartupDialog extends JDialog {
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
 
         setContentPane(mainPanel);
+        setUndecorated(false);
     }
 
-    private JPanel createCategoryTab(List<String> paths) {
+    private JTabbedPane createStyledTabbedPane() {
+        JTabbedPane tabPane = new JTabbedPane();
+        tabPane.setBackground(AppColors.BG_PANEL);
+        tabPane.setForeground(AppColors.TEXT);
+        tabPane.setTabPlacement(JTabbedPane.TOP);
+
+        // Style the tab pane
+        UIManager.put("TabbedPane.background", AppColors.BG_PANEL);
+        UIManager.put("TabbedPane.foreground", AppColors.TEXT);
+        UIManager.put("TabbedPane.contentAreaColor", AppColors.BG_DARK);
+        UIManager.put("TabbedPane.selected", AppColors.ACCENT);
+        UIManager.put("TabbedPane.selectHighlight", AppColors.ACCENT);
+
+        return tabPane;
+    }
+
+    private JButton createStyledButton(String text, Color bgColor, Color hoverColor) {
+        JButton btn = new JButton(text);
+        btn.setBackground(bgColor);
+        btn.setForeground(AppColors.TEXT);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setFont(btn.getFont().deriveFont(Font.PLAIN, 12f));
+        btn.setMargin(new Insets(8, 16, 8, 16));
+
+        btn.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                btn.setBackground(hoverColor);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                btn.setBackground(bgColor);
+            }
+        });
+
+        return btn;
+    }
+
+    private JPanel createCategoryTab(List<String> paths, String category) {
         JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(AppColors.BG_DARK);
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         if (paths.isEmpty()) {
             JLabel emptyLabel = new JLabel("Keine Einträge");
-            emptyLabel.setForeground(Color.GRAY);
+            emptyLabel.setForeground(AppColors.TEXT_MUTED);
+            emptyLabel.setFont(emptyLabel.getFont().deriveFont(Font.ITALIC, 12f));
+            emptyLabel.setHorizontalAlignment(SwingConstants.CENTER);
             panel.add(emptyLabel, BorderLayout.CENTER);
             return panel;
         }
 
-        JList<String> list = new JList<>(paths.toArray(new String[0]));
+        // Custom JList with dark styling
+        JList<String> list = new JList<>(formatPaths(paths));
+        list.setBackground(AppColors.BG_PANEL);
+        list.setForeground(AppColors.TEXT);
+        list.setSelectionBackground(AppColors.ACCENT);
+        list.setSelectionForeground(Color.BLACK);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        list.setCellRenderer(new ProjectListCellRenderer());
+
         list.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
-                String selected = list.getSelectedValue();
-                if (selected != null) {
-                    selectedPath = new File(selected);
+                int idx = list.getSelectedIndex();
+                if (idx >= 0) {
+                    selectedPath = new File(paths.get(idx));
                     dispose();
                 }
             }
         });
 
         JScrollPane scrollPane = new JScrollPane(list);
+        scrollPane.setBackground(AppColors.BG_PANEL);
+        scrollPane.getViewport().setBackground(AppColors.BG_PANEL);
+        scrollPane.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
         panel.add(scrollPane, BorderLayout.CENTER);
 
         return panel;
+    }
+
+    /**
+     * Special panel for Images with delete buttons per item.
+     */
+    private JPanel createImagesPanel(List<String> paths) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(AppColors.BG_DARK);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        if (paths.isEmpty()) {
+            JLabel emptyLabel = new JLabel("Keine Bilder");
+            emptyLabel.setForeground(AppColors.TEXT_MUTED);
+            emptyLabel.setFont(emptyLabel.getFont().deriveFont(Font.ITALIC, 12f));
+            emptyLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            panel.add(emptyLabel, BorderLayout.CENTER);
+            return panel;
+        }
+
+        // List panel with delete buttons - use container that respects preferred sizes
+        JPanel listPanel = new JPanel();
+        listPanel.setLayout(new java.awt.GridBagLayout());
+        listPanel.setBackground(AppColors.BG_PANEL);
+
+        java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
+        gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+        gbc.weighty = 0;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+
+        for (int i = 0; i < paths.size(); i++) {
+            final String path = paths.get(i);
+            final int idx = i;
+            final JPanel[] itemPanelRef = new JPanel[1]; // Use array to allow assignment in lambda
+            itemPanelRef[0] = createImageListItem(path, () -> {
+                try {
+                    LastProjectsManager.removeRecent(LastProjectsManager.CAT_IMAGES, path);
+                    paths.remove(idx);
+                    listPanel.remove(itemPanelRef[0]);
+                    listPanel.revalidate();
+                    listPanel.repaint();
+                } catch (IOException e) {
+                    System.err.println("[ERROR] Konnte Eintrag nicht löschen: " + e.getMessage());
+                }
+            }, () -> {
+                selectedPath = new File(path);
+                dispose();
+            });
+            listPanel.add(itemPanelRef[0], gbc);
+            gbc.gridy++;
+        }
+
+        // Add filler to push items to top
+        gbc.weighty = 1.0;
+        listPanel.add(new JPanel(), gbc);
+
+        JScrollPane scrollPane = new JScrollPane(listPanel);
+        scrollPane.setBackground(AppColors.BG_PANEL);
+        scrollPane.getViewport().setBackground(AppColors.BG_PANEL);
+        scrollPane.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    /**
+     * Single image list item with thumbnail and delete button.
+     * Standard height of 120px showing the first image in the directory.
+     */
+    private JPanel createImageListItem(String path, Runnable onDelete, Runnable onSelect) {
+        JPanel item = new JPanel(new BorderLayout(8, 0));
+        item.setBackground(AppColors.BG_PANEL);
+        item.setBorder(new EmptyBorder(4, 4, 4, 4));
+        item.setPreferredSize(new Dimension(-1, 120)); // Standard height
+        item.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120)); // Force height with BoxLayout
+
+        File dirFile = new File(path);
+
+        // Thumbnail panel - load first image from directory
+        JPanel thumbnailPanel = new JPanel() {
+            private BufferedImage thumbnail = null;
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+
+                if (thumbnail != null) {
+                    int w = getWidth();
+                    int h = getHeight();
+                    int imgW = thumbnail.getWidth();
+                    int imgH = thumbnail.getHeight();
+
+                    // Scale to fit while maintaining aspect ratio
+                    double scale = Math.min((double)w / imgW, (double)h / imgH);
+                    int scaledW = (int)(imgW * scale);
+                    int scaledH = (int)(imgH * scale);
+                    int x = (w - scaledW) / 2;
+                    int y = (h - scaledH) / 2;
+
+                    g2.drawImage(thumbnail, x, y, scaledW, scaledH, null);
+                } else {
+                    // Placeholder while loading
+                    g2.setColor(AppColors.BG_DARK);
+                    g2.fillRect(0, 0, getWidth(), getHeight());
+                    g2.setColor(AppColors.TEXT_MUTED);
+                    g2.drawString("...", getWidth() / 2 - 10, getHeight() / 2 + 5);
+                }
+            }
+        };
+        thumbnailPanel.setBackground(AppColors.BG_DARK);
+        thumbnailPanel.setPreferredSize(new Dimension(120, 120));
+
+        // Load thumbnail asynchronously
+        new SwingWorker<BufferedImage, Void>() {
+            @Override
+            protected BufferedImage doInBackground() throws Exception {
+                File[] files = dirFile.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg");
+                });
+
+                if (files != null && files.length > 0) {
+                    BufferedImage img = javax.imageio.ImageIO.read(files[0]);
+                    if (img != null) {
+                        // Scale to ~120x120
+                        int targetSize = 120;
+                        double scale = Math.min((double)targetSize / img.getWidth(), (double)targetSize / img.getHeight());
+                        int newW = (int)(img.getWidth() * scale);
+                        int newH = (int)(img.getHeight() * scale);
+                        BufferedImage scaled = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
+                        Graphics2D g2 = scaled.createGraphics();
+                        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                        g2.drawImage(img, 0, 0, newW, newH, null);
+                        g2.dispose();
+                        return scaled;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    BufferedImage result = get();
+                    if (result != null) {
+                        // Use reflection to set thumbnail
+                        java.lang.reflect.Field field = thumbnailPanel.getClass().getDeclaredField("thumbnail");
+                        field.setAccessible(true);
+                        field.set(thumbnailPanel, result);
+                        thumbnailPanel.repaint();
+                    }
+                } catch (Exception e) {
+                    System.err.println("[WARN] Konnte Thumbnail nicht laden: " + e.getMessage());
+                }
+            }
+        }.execute();
+
+        // Info panel - directory name and path
+        JPanel infoPanel = new JPanel(new BorderLayout());
+        infoPanel.setBackground(AppColors.BG_PANEL);
+        infoPanel.setBorder(new EmptyBorder(8, 0, 8, 0));
+
+        JLabel nameLabel = new JLabel(dirFile.getName());
+        nameLabel.setForeground(AppColors.TEXT);
+        nameLabel.setFont(nameLabel.getFont().deriveFont(Font.PLAIN, 12f));
+        nameLabel.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+
+        JLabel pathLabel = new JLabel(dirFile.getParent());
+        pathLabel.setForeground(AppColors.TEXT_MUTED);
+        pathLabel.setFont(pathLabel.getFont().deriveFont(Font.PLAIN, 10f));
+        pathLabel.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+
+        // Click listeners on labels
+        java.awt.event.MouseAdapter labelClickAdapter = new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                onSelect.run();
+            }
+        };
+        nameLabel.addMouseListener(labelClickAdapter);
+        pathLabel.addMouseListener(labelClickAdapter);
+
+        infoPanel.add(nameLabel, BorderLayout.NORTH);
+        infoPanel.add(pathLabel, BorderLayout.CENTER);
+
+        // Add click listener to infoPanel
+        infoPanel.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                onSelect.run();
+            }
+
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                item.setBackground(AppColors.TILE_HOVER_BG);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                item.setBackground(AppColors.BG_PANEL);
+            }
+        });
+
+        // Delete button
+        JButton deleteBtn = new JButton("✕");
+        deleteBtn.setBackground(AppColors.DANGER);
+        deleteBtn.setForeground(Color.WHITE);
+        deleteBtn.setFont(deleteBtn.getFont().deriveFont(Font.BOLD, 12f));
+        deleteBtn.setFocusPainted(false);
+        deleteBtn.setBorderPainted(false);
+        deleteBtn.setPreferredSize(new Dimension(32, 32));
+        deleteBtn.setMargin(new Insets(0, 0, 0, 0));
+
+        deleteBtn.addActionListener(e -> onDelete.run());
+        deleteBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                deleteBtn.setBackground(AppColors.DANGER_HOVER);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                deleteBtn.setBackground(AppColors.DANGER);
+            }
+        });
+
+        // Hover effect on entire item
+        java.awt.event.MouseAdapter hoverAdapter = new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                item.setBackground(AppColors.TILE_HOVER_BG);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                item.setBackground(AppColors.BG_PANEL);
+            }
+        };
+
+        // Thumbnail click handler
+        thumbnailPanel.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                onSelect.run();
+            }
+
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                item.setBackground(AppColors.TILE_HOVER_BG);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                item.setBackground(AppColors.BG_PANEL);
+            }
+        });
+
+        // Item hover effect
+        item.addMouseListener(hoverAdapter);
+
+        item.add(thumbnailPanel, BorderLayout.WEST);
+        item.add(infoPanel, BorderLayout.CENTER);
+        item.add(deleteBtn, BorderLayout.EAST);
+
+        return item;
+    }
+
+    private String[] formatPaths(List<String> paths) {
+        return paths.stream()
+                .map(p -> {
+                    File f = new File(p);
+                    return "  " + f.getName() + "  —  " + f.getParent();
+                })
+                .toArray(String[]::new);
     }
 
     private String capitalize(String s) {
@@ -114,5 +457,31 @@ public class StartupDialog extends JDialog {
 
     public File getSelectedPath() {
         return selectedPath;
+    }
+
+    /**
+     * Custom cell renderer for project list items.
+     */
+    private static class ProjectListCellRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(JList<?> list, Object value,
+                                                      int index, boolean isSelected,
+                                                      boolean cellHasFocus) {
+            JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+            if (isSelected) {
+                label.setBackground(AppColors.ACCENT);
+                label.setForeground(Color.BLACK);
+            } else {
+                label.setBackground(AppColors.BG_PANEL);
+                label.setForeground(AppColors.TEXT);
+            }
+
+            label.setOpaque(true);
+            label.setBorder(new EmptyBorder(5, 5, 5, 5));
+            label.setFont(label.getFont().deriveFont(Font.PLAIN, 11f));
+
+            return label;
+        }
     }
 }
