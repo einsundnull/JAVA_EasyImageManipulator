@@ -11,6 +11,9 @@ public class AppPaths {
 
     private static File appDataDir;
     private static File projectsDir;
+    private static File settingsDir;
+    private static File lastProjectsDir;
+    private static File assetsDir;
     private static File settingsFile;
 
     static {
@@ -26,11 +29,17 @@ public class AppPaths {
 
         appDataDir = new File(appData, "TransparencyTool");
         projectsDir = new File(appDataDir, "projects");
-        settingsFile = new File(appDataDir, "settings.json");
+        settingsDir = new File(appDataDir, "settings");
+        lastProjectsDir = new File(settingsDir, "lastProjects");
+        assetsDir = new File(appDataDir, "assets");
+        settingsFile = new File(settingsDir, "default.txt");
 
         // Verzeichnisse anlegen wenn nicht vorhanden
         if (!appDataDir.exists()) appDataDir.mkdirs();
         if (!projectsDir.exists()) projectsDir.mkdirs();
+        if (!settingsDir.exists()) settingsDir.mkdirs();
+        if (!lastProjectsDir.exists()) lastProjectsDir.mkdirs();
+        if (!assetsDir.exists()) assetsDir.mkdirs();
     }
 
     /**
@@ -41,10 +50,38 @@ public class AppPaths {
     }
 
     /**
-     * Gibt die settings.json-Datei zurück.
+     * Gibt das settings/-Verzeichnis zurück.
+     */
+    public static File getSettingsDir() {
+        return settingsDir;
+    }
+
+    /**
+     * Gibt die settings/default.txt-Datei zurück.
      */
     public static File getSettingsFile() {
         return settingsFile;
+    }
+
+    /**
+     * Gibt das settings/lastProjects/-Verzeichnis zurück.
+     */
+    public static File getLastProjectsDir() {
+        return lastProjectsDir;
+    }
+
+    /**
+     * Gibt die settings/lastProjects/{category}.txt-Datei zurück.
+     */
+    public static File getLastProjectsFile(String category) {
+        return new File(lastProjectsDir, category + ".txt");
+    }
+
+    /**
+     * Gibt das assets/-Verzeichnis zurück.
+     */
+    public static File getAssetsDir() {
+        return assetsDir;
     }
 
     /**

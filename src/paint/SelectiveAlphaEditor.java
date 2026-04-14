@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.imageio.ImageIO;
@@ -340,6 +341,23 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         });
 
         initSecondaryWindow();
+
+        // Show StartupDialog for recently used projects (always show)
+        SwingUtilities.invokeLater(() -> {
+            try {
+                Map<String, List<String>> recent = LastProjectsManager.loadAll();
+                StartupDialog dlg = new StartupDialog(SelectiveAlphaEditor.this, recent);
+                dlg.setVisible(true);
+                File chosen = dlg.getSelectedPath();
+                if (chosen != null && chosen.isDirectory()) {
+                    // TODO: Open directory in gallery (integrate with TileGalleryPanel)
+                    System.out.println("[INFO] Selected project: " + chosen.getAbsolutePath());
+                }
+            } catch (IOException e) {
+                System.err.println("[WARN] Konnte lastProjects nicht laden: " + e.getMessage());
+            }
+        });
+
         setVisible(true);
     }
 

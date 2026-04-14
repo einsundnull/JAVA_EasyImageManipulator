@@ -158,6 +158,53 @@ public class AppSettings {
         if (data.containsKey("maximized")) windowMaximized = parseBoolean(data.get("maximized"));
 
         if (data.containsKey("mouseWheelSensitivity")) mouseWheelSensitivity = parseInt(data.get("mouseWheelSensitivity"));
+
+        // Parse recentProjects array
+        if (data.containsKey("recentProjects")) {
+            String arrStr = data.get("recentProjects");
+            parseStringArray(arrStr, recentProjects);
+        }
+
+        // Parse recentFiles array
+        if (data.containsKey("recentFiles")) {
+            String arrStr = data.get("recentFiles");
+            parseStringArray(arrStr, recentFiles);
+        }
+    }
+
+    private static void parseStringArray(String arrStr, List<String> list) {
+        if (arrStr == null || !arrStr.startsWith("[") || !arrStr.endsWith("]")) {
+            return;
+        }
+        String content = arrStr.substring(1, arrStr.length() - 1).trim();
+        if (content.isEmpty()) {
+            return;
+        }
+        // Simple CSV parsing for quoted strings
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        boolean escaped = false;
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (escaped) {
+                if (c == '\\') current.append('\\');
+                else if (c == '"') current.append('"');
+                else current.append(c);
+                escaped = false;
+            } else if (c == '\\' && inQuotes) {
+                escaped = true;
+            } else if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == ',' && !inQuotes) {
+                String item = current.toString().trim();
+                if (!item.isEmpty()) list.add(item);
+                current = new StringBuilder();
+            } else {
+                current.append(c);
+            }
+        }
+        String item = current.toString().trim();
+        if (!item.isEmpty()) list.add(item);
     }
 
     public void save() throws IOException {
@@ -201,7 +248,23 @@ public class AppSettings {
             writeField(writer, "windowH", windowHeight, true);
             writeField(writer, "maximized", windowMaximized, true);
 
-            writeField(writer, "mouseWheelSensitivity", mouseWheelSensitivity, false);
+            writeField(writer, "mouseWheelSensitivity", mouseWheelSensitivity, true);
+
+            // recentProjects as JSON array
+            writer.write("  \"recentProjects\": [");
+            for (int i = 0; i < recentProjects.size(); i++) {
+                writer.write("\"" + recentProjects.get(i).replace("\\", "\\\\") + "\"");
+                if (i < recentProjects.size() - 1) writer.write(", ");
+            }
+            writer.write("],\n");
+
+            // recentFiles as JSON array (last field, no comma)
+            writer.write("  \"recentFiles\": [");
+            for (int i = 0; i < recentFiles.size(); i++) {
+                writer.write("\"" + recentFiles.get(i).replace("\\", "\\\\") + "\"");
+                if (i < recentFiles.size() - 1) writer.write(", ");
+            }
+            writer.write("]\n");
 
             writer.write("\n}\n");
         }
