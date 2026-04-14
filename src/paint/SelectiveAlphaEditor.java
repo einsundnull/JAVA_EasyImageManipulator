@@ -2380,7 +2380,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
      * Helper: Update an ImageLayer in both activeElements and selectedElements lists by ID.
      * Used by flip/rotate/reset operations.
      */
-    private void replaceInLists(CanvasInstance c, ImageLayer updated) {
+    private void replaceInLists(CanvasInstance c, Layer updated) {
         for (int i = 0; i < c.activeElements.size(); i++) {
             if (c.activeElements.get(i).id() == updated.id()) {
                 c.activeElements.set(i, updated);
@@ -2646,6 +2646,25 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this,
                             "Fehler beim Speichern:\n" + ex.getMessage(),
                             "Fehler", javax.swing.JOptionPane.ERROR_MESSAGE);
+                }
+            }
+
+            @Override public void toggleElementVisibility(Layer el) {
+                CanvasInstance c = c();
+                pushUndo();
+                Layer updated = null;
+                if (el instanceof ImageLayer il) {
+                    updated = il.withHidden(!il.isHidden());
+                } else if (el instanceof TextLayer tl) {
+                    updated = tl.withHidden(!tl.isHidden());
+                } else if (el instanceof PathLayer pl) {
+                    updated = pl.withHidden(!pl.isHidden());
+                }
+                if (updated != null) {
+                    replaceInLists(c, updated);
+                    markDirty(idx);
+                    refreshElementPanel();
+                    if (c.canvasPanel != null) c.canvasPanel.repaint();
                 }
             }
 
@@ -3674,18 +3693,19 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     newLayer = new ImageLayer(c.nextElementId++,
                         deepCopy(il.image()),
                         original.x(), original.y(),
-                        original.width(), original.height());
+                        original.width(), original.height(),
+                        il.rotationAngle(), il.opacity(), il.isHidden());
                 } else if (original instanceof TextLayer tl) {
                     newLayer = TextLayer.of(c.nextElementId++,
                         tl.text(), tl.fontName(), tl.fontSize(),
                         tl.fontBold(), tl.fontItalic(), tl.fontColor(),
-                        original.x(), original.y());
+                        original.x(), original.y(), tl.isHidden());
                 } else if (original instanceof PathLayer pl) {
                     newLayer = PathLayer.of(c.nextElementId++,
                         new ArrayList<>(pl.points()),
                         null,  // image will be null, rendered on-the-fly
                         pl.isClosed(),
-                        original.x(), original.y());
+                        original.x(), original.y(), pl.isHidden());
                 } else {
                     continue;  // Unknown layer type
                 }
@@ -4192,6 +4212,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT | InputEvent.SHIFT_DOWN_MASK), "saveBurnedOriginal");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, 0),           "rotateCW");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.SHIFT_DOWN_MASK), "rotateCCW");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.SHIFT_DOWN_MASK), "toggleVis");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE,    0),   "escape");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE,    0),   "deleteInside");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0),  "deleteOutside");
@@ -4229,6 +4250,35 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         am.put("saveBurnedOriginal",  new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { saveBurnedElementsOriginal(); } });
         am.put("rotateCW",     new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRotate(90.0); } });
         am.put("rotateCCW",    new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { doRotate(-90.0); } });
+        am.put("toggleVis",    new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+            CanvasInstance c = ci();
+            if (c.workingImage == null) return;
+            List<Layer> toToggle = c.selectedElements.isEmpty() ? java.util.List.of() : c.selectedElements;
+            for (Layer el : toToggle) {
+                pushUndo();
+                Layer updated = null;
+                if (el instanceof ImageLayer il) {
+                    updated = il.withHidden(!il.isHidden());
+                } else if (el instanceof TextLayer tl) {
+                    updated = tl.withHidden(!tl.isHidden());
+                } else if (el instanceof PathLayer pl) {
+                    updated = pl.withHidden(!pl.isHidden());
+                }
+                if (updated != null) {
+                    for (int i = 0; i < c.activeElements.size(); i++) {
+                        if (c.activeElements.get(i).id() == updated.id()) { c.activeElements.set(i, updated); break; }
+                    }
+                    for (int i = 0; i < c.selectedElements.size(); i++) {
+                        if (c.selectedElements.get(i).id() == updated.id()) { c.selectedElements.set(i, updated); break; }
+                    }
+                }
+            }
+            if (!toToggle.isEmpty()) {
+                markDirty();
+                refreshElementPanel();
+                if (c.canvasPanel != null) c.canvasPanel.repaint();
+            }
+        }});
         am.put("escape",      new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             CanvasInstance c = ci();
             if (c.floatingImg != null) { cancelFloat(); }

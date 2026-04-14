@@ -23,15 +23,17 @@ public final class PathLayer extends Layer {
     private final List<Point3D> points;
     private final BufferedImage image;  // null if no image
     private final boolean closed;       // true = polygon (close path), false = open path
+    private final boolean hidden;       // true = invisible (doesn't render)
 
     // ── Private constructor – callers use the factory method ─────────────────
 
     private PathLayer(int id, List<Point3D> points, BufferedImage image, boolean closed,
-                      int x, int y, int w, int h) {
+                      int x, int y, int w, int h, boolean hidden) {
         super(id, x, y, w, h);
         this.points = new ArrayList<>(points);
         this.image = image;
         this.closed = closed;
+        this.hidden = hidden;
     }
 
     // ── Factory method ────────────────────────────────────────────────────────
@@ -48,6 +50,11 @@ public final class PathLayer extends Layer {
      */
     public static PathLayer of(int id, List<Point3D> points, BufferedImage image, boolean closed,
                                int x, int y) {
+        return of(id, points, image, closed, x, y, false);
+    }
+
+    public static PathLayer of(int id, List<Point3D> points, BufferedImage image, boolean closed,
+                               int x, int y, boolean hidden) {
         if (points.isEmpty()) {
             throw new IllegalArgumentException("PathLayer must have at least 1 point");
         }
@@ -65,7 +72,7 @@ public final class PathLayer extends Layer {
         int w = Math.max(1, (int) (maxX - minX) + 1);
         int h = Math.max(1, (int) (maxY - minY) + 1);
 
-        return new PathLayer(id, points, image, closed, x, y, w, h);
+        return new PathLayer(id, points, image, closed, x, y, w, h, hidden);
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────
@@ -75,12 +82,13 @@ public final class PathLayer extends Layer {
     public int pointCount()           { return points.size(); }
     public BufferedImage image()      { return image; }
     public boolean isClosed()         { return closed; }
+    public boolean isHidden()         { return hidden; }
 
     // ── Mutations (return new instances) ──────────────────────────────────────
 
     @Override
     public PathLayer withPosition(int nx, int ny) {
-        return new PathLayer(id, points, image, closed, nx, ny, width, height);
+        return new PathLayer(id, points, image, closed, nx, ny, width, height, hidden);
     }
 
     /**
@@ -99,7 +107,7 @@ public final class PathLayer extends Layer {
         }
 
         // Recompute bounds with scaled points
-        return of(id, scaledPoints, image, closed, nx, ny);
+        return of(id, scaledPoints, image, closed, nx, ny, hidden);
     }
 
     /**
@@ -112,7 +120,7 @@ public final class PathLayer extends Layer {
         }
         List<Point3D> newPoints = new ArrayList<>(points);
         newPoints.set(pointIndex, new Point3D(newX, newY, points.get(pointIndex).z));
-        return of(id, newPoints, image, closed, x, y);
+        return of(id, newPoints, image, closed, x, y, hidden);
     }
 
     /**
@@ -125,7 +133,7 @@ public final class PathLayer extends Layer {
         List<Point3D> newPoints = new ArrayList<>(points);
         Point3D old = points.get(pointIndex);
         newPoints.set(pointIndex, new Point3D(old.x, old.y, newZ));
-        return new PathLayer(id, newPoints, image, closed, x, y, width, height);
+        return new PathLayer(id, newPoints, image, closed, x, y, width, height, hidden);
     }
 
     /**
@@ -139,7 +147,7 @@ public final class PathLayer extends Layer {
         } else {
             newPoints.add(index, newPoint);
         }
-        return of(id, newPoints, image, closed, x, y);
+        return of(id, newPoints, image, closed, x, y, hidden);
     }
 
     /**
@@ -152,21 +160,25 @@ public final class PathLayer extends Layer {
         }
         List<Point3D> newPoints = new ArrayList<>(points);
         newPoints.remove(index);
-        return of(id, newPoints, image, closed, x, y);
+        return of(id, newPoints, image, closed, x, y, hidden);
     }
 
     /**
      * Returns a copy with an optional image.
      */
     public PathLayer withImage(BufferedImage newImage) {
-        return new PathLayer(id, points, newImage, closed, x, y, width, height);
+        return new PathLayer(id, points, newImage, closed, x, y, width, height, hidden);
     }
 
     /**
      * Returns a copy with the closed state toggled.
      */
     public PathLayer withClosed(boolean newClosed) {
-        return new PathLayer(id, points, image, newClosed, x, y, width, height);
+        return new PathLayer(id, points, image, newClosed, x, y, width, height, hidden);
+    }
+
+    public PathLayer withHidden(boolean newHidden) {
+        return new PathLayer(id, points, image, closed, x, y, width, height, newHidden);
     }
 
     // ── Polygon operations ────────────────────────────────────────────────────

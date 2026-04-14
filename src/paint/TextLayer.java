@@ -29,12 +29,13 @@ public final class TextLayer extends Layer {
     private final boolean fontBold;
     private final boolean fontItalic;
     private final Color   fontColor;
+    private final boolean hidden;  // true = invisible (doesn't render)
 
     // ── Private constructor – callers use the factory method ─────────────────
 
     private TextLayer(int id, String text, String fontName, int fontSize,
                       boolean fontBold, boolean fontItalic, Color fontColor,
-                      int x, int y, int w, int h) {
+                      int x, int y, int w, int h, boolean hidden) {
         super(id, x, y, w, h);
         this.text      = text;
         this.fontName  = fontName;
@@ -42,6 +43,7 @@ public final class TextLayer extends Layer {
         this.fontBold  = fontBold;
         this.fontItalic = fontItalic;
         this.fontColor = fontColor;
+        this.hidden    = hidden;
     }
 
     // ── Factory method ────────────────────────────────────────────────────────
@@ -61,6 +63,11 @@ public final class TextLayer extends Layer {
      */
     public static TextLayer of(int id, String text, String fontName, int fontSize,
                                boolean bold, boolean italic, Color color, int x, int y) {
+        return of(id, text, fontName, fontSize, bold, italic, color, x, y, false);
+    }
+
+    public static TextLayer of(int id, String text, String fontName, int fontSize,
+                               boolean bold, boolean italic, Color color, int x, int y, boolean hidden) {
         String  fn   = fontName != null ? fontName : "SansSerif";
         int     fs   = Math.max(6, fontSize);
         int     style = (bold ? Font.BOLD : 0) | (italic ? Font.ITALIC : 0);
@@ -75,7 +82,7 @@ public final class TextLayer extends Layer {
         for (String line : lines) w = Math.max(w, fm.stringWidth(line));
         int h = Math.max(1, fm.getHeight() * lines.length);
         // Add TEXT_PADDING on each side
-        return new TextLayer(id, txt, fn, fs, bold, italic, col, x, y, w + TEXT_PADDING * 2, h + TEXT_PADDING * 2);
+        return new TextLayer(id, txt, fn, fs, bold, italic, col, x, y, w + TEXT_PADDING * 2, h + TEXT_PADDING * 2, hidden);
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────
@@ -86,12 +93,13 @@ public final class TextLayer extends Layer {
     public boolean fontBold()  { return fontBold;  }
     public boolean fontItalic(){ return fontItalic; }
     public Color   fontColor() { return fontColor; }
+    public boolean isHidden()  { return hidden;    }
 
     // ── Mutations (return new instances) ──────────────────────────────────────
 
     @Override
     public TextLayer withPosition(int nx, int ny) {
-        return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, nx, ny, width, height);
+        return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, nx, ny, width, height, hidden);
     }
 
     /**
@@ -105,7 +113,7 @@ public final class TextLayer extends Layer {
         double scaleY = (double) nh / Math.max(1, height);
         double scale  = Math.max(scaleX, scaleY);
         int newFontSize = Math.max(6, (int) Math.round(fontSize * scale));
-        return of(id, text, fontName, newFontSize, fontBold, fontItalic, fontColor, nx, ny);
+        return of(id, text, fontName, newFontSize, fontBold, fontItalic, fontColor, nx, ny, hidden);
     }
 
     /**
@@ -114,7 +122,7 @@ public final class TextLayer extends Layer {
      */
     public TextLayer withText(String newText, String newFontName, int newFontSize,
                               boolean newBold, boolean newItalic, Color newColor) {
-        return of(id, newText, newFontName, newFontSize, newBold, newItalic, newColor, x, y);
+        return of(id, newText, newFontName, newFontSize, newBold, newItalic, newColor, x, y, hidden);
     }
 
     /**
@@ -122,7 +130,11 @@ public final class TextLayer extends Layer {
      * The bounding box is recomputed from the new font metrics.
      */
     public TextLayer withFontSize(int newFontSize) {
-        return of(id, text, fontName, newFontSize, fontBold, fontItalic, fontColor, x, y);
+        return of(id, text, fontName, newFontSize, fontBold, fontItalic, fontColor, x, y, hidden);
+    }
+
+    public TextLayer withHidden(boolean newHidden) {
+        return of(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, x, y, newHidden);
     }
 
     // ── Convenience ───────────────────────────────────────────────────────────

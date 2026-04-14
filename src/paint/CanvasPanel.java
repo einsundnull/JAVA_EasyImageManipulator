@@ -1839,6 +1839,11 @@ public class CanvasPanel extends JPanel {
 				// Skip the element currently being text-edited — the live preview replaces it
 				if (editingTextElementId >= 0 && el.id() == editingTextElementId) continue;
 
+				// Skip hidden layers
+				if (el instanceof ImageLayer il && il.isHidden()) continue;
+				if (el instanceof TextLayer tl && tl.isHidden()) continue;
+				if (el instanceof PathLayer pl && pl.isHidden()) continue;
+
 				Rectangle sr = callbacks.elemRectScreen(el);
 
 				// For PathLayer the frame must be derived from the actual point

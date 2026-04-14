@@ -85,6 +85,8 @@ public class ElementLayerPanel extends JPanel {
         void resetElementRotation(Layer el);
         /** Export a TextLayer as a translation map. */
         void exportElementAsMap(Layer el);
+        /** Toggle visibility (hidden state) of a layer. */
+        void toggleElementVisibility(Layer el);
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
@@ -314,7 +316,7 @@ public class ElementLayerPanel extends JPanel {
 
         private final Layer   layer;
         private final boolean selected;
-        private JLabel toImage, burn, del, resetRot, mapBtn, lbl;
+        private JLabel toImage, burn, del, resetRot, mapBtn, vis, lbl;
 
         LayerTile(Layer layer, boolean selected) {
             this.layer    = layer;
@@ -437,6 +439,46 @@ public class ElementLayerPanel extends JPanel {
                 });
                 add(resetRot);
             }
+
+            // ── Cyan visibility button (👁) – for all layers ────────────────────
+            boolean hidden = false;
+            if (layer instanceof ImageLayer il) hidden = il.isHidden();
+            else if (layer instanceof TextLayer tl) hidden = tl.isHidden();
+            else if (layer instanceof PathLayer pl) hidden = pl.isHidden();
+
+            vis = new JLabel(hidden ? "🚫" : "👁", JLabel.CENTER);
+            vis.setForeground(hidden ? new Color(180, 60, 60) : new Color(60, 180, 180));
+            vis.setFont(new Font("SansSerif", Font.BOLD, 10));
+            vis.setBounds(TILE_W - 109, 4, 16, 16);
+            vis.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            vis.setOpaque(true);
+            vis.setBackground(new Color(50, 50, 50));
+            vis.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            vis.setToolTipText(hidden ? "Sichtbar machen" : "Ausblenden");
+            vis.addMouseListener(new MouseAdapter() {
+                @Override public void mouseClicked(MouseEvent e) {
+                    e.consume();
+                    cb.toggleElementVisibility(layer);
+                }
+                @Override public void mouseEntered(MouseEvent e) {
+                    boolean h = layer instanceof ImageLayer il && il.isHidden() ||
+                               layer instanceof TextLayer tl && tl.isHidden() ||
+                               layer instanceof PathLayer pl && pl.isHidden();
+                    vis.setBackground(h ? new Color(140, 40, 40) : new Color(40, 140, 140));
+                    vis.setForeground(Color.WHITE);
+                    vis.setBorder(BorderFactory.createLineBorder(
+                        h ? new Color(180, 60, 60) : new Color(60, 180, 180), 1));
+                }
+                @Override public void mouseExited(MouseEvent e) {
+                    boolean h = layer instanceof ImageLayer il && il.isHidden() ||
+                               layer instanceof TextLayer tl && tl.isHidden() ||
+                               layer instanceof PathLayer pl && pl.isHidden();
+                    vis.setBackground(new Color(50, 50, 50));
+                    vis.setForeground(h ? new Color(180, 60, 60) : new Color(60, 180, 180));
+                    vis.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                }
+            });
+            add(vis);
 
             // ── Purple map button (🗺) – only for TextLayers ────────────────────
             if (layer instanceof TextLayer) {
