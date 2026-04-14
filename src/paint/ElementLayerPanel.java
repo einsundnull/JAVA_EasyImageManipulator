@@ -53,7 +53,7 @@ import javax.swing.SwingUtilities;
  * Visibility is controlled externally (shown/hidden together with Canvas mode).
  * The panel's own header close-button notifies the host via onCloseRequested().
  */
-public class ElementLayerPanel extends JPanel {
+public class ElementLayerPanel extends BaseSidebarPanel {
 
     // ── DnD flavor for dragging a Layer between panels / onto a canvas ────────
     public static final DataFlavor LAYER_FLAVOR = new DataFlavor(Layer.class, "Layer");
@@ -119,6 +119,7 @@ public class ElementLayerPanel extends JPanel {
                 BorderFactory.createEmptyBorder(0, 0, 16, 0)));
 
         // ── Header ────────────────────────────────────────────────────────────
+        // Build header manually since we need both outline button + close button
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(new Color(42, 42, 42));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
@@ -141,6 +142,7 @@ public class ElementLayerPanel extends JPanel {
             @Override public void mouseEntered(MouseEvent e) { closeBtn.setForeground(Color.WHITE); }
             @Override public void mouseExited (MouseEvent e) { closeBtn.setForeground(AppColors.TEXT_MUTED); }
         });
+
         // "Show all outlines" toggle – small square icon button
         JToggleButton outlineBtn = new JToggleButton("▣") {
             @Override protected void paintComponent(Graphics g) {
@@ -169,6 +171,7 @@ public class ElementLayerPanel extends JPanel {
         eastBtns.add(outlineBtn);
         eastBtns.add(closeBtn);
         header.add(eastBtns, BorderLayout.EAST);
+
         add(header, BorderLayout.NORTH);
 
         // ── Tiles container ───────────────────────────────────────────────────
@@ -229,13 +232,8 @@ public class ElementLayerPanel extends JPanel {
             }
         }, true);
 
-        JScrollPane scroll = new JScrollPane(tilesContainer,
-                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.setBorder(null);
-        scroll.setBackground(new Color(36, 36, 36));
-        scroll.getViewport().setBackground(new Color(36, 36, 36));
-        TileGalleryPanel.applyDarkScrollBar(scroll.getVerticalScrollBar());
+        // Use base class builder for dark-styled scrollpane
+        JScrollPane scroll = buildSidebarScrollPane(tilesContainer);
         add(scroll, BorderLayout.CENTER);
     }
 
@@ -243,6 +241,11 @@ public class ElementLayerPanel extends JPanel {
     // Public API
     // =========================================================================
     public boolean isShowAllOutlines() { return showAllOutlines; }
+
+    @Override
+    public void refresh() {
+        /* ElementLayerPanel uses refresh(List<Layer>) for updates, not generic refresh(). */
+    }
 
     // ── Drop-indicator helpers ────────────────────────────────────────────────
 

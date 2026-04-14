@@ -9,7 +9,7 @@ import javax.swing.*;
  * Panel displaying all translation maps in a list view.
  * Shows language, section, and allows viewing/editing/deleting maps.
  */
-public class MapsPanel extends JPanel {
+public class MapsPanel extends BaseSidebarPanel {
 
     public interface Callbacks {
         void onMapSelected(TranslationMap map);
@@ -27,25 +27,24 @@ public class MapsPanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(AppColors.BG_PANEL);
 
-        // Header
-        JLabel headerLbl = new JLabel("Translation Maps");
-        headerLbl.setForeground(AppColors.TEXT);
-        headerLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
-        headerLbl.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        // Header using base class builder (no close button for Maps)
+        JPanel header = buildSidebarHeader("Translation Maps", null);
+        add(header, BorderLayout.NORTH);
 
         // Maps container
         mapsContainer = new JPanel();
         mapsContainer.setLayout(new BoxLayout(mapsContainer, BoxLayout.Y_AXIS));
         mapsContainer.setBackground(AppColors.BG_PANEL);
 
-        scrollPane = new JScrollPane(mapsContainer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                                     JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollPane.setBackground(AppColors.BG_PANEL);
-        TileGalleryPanel.applyDarkScrollBar(scrollPane.getVerticalScrollBar());
-
-        add(headerLbl, BorderLayout.NORTH);
+        // ScrollPane using base class builder
+        scrollPane = buildSidebarScrollPane(mapsContainer);
         add(scrollPane, BorderLayout.CENTER);
 
+        refreshMapsList();
+    }
+
+    @Override
+    public void refresh() {
         refreshMapsList();
     }
 

@@ -74,11 +74,11 @@ public class SceneSerializer {
         if (layer instanceof TextLayer tl) {
             return String.format(
                 "{\"type\":\"TextLayer\",\"id\":%d,\"x\":%d,\"y\":%d,\"width\":%d,\"height\":%d," +
-                "\"text\":\"%s\",\"fontName\":\"%s\",\"fontSize\":%d,\"bold\":%s,\"italic\":%s,\"color\":%d}",
+                "\"text\":\"%s\",\"fontName\":\"%s\",\"fontSize\":%d,\"bold\":%s,\"italic\":%s,\"color\":%d,\"hidden\":%s}",
                 tl.id(), tl.x(), tl.y(), tl.width(), tl.height(),
                 escapeJson(tl.text()), tl.fontName(), tl.fontSize(),
                 tl.fontBold() ? "true" : "false", tl.fontItalic() ? "true" : "false",
-                tl.fontColor().getRGB()
+                tl.fontColor().getRGB(), tl.isHidden() ? "true" : "false"
             );
         } else if (layer instanceof ImageLayer il) {
             String imageData = "";
@@ -91,8 +91,9 @@ public class SceneSerializer {
             }
             return String.format(
                 "{\"type\":\"ImageLayer\",\"id\":%d,\"x\":%d,\"y\":%d,\"width\":%d,\"height\":%d," +
-                "\"rotationAngle\":%.6f,\"imageData\":\"%s\"}",
-                il.id(), il.x(), il.y(), il.width(), il.height(), il.rotationAngle(), imageData
+                "\"rotationAngle\":%.6f,\"opacity\":%d,\"hidden\":%s,\"imageData\":\"%s\"}",
+                il.id(), il.x(), il.y(), il.width(), il.height(), il.rotationAngle(),
+                il.opacity(), il.isHidden() ? "true" : "false", imageData
             );
         } else if (layer instanceof PathLayer pl) {
             StringBuilder pointsJson = new StringBuilder("[");
@@ -106,9 +107,9 @@ public class SceneSerializer {
 
             return String.format(
                 "{\"type\":\"PathLayer\",\"id\":%d,\"x\":%d,\"y\":%d,\"width\":%d,\"height\":%d," +
-                "\"closed\":%s,\"points\":%s}",
+                "\"closed\":%s,\"hidden\":%s,\"points\":%s}",
                 pl.id(), pl.x(), pl.y(), pl.width(), pl.height(),
-                pl.isClosed() ? "true" : "false", pointsJson.toString()
+                pl.isClosed() ? "true" : "false", pl.isHidden() ? "true" : "false", pointsJson.toString()
             );
         }
 
@@ -135,8 +136,9 @@ public class SceneSerializer {
                 boolean italic = "true".equals(extractField(json, "italic"));
                 int colorInt = Integer.parseInt(extractField(json, "color"));
                 Color color = new Color(colorInt, true);
+                boolean hidden = "true".equals(extractField(json, "hidden"));
 
-                return TextLayer.of(id, text, fontName, fontSize, bold, italic, color, x, y);
+                return TextLayer.of(id, text, fontName, fontSize, bold, italic, color, x, y, hidden);
             } else if ("ImageLayer".equals(type)) {
                 String imageData = extractField(json, "imageData");
                 BufferedImage img = null;
@@ -146,11 +148,17 @@ public class SceneSerializer {
                 // Parse rotationAngle (default 0.0 for backward compatibility with old saved files)
                 String rotStr = extractField(json, "rotationAngle");
                 double rotAngle = (rotStr != null && !rotStr.isEmpty()) ? Double.parseDouble(rotStr) : 0.0;
-                return new ImageLayer(id, img, x, y, w, h, rotAngle);
+                // Parse opacity (default 100 for backward compatibility)
+                String opacityStr = extractField(json, "opacity");
+                int opacity = (opacityStr != null && !opacityStr.isEmpty()) ? Integer.parseInt(opacityStr) : 100;
+                // Parse hidden flag (default false for backward compatibility)
+                boolean hidden = "true".equals(extractField(json, "hidden"));
+                return new ImageLayer(id, img, x, y, w, h, rotAngle, opacity, hidden);
             } else if ("PathLayer".equals(type)) {
                 boolean closed = "true".equals(extractField(json, "closed"));
+                boolean hidden = "true".equals(extractField(json, "hidden"));
                 List<Point3D> points = extractPoints(json);
-                return PathLayer.of(id, points, null, closed, x, y);
+                return PathLayer.of(id, points, null, closed, x, y, hidden);
             }
         } catch (Exception e) {
             System.err.println("[ERROR] Fehler beim Deserialisieren von Layer: " + e.getMessage());

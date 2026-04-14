@@ -63,7 +63,7 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
  *  - Checkboxes appear on every tile
  *  - "Alle" / "Keine" buttons appear in the header
  */
-public class TileGalleryPanel extends JPanel {
+public class TileGalleryPanel extends BaseSidebarPanel {
 
     // ── Dimensions ────────────────────────────────────────────────────────────
     public  static final int GALLERY_W = 198;
@@ -197,20 +197,18 @@ public class TileGalleryPanel extends JPanel {
                         FileForElement ffe = (FileForElement) t.getTransferData(FILE_AS_ELEMENT_FLAVOR);
                         File sourceFile = ffe.file;
 
-                        // Copy file in same directory
-                        File destFile = createCopyFile(sourceFile);
-                        if (destFile != null) {
-                            try {
-                                copyFileToDestination(sourceFile, destFile);
+                        // Copy file in same directory using BaseSidebarPanel utility
+                        File destDir = sourceFile.getParentFile();
+                        if (destDir != null) {
+                            File destFile = BaseSidebarPanel.copyFileWithUniqueName(sourceFile, destDir);
+                            if (destFile != null) {
                                 // Calculate insertion index based on drop position
                                 Point dropPt = dtde.getLocation();
-                                int insertIndex = calculateInsertIndex(dropPt);
+                                int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, dropPt.y);
                                 // Notify callback about the copied file with position
                                 callbacks.onFileCopied(destFile, insertIndex);
                                 dtde.dropComplete(true);
                                 return;
-                            } catch (Exception ex) {
-                                System.err.println("[ERROR] Failed to copy file: " + ex.getMessage());
                             }
                         }
                         dtde.dropComplete(false);
@@ -224,7 +222,7 @@ public class TileGalleryPanel extends JPanel {
                         java.util.List<File> droppedFiles = (java.util.List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
                         if (droppedFiles != null && !droppedFiles.isEmpty()) {
                             Point dropPt = dtde.getLocation();
-                            int insertIndex = calculateInsertIndex(dropPt);
+                            int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, dropPt.y);
                             // Copy files from external source to current gallery directory
                             for (File sourceFile : droppedFiles) {
                                 if (sourceFile.isFile()) {
@@ -234,19 +232,11 @@ public class TileGalleryPanel extends JPanel {
                                             dtde.dropComplete(false);
                                             return;
                                         }
-                                        // Copy file to destination directory
-                                        File destFile = new File(destDir, sourceFile.getName());
-                                        int counter = 1;
-                                        while (destFile.exists()) {
-                                            String name = sourceFile.getName();
-                                            int lastDot = name.lastIndexOf('.');
-                                            String baseName = lastDot > 0 ? name.substring(0, lastDot) : name;
-                                            String ext = lastDot > 0 ? name.substring(lastDot) : "";
-                                            destFile = new File(destDir, baseName + "_copy_" + counter + ext);
-                                            counter++;
+                                        // Copy file to destination directory using BaseSidebarPanel utility
+                                        File destFile = BaseSidebarPanel.copyFileWithUniqueName(sourceFile, destDir);
+                                        if (destFile != null) {
+                                            callbacks.onFileCopied(destFile, insertIndex);
                                         }
-                                        copyFileToDestination(sourceFile, destFile);
-                                        callbacks.onFileCopied(destFile, insertIndex);
                                     } catch (Exception ex) {
                                         System.err.println("[ERROR] Failed to copy file: " + ex.getMessage());
                                     }
@@ -317,6 +307,11 @@ public class TileGalleryPanel extends JPanel {
     public void setDirtyFiles(java.util.Set<File> dirty) {
         this.dirtyFiles = dirty == null ? new java.util.HashSet<>() : new java.util.HashSet<>(dirty);
         for (TilePanel t : tiles) t.repaint();
+    }
+
+    @Override
+    public void refresh() {
+        /* TileGalleryPanel uses setFiles() and setActiveFile() for updates, not a generic refresh(). */
     }
 
     /**
@@ -464,27 +459,6 @@ public class TileGalleryPanel extends JPanel {
             return tiles.get(0).imageFile.getParentFile();
         }
         return null;
-    }
-
-    /**
-     * Calculate the insertion index based on drop position.
-     * Maps the Y coordinate to the appropriate tile index.
-     */
-    private int calculateInsertIndex(Point dropPt) {
-        int y = dropPt.y;
-        int tileCount = tiles.size();
-        int cumulativeY = 0;
-        for (int i = 0; i < tileCount; i++) {
-            TilePanel tp = tiles.get(i);
-            int tileHeight = tp.getHeight() > 0 ? tp.getHeight() : TILE_H;
-            int gapHeight = 5;
-            int totalHeight = tileHeight + gapHeight;
-            if (y < cumulativeY + totalHeight / 2) {
-                return i;  // Insert before this tile
-            }
-            cumulativeY += totalHeight;
-        }
-        return tileCount;  // Insert at end
     }
 
     // =========================================================================
@@ -808,29 +782,6 @@ public class TileGalleryPanel extends JPanel {
     }
 
     // ── Small button factory ──────────────────────────────────────────────────
-    /** Create a copy file name: original.png → original_copy.png, original_copy.png → original_copy_2.png, etc. */
-    private File createCopyFile(File sourceFile) {
-        String name = sourceFile.getName();
-        int lastDot = name.lastIndexOf('.');
-        String baseName = lastDot > 0 ? name.substring(0, lastDot) : name;
-        String extension = lastDot > 0 ? name.substring(lastDot) : "";
-
-        File dir = sourceFile.getParentFile();
-        File copyFile = new File(dir, baseName + "_copy" + extension);
-        int counter = 1;
-        while (copyFile.exists()) {
-            copyFile = new File(dir, baseName + "_copy_" + counter + extension);
-            counter++;
-        }
-        return copyFile;
-    }
-
-    /** Copy file from source to destination. */
-    private void copyFileToDestination(File source, File dest) throws java.io.IOException {
-        java.nio.file.Files.copy(source.toPath(), dest.toPath(),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-    }
-
     private static JButton galleryBtn(String text) {
         JButton b = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
