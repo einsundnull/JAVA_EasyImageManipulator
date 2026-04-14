@@ -710,10 +710,13 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
         mapsPanel = new MapsPanel(new MapsPanel.Callbacks() {
             @Override public void onMapSelected(TranslationMap map) {
-                // TODO: implement map viewing/editing
+                // TODO: implement map viewing
             }
             @Override public void onMapDeleted(String language, String mapId) {
                 // Map is already deleted, just refresh
+            }
+            @Override public void onMapEdited(TranslationMap oldMap, TranslationMap newMap) {
+                // Map is already saved, just refresh
             }
         });
         mapsPanel.setVisible(false);  // Hide initially

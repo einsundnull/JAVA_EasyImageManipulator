@@ -14,6 +14,7 @@ public class MapsPanel extends JPanel {
     public interface Callbacks {
         void onMapSelected(TranslationMap map);
         void onMapDeleted(String language, String mapId);
+        void onMapEdited(TranslationMap oldMap, TranslationMap newMap);
     }
 
     private final Callbacks cb;
@@ -108,6 +109,18 @@ public class MapsPanel extends JPanel {
             setOpaque(true);
             setBackground(new Color(48, 48, 48));
             setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+            // Doppelklick zum Bearbeiten
+            addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseClicked(java.awt.event.MouseEvent e) {
+                    if (e.getClickCount() == 2) {
+                        e.consume();
+                        editMap();
+                    }
+                }
+            });
 
             // Delete button (top right)
             JLabel delBtn = new JLabel("✕", JLabel.CENTER);
@@ -123,9 +136,9 @@ public class MapsPanel extends JPanel {
                 public void mouseClicked(java.awt.event.MouseEvent e) {
                     e.consume();
                     int result = JOptionPane.showConfirmDialog(MapsPanel.this,
-                            "Map löschen: " + map.section() + "?", "Bestätigung",
-                            JOptionPane.OK_CANCEL_OPTION);
-                    if (result == JOptionPane.OK_OPTION) {
+                            "Wirklich löschen?\n" + map.section() + " [" + map.language() + "]",
+                            "Bestätigung", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                    if (result == JOptionPane.YES_OPTION) {
                         try {
                             MapManager.deleteMap(map.language(), map.id());
                             cb.onMapDeleted(map.language(), map.id());
@@ -153,6 +166,66 @@ public class MapsPanel extends JPanel {
                 }
             });
             add(delBtn);
+
+            // TTS buttons for textI and textII
+            addTTSButton(map.textI(), 150, 4);
+            addTTSButton(map.textII(), 168, 4);
+        }
+
+        private void addTTSButton(String text, int x, int y) {
+            if (text == null || text.isEmpty()) return;
+
+            JLabel ttsBtn = new JLabel("🔊", JLabel.CENTER);
+            ttsBtn.setForeground(new Color(100, 180, 220));
+            ttsBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+            ttsBtn.setBounds(x, y, 16, 16);
+            ttsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            ttsBtn.setOpaque(true);
+            ttsBtn.setBackground(new Color(50, 50, 50));
+            ttsBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            ttsBtn.setToolTipText("Text vorlesen");
+            ttsBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseClicked(java.awt.event.MouseEvent e) {
+                    e.consume();
+                    TextToSpeech.speak(text, map.language());
+                }
+
+                @Override
+                public void mouseEntered(java.awt.event.MouseEvent e) {
+                    ttsBtn.setBackground(new Color(80, 150, 200));
+                    ttsBtn.setForeground(Color.WHITE);
+                    ttsBtn.setBorder(BorderFactory.createLineBorder(new Color(100, 180, 220), 1));
+                }
+
+                @Override
+                public void mouseExited(java.awt.event.MouseEvent e) {
+                    ttsBtn.setBackground(new Color(50, 50, 50));
+                    ttsBtn.setForeground(new Color(100, 180, 220));
+                    ttsBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                }
+            });
+            add(ttsBtn);
+        }
+
+        private void editMap() {
+            MapEditDialog dialog = new MapEditDialog(SwingUtilities.getWindowAncestor(MapsPanel.this), map);
+            dialog.setVisible(true);
+
+            if (dialog.isAccepted()) {
+                try {
+                    TranslationMap updated = new TranslationMap(map.id(), dialog.getLanguage(),
+                            dialog.getSection(), dialog.getTextI(), dialog.getTextII(), map.createdAt());
+                    updated.setModifiedTime(System.currentTimeMillis());
+                    MapManager.addOrUpdateMap(updated);
+                    cb.onMapEdited(map, updated);
+                    refreshMapsList();
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(MapsPanel.this,
+                            "Fehler beim Speichern: " + ex.getMessage(),
+                            "Fehler", JOptionPane.ERROR_MESSAGE);
+                }
+            }
         }
 
         @Override
