@@ -83,6 +83,8 @@ public class ElementLayerPanel extends JPanel {
         void insertFileAsLayerAt(File file, int visualIdx);
         /** Reset the rotation angle of an ImageLayer to 0. */
         void resetElementRotation(Layer el);
+        /** Export a TextLayer as a translation map. */
+        void exportElementAsMap(Layer el);
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
@@ -312,7 +314,7 @@ public class ElementLayerPanel extends JPanel {
 
         private final Layer   layer;
         private final boolean selected;
-        private JLabel toImage, burn, del, resetRot, lbl;
+        private JLabel toImage, burn, del, resetRot, mapBtn, lbl;
 
         LayerTile(Layer layer, boolean selected) {
             this.layer    = layer;
@@ -436,6 +438,36 @@ public class ElementLayerPanel extends JPanel {
                 add(resetRot);
             }
 
+            // ── Purple map button (🗺) – only for TextLayers ────────────────────
+            if (layer instanceof TextLayer) {
+                mapBtn = new JLabel("🗺", JLabel.CENTER);
+                mapBtn.setForeground(new Color(180, 100, 200));
+                mapBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+                mapBtn.setBounds(TILE_W - 91, 4, 16, 16);
+                mapBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                mapBtn.setOpaque(true);
+                mapBtn.setBackground(new Color(50, 50, 50));
+                mapBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                mapBtn.setToolTipText("Als Translation Map exportieren");
+                mapBtn.addMouseListener(new MouseAdapter() {
+                    @Override public void mouseClicked(MouseEvent e) {
+                        e.consume();
+                        cb.exportElementAsMap(layer);
+                    }
+                    @Override public void mouseEntered(MouseEvent e) {
+                        mapBtn.setBackground(new Color(140, 80, 160));
+                        mapBtn.setForeground(Color.WHITE);
+                        mapBtn.setBorder(BorderFactory.createLineBorder(new Color(180, 100, 200), 1));
+                    }
+                    @Override public void mouseExited(MouseEvent e) {
+                        mapBtn.setBackground(new Color(50, 50, 50));
+                        mapBtn.setForeground(new Color(180, 100, 200));
+                        mapBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    }
+                });
+                add(mapBtn);
+            }
+
             // ── Layer label at bottom ──────────────────────────────────────────
             lbl = new JLabel(layer.displayName(), JLabel.CENTER);
             lbl.setForeground(AppColors.TEXT_MUTED);
@@ -508,12 +540,20 @@ public class ElementLayerPanel extends JPanel {
         @Override
         public void doLayout() {
             int w = getWidth() > 0 ? getWidth() : TILE_W;
-            if (resetRot != null) {
+            if (mapBtn != null) {
+                // TextLayer: mapBtn at w-91, toImage at w-55, burn at w-37, del at w-19
+                mapBtn .setBounds(w - 91, 4, 16, 16);
+                toImage.setBounds(w - 55, 4, 16, 16);
+                burn   .setBounds(w - 37, 4, 16, 16);
+                del    .setBounds(w - 19, 4, 16, 16);
+            } else if (resetRot != null) {
+                // Rotated ImageLayer: resetRot at w-73, toImage at w-55, burn at w-37, del at w-19
                 resetRot.setBounds(w - 73, 4, 16, 16);
                 toImage.setBounds(w - 55, 4, 16, 16);
                 burn   .setBounds(w - 37, 4, 16, 16);
                 del    .setBounds(w - 19, 4, 16, 16);
             } else {
+                // ImageLayer without rotation: toImage at w-55, burn at w-37, del at w-19
                 toImage.setBounds(w - 55, 4, 16, 16);
                 burn   .setBounds(w - 37, 4, 16, 16);
                 del    .setBounds(w - 19, 4, 16, 16);

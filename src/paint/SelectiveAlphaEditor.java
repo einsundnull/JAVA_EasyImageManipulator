@@ -182,6 +182,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private JToggleButton firstElementsBtn;         // Toggle for elementLayerPanel
     private JToggleButton secondElementsBtn;        // Toggle for elementLayerPanel2
 
+    // ── Maps panel (toggle-able list view) ─────────────────────────────────────
+    private MapsPanel mapsPanel;
+    private JToggleButton mapsBtn;                  // Toggle for mapsPanel
+
     // ── Element-edit mode (double-click on layer tile) ────────────────────────
     private Layer elementEditSourceLayer;   // the layer being edited
     private int   elementEditSourceIdx;     // canvas that owns the layer
@@ -502,6 +506,16 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             updateLayoutVisibility();
         });
 
+        mapsBtn = UIComponentFactory.buildModeToggleBtn("🗺", "Translation Maps ein-/ausblenden");
+        mapsBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+        mapsBtn.setSelected(false);
+        mapsBtn.addActionListener(e -> {
+            if (mapsPanel != null) {
+                mapsPanel.setVisible(mapsBtn.isSelected());
+            }
+            updateLayoutVisibility();
+        });
+
         modeLabel = new JLabel("Modus: Selective Alpha");
         modeLabel.setForeground(AppColors.TEXT_MUTED);
         modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -517,6 +531,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         left.add(secondCanvasBtn);
         left.add(secondGalleryBtn);
         left.add(secondElementsBtn);
+        left.add(mapsBtn);
         left.add(modeLabel);
         left.add(statusLabel);
         bar.add(left, BorderLayout.WEST);
@@ -693,6 +708,18 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         elementLayerPanel2 = new ElementLayerPanel(buildElementLayerCallbacks(1));
         elementLayerPanel2.setVisible(false);  // Hide until canvas 2 has content
 
+        mapsPanel = new MapsPanel(new MapsPanel.Callbacks() {
+            @Override public void onMapSelected(TranslationMap map) {
+                // TODO: implement map viewing/editing
+            }
+            @Override public void onMapDeleted(String language, String mapId) {
+                // Map is already deleted, just refresh
+            }
+        });
+        mapsPanel.setVisible(false);  // Hide initially
+        mapsPanel.setPreferredSize(new Dimension(250, 400));
+        mapsPanel.setMaximumSize(new Dimension(250, Integer.MAX_VALUE));
+
         // Canvas drawing areas: flexible width (take all available space)
         ci(0).layeredPane.setMinimumSize(new Dimension(0, 0));
         ci(0).layeredPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
@@ -747,7 +774,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         galleryWrapper.setLayout(new BoxLayout(galleryWrapper, BoxLayout.X_AXIS));
         galleryWrapper.setBackground(AppColors.BG_DARK);
 
-        // Order: Gallery1 | Elements1 | Canvas1 | Divider | Canvas2 | Elements2 | Gallery2
+        // Order: Gallery1 | Elements1 | Canvas1 | Divider | Canvas2 | Elements2 | Gallery2 | Maps
         galleryWrapper.add(ci(0).tileGallery);
         galleryWrapper.add(elementLayerPanel);
         galleryWrapper.add(ci(0).layeredPane);
@@ -755,6 +782,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         galleryWrapper.add(ci(1).layeredPane);
         galleryWrapper.add(elementLayerPanel2);
         galleryWrapper.add(ci(1).tileGallery);
+        galleryWrapper.add(mapsPanel);
 
         // Auto-fit canvas when layout changes (panels hidden, divider moved, etc.)
         galleryWrapper.addComponentListener(new ComponentAdapter() {
@@ -2376,6 +2404,51 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 markDirty(idx);
                 refreshElementPanel();
                 if (c.canvasPanel != null) c.canvasPanel.repaint();
+            }
+
+            @Override public void exportElementAsMap(Layer el) {
+                if (!(el instanceof TextLayer tl)) return;
+                // Get live layer
+                Layer live = c().activeElements.stream()
+                        .filter(e -> e.id() == el.id()).findFirst().orElse(el);
+                if (!(live instanceof TextLayer textLive)) return;
+
+                // Get text content
+                String textContent = textLive.text();
+                if (textContent == null || textContent.isEmpty()) {
+                    javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this,
+                            "TextLayer hat keinen Inhalt.", "Fehler", javax.swing.JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                // Show dialog to select language and section
+                MapCreateDialog dialog = new MapCreateDialog(SelectiveAlphaEditor.this, textContent);
+                dialog.setVisible(true);
+
+                if (!dialog.isAccepted()) return;
+
+                try {
+                    String mapId = MapManager.generateMapId();
+                    TranslationMap newMap = new TranslationMap(mapId, dialog.getLanguage(),
+                            dialog.getSection(), dialog.getTextI(), dialog.getTextII());
+                    MapManager.addOrUpdateMap(newMap);
+
+                    // Refresh maps panel if it exists
+                    if (mapsPanel != null) {
+                        mapsPanel.refreshMapsList();
+                    }
+
+                    javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this,
+                            "Translation Map gespeichert:\nSprache: " + dialog.getLanguage() +
+                            "\nBereich: " + dialog.getSection(),
+                            "Erfolg", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception ex) {
+                    System.err.println("[ERROR] Failed to export map: " + ex.getMessage());
+                    ex.printStackTrace();
+                    javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this,
+                            "Fehler beim Speichern:\n" + ex.getMessage(),
+                            "Fehler", javax.swing.JOptionPane.ERROR_MESSAGE);
+                }
             }
 
             // ── Case 2: LayerTile dropped onto another ElementLayerPanel ─────

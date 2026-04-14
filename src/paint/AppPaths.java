@@ -14,6 +14,7 @@ public class AppPaths {
     private static File settingsDir;
     private static File lastProjectsDir;
     private static File assetsDir;
+    private static File mapsDir;
     private static File settingsFile;
 
     static {
@@ -32,6 +33,7 @@ public class AppPaths {
         settingsDir = new File(appDataDir, "settings");
         lastProjectsDir = new File(settingsDir, "lastProjects");
         assetsDir = new File(appDataDir, "assets");
+        mapsDir = new File(appDataDir, "maps");
         settingsFile = new File(settingsDir, "default.txt");
 
         // Verzeichnisse anlegen wenn nicht vorhanden
@@ -40,6 +42,7 @@ public class AppPaths {
         if (!settingsDir.exists()) settingsDir.mkdirs();
         if (!lastProjectsDir.exists()) lastProjectsDir.mkdirs();
         if (!assetsDir.exists()) assetsDir.mkdirs();
+        if (!mapsDir.exists()) mapsDir.mkdirs();
     }
 
     /**
@@ -137,5 +140,19 @@ public class AppPaths {
     public static File getSceneJsonFile(String projectName, File imageFile) {
         String fileName = getSceneFileName(imageFile);
         return new File(getProjectScenesDir(projectName), fileName);
+    }
+
+    /**
+     * Gibt das maps/-Verzeichnis zurück.
+     */
+    public static File getMapsDir() {
+        return mapsDir;
+    }
+
+    /**
+     * Gibt die maps/{language}.json-Datei zurück.
+     */
+    public static File getMapFile(String language) {
+        return new File(mapsDir, language + ".json");
     }
 }
