@@ -1747,6 +1747,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             dirtyFiles.remove(c.sourceFile);
             updateTitle();
             updateDirtyUI();
+            refreshGalleryThumbnail();
             ToastNotification.show(this, "Gespeichert: " + c.sourceFile.getName());
             SwingUtilities.invokeLater(this::ensureElementEditBarVisible);
         } catch (IOException e) { showErrorDialog("Speicherfehler", e.getMessage()); }
@@ -1949,6 +1950,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             dirtyFiles.remove(c.sourceFile);
             updateTitle();
             updateDirtyUI();
+            refreshGalleryThumbnail();
             ToastNotification.show(this, "Gespeichert");
             SwingUtilities.invokeLater(this::ensureElementEditBarVisible);
         } catch (IOException e) { showErrorDialog("Speicherfehler", e.getMessage()); }
@@ -1975,6 +1977,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         updateTitle();
         updateDirtyUI();
         refreshElementPanel();
+        refreshGalleryThumbnail();
         c.canvasPanel.repaint();
         if (showRuler && idx == 0) { hRuler.repaint(); vRuler.repaint(); }
     }
@@ -2135,6 +2138,69 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     /** Builds the callbacks for the ElementLayerPanel, bound to a specific canvas index.
      *  Panel operations (delete, burn, …) always affect that panel's own canvas.
      *  Paste/insert uses ci() separately and is unaffected by this binding. */
+    /**
+     * Helper: Update an ImageLayer in both activeElements and selectedElements lists by ID.
+     * Used by flip/rotate/reset operations.
+     */
+    private void replaceInLists(CanvasInstance c, ImageLayer updated) {
+        for (int i = 0; i < c.activeElements.size(); i++) {
+            if (c.activeElements.get(i).id() == updated.id()) {
+                c.activeElements.set(i, updated);
+                break;
+            }
+        }
+        for (int i = 0; i < c.selectedElements.size(); i++) {
+            if (c.selectedElements.get(i).id() == updated.id()) {
+                c.selectedElements.set(i, updated);
+                break;
+            }
+        }
+    }
+
+    /**
+     * Rendert Canvas + alle aktiven Elemente als Composite-Bild (für Gallery-Thumbnail).
+     * Nur ImageLayers mit Rotation werden mit g2.rotate() gerendert.
+     */
+    private BufferedImage renderCompositeForThumbnail(CanvasInstance c) {
+        if (c.workingImage == null) return null;
+        int w = c.workingImage.getWidth(), h = c.workingImage.getHeight();
+        BufferedImage comp = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = comp.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        // Canvas background
+        g2.drawImage(c.workingImage, 0, 0, null);
+        // Aktive Elemente
+        for (Layer el : c.activeElements) {
+            if (el instanceof ImageLayer il) {
+                if (Math.abs(il.rotationAngle()) > 0.001) {
+                    // Rotated: apply transform
+                    double cx = il.x() + il.width() / 2.0;
+                    double cy = il.y() + il.height() / 2.0;
+                    g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
+                    g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+                    g2.rotate(-Math.toRadians(il.rotationAngle()), cx, cy);
+                } else {
+                    // Unrotated
+                    g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+                }
+            }
+            // TextLayer und PathLayer: für Thumbnail vernachlässigt
+        }
+        g2.dispose();
+        return comp;
+    }
+
+    /**
+     * Aktualisiert das Gallery-Thumbnail für den aktuellen Canvas
+     * mit dem Live-Composite aus Canvas + Elementen.
+     */
+    private void refreshGalleryThumbnail() {
+        CanvasInstance c = ci();
+        if (c.sourceFile == null || c.workingImage == null) return;
+        BufferedImage thumb = renderCompositeForThumbnail(c);
+        if (thumb != null) c.tileGallery.refreshThumbnailFor(c.sourceFile, thumb);
+    }
+
     private ElementLayerPanel.Callbacks buildElementLayerCallbacks(int idx) {
         return new ElementLayerPanel.Callbacks() {
             private CanvasInstance c() { return canvases[idx]; }
@@ -2287,6 +2353,17 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 updateCanvasFocusBorder();
                 CanvasInstance ci = c();
                 if (ci.canvasPanel != null) ci.canvasPanel.enterTextEditMode(el);
+            }
+
+            @Override public void resetElementRotation(Layer el) {
+                CanvasInstance c = c();
+                if (!(el instanceof ImageLayer il)) return;
+                pushUndo();
+                ImageLayer updated = il.withRotation(0.0);
+                replaceInLists(c, updated);
+                markDirty(idx);
+                refreshElementPanel();
+                if (c.canvasPanel != null) c.canvasPanel.repaint();
             }
 
             // ── Case 2: LayerTile dropped onto another ElementLayerPanel ─────

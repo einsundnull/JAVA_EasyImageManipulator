@@ -81,6 +81,8 @@ public class ElementLayerPanel extends JPanel {
         void insertLayerCopyAt(Layer layer, int visualIdx);
         /** Insert the image at {@code file} as a new layer at visual index {@code visualIdx}. */
         void insertFileAsLayerAt(File file, int visualIdx);
+        /** Reset the rotation angle of an ImageLayer to 0. */
+        void resetElementRotation(Layer el);
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
@@ -310,7 +312,7 @@ public class ElementLayerPanel extends JPanel {
 
         private final Layer   layer;
         private final boolean selected;
-        private JLabel toImage, burn, del, lbl;
+        private JLabel toImage, burn, del, resetRot, lbl;
 
         LayerTile(Layer layer, boolean selected) {
             this.layer    = layer;
@@ -404,6 +406,36 @@ public class ElementLayerPanel extends JPanel {
             });
             add(del);
 
+            // ── Green reset rotation button (↺) – only for rotated ImageLayers ─
+            if (layer instanceof ImageLayer il && Math.abs(il.rotationAngle()) > 0.001) {
+                resetRot = new JLabel("↺", JLabel.CENTER);
+                resetRot.setForeground(new Color(100, 180, 100));
+                resetRot.setFont(new Font("SansSerif", Font.BOLD, 11));
+                resetRot.setBounds(TILE_W - 73, 4, 16, 16);
+                resetRot.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                resetRot.setOpaque(true);
+                resetRot.setBackground(new Color(50, 50, 50));
+                resetRot.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                resetRot.setToolTipText("Rotation zurücksetzen");
+                resetRot.addMouseListener(new MouseAdapter() {
+                    @Override public void mouseClicked(MouseEvent e) {
+                        e.consume();
+                        cb.resetElementRotation(layer);
+                    }
+                    @Override public void mouseEntered(MouseEvent e) {
+                        resetRot.setBackground(new Color(80, 140, 80));
+                        resetRot.setForeground(Color.WHITE);
+                        resetRot.setBorder(BorderFactory.createLineBorder(new Color(100, 180, 100), 1));
+                    }
+                    @Override public void mouseExited(MouseEvent e) {
+                        resetRot.setBackground(new Color(50, 50, 50));
+                        resetRot.setForeground(new Color(100, 180, 100));
+                        resetRot.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    }
+                });
+                add(resetRot);
+            }
+
             // ── Layer label at bottom ──────────────────────────────────────────
             lbl = new JLabel(layer.displayName(), JLabel.CENTER);
             lbl.setForeground(AppColors.TEXT_MUTED);
@@ -476,9 +508,16 @@ public class ElementLayerPanel extends JPanel {
         @Override
         public void doLayout() {
             int w = getWidth() > 0 ? getWidth() : TILE_W;
-            toImage.setBounds(w - 55, 4, 16, 16);
-            burn   .setBounds(w - 37, 4, 16, 16);
-            del    .setBounds(w - 19, 4, 16, 16);
+            if (resetRot != null) {
+                resetRot.setBounds(w - 73, 4, 16, 16);
+                toImage.setBounds(w - 55, 4, 16, 16);
+                burn   .setBounds(w - 37, 4, 16, 16);
+                del    .setBounds(w - 19, 4, 16, 16);
+            } else {
+                toImage.setBounds(w - 55, 4, 16, 16);
+                burn   .setBounds(w - 37, 4, 16, 16);
+                del    .setBounds(w - 19, 4, 16, 16);
+            }
             lbl    .setBounds(0, TILE_H - 18, w, 16);
         }
 

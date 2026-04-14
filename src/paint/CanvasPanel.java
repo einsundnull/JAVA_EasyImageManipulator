@@ -48,6 +48,10 @@ public class CanvasPanel extends JPanel {
 	private double  rotDragStartAngle  = 0.0;  // atan2 angle at press
 	private double  rotDragBaseAngle   = 0.0;  // element.rotationAngle at press
 
+	// ── Right-click snap-drag state ───────────────────────────────────────────
+	private boolean isSnapDragging = false;
+	private static final int SNAP_DIST = 12;  // image-space pixels
+
 	// ── Text tool state ───────────────────────────────────────────────────────
 	private static final int TEXT_PADDING = 4;
 
@@ -201,6 +205,21 @@ public class CanvasPanel extends JPanel {
 				}
 
 				Point imgPt = callbacks.screenToImage(e.getPoint());
+
+				// ── Right-click snap-drag: start snap element drag ────────────────────
+				if (SwingUtilities.isRightMouseButton(e)) {
+					if (callbacks.getWorkingImage() == null) return;
+					Layer hit = hitElement(e.getPoint());
+					if (hit != null) {
+						if (!callbacks.getSelectedElements().contains(hit)) {
+							callbacks.setSelectedElement(hit);
+						}
+						isSnapDragging = true;
+						elemLastImgPt = imgPt;
+						callbacks.pushUndo();
+					}
+					return;
+				}
 
 				// ── Rotation handle for selected element (highest priority) ─────────
 				Layer primaryEl = callbacks.getSelectedElement();
@@ -564,6 +583,25 @@ public class CanvasPanel extends JPanel {
 					return;
 				Point imgPt = callbacks.screenToImage(e.getPoint());
 
+				// ── Snap-drag ──────────────────────────────────────────────────────
+				if (isSnapDragging) {
+					if (elemLastImgPt != null) {
+						int dx = imgPt.x - elemLastImgPt.x;
+						int dy = imgPt.y - elemLastImgPt.y;
+						if (dx != 0 || dy != 0) {
+							callbacks.moveSelectedElements(dx, dy);
+							elemLastImgPt = imgPt;
+							// Get the primary element and apply snap
+							Layer primary = callbacks.getSelectedElement();
+							if (primary instanceof ImageLayer il) {
+								applySnapToElement(il);
+							}
+						}
+					}
+					repaint();
+					return;
+				}
+
 				// ── PathLayer point drag ────────────────────────────────────────
 				Layer primary = callbacks.getSelectedElement();
 				if (primary instanceof PathLayer pl && selectedPathPointIndex >= 0) {
@@ -740,6 +778,13 @@ public class CanvasPanel extends JPanel {
 				// Finalize rotation drag
 				if (isDraggingRotation) {
 					isDraggingRotation = false;
+					callbacks.markDirty();
+					return;
+				}
+
+				// Finalize snap-drag
+				if (isSnapDragging) {
+					isSnapDragging = false;
 					callbacks.markDirty();
 					return;
 				}
@@ -1465,6 +1510,68 @@ public class CanvasPanel extends JPanel {
 			dlgTextArea.setCaretPosition(dlgTextArea.getText().length());
 		}
 		repaint();
+	}
+
+	/**
+	 * Applies snap-to-element logic: aligns edges/corners of the dragged element
+	 * to nearby edges/corners of other elements within SNAP_DIST pixels.
+	 * Checks 5 edge pairs per axis: left/right/center + 4 corners.
+	 */
+	private void applySnapToElement(ImageLayer dragged) {
+		if (dragged == null) return;
+
+		java.util.List<Layer> others = callbacks.getActiveElements();
+		Rectangle dr = new Rectangle(dragged.x(), dragged.y(), dragged.width(), dragged.height());
+
+		int snapX = Integer.MAX_VALUE, snapDx = 0;
+		int snapY = Integer.MAX_VALUE, snapDy = 0;
+
+		for (Layer other : others) {
+			if (other.id() == dragged.id()) continue;
+			Rectangle or = new Rectangle(other.x(), other.y(), other.width(), other.height());
+
+			// X-axis snap pairs: dragged element edges to other element edges
+			int[][] xPairs = {
+				{ dr.x,               or.x              },  // left → left
+				{ dr.x,               or.x + or.width   },  // left → right
+				{ dr.x + dr.width,    or.x              },  // right → left
+				{ dr.x + dr.width,    or.x + or.width   },  // right → right
+				{ dr.x + dr.width/2,  or.x + or.width/2 }   // center → center
+			};
+			int[][] yPairs = {
+				{ dr.y,               or.y              },
+				{ dr.y,               or.y + or.height  },
+				{ dr.y + dr.height,   or.y              },
+				{ dr.y + dr.height,   or.y + or.height  },
+				{ dr.y + dr.height/2, or.y + or.height/2 }
+			};
+
+			// Find closest X snap
+			for (int[] pair : xPairs) {
+				int dist = Math.abs(pair[0] - pair[1]);
+				if (dist < SNAP_DIST && dist < snapX) {
+					snapX = dist;
+					snapDx = pair[1] - pair[0];
+				}
+			}
+
+			// Find closest Y snap
+			for (int[] pair : yPairs) {
+				int dist = Math.abs(pair[0] - pair[1]);
+				if (dist < SNAP_DIST && dist < snapY) {
+					snapY = dist;
+					snapDy = pair[1] - pair[0];
+				}
+			}
+		}
+
+		// Apply snap if within threshold
+		if (snapX < SNAP_DIST && snapDx != 0) {
+			callbacks.moveSelectedElements(snapDx, 0);
+		}
+		if (snapY < SNAP_DIST && snapDy != 0) {
+			callbacks.moveSelectedElements(0, snapDy);
+		}
 	}
 
 	/**

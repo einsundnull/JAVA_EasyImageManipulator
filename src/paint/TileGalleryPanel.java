@@ -257,6 +257,20 @@ public class TileGalleryPanel extends JPanel {
     }
 
     /**
+     * Aktualisiert das Thumbnail für eine Datei mit dem übergebenen Bild direkt
+     * (ohne Disk-Read). Skaliert wie loadThumbAsync().
+     */
+    public void refreshThumbnailFor(File f, BufferedImage liveImage) {
+        if (liveImage == null) return;
+        for (TilePanel t : tiles) {
+            if (t.imageFile.equals(f)) {
+                t.setLiveThumbnail(liveImage);
+                break;
+            }
+        }
+    }
+
+    /**
      * Add new files to the gallery without clearing existing ones.
      * Only adds files not already present.
      */
@@ -534,6 +548,24 @@ public class TileGalleryPanel extends JPanel {
                     catch (InterruptedException | ExecutionException ignored) {}
                 }
             }.execute();
+        }
+
+        void setLiveThumbnail(BufferedImage src) {
+            if (src == null) return;
+            int maxW = TILE_W - 10;
+            int maxH = THUMB_H;
+            double s = Math.min((double) maxW / src.getWidth(),
+                                (double) maxH / src.getHeight());
+            int w = Math.max(1, (int)(src.getWidth()  * s));
+            int h = Math.max(1, (int)(src.getHeight() * s));
+            BufferedImage t = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = t.createGraphics();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2.drawImage(src, 0, 0, w, h, null);
+            g2.dispose();
+            thumbnail = t;
+            repaint();
         }
 
         @Override protected void paintComponent(Graphics g) {
