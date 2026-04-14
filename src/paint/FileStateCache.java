@@ -293,12 +293,12 @@ public class FileStateCache {
     /**
      * Save scene data (layers, zoom, mode) to project manager.
      */
-    public void saveSceneData(File file, List<Layer> layers, double zoom, AppMode mode)
+    public void saveSceneData(File file, List<Layer> layers, double zoom, AppMode mode, int canvasW, int canvasH)
             throws IOException {
         if (projectManager == null || projectManager.getProjectName() == null) {
             return;
         }
-        projectManager.saveScene(file, layers, zoom, mode);
+        projectManager.saveScene(file, layers, zoom, mode, canvasW, canvasH);
     }
 
     // ─────────────────────────────────────────────────────────────

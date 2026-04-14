@@ -70,8 +70,8 @@ public class StartupDialog extends JDialog {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonPanel.setBackground(AppColors.BG_DARK);
 
-        JButton newProjectBtn = createStyledButton("Neues Projekt", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
-        JButton skipBtn = createStyledButton("Überspringen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        JButton newProjectBtn = UIComponentFactory.buildButton("Neues Projekt", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
+        JButton skipBtn = UIComponentFactory.buildButton("Überspringen", AppColors.BTN_BG, AppColors.BTN_HOVER);
 
         newProjectBtn.addActionListener(e -> {
             // TODO: Open new project dialog
@@ -105,30 +105,6 @@ public class StartupDialog extends JDialog {
         UIManager.put("TabbedPane.selectHighlight", AppColors.ACCENT);
 
         return tabPane;
-    }
-
-    private JButton createStyledButton(String text, Color bgColor, Color hoverColor) {
-        JButton btn = new JButton(text);
-        btn.setBackground(bgColor);
-        btn.setForeground(AppColors.TEXT);
-        btn.setFocusPainted(false);
-        btn.setBorderPainted(false);
-        btn.setFont(btn.getFont().deriveFont(Font.PLAIN, 12f));
-        btn.setMargin(new Insets(8, 16, 8, 16));
-
-        btn.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseEntered(java.awt.event.MouseEvent e) {
-                btn.setBackground(hoverColor);
-            }
-
-            @Override
-            public void mouseExited(java.awt.event.MouseEvent e) {
-                btn.setBackground(bgColor);
-            }
-        });
-
-        return btn;
     }
 
     private JPanel createCategoryTab(List<String> paths, String category) {

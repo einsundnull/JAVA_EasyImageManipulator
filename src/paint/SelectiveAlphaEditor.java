@@ -390,7 +390,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         try {
             // Speichere aktuelle Szene
             if (ci(0).sourceFile != null && ci(0).workingImage != null) {
-                projectManager.saveScene(ci(0).sourceFile, ci(0).activeElements, ci(0).zoom, appMode);
+                projectManager.saveScene(ci(0).sourceFile, ci(0).activeElements, ci(0).zoom, appMode,
+                    ci(0).workingImage.getWidth(), ci(0).workingImage.getHeight());
             }
 
             // Speichere globale Einstellungen
@@ -465,7 +466,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         // \u2261 (≡) is in Basic Multilingual Plane — safe on all Windows systems
         filmstripBtn = UIComponentFactory.buildModeToggleBtn("\u2261", "Bilder ein-/ausblenden");
         filmstripBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-        filmstripBtn.setSelected(false);  // Start hidden, only drop zone visible
+        filmstripBtn.setSelected(true);  // Start VISIBLE
         filmstripBtn.addActionListener(e -> {
             ci(0).tileGallery.setVisible(filmstripBtn.isSelected());
             updateLayoutVisibility();
@@ -474,7 +475,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
         scenesBtn = UIComponentFactory.buildModeToggleBtn("S", "Szenen ein-/ausblenden");
         scenesBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-        scenesBtn.setSelected(false);  // Start hidden
+        scenesBtn.setSelected(true);  // Start VISIBLE
         scenesBtn.addActionListener(e -> {
             ci(0).scenesPanel.setVisible(scenesBtn.isSelected());
             updateLayoutVisibility();
@@ -571,13 +572,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
 
-        left.add(filmstripBtn);
+        // Scenes panel toggle (ganz links)
         left.add(scenesBtn);
+        left.add(filmstripBtn);
         left.add(firstCanvasBtn);
         left.add(firstElementsBtn);
         left.add(secondCanvasBtn);
-        left.add(secondGalleryBtn);
-        left.add(secondScenesBtn);
         left.add(secondElementsBtn);
         left.add(mapsBtn);
         left.add(quickOpenBtn);
@@ -589,6 +589,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         // ── RIGHT: all action + layer + file + mode + zoom buttons ─────────────
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 5));
         right.setOpaque(false);
+
+        // Scenes2 und Gallery2 buttons (ganz rechts)
+        right.add(secondGalleryBtn);
+        right.add(secondScenesBtn);
 
         // — Selection/alpha actions (formerly statusBar) —
         // applyButton and clearSelectionsButton are fields accessed by setBottomButtonsEnabled()
@@ -786,10 +790,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         // Gallery panels: fixed width (no growth beyond preferred)
         // NOTE: When SHRINK_GALLERY = false, remove setMaximumSize() calls below
         // so galleries keep full width and canvases shrink instead
-        ci(0).scenesPanel.setVisible(false);  // Start hidden, show on filmstrip toggle
+        ci(0).scenesPanel.setVisible(true);  // Start VISIBLE
         ci(0).scenesPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
 
-        ci(0).tileGallery.setVisible(false);  // Start hidden, show on filmstrip toggle
+        ci(0).tileGallery.setVisible(true);  // Start VISIBLE
         if (SHRINK_GALLERY) {
             ci(0).tileGallery.setMaximumSize(new Dimension(TileGalleryPanel.GALLERY_W, Integer.MAX_VALUE));
         }
@@ -805,10 +809,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         }
         elementLayerPanel2.setAlignmentY(Component.CENTER_ALIGNMENT);
 
-        ci(1).scenesPanel.setVisible(false);  // Start hidden, show on gallery 2 toggle
+        ci(1).scenesPanel.setVisible(false);  // Start hidden until Canvas 2 is activated
         ci(1).scenesPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
 
-        ci(1).tileGallery.setVisible(false);  // Start hidden, show on gallery 2 toggle
+        ci(1).tileGallery.setVisible(false);  // Start hidden until Canvas 2 is activated
         if (SHRINK_GALLERY) {
             ci(1).tileGallery.setMaximumSize(new Dimension(TileGalleryPanel.GALLERY_W, Integer.MAX_VALUE));
         }
@@ -844,6 +848,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         galleryWrapper.add(ci(1).tileGallery);
         galleryWrapper.add(ci(1).scenesPanel);
         galleryWrapper.add(mapsPanel);
+
+        // Synchronize initial visibility with button states
+        updateLayoutVisibility();
 
         // Auto-fit canvas when layout changes (panels hidden, divider moved, etc.)
         galleryWrapper.addComponentListener(new ComponentAdapter() {
@@ -1067,6 +1074,25 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 updateCanvasFocusBorder();
             }
         });
+
+        // Load last image directory
+        try {
+            List<String> recentImages = LastProjectsManager.load(LastProjectsManager.CAT_IMAGES);
+            if (!recentImages.isEmpty()) {
+                File lastDir = new File(recentImages.get(0));
+                if (lastDir.exists() && lastDir.isDirectory()) {
+                    File[] files = lastDir.listFiles(f -> f.isFile() && isSupportedFile(f));
+                    if (files != null && files.length > 0) {
+                        java.util.Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+                        c.directoryImages = new java.util.ArrayList<>(java.util.Arrays.asList(files));
+                        c.lastIndexedDir = lastDir;
+                        c.tileGallery.setFiles(c.directoryImages, files[0]);
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            System.out.println("[INFO] Keine letzten Bilder gefunden: " + ex.getMessage());
+        }
 
         // Scenes panel for this canvas
         c.scenesPanel = new ScenesPanel(buildScenesCallbacks(idx), () -> c.scenesPanel.setVisible(false));
@@ -1794,7 +1820,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
             // Speichere Szene wenn Projekt aktiv ist
             if (projectManager.getProjectName() != null) {
-                projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode);
+                projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode,
+                    c.workingImage.getWidth(), c.workingImage.getHeight());
             }
 
             c.hasUnsavedChanges = false;
@@ -1875,7 +1902,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
             // Speichere Szene wenn Projekt aktiv ist
             if (projectManager.getProjectName() != null) {
-                projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode);
+                projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode,
+                    c.workingImage.getWidth(), c.workingImage.getHeight());
             }
 
             c.hasUnsavedChanges = false;
@@ -2084,7 +2112,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
             // Speichere Szene wenn Projekt aktiv ist
             if (projectManager.getProjectName() != null) {
-                projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode);
+                projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode,
+                    c.workingImage.getWidth(), c.workingImage.getHeight());
             }
 
             c.hasUnsavedChanges = false;

@@ -94,7 +94,7 @@ public class ProjectManager {
     /**
      * Speichert eine Szene (Bild + Layer) für die gegebene Datei.
      */
-    public void saveScene(File imageFile, List<Layer> layers, double zoom, AppMode mode) throws IOException {
+    public void saveScene(File imageFile, List<Layer> layers, double zoom, AppMode mode, int canvasW, int canvasH) throws IOException {
         if (currentProject == null) {
             return; // Kein Projekt offen
         }
@@ -104,6 +104,8 @@ public class ProjectManager {
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(sceneJsonFile))) {
             writer.write("{\n");
+            writer.write("  \"canvasWidth\": " + canvasW + ",\n");
+            writer.write("  \"canvasHeight\": " + canvasH + ",\n");
             writer.write("  \"imageFile\": \"" + imageFile.getAbsolutePath() + "\",\n");
             writer.write("  \"zoom\": " + zoom + ",\n");
             writer.write("  \"appMode\": \"" + (mode != null ? mode.toString() : "ALPHA_EDITOR") + "\",\n");
@@ -184,6 +186,58 @@ public class ProjectManager {
         }
 
         return null;
+    }
+
+    /**
+     * Lädt die Canvas-Breite für die gegebene Datei.
+     * Gibt -1 zurück, wenn keine Szene gespeichert wurde oder das Feld fehlt.
+     */
+    public int loadSceneCanvasWidth(File imageFile) throws IOException {
+        if (currentProject == null) {
+            return -1;
+        }
+
+        File sceneJsonFile = AppPaths.getSceneJsonFile(currentProject, imageFile);
+        if (!sceneJsonFile.exists()) {
+            return -1;
+        }
+
+        String widthStr = extractFieldFromFile(sceneJsonFile, "canvasWidth");
+        if (widthStr != null) {
+            try {
+                return Integer.parseInt(widthStr.trim());
+            } catch (NumberFormatException e) {
+                return -1;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Lädt die Canvas-Höhe für die gegebene Datei.
+     * Gibt -1 zurück, wenn keine Szene gespeichert wurde oder das Feld fehlt.
+     */
+    public int loadSceneCanvasHeight(File imageFile) throws IOException {
+        if (currentProject == null) {
+            return -1;
+        }
+
+        File sceneJsonFile = AppPaths.getSceneJsonFile(currentProject, imageFile);
+        if (!sceneJsonFile.exists()) {
+            return -1;
+        }
+
+        String heightStr = extractFieldFromFile(sceneJsonFile, "canvasHeight");
+        if (heightStr != null) {
+            try {
+                return Integer.parseInt(heightStr.trim());
+            } catch (NumberFormatException e) {
+                return -1;
+            }
+        }
+
+        return -1;
     }
 
     /**
