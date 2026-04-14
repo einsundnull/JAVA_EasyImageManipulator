@@ -2368,6 +2368,32 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private void doFlipH() {
         CanvasInstance c = ci();
         if (c.workingImage == null) return;
+
+        // Apply to selected elements first
+        if (!c.selectedElements.isEmpty()) {
+            pushUndo();
+            for (int i = 0; i < c.selectedElements.size(); i++) {
+                Layer el = c.selectedElements.get(i);
+                if (el instanceof ImageLayer il) {
+                    BufferedImage flipped = PaintEngine.flipHorizontal(il.image());
+                    ImageLayer updated = new ImageLayer(il.id(), flipped, il.x(), il.y(), il.width(), il.height());
+                    c.selectedElements.set(i, updated);
+                    // Also update in activeElements
+                    for (int j = 0; j < c.activeElements.size(); j++) {
+                        if (c.activeElements.get(j).id() == updated.id()) {
+                            c.activeElements.set(j, updated);
+                            break;
+                        }
+                    }
+                }
+            }
+            markDirty();
+            refreshElementPanel();
+            if (c.canvasPanel != null) c.canvasPanel.repaint();
+            return;
+        }
+
+        // Apply to canvas
         Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
         pushUndo();
         if (sel != null) {
@@ -2381,6 +2407,32 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private void doFlipV() {
         CanvasInstance c = ci();
         if (c.workingImage == null) return;
+
+        // Apply to selected elements first
+        if (!c.selectedElements.isEmpty()) {
+            pushUndo();
+            for (int i = 0; i < c.selectedElements.size(); i++) {
+                Layer el = c.selectedElements.get(i);
+                if (el instanceof ImageLayer il) {
+                    BufferedImage flipped = PaintEngine.flipVertical(il.image());
+                    ImageLayer updated = new ImageLayer(il.id(), flipped, il.x(), il.y(), il.width(), il.height());
+                    c.selectedElements.set(i, updated);
+                    // Also update in activeElements
+                    for (int j = 0; j < c.activeElements.size(); j++) {
+                        if (c.activeElements.get(j).id() == updated.id()) {
+                            c.activeElements.set(j, updated);
+                            break;
+                        }
+                    }
+                }
+            }
+            markDirty();
+            refreshElementPanel();
+            if (c.canvasPanel != null) c.canvasPanel.repaint();
+            return;
+        }
+
+        // Apply to canvas
         Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
         pushUndo();
         if (sel != null) {
@@ -3499,8 +3551,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private void initSecondaryWindow() {
         secPanel = new SecondaryPanel();
         secPanel.setBackground(Color.BLACK);
-        secWin = new JFrame();
-        secWin.setUndecorated(true);
+        secWin = new JFrame("TransparencyTool - Canvas Preview");
+        // Keep decorated so screen sharing / screen capture can detect the window
+        secWin.setUndecorated(false);
+        secWin.setResizable(true);
         secWin.setSize(640, 480);
         secWin.setLocationRelativeTo(this);
         secWin.getContentPane().add(secPanel);
@@ -3699,8 +3753,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, CTRL),        "cut");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, CTRL_SHIFT),  "cutOutside");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, CTRL),        "paste");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, CTRL),        "selectAll");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, CTRL),        "undo");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, CTRL),                        "selectAll");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK), "selectAllElements");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, CTRL),                       "undo");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, CTRL),        "redo");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL),        "save");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT),   "saveOriginal");
@@ -3722,6 +3777,13 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 if (c.canvasPanel != null) c.canvasPanel.repaint();
                 refreshElementPanel();
             }
+        }});
+        am.put("selectAllElements", new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
+            CanvasInstance c = ci();
+            c.selectedElements.clear();
+            c.selectedElements.addAll(c.activeElements);
+            if (c.canvasPanel != null) c.canvasPanel.repaint();
+            refreshElementPanel();
         }});
         am.put("undo",        new AbstractAction() { @Override public void actionPerformed(ActionEvent e) {
             CanvasInstance c = ci();
@@ -4289,6 +4351,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         int h = Math.max(1, fm.getHeight() * lines.length);
         BufferedImage img = new BufferedImage(w + TextLayer.TEXT_PADDING * 2, h + TextLayer.TEXT_PADDING * 2, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = img.createGraphics();
+        // Set transparent background - preserve alpha channel
+        g2.setComposite(AlphaComposite.Clear);
+        g2.fillRect(0, 0, img.getWidth(), img.getHeight());
+        g2.setComposite(AlphaComposite.SrcOver);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setFont(font);
