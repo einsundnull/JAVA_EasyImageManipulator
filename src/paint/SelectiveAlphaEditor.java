@@ -3471,6 +3471,17 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     showErrorDialog("Fehler", "Speichern fehlgeschlagen: " + ex.getMessage());
                 }
             }
+
+            // ── File copied via right-drag in gallery ─────────────────────────
+            @Override public void onFileCopied(File copiedFile, int insertIndex) {
+                CanvasInstance c = canvases[idx];
+                // Add the copied file at the drop position
+                c.tileGallery.addFileAtIndex(copiedFile, insertIndex);
+                // Set as active (auto-select in gallery)
+                c.tileGallery.setActiveFile(copiedFile);
+                ToastNotification.show(SelectiveAlphaEditor.this,
+                        "Kopie erstellt: " + copiedFile.getName());
+            }
         };
     }
 

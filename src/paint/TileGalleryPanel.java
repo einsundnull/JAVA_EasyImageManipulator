@@ -88,6 +88,8 @@ public class TileGalleryPanel extends JPanel {
         default void onDragEnded() {}
         /** A LayerTile was dropped on this gallery – save it as a PNG image file. */
         default void onLayerDropped(Layer layer) {}
+        /** A file was copied via right-drag in the gallery at a specific position. */
+        default void onFileCopied(File copiedFile, int insertIndex) {}
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -189,7 +191,30 @@ public class TileGalleryPanel extends JPanel {
                 dtde.acceptDrop(DnDConstants.ACTION_COPY);
                 try {
                     Transferable t = dtde.getTransferable();
-                    if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
+
+                    // Handle right-drag within gallery: copy file
+                    if (t.isDataFlavorSupported(FILE_AS_ELEMENT_FLAVOR)) {
+                        FileForElement ffe = (FileForElement) t.getTransferData(FILE_AS_ELEMENT_FLAVOR);
+                        File sourceFile = ffe.file;
+
+                        // Copy file in same directory
+                        File destFile = createCopyFile(sourceFile);
+                        if (destFile != null) {
+                            try {
+                                copyFileToDestination(sourceFile, destFile);
+                                // Calculate insertion index based on drop position
+                                Point dropPt = dtde.getLocation();
+                                int insertIndex = calculateInsertIndex(dropPt);
+                                // Notify callback about the copied file with position
+                                callbacks.onFileCopied(destFile, insertIndex);
+                                dtde.dropComplete(true);
+                                return;
+                            } catch (Exception ex) {
+                                System.err.println("[ERROR] Failed to copy file: " + ex.getMessage());
+                            }
+                        }
+                        dtde.dropComplete(false);
+                    } else if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
                         Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
                         callbacks.onLayerDropped(layer);
                         dtde.dropComplete(true);
@@ -289,12 +314,38 @@ public class TileGalleryPanel extends JPanel {
         }
     }
 
+    /**
+     * Add a file at a specific index position in the gallery.
+     * Used for maintaining drop position when copying files.
+     */
+    public void addFileAtIndex(File f, int index) {
+        boolean alreadyPresent = tiles.stream().anyMatch(t -> t.imageFile.equals(f));
+        if (!alreadyPresent) {
+            addTileAtIndex(f, index);
+            tilesContainer.revalidate();
+            tilesContainer.repaint();
+        }
+    }
+
     private void addTile(File f) {
         TilePanel tp = new TilePanel(f);
         tp.setActive(f.equals(activeFile));
         tiles.add(tp);
         tilesContainer.add(tp);
         tilesContainer.add(Box.createVerticalStrut(5));
+    }
+
+    /** Insert a tile at a specific index (for drop positioning). */
+    private void addTileAtIndex(File f, int tileIndex) {
+        TilePanel tp = new TilePanel(f);
+        tp.setActive(f.equals(activeFile));
+        // Clamp index to valid range
+        int idx = Math.max(0, Math.min(tileIndex, tiles.size()));
+        tiles.add(idx, tp);
+        // Each tile has: TilePanel + 5px gap, so position in tilesContainer is 2*idx
+        int containerIdx = 2 * idx;
+        tilesContainer.add(tp, containerIdx);
+        tilesContainer.add(Box.createVerticalStrut(5), containerIdx + 1);
     }
 
     // =========================================================================
@@ -362,6 +413,27 @@ public class TileGalleryPanel extends JPanel {
                 break;
             }
         }
+    }
+
+    /**
+     * Calculate the insertion index based on drop position.
+     * Maps the Y coordinate to the appropriate tile index.
+     */
+    private int calculateInsertIndex(Point dropPt) {
+        int y = dropPt.y;
+        int tileCount = tiles.size();
+        int cumulativeY = 0;
+        for (int i = 0; i < tileCount; i++) {
+            TilePanel tp = tiles.get(i);
+            int tileHeight = tp.getHeight() > 0 ? tp.getHeight() : TILE_H;
+            int gapHeight = 5;
+            int totalHeight = tileHeight + gapHeight;
+            if (y < cumulativeY + totalHeight / 2) {
+                return i;  // Insert before this tile
+            }
+            cumulativeY += totalHeight;
+        }
+        return tileCount;  // Insert at end
     }
 
     // =========================================================================
@@ -685,6 +757,29 @@ public class TileGalleryPanel extends JPanel {
     }
 
     // ── Small button factory ──────────────────────────────────────────────────
+    /** Create a copy file name: original.png → original_copy.png, original_copy.png → original_copy_2.png, etc. */
+    private File createCopyFile(File sourceFile) {
+        String name = sourceFile.getName();
+        int lastDot = name.lastIndexOf('.');
+        String baseName = lastDot > 0 ? name.substring(0, lastDot) : name;
+        String extension = lastDot > 0 ? name.substring(lastDot) : "";
+
+        File dir = sourceFile.getParentFile();
+        File copyFile = new File(dir, baseName + "_copy" + extension);
+        int counter = 1;
+        while (copyFile.exists()) {
+            copyFile = new File(dir, baseName + "_copy_" + counter + extension);
+            counter++;
+        }
+        return copyFile;
+    }
+
+    /** Copy file from source to destination. */
+    private void copyFileToDestination(File source, File dest) throws java.io.IOException {
+        java.nio.file.Files.copy(source.toPath(), dest.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    }
+
     private static JButton galleryBtn(String text) {
         JButton b = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
