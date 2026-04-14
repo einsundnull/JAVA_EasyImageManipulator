@@ -14,6 +14,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Image;
+import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
@@ -63,8 +64,6 @@ import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
-
-import java.awt.KeyboardFocusManager;
 
 import book.PaperFormat;
 
@@ -149,15 +148,17 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     private FloatSelectionState floatSelectionState  = new FloatSelectionState();
     private FileStateCache    fileCacheManager       = new FileStateCache();
 
-    // ── Secondary Canvas Window (F1/F2/F3/F4/F5) ──────────────────────────────
+    // ── Secondary Canvas Window (F1/F2/F3/F4/F5/F7) ──────────────────────────────
     private enum PreviewMode { SNAPSHOT, LIVE_ALL, LIVE_ALL_EDIT }
     private enum AlwaysOnTopMode { TO_FRONT, NORMAL, TO_BACKGROUND }
+    private enum CanvasDisplayMode { SHOW_CANVAS_I_ONLY, SHOW_CANVAS_II_ONLY, SHOW_ACTIVE_CANVAS }
     private JFrame        secWin;
     private SecondaryPanel secPanel;
-    private PreviewMode   secMode    = PreviewMode.SNAPSHOT;
+    private PreviewMode   secMode    = PreviewMode.LIVE_ALL;
+    private CanvasDisplayMode secCanvasMode = CanvasDisplayMode.SHOW_ACTIVE_CANVAS;
     private BufferedImage secSnapshot;
     private javax.swing.Timer secTimer;
-    private boolean       secFullscreen = false;
+    private boolean       secFullscreen = true;
     private AlwaysOnTopMode secAlwaysOnTop = AlwaysOnTopMode.NORMAL;
     private int           secOldX, secOldY, secOldW, secOldH;  // For fullscreen restoration
 
@@ -3386,10 +3387,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 
-            // Determine source canvas
+            // Determine source canvas based on display mode
             BufferedImage src;
             List<Layer> elements;
-            int srcIdx = activeCanvasIndex;  // Always use active canvas
+            int srcIdx = switch (SelectiveAlphaEditor.this.secCanvasMode) {
+                case SHOW_CANVAS_I_ONLY -> 0;
+                case SHOW_CANVAS_II_ONLY -> 1;
+                case SHOW_ACTIVE_CANVAS -> SelectiveAlphaEditor.this.activeCanvasIndex;
+            };
             CanvasInstance ci = canvases[srcIdx];
             if (ci.workingImage == null) return;
             src = ci.workingImage;
@@ -3604,6 +3609,27 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         }
     }
 
+    private void cycleCanvasDisplayMode() {
+        if (secWin == null) initSecondaryWindow();
+        if (!secWin.isVisible()) {
+            secWin.setVisible(true);
+        }
+
+        secCanvasMode = switch (secCanvasMode) {
+            case SHOW_CANVAS_I_ONLY -> CanvasDisplayMode.SHOW_CANVAS_II_ONLY;
+            case SHOW_CANVAS_II_ONLY -> CanvasDisplayMode.SHOW_ACTIVE_CANVAS;
+            case SHOW_ACTIVE_CANVAS -> CanvasDisplayMode.SHOW_CANVAS_I_ONLY;
+        };
+
+        String msg = switch (secCanvasMode) {
+            case SHOW_CANVAS_I_ONLY -> "Display: Canvas I Only";
+            case SHOW_CANVAS_II_ONLY -> "Display: Canvas II Only";
+            case SHOW_ACTIVE_CANVAS -> "Display: Active Canvas";
+        };
+        ToastNotification.show(SelectiveAlphaEditor.this, msg);
+        if (secPanel != null) secPanel.repaint();
+    }
+
     private void applySecondaryWindowToCanvas() {
         if (secWin == null || !secWin.isVisible()) {
             ToastNotification.show(SelectiveAlphaEditor.this, "Secondary window not open");
@@ -3751,6 +3777,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                 case KeyEvent.VK_F4 -> { toggleSecondaryFullscreen();  return true; }
                 case KeyEvent.VK_F5 -> { cycleAlwaysOnTop();           return true; }
                 case KeyEvent.VK_F6 -> { applySecondaryWindowToCanvas(); return true; }
+                case KeyEvent.VK_F7 -> { cycleCanvasDisplayMode();     return true; }
             }
             return false;
         });
