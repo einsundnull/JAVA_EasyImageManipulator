@@ -168,6 +168,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
     // ── Canvas background ─────────────────────────────────────────────────────
     private Color canvasBg1 = new Color(200, 200, 200);
     private Color canvasBg2 = new Color(160, 160, 160);
+    private Color canvasBg1Backup = null;  // for QuickBG toggle
 
     // ── Filmstrip sidebar + toggles ────────────────────────────────────────────
     private JPanel        galleryWrapper;
@@ -356,6 +357,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
                     if (images != null && images.length > 0) {
                         java.util.Arrays.sort(images, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
                         indexDirectory(images[0], activeCanvasIndex);
+                        // Show TileGalleryPanel when opening from StartDialog
+                        filmstripBtn.setSelected(true);
+                        ci(activeCanvasIndex).tileGallery.setVisible(true);
+                        updateLayoutVisibility();
                     }
                 }
             } catch (IOException e) {
@@ -562,6 +567,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         bgColorBtn.addActionListener(e -> showCanvasBgDialog());
         bgColorBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 
+        // QuickBG toggle: temporarily hide/show BG Color 1
+        JButton quickBgBtn = UIComponentFactory.buildButton("Q-BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        quickBgBtn.setToolTipText("BG Color 1 temporär aus-/einblenden");
+        quickBgBtn.addActionListener(e -> toggleQuickBG());
+        quickBgBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
         // \u21ba (↺) = anticlockwise arrow — BMP, safe
         JButton resetButton = UIComponentFactory.buildButton("\u21ba", AppColors.BTN_BG, AppColors.BTN_HOVER);
         resetButton.setName("resetButton");
@@ -636,6 +647,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         right.add(Box.createHorizontalStrut(4));
         right.add(newBitmapBtn);
         right.add(bgColorBtn);
+        right.add(quickBgBtn);
         right.add(actionPanel);
         right.add(Box.createHorizontalStrut(4));
         right.add(canvasModeBtn);
@@ -3594,14 +3606,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
             int dw = (int)(iw * scale), dh = (int)(ih * scale);
             int ox = (pw - dw) / 2, oy = (ph - dh) / 2;
 
-            // Checkerboard background - use canvas settings colors
-            AppSettings settings = AppSettings.getInstance();
+            // Checkerboard background - use same colors as main canvas
             int cell = 16;
-            Color bg1Color = new Color(settings.getBg1(), true);
-            Color bg2Color = new Color(settings.getBg2(), true);
             for (int cy = 0; cy < ph; cy += cell) {
                 for (int cx = 0; cx < pw; cx += cell) {
-                    g2.setColor(((cx/cell + cy/cell) % 2 == 0) ? bg1Color : bg2Color);
+                    g2.setColor(((cx/cell + cy/cell) % 2 == 0) ? canvasBg1 : canvasBg2);
                     g2.fillRect(cx, cy, cell, cell);
                 }
             }
@@ -4308,6 +4317,20 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         dialog.setVisible(true);
     }
 
+    private void toggleQuickBG() {
+        if (canvasBg1Backup == null) {
+            // Hide BG Color 1 by setting it to match BG Color 2
+            canvasBg1Backup = canvasBg1;
+            canvasBg1 = canvasBg2;
+        } else {
+            // Restore BG Color 1
+            canvasBg1 = canvasBg1Backup;
+            canvasBg1Backup = null;
+        }
+        if (ci() != null && ci().canvasPanel != null) ci().canvasPanel.repaint();
+        if (secPanel != null) secPanel.repaint();  // Also repaint secondary window if visible
+    }
+
     // =========================================================================
     // UI state helpers
     // =========================================================================
@@ -4325,9 +4348,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
         CanvasInstance c = ci();
         if (c.sourceFile == null) { setTitle("Selective Alpha Editor"); return; }
         String dirty = c.hasUnsavedChanges ? " •" : "";
-        String mode  = appMode == AppMode.PAINT ? "[Paint]"
-                : floodfillMode ? "[Floodfill]" : "[Selective Alpha]";
-        setTitle("Selective Alpha Editor  " + mode + "  –  " + c.sourceFile.getName() + dirty);
+        String fileName = c.sourceFile.getName();
+        String size = c.workingImage != null ? c.workingImage.getWidth() + "x" + c.workingImage.getHeight() + "px" : "?x?";
+        String imageCount = (c.currentImageIndex + 1) + "/" + c.directoryImages.size();
+        setTitle("Selective Alpha Editor  |  " + fileName + "  |  " + size + "  |  " + imageCount + dirty);
     }
 
     public void updateStatus() {
