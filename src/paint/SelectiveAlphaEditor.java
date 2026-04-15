@@ -1540,6 +1540,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		c.scaleBaseRect = null;
 		c.scaleDragStart = null;
 		c.selectedElements.clear();
+		c.activeSceneFile = null;  // regular image load clears any active scene
 		c.draggingElement = false;
 		c.elemDragAnchor = null;
 		c.elemActiveHandle = -1;
@@ -1625,6 +1626,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			return;
 		}
 		c.sourceFile = file;
+		c.activeSceneFile = null;  // loading a background clears scene tracking; caller sets it after
 		c.hasUnsavedChanges = false;
 		c.selectedAreas.clear();
 		c.isSelecting = false;
@@ -2958,6 +2960,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				refreshElementPanel();
 				if (c().canvasPanel != null)
 					c().canvasPanel.repaint();
+				persistSceneIfActive(idx);
 			}
 
 			@Override
@@ -4522,6 +4525,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 					c.activeElements = allLayers;
 					c.selectedElements.clear();
+					c.activeSceneFile = sceneFile;  // track loaded scene
 					refreshElementPanel();
 					c.canvasPanel.repaint();
 
@@ -6386,6 +6390,32 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		c.selectedElements.clear();
 		markDirty();
 		refreshElementPanel();
+		persistSceneIfActive(activeCanvasIndex);
+	}
+
+	/**
+	 * If a scene is currently loaded, rewrite its .txt file with the current
+	 * activeElements so deletions (and other changes) are persisted to disk.
+	 */
+	private void persistSceneIfActive(int idx) {
+		CanvasInstance c = ci(idx);
+		if (c.activeSceneFile == null || c.sourceFile == null) return;
+		File sceneDir  = c.activeSceneFile.getParentFile();
+		String sceneName = c.activeSceneFile.getName().replaceAll("\\.(txt|json)$", "");
+		List<Layer> layers = new ArrayList<>(c.activeElements);
+		File bgFile = c.sourceFile;
+		new javax.swing.SwingWorker<Void, Void>() {
+			@Override protected Void doInBackground() throws Exception {
+				SceneFileWriter.writeScene(sceneDir, sceneName, bgFile, layers);
+				return null;
+			}
+			@Override protected void done() {
+				try { get(); }
+				catch (Exception ex) {
+					System.err.println("[ERROR] Scene persist failed: " + ex.getMessage());
+				}
+			}
+		}.execute();
 	}
 
 	/**

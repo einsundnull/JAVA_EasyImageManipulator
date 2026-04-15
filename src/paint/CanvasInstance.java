@@ -59,6 +59,9 @@ public class CanvasInstance {
     public Rectangle      scaleBaseRect;
     public Point          scaleDragStart;
 
+    // ── Active scene (set when a scene is loaded, null otherwise) ────────────
+    public File             activeSceneFile;   // the .txt file of the currently loaded scene
+
     // ── Alpha-editor selection ────────────────────────────────────────────────
     public boolean        isSelecting      = false;
     public Point          selectionStart;
