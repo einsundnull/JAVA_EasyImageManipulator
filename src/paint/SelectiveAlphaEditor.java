@@ -479,7 +479,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		filmstripBtn.addActionListener(e -> {
 			ci(0).tileGallery.setVisible(filmstripBtn.isSelected());
 			updateLayoutVisibility();
-			fitToViewport(0);  // Recalculate zoom when gallery width changes
+			// Wait for layout to settle before recalculating image zoom/position
+			SwingUtilities.invokeLater(() -> {
+				SwingUtilities.invokeLater(() -> reloadCurrentImage(0));
+			});
 		});
 
 		scenesBtn = UIComponentFactory.buildModeToggleBtn("S", "Szenen ein-/ausblenden");
@@ -508,7 +511,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				ci(1).tileGallery.setVisible(secondGalleryBtn.isSelected());
 			}
 			updateLayoutVisibility();
-			fitToViewport(1);  // Recalculate zoom when gallery width changes
+			// Wait for layout to settle before recalculating image zoom/position
+			SwingUtilities.invokeLater(() -> {
+				SwingUtilities.invokeLater(() -> reloadCurrentImage(1));
+			});
 		});
 
 		secondScenesBtn = UIComponentFactory.buildModeToggleBtn("S2", "2. Szenen ein-/ausblenden");
@@ -526,7 +532,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				elementLayerPanel.setVisible(firstElementsBtn.isSelected());
 			}
 			updateLayoutVisibility();
-			fitToViewport(activeCanvasIndex);  // Recalculate zoom when sidebar width changes
+			// Wait for layout to settle before recalculating image zoom/position
+			SwingUtilities.invokeLater(() -> {
+				SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex));
+			});
 		});
 
 		secondElementsBtn = UIComponentFactory.buildModeToggleBtn("E2", "2. Ebenen ein-/ausblenden");
@@ -538,7 +547,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				elementLayerPanel2.setVisible(secondElementsBtn.isSelected());
 			}
 			updateLayoutVisibility();
-			fitToViewport(activeCanvasIndex);  // Recalculate zoom when sidebar width changes
+			// Wait for layout to settle before recalculating image zoom/position
+			SwingUtilities.invokeLater(() -> {
+				SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex));
+			});
 		});
 
 		mapsBtn = UIComponentFactory.buildModeToggleBtn("🗺", "Translation Maps ein-/ausblenden");
@@ -549,7 +561,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				mapsPanel.setVisible(mapsBtn.isSelected());
 			}
 			updateLayoutVisibility();
-			fitToViewport(activeCanvasIndex);  // Recalculate zoom when sidebar width changes
+			// Wait for layout to settle before recalculating image zoom/position
+			SwingUtilities.invokeLater(() -> {
+				SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex));
+			});
 		});
 
 		quickOpenBtn = UIComponentFactory.buildButton("📂", AppColors.BTN_BG, AppColors.BTN_HOVER);
@@ -1398,11 +1413,37 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		zone.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
 		// Click handler: open quick select dialog for canvas 2
+		// Also hide dropzone on mouse exit or when clicking elsewhere
 		zone.addMouseListener(new java.awt.event.MouseAdapter() {
+			private javax.swing.Timer hideTimer;
+
 			@Override
 			public void mouseClicked(java.awt.event.MouseEvent e) {
 				e.consume();
 				showQuickOpenDialog(1); // Load into canvas 2 (index 1)
+			}
+
+			@Override
+			public void mouseExited(java.awt.event.MouseEvent e) {
+				// Hide dropzone after brief delay if mouse leaves it
+				hideTimer = new javax.swing.Timer(300, ev -> {
+					if (zone.isVisible()) {
+						zone.setVisible(false);
+						if (ci(0).layeredPane != null)
+							ci(0).layeredPane.repaint();
+					}
+				});
+				hideTimer.setRepeats(false);
+				hideTimer.start();
+			}
+
+			@Override
+			public void mouseEntered(java.awt.event.MouseEvent e) {
+				// Cancel hide timer when re-entering
+				if (hideTimer != null) {
+					hideTimer.stop();
+					hideTimer = null;
+				}
 			}
 		});
 
@@ -1573,6 +1614,19 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	/**
+	 * Recalculates zoom and centering for the canvas after layout changes.
+	 * Does NOT change the active canvas - just fixes the display of the current canvas.
+	 */
+	private void reloadCurrentImage(int idx) {
+		CanvasInstance c = ci(idx);
+		// Only recalculate if this canvas has an image and it's currently visible
+		if (c.workingImage == null || !c.viewportPanel.isVisible())
+			return;
+		// Just fit to viewport without changing activeCanvasIndex or reloading
+		fitToViewport(idx);
+	}
+
+	/**
 	 * Converts the image to TYPE_INT_ARGB and ensures it is always stored in a
 	 * clean ARGB format so paint operations work correctly on any source.
 	 */
@@ -1652,7 +1706,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		}
 		c.scenesPanel.setVisible(visible);
 		updateLayoutVisibility();
-		fitToViewport(idx);  // Recalculate zoom when scenes panel width changes
+		// Wait for layout to settle before recalculating image zoom/position
+		SwingUtilities.invokeLater(() -> {
+			SwingUtilities.invokeLater(() -> reloadCurrentImage(idx));
+		});
 	}
 
 	// ── Indexed canvas methods (array-based) ────────────────────────────────────
@@ -2700,7 +2757,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		}
 		galleryWrapper.revalidate();
 		galleryWrapper.repaint();
-		fitToViewport(activeCanvasIndex);  // Recalculate zoom when element panel changes
+		// Wait for layout to settle before recalculating image zoom/position
+		SwingUtilities.invokeLater(() -> {
+			SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex));
+		});
 	}
 
 	/** Updates modeLabel to show all active mode flags dynamically. */
@@ -5383,6 +5443,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		am.put("escape", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				// Hide drop zone when ESC is pressed
+				if (rightDropZone != null && rightDropZone.isVisible()) {
+					rightDropZone.setVisible(false);
+					ci(0).layeredPane.repaint();
+				}
+
 				CanvasInstance c = ci();
 				if (c.floatingImg != null) {
 					cancelFloat();

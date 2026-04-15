@@ -129,15 +129,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 BorderFactory.createMatteBorder(0, 0, 0, 1, AppColors.BORDER),
                 BorderFactory.createEmptyBorder(0, 0, 16, 0)));
 
-        // ── Header label ──────────────────────────────────────────────────────
-        JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(new Color(42, 42, 42));
-        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
-        JLabel lbl = new JLabel("  Bilder");
-        lbl.setForeground(AppColors.TEXT_MUTED);
-        lbl.setFont(new Font("SansSerif", Font.BOLD, 11));
-        lbl.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 4));
-        header.add(lbl, BorderLayout.CENTER);
+        // ── Header mit Refresh-Button ────────────────────────────────────────
+        JPanel header = buildSidebarHeader("Bilder", this::refreshGallery, null);
 
         // ── Select-All / Deselect-All (initially hidden) ──────────────────────
         actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
@@ -324,6 +317,45 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     @Override
     public void refresh() {
         /* TileGalleryPanel uses setFiles() and setActiveFile() for updates, not a generic refresh(). */
+    }
+
+    /**
+     * Refresh the gallery by rescanning the current directory from disk.
+     * Called when user clicks the refresh button in the header.
+     */
+    public void refreshGallery() {
+        if (tiles.isEmpty())
+            return;
+
+        // Get the directory from the first tile
+        File currentDir = tiles.get(0).imageFile.getParentFile();
+        if (currentDir == null || !currentDir.isDirectory())
+            return;
+
+        // Scan directory for image files
+        File[] files = currentDir.listFiles((d, name) -> {
+            String lower = name.toLowerCase();
+            return lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                    || lower.endsWith(".gif") || lower.endsWith(".bmp");
+        });
+
+        if (files != null) {
+            // Create sorted list of files
+            java.util.List<File> newFiles = new ArrayList<>(java.util.Arrays.asList(files));
+            newFiles.sort(java.util.Comparator.comparing(File::getName));
+
+            // Get currently active file
+            File activeFile = null;
+            for (TilePanel t : tiles) {
+                if (t.isActive) {
+                    activeFile = t.imageFile;
+                    break;
+                }
+            }
+
+            // Update gallery with new file list
+            setFiles(newFiles, activeFile);
+        }
     }
 
     /**
@@ -611,13 +643,23 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         private void deleteTile() {
             int result = JOptionPane.showConfirmDialog(
                     TileGalleryPanel.this,
-                    "Möchten Sie dieses Element wirklich löschen?",
-                    "Bestätigung",
+                    "Möchten Sie die Datei \"" + imageFile.getName() + "\" wirklich löschen?",
+                    "Datei löschen",
                     JOptionPane.YES_NO_OPTION,
                     JOptionPane.WARNING_MESSAGE);
 
             if (result == JOptionPane.YES_OPTION) {
-                // Find and remove this tile
+                // Delete the file from disk
+                if (!imageFile.delete()) {
+                    JOptionPane.showMessageDialog(
+                            TileGalleryPanel.this,
+                            "Fehler: Datei konnte nicht gelöscht werden.\n" + imageFile.getAbsolutePath(),
+                            "Fehler",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                // Remove this tile from the gallery
                 int tileIndex = tiles.indexOf(this);
                 if (tileIndex >= 0) {
                     tiles.remove(tileIndex);

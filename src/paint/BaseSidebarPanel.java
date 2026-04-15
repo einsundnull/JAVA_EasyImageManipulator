@@ -55,6 +55,20 @@ public abstract class BaseSidebarPanel extends JPanel {
      * @return JPanel configured as a header (dark BG, border, layout)
      */
     protected JPanel buildSidebarHeader(String title, Runnable onClose) {
+        return buildSidebarHeader(title, null, onClose);
+    }
+
+    /**
+     * Creates a dark header panel with title and optional refresh and close buttons.
+     *
+     * @param title         Display text for the header
+     * @param onRefresh     Runnable to call when refresh button is clicked.
+     *                      If null, no refresh button is shown.
+     * @param onClose       Runnable to call when close button is clicked.
+     *                      If null, no close button is shown.
+     * @return JPanel configured as a header (dark BG, border, layout)
+     */
+    protected JPanel buildSidebarHeader(String title, Runnable onRefresh, Runnable onClose) {
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(new Color(42, 42, 42));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
@@ -66,18 +80,41 @@ public abstract class BaseSidebarPanel extends JPanel {
         titleLbl.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 4));
         header.add(titleLbl, BorderLayout.CENTER);
 
-        if (onClose != null) {
-            JLabel closeBtn = new JLabel("×");
-            closeBtn.setForeground(AppColors.TEXT_MUTED);
-            closeBtn.setFont(new Font("SansSerif", Font.BOLD, 15));
-            closeBtn.setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 6));
-            closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            closeBtn.addMouseListener(new MouseAdapter() {
-                @Override public void mouseClicked(MouseEvent e) { onClose.run(); }
-                @Override public void mouseEntered(MouseEvent e) { closeBtn.setForeground(Color.WHITE); }
-                @Override public void mouseExited (MouseEvent e) { closeBtn.setForeground(AppColors.TEXT_MUTED); }
-            });
-            header.add(closeBtn, BorderLayout.EAST);
+        // ── East side: refresh button (optional) + close button (optional) ─
+        if (onRefresh != null || onClose != null) {
+            JPanel eastPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+            eastPanel.setBackground(new Color(42, 42, 42));
+            eastPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
+
+            if (onRefresh != null) {
+                JLabel refreshBtn = new JLabel("⟳");
+                refreshBtn.setForeground(AppColors.TEXT_MUTED);
+                refreshBtn.setFont(new Font("SansSerif", Font.PLAIN, 12));
+                refreshBtn.setBorder(BorderFactory.createEmptyBorder(4, 3, 4, 3));
+                refreshBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                refreshBtn.addMouseListener(new MouseAdapter() {
+                    @Override public void mouseClicked(MouseEvent e) { onRefresh.run(); }
+                    @Override public void mouseEntered(MouseEvent e) { refreshBtn.setForeground(Color.WHITE); }
+                    @Override public void mouseExited (MouseEvent e) { refreshBtn.setForeground(AppColors.TEXT_MUTED); }
+                });
+                eastPanel.add(refreshBtn);
+            }
+
+            if (onClose != null) {
+                JLabel closeBtn = new JLabel("×");
+                closeBtn.setForeground(AppColors.TEXT_MUTED);
+                closeBtn.setFont(new Font("SansSerif", Font.BOLD, 15));
+                closeBtn.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 0));
+                closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                closeBtn.addMouseListener(new MouseAdapter() {
+                    @Override public void mouseClicked(MouseEvent e) { onClose.run(); }
+                    @Override public void mouseEntered(MouseEvent e) { closeBtn.setForeground(Color.WHITE); }
+                    @Override public void mouseExited (MouseEvent e) { closeBtn.setForeground(AppColors.TEXT_MUTED); }
+                });
+                eastPanel.add(closeBtn);
+            }
+
+            header.add(eastPanel, BorderLayout.EAST);
         }
         return header;
     }

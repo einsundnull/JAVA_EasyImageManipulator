@@ -47,8 +47,8 @@ public class ScenesPanel extends BaseSidebarPanel {
         setBackground(AppColors.BG_PANEL);
         setOpaque(true);
 
-        // Header with close button
-        JPanel header = buildSidebarHeader("Szenen", onClose);
+        // Header with refresh and close buttons
+        JPanel header = buildSidebarHeader("Szenen", this::refreshScenes, onClose);
         add(header, BorderLayout.NORTH);
 
         // Tabbed Pane für Tool/Game Scenes
@@ -85,6 +85,13 @@ public class ScenesPanel extends BaseSidebarPanel {
     public void refresh() {
         toolScenesPanel.refresh();
         gameScenesPanel.refresh();
+    }
+
+    /**
+     * Refresh Szenen-Liste vom Filesystem (called by refresh button in header).
+     */
+    public void refreshScenes() {
+        refresh();
     }
 
     // =====================================================

@@ -27,8 +27,8 @@ public class MapsPanel extends BaseSidebarPanel {
         setLayout(new BorderLayout());
         setBackground(AppColors.BG_PANEL);
 
-        // Header using base class builder (no close button for Maps)
-        JPanel header = buildSidebarHeader("Translation Maps", null);
+        // Header with refresh button
+        JPanel header = buildSidebarHeader("Translation Maps", this::refreshMaps, null);
         add(header, BorderLayout.NORTH);
 
         // Maps container
@@ -46,6 +46,13 @@ public class MapsPanel extends BaseSidebarPanel {
     @Override
     public void refresh() {
         refreshMapsList();
+    }
+
+    /**
+     * Refresh Maps-Liste vom Filesystem (called by refresh button in header).
+     */
+    public void refreshMaps() {
+        refresh();
     }
 
     /**

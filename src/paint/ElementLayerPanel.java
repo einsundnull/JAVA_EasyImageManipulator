@@ -169,6 +169,20 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         JPanel eastBtns = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 2, 3));
         eastBtns.setOpaque(false);
         eastBtns.add(outlineBtn);
+
+        // Refresh button – reload elements from disk
+        JLabel refreshBtn = new JLabel("⟳");
+        refreshBtn.setForeground(AppColors.TEXT_MUTED);
+        refreshBtn.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        refreshBtn.setBorder(BorderFactory.createEmptyBorder(4, 3, 4, 3));
+        refreshBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        refreshBtn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { refresh(); }
+            @Override public void mouseEntered(MouseEvent e) { refreshBtn.setForeground(Color.WHITE); }
+            @Override public void mouseExited (MouseEvent e) { refreshBtn.setForeground(AppColors.TEXT_MUTED); }
+        });
+        eastBtns.add(refreshBtn);
+
         eastBtns.add(closeBtn);
         header.add(eastBtns, BorderLayout.EAST);
 
