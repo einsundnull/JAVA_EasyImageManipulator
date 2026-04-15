@@ -1,7 +1,19 @@
 package paint;
 
-import java.awt.*;
-import javax.swing.*;
+import java.awt.Color;
+import java.awt.FlowLayout;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 
 /**
  * Dialog to create or edit a translation map.

@@ -1,9 +1,23 @@
 package paint;
 
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.io.IOException;
-import java.util.*;
-import javax.swing.*;
+import java.util.LinkedHashMap;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
 
 /**
  * Panel displaying all translation maps in a list view.
@@ -21,14 +35,19 @@ public class MapsPanel extends BaseSidebarPanel {
     private final JPanel mapsContainer;
     private final JScrollPane scrollPane;
     private java.util.Map<String, java.util.List<TranslationMap>> allMaps = new LinkedHashMap<>();
+    private boolean showAll = false;
+    private TranslationMap linkedMap = null;
 
     public MapsPanel(Callbacks cb) {
         this.cb = cb;
         setLayout(new BorderLayout());
         setBackground(AppColors.BG_PANEL);
 
-        // Header with refresh button
-        JPanel header = buildSidebarHeader("Translation Maps", this::refreshMaps, null);
+        // Header with All/Only toggle, refresh button
+        JPanel header = buildSidebarHeader("Translation Maps", this::refreshMaps, isAll -> {
+            showAll = isAll;
+            refreshMapsList();
+        }, null);
         add(header, BorderLayout.NORTH);
 
         // Maps container
@@ -53,6 +72,14 @@ public class MapsPanel extends BaseSidebarPanel {
      */
     public void refreshMaps() {
         refresh();
+    }
+
+    /**
+     * Set the linked map for the All/Only toggle.
+     */
+    public void setLinkedMap(TranslationMap map) {
+        this.linkedMap = map;
+        refreshMapsList();
     }
 
     /**
@@ -106,9 +133,13 @@ public class MapsPanel extends BaseSidebarPanel {
      */
     private class MapTile extends JPanel {
         private final TranslationMap map;
+        private final boolean isShowAll;
+        private final TranslationMap linkedMapRef;
 
         MapTile(TranslationMap map) {
             this.map = map;
+            this.isShowAll = showAll;
+            this.linkedMapRef = linkedMap;
             setLayout(null);
             setPreferredSize(new Dimension(140, 110));
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 110));
@@ -271,6 +302,13 @@ public class MapsPanel extends BaseSidebarPanel {
             if (previewII == null) previewII = "";
             if (previewII.length() > 50) previewII = previewII.substring(0, 50) + "...";
             g2.drawString("II: " + previewII, 6, 62);
+
+            // Draw red border for unlinked maps when showAll is true
+            if (isShowAll && linkedMapRef != null && !map.id().equals(linkedMapRef.id())) {
+                g2.setColor(AppColors.DANGER);
+                g2.setStroke(new java.awt.BasicStroke(1));
+                g2.drawRect(0, 0, w - 1, h - 1);
+            }
 
             g2.dispose();
         }

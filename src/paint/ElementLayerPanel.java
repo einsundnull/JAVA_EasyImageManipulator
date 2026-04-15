@@ -34,6 +34,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
@@ -100,6 +101,8 @@ public class ElementLayerPanel extends BaseSidebarPanel {
     private final Callbacks      cb;
     private final JPanel         tilesContainer;
     private boolean              showAllOutlines = false;
+    private boolean              showAll = false;
+    private Layer                linkedElement = null;
     /** Id of the layer whose tile is currently hovered in this panel, or -1. */
     private int                  hoveredElementId = -1;
     /** Y-coordinate of the drop indicator line in tilesContainer, or -1 if none. */
@@ -168,6 +171,25 @@ public class ElementLayerPanel extends BaseSidebarPanel {
 
         JPanel eastBtns = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 2, 3));
         eastBtns.setOpaque(false);
+
+        // All/Only toggle button using link-alt icon
+        ImageIcon linkIcon = loadIcon("link-alt.png", 14);
+        JLabel toggleBtn = new JLabel(linkIcon);
+        toggleBtn.setForeground(AppColors.TEXT_MUTED);
+        toggleBtn.setBorder(BorderFactory.createEmptyBorder(4, 3, 4, 3));
+        toggleBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        toggleBtn.setToolTipText("Only (linked) / All (unlinked) Toggle");
+        toggleBtn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                showAll = !showAll;
+                toggleBtn.setForeground(showAll ? Color.WHITE : AppColors.TEXT_MUTED);
+                tilesContainer.repaint();
+            }
+            @Override public void mouseEntered(MouseEvent e) { toggleBtn.setForeground(Color.WHITE); }
+            @Override public void mouseExited (MouseEvent e) { toggleBtn.setForeground(showAll ? Color.WHITE : AppColors.TEXT_MUTED); }
+        });
+        eastBtns.add(toggleBtn);
+
         eastBtns.add(outlineBtn);
 
         // Refresh button – reload elements from disk
@@ -256,6 +278,14 @@ public class ElementLayerPanel extends BaseSidebarPanel {
     // =========================================================================
     public boolean isShowAllOutlines() { return showAllOutlines; }
 
+    /**
+     * Set the linked element for the All/Only toggle.
+     */
+    public void setLinkedElement(Layer layer) {
+        this.linkedElement = layer;
+        tilesContainer.repaint();
+    }
+
     @Override
     public void refresh() {
         /* ElementLayerPanel uses refresh(List<Layer>) for updates, not generic refresh(). */
@@ -308,7 +338,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         for (int i = layers.size() - 1; i >= 0; i--) {
             Layer layer = layers.get(i);
             boolean sel = selectedEls.stream().anyMatch(s -> s.id() == layer.id());
-            tilesContainer.add(new LayerTile(layer, sel));
+            tilesContainer.add(new LayerTile(layer, sel, showAll, linkedElement));
             tilesContainer.add(Box.createVerticalStrut(5));
         }
 
@@ -333,11 +363,15 @@ public class ElementLayerPanel extends BaseSidebarPanel {
 
         private final Layer   layer;
         private final boolean selected;
+        private final boolean isShowAll;
+        private final Layer linkedLayerRef;
         private JLabel toImage, burn, del, resetRot, mapBtn, vis, lbl;
 
-        LayerTile(Layer layer, boolean selected) {
+        LayerTile(Layer layer, boolean selected, boolean showAll, Layer linkedElement) {
             this.layer    = layer;
             this.selected = selected;
+            this.isShowAll = showAll;
+            this.linkedLayerRef = linkedElement;
             setLayout(null);
             setPreferredSize(new Dimension(TILE_W, TILE_H));
             // Don't set MaximumSize/MinimumSize — let tiles scale with panel width
@@ -761,6 +795,13 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             } else {
                 g2.setColor(new Color(62, 62, 62));
                 g2.setStroke(new BasicStroke(1f));
+                g2.drawRoundRect(0, 0, w - 1, TILE_H - 1, 6, 6);
+            }
+
+            // Draw red border for unlinked layers when showAll is true
+            if (isShowAll && linkedLayerRef != null && layer.id() != linkedLayerRef.id()) {
+                g2.setColor(AppColors.DANGER);
+                g2.setStroke(new BasicStroke(1.5f));
                 g2.drawRoundRect(0, 0, w - 1, TILE_H - 1, 6, 6);
             }
 

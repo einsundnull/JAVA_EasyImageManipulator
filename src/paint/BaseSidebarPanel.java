@@ -1,12 +1,32 @@
 package paint;
 
-import java.awt.*;
-import java.awt.datatransfer.*;
-import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.io.File;
 import java.io.IOException;
 import java.util.function.Supplier;
-import javax.swing.*;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.ImageIcon;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
+import javax.swing.TransferHandler;
 
 /**
  * Abstract base class for all sidebar panels (TileGalleryPanel, ElementLayerPanel,
@@ -45,6 +65,32 @@ public abstract class BaseSidebarPanel extends JPanel {
      */
     public abstract void refresh();
 
+    // ── Icon Helper ───────────────────────────────────────────────────────────
+    /**
+     * Loads an icon from resources/icons and scales it to the specified size.
+     */
+    protected static ImageIcon loadIcon(String iconName, int size) {
+        try {
+            String iconPath = "resources/icons/" + iconName;
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(
+                new java.io.File(iconPath));
+            if (img == null) return null;
+
+            java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(
+                size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g2 = scaled.createGraphics();
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2.drawImage(img, 0, 0, size, size, null);
+            g2.dispose();
+
+            return new ImageIcon(scaled);
+        } catch (Exception e) {
+            System.err.println("[BaseSidebarPanel] Failed to load icon: " + iconName);
+            return null;
+        }
+    }
+
     // ── Header-Builder ────────────────────────────────────────────────────────
     /**
      * Creates a standard dark header panel with title and optional close button.
@@ -55,20 +101,32 @@ public abstract class BaseSidebarPanel extends JPanel {
      * @return JPanel configured as a header (dark BG, border, layout)
      */
     protected JPanel buildSidebarHeader(String title, Runnable onClose) {
-        return buildSidebarHeader(title, null, onClose);
+        return buildSidebarHeader(title, null, null, onClose);
     }
 
     /**
-     * Creates a dark header panel with title and optional refresh and close buttons.
+     * Creates a dark header panel with title, refresh, and close buttons.
+     */
+    protected JPanel buildSidebarHeader(String title, Runnable onRefresh, Runnable onClose) {
+        return buildSidebarHeader(title, onRefresh, null, onClose);
+    }
+
+    /**
+     * Creates a dark header panel with title and optional refresh, all/only toggle, and close buttons.
      *
      * @param title         Display text for the header
      * @param onRefresh     Runnable to call when refresh button is clicked.
      *                      If null, no refresh button is shown.
+     * @param onAllOnlyToggle  Callback when All/Only button is toggled.
+     *                      If null, no toggle button is shown.
+     *                      Boolean parameter: true = All, false = Only
      * @param onClose       Runnable to call when close button is clicked.
      *                      If null, no close button is shown.
      * @return JPanel configured as a header (dark BG, border, layout)
      */
-    protected JPanel buildSidebarHeader(String title, Runnable onRefresh, Runnable onClose) {
+    protected JPanel buildSidebarHeader(String title, Runnable onRefresh,
+                                        java.util.function.Consumer<Boolean> onAllOnlyToggle,
+                                        Runnable onClose) {
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(new Color(42, 42, 42));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
@@ -80,11 +138,33 @@ public abstract class BaseSidebarPanel extends JPanel {
         titleLbl.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 4));
         header.add(titleLbl, BorderLayout.CENTER);
 
-        // ── East side: refresh button (optional) + close button (optional) ─
-        if (onRefresh != null || onClose != null) {
+        // ── East side: all/only toggle (optional) + refresh button (optional) + close button (optional) ─
+        if (onRefresh != null || onAllOnlyToggle != null || onClose != null) {
             JPanel eastPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
             eastPanel.setBackground(new Color(42, 42, 42));
             eastPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
+
+            // All/Only toggle button using link-alt icon
+            if (onAllOnlyToggle != null) {
+                final boolean[] isAll = {false};  // Default: Only
+                ImageIcon icon = loadIcon("link-alt.png", 14);
+                JLabel toggleBtn = new JLabel(icon);
+                toggleBtn.setForeground(AppColors.TEXT_MUTED);
+                toggleBtn.setBorder(BorderFactory.createEmptyBorder(4, 3, 4, 3));
+                toggleBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                toggleBtn.setToolTipText("Only (linked) / All (unlinked) Toggle");
+                toggleBtn.addMouseListener(new MouseAdapter() {
+                    @Override public void mouseClicked(MouseEvent e) {
+                        isAll[0] = !isAll[0];
+                        onAllOnlyToggle.accept(isAll[0]);
+                        // Update icon opacity to show state
+                        toggleBtn.setForeground(isAll[0] ? Color.WHITE : AppColors.TEXT_MUTED);
+                    }
+                    @Override public void mouseEntered(MouseEvent e) { toggleBtn.setForeground(Color.WHITE); }
+                    @Override public void mouseExited (MouseEvent e) { toggleBtn.setForeground(isAll[0] ? Color.WHITE : AppColors.TEXT_MUTED); }
+                });
+                eastPanel.add(toggleBtn);
+            }
 
             if (onRefresh != null) {
                 JLabel refreshBtn = new JLabel("⟳");

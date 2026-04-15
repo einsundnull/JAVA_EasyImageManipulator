@@ -41,7 +41,6 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
@@ -106,6 +105,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     private       boolean         multiSelectMode = false;
     private       File            activeFile      = null;
     private       java.util.Set<File> dirtyFiles = new java.util.HashSet<>();
+    private       boolean         showAll = false;  // Toggle: false = Only, true = All
+    private       File            linkedScene = null;  // Scene to filter by when in "Only" mode
 
     // ── UI refs ───────────────────────────────────────────────────────────────
     private final JPanel      tilesContainer;
@@ -129,8 +130,15 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 BorderFactory.createMatteBorder(0, 0, 0, 1, AppColors.BORDER),
                 BorderFactory.createEmptyBorder(0, 0, 16, 0)));
 
-        // ── Header mit Refresh-Button ────────────────────────────────────────
-        JPanel header = buildSidebarHeader("Bilder", this::refreshGallery, null);
+        // ── Header mit All/Only Toggle, Refresh-Button ──────────────────────
+        JPanel header = buildSidebarHeader("Bilder", this::refreshGallery, isAll -> {
+            // Toggle between All Images vs Only Images of the Scene
+            showAll = isAll;
+            // Redraw all tiles to reflect linked/unlinked status
+            for (TilePanel t : tiles) {
+                t.repaint();
+            }
+        }, null);
 
         // ── Select-All / Deselect-All (initially hidden) ──────────────────────
         actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
@@ -301,6 +309,17 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     /** Scroll the gallery so the currently active tile is fully visible. */
     public void scrollToActive() {
         scrollToActiveImpl();
+    }
+
+    /**
+     * Set the linked scene/directory - used to show which images belong to which scene.
+     * When showAll is true, images not in this scene get a red border.
+     */
+    public void setLinkedScene(File sceneDir) {
+        this.linkedScene = sceneDir;
+        for (TilePanel t : tiles) {
+            t.repaint();
+        }
     }
 
     public List<File> getSelectedImages() { return new ArrayList<>(selectedImages); }
@@ -774,6 +793,9 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
             // ── Border ───────────────────────────────────────────────────────
             boolean isDirty = dirtyFiles.contains(imageFile);
+            boolean isUnlinked = showAll && linkedScene != null &&
+                                 !imageFile.getParentFile().equals(linkedScene);
+
             g2.setStroke(new BasicStroke(2f));
             if (isActive && isDirty) {
                 g2.setColor(AppColors.DANGER);
@@ -782,6 +804,9 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 g2.drawRoundRect(2, 2, w - 6, TILE_H - 6, 6, 6);
             } else if (isDirty) {
                 g2.setColor(AppColors.DANGER);            // red – ungespeicherte Änderungen
+                g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
+            } else if (isUnlinked) {
+                g2.setColor(AppColors.DANGER);            // red – unlinked from current scene
                 g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (isClicked) {
                 g2.setColor(new Color(255, 255, 0));      // yellow – clicked state

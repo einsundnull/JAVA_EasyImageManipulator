@@ -1,11 +1,38 @@
 package paint;
 
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDropEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import javax.swing.*;
-import javax.swing.event.ChangeEvent;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.JScrollPane;
+import javax.swing.JTabbedPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 
 /**
  * Szenen-Browser Panel für TransparencyTool und GameII Szenen.
@@ -25,6 +52,8 @@ public class ScenesPanel extends BaseSidebarPanel {
     private JTabbedPane tabbedPane;
     private SceneListPanel toolScenesPanel;
     private SceneListPanel gameScenesPanel;
+    private boolean showAll = false;
+    private File linkedScene = null;
 
     public interface Callbacks {
         /** Lädt eine Szene in den aktuellen Canvas. */
@@ -35,6 +64,8 @@ public class ScenesPanel extends BaseSidebarPanel {
         void deleteScene(File sceneFile);
         /** Wird aufgerufen wenn Szenen aktualisiert werden sollen. */
         void refreshScenes();
+        /** Erstellt eine neue Szene mit einem Hintergrundbild und Elementen. */
+        void createNewScene(File backgroundImage, List<Layer> elements, String sceneName);
     }
 
     public ScenesPanel(Callbacks cb, Runnable onClose) {
@@ -47,8 +78,12 @@ public class ScenesPanel extends BaseSidebarPanel {
         setBackground(AppColors.BG_PANEL);
         setOpaque(true);
 
-        // Header with refresh and close buttons
-        JPanel header = buildSidebarHeader("Szenen", this::refreshScenes, onClose);
+        // Header with All/Only toggle, refresh and close buttons
+        JPanel header = buildSidebarHeader("Szenen", this::refreshScenes, isAll -> {
+            showAll = isAll;
+            toolScenesPanel.updateShowAll(showAll);
+            gameScenesPanel.updateShowAll(showAll);
+        }, onClose);
         add(header, BorderLayout.NORTH);
 
         // Tabbed Pane für Tool/Game Scenes
@@ -62,7 +97,8 @@ public class ScenesPanel extends BaseSidebarPanel {
             "Tool Scenes",
             () -> SceneLocator.getToolProjects(),
             (project) -> SceneLocator.getToolScenes(project),
-            callbacks
+            callbacks,
+            this
         );
         tabbedPane.addTab("Tool Scenes", toolScenesPanel);
 
@@ -71,7 +107,8 @@ public class ScenesPanel extends BaseSidebarPanel {
             "Game Scenes",
             () -> SceneLocator.getAvailableGames(),
             (gameName) -> SceneLocator.getGameScenes(gameName),
-            callbacks
+            callbacks,
+            this
         );
         tabbedPane.addTab("Game Scenes", gameScenesPanel);
 
@@ -94,6 +131,15 @@ public class ScenesPanel extends BaseSidebarPanel {
         refresh();
     }
 
+    /**
+     * Set the linked scene directory for the All/Only toggle.
+     */
+    public void setLinkedScene(File sceneDir) {
+        this.linkedScene = sceneDir;
+        toolScenesPanel.setLinkedScene(sceneDir);
+        gameScenesPanel.setLinkedScene(sceneDir);
+    }
+
     // =====================================================
     // Inner Class: SceneListPanel
     // =====================================================
@@ -107,19 +153,25 @@ public class ScenesPanel extends BaseSidebarPanel {
         private java.util.function.Supplier<List<String>> projectsSupplier;
         private java.util.function.Function<String, List<File>> scenesSupplier;
         private Callbacks callbacks;
+        private boolean showAll = false;
+        private File linkedScene = null;
 
         private JComboBox<String> projectCombo;
         private JPanel scenesContainer;
         private JScrollPane scrollPane;
+        private java.util.List<SceneItem> items = new ArrayList<>();
+        private ScenesPanel parentPanel;  // Reference to parent for dialogs
 
         SceneListPanel(String source,
                       java.util.function.Supplier<List<String>> projects,
                       java.util.function.Function<String, List<File>> scenes,
-                      Callbacks cb) {
+                      Callbacks cb,
+                      ScenesPanel parent) {
             this.source = source;
             this.projectsSupplier = projects;
             this.scenesSupplier = scenes;
             this.callbacks = cb;
+            this.parentPanel = parent;
 
             initUI();
         }
@@ -159,7 +211,119 @@ public class ScenesPanel extends BaseSidebarPanel {
             add(topPanel, BorderLayout.NORTH);
             add(scrollPane, BorderLayout.CENTER);
 
+            // ── Drop support: accept images and layers to create new scenes ────
+            new DropTarget(scenesContainer, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
+                @Override
+                public void drop(DropTargetDropEvent dtde) {
+                    System.out.println("[DEBUG] Drop detected in SceneListPanel");
+                    dtde.acceptDrop(DnDConstants.ACTION_COPY);
+                    try {
+                        Transferable t = dtde.getTransferable();
+                        System.out.println("[DEBUG] Transferable received");
+
+                        // Handle IMAGE drop (Java File List Flavor from TileGalleryPanel)
+                        if (t.isDataFlavorSupported(java.awt.datatransfer.DataFlavor.javaFileListFlavor)) {
+                            System.out.println("[DEBUG] javaFileListFlavor detected");
+                            @SuppressWarnings("unchecked")
+                            List<File> files = (List<File>) t.getTransferData(java.awt.datatransfer.DataFlavor.javaFileListFlavor);
+                            if (!files.isEmpty()) {
+                                File imageFile = files.get(0);
+                                System.out.println("[DEBUG] File: " + imageFile.getAbsolutePath());
+                                showCreateSceneDialog(imageFile, null);  // null elements = use current
+                                dtde.dropComplete(true);
+                            } else {
+                                dtde.dropComplete(false);
+                            }
+                        }
+                        // Handle LAYER drop (LAYER_FLAVOR)
+                        else if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
+                            System.out.println("[DEBUG] LAYER_FLAVOR detected");
+                            Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
+                            List<Layer> elements = new ArrayList<>();
+                            elements.add(layer);
+                            showCreateSceneDialog(null, elements);  // null image = use current
+                            dtde.dropComplete(true);
+                        }
+                        else {
+                            System.out.println("[DEBUG] No supported flavors detected");
+                            System.out.println("[DEBUG] Available flavors:");
+                            for (DataFlavor df : t.getTransferDataFlavors()) {
+                                System.out.println("  - " + df.toString());
+                            }
+                            dtde.dropComplete(false);
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("[ERROR] Drop failed: " + ex.getMessage());
+                        ex.printStackTrace();
+                        dtde.dropComplete(false);
+                    }
+                }
+            }, true);
+
             refresh();
+        }
+
+        private void showCreateSceneDialog(File imageFile, List<Layer> layers) {
+            // Generate auto scene name
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss");
+            String sceneName = "Scene_" + sdf.format(new java.util.Date());
+
+            // Create dialog
+            java.awt.Window window = SwingUtilities.getWindowAncestor(parentPanel);
+            JDialog dialog = new JDialog((java.awt.Frame) window, "Neue Szene erstellen", true);
+            dialog.setSize(350, 150);
+            dialog.setLocationRelativeTo(window);
+            dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+            dialog.setResizable(false);
+
+            JPanel content = new JPanel(new BorderLayout(10, 10));
+            content.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+            content.setBackground(AppColors.BG_PANEL);
+
+            // Input panel
+            JPanel inputPanel = new JPanel(new BorderLayout(5, 5));
+            inputPanel.setOpaque(false);
+
+            JLabel label = new JLabel("Szenen-Name:");
+            label.setForeground(AppColors.TEXT);
+
+            JTextField field = new JTextField(sceneName, 30);
+            field.setBackground(AppColors.BTN_BG);
+            field.setForeground(AppColors.TEXT);
+            field.setCaretColor(AppColors.ACCENT);
+            field.selectAll();  // Select all text for easy editing
+
+            inputPanel.add(label, BorderLayout.WEST);
+            inputPanel.add(field, BorderLayout.CENTER);
+
+            // Button panel
+            JPanel buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 5, 0));
+            buttons.setOpaque(false);
+
+            javax.swing.JButton okBtn = new javax.swing.JButton("OK");
+            okBtn.setBackground(AppColors.ACCENT);
+            okBtn.setForeground(AppColors.TEXT);
+            okBtn.addActionListener(e -> {
+                String name = field.getText().trim();
+                if (name.isEmpty()) {
+                    name = sceneName;
+                }
+                dialog.dispose();
+                callbacks.createNewScene(imageFile, layers, name);
+            });
+
+            javax.swing.JButton cancelBtn = new javax.swing.JButton("Abbrechen");
+            cancelBtn.setBackground(AppColors.BTN_BG);
+            cancelBtn.setForeground(AppColors.TEXT);
+            cancelBtn.addActionListener(e -> dialog.dispose());
+
+            buttons.add(okBtn);
+            buttons.add(cancelBtn);
+
+            content.add(inputPanel, BorderLayout.CENTER);
+            content.add(buttons, BorderLayout.SOUTH);
+            dialog.add(content);
+            dialog.setVisible(true);
         }
 
         void refresh() {
@@ -173,8 +337,23 @@ public class ScenesPanel extends BaseSidebarPanel {
             refreshScenesList();
         }
 
+        void updateShowAll(boolean newShowAll) {
+            showAll = newShowAll;
+            for (SceneItem item : items) {
+                item.repaint();
+            }
+        }
+
+        void setLinkedScene(File sceneDir) {
+            linkedScene = sceneDir;
+            for (SceneItem item : items) {
+                item.repaint();
+            }
+        }
+
         private void refreshScenesList() {
             scenesContainer.removeAll();
+            items.clear();
 
             String selected = (String) projectCombo.getSelectedItem();
             if (selected == null) {
@@ -191,7 +370,8 @@ public class ScenesPanel extends BaseSidebarPanel {
                 scenesContainer.add(emptyLabel);
             } else {
                 for (File scene : scenes) {
-                    SceneItem item = new SceneItem(scene, selected, callbacks);
+                    SceneItem item = new SceneItem(scene, selected, callbacks, showAll, linkedScene);
+                    items.add(item);
                     scenesContainer.add(item);
                     scenesContainer.add(Box.createVerticalStrut(2));
                 }
@@ -215,11 +395,15 @@ public class ScenesPanel extends BaseSidebarPanel {
         private File sceneFile;
         private String projectName;
         private Callbacks callbacks;
+        private boolean showAll;
+        private File linkedScene;
 
-        SceneItem(File scene, String project, Callbacks cb) {
+        SceneItem(File scene, String project, Callbacks cb, boolean showAll, File linkedScene) {
             this.sceneFile = scene;
             this.projectName = project;
             this.callbacks = cb;
+            this.showAll = showAll;
+            this.linkedScene = linkedScene;
 
             initUI();
         }
@@ -290,6 +474,20 @@ public class ScenesPanel extends BaseSidebarPanel {
                 },
                 null  // no drag-started callback
             );
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+
+            // Draw red border for unlinked scenes when showAll is true
+            if (showAll && linkedScene != null && !sceneFile.getParentFile().equals(linkedScene)) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(AppColors.DANGER);
+                g2.setStroke(new BasicStroke(1));
+                g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+                g2.dispose();
+            }
         }
 
         private void showContextMenu(int x, int y) {

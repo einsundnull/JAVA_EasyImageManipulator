@@ -4479,6 +4479,102 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			public void refreshScenes() {
 				ci(idx).scenesPanel.refresh();
 			}
+
+			@Override
+			public void createNewScene(File backgroundImage, List<Layer> elements, String sceneName) {
+				CanvasInstance c = ci(idx);
+				try {
+					System.out.println("[DEBUG] createNewScene: backgroundImage=" + backgroundImage + ", elements=" + (elements != null ? elements.size() : "null") + ", sceneName=" + sceneName);
+
+					// Get or initialize project
+					String projectName = projectManager.getProjectName();
+					if (projectName == null || projectName.isEmpty()) {
+						// Create default project if none exists
+						projectName = "Default";
+						projectManager.newProject(projectName);
+						System.out.println("[DEBUG] Created default project: " + projectName);
+					}
+					System.out.println("[DEBUG] projectName: " + projectName);
+
+					// Use provided image or current workingImage
+					File imageToUse = backgroundImage;
+					if (imageToUse == null) {
+						if (c.workingImage == null) {
+							showErrorDialog("Fehler", "Kein Bild geladen");
+							return;
+						}
+						// Use current sourceFile
+						if (c.sourceFile != null) {
+							imageToUse = c.sourceFile;
+						} else {
+							showErrorDialog("Fehler", "Quellbild nicht verfügbar");
+							return;
+						}
+					}
+					System.out.println("[DEBUG] imageToUse: " + imageToUse.getAbsolutePath());
+
+					// Use provided elements or current activeElements
+					List<Layer> elementsToUse = elements != null ? elements : new ArrayList<>(c.activeElements);
+					System.out.println("[DEBUG] elementsToUse count: " + elementsToUse.size());
+
+					// Get and ensure scenes directory exists
+					File scenesDir = SceneLocator.getToolScenesDir(projectName);
+					if (!scenesDir.exists()) {
+						scenesDir.mkdirs();
+						System.out.println("[DEBUG] Created scenes directory: " + scenesDir.getAbsolutePath());
+					}
+					System.out.println("[DEBUG] scenesDir: " + scenesDir.getAbsolutePath());
+
+					// Generate scene file name
+					String fileName = sceneName.replaceAll("[^a-zA-Z0-9_-]", "_") + ".json";
+					File sceneFile = new File(scenesDir, fileName);
+
+					// Ensure unique filename
+					int counter = 1;
+					while (sceneFile.exists()) {
+						String baseName = sceneName.replaceAll("[^a-zA-Z0-9_-]", "_");
+						fileName = baseName + "_" + counter + ".json";
+						sceneFile = new File(scenesDir, fileName);
+						counter++;
+					}
+					System.out.println("[DEBUG] Final sceneFile: " + sceneFile.getAbsolutePath());
+
+					// Save scene
+					String layersJson = SceneSerializer.layersToJson(elementsToUse);
+					System.out.println("[DEBUG] layersJson: " + layersJson.substring(0, Math.min(100, layersJson.length())));
+
+					try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(sceneFile))) {
+						writer.write("{\n");
+						writer.write("  \"canvasWidth\": " + c.workingImage.getWidth() + ",\n");
+						writer.write("  \"canvasHeight\": " + c.workingImage.getHeight() + ",\n");
+						writer.write("  \"imageFile\": \"" + imageToUse.getAbsolutePath() + "\",\n");
+						writer.write("  \"zoom\": 1.0,\n");
+						writer.write("  \"appMode\": \"" + appMode.toString() + "\",\n");
+						writer.write("  \"layers\": " + layersJson + "\n");
+						writer.write("}\n");
+					}
+					System.out.println("[DEBUG] Scene file written successfully");
+
+					// Verify file was created
+					if (sceneFile.exists()) {
+						System.out.println("[DEBUG] Scene file verified: " + sceneFile.length() + " bytes");
+						String successMsg = "Szene '" + fileName + "' erstellt\n\nPfad:\n" + sceneFile.getAbsolutePath();
+						showInfoDialog("Erfolgreich", successMsg);
+					} else {
+						System.out.println("[ERROR] Scene file was not created!");
+						showErrorDialog("Fehler", "Szene-Datei wurde nicht erstellt");
+						return;
+					}
+
+					System.out.println("[DEBUG] About to refresh scenes panel");
+					ci(idx).scenesPanel.refresh();
+					System.out.println("[DEBUG] Scenes panel refreshed");
+				} catch (Exception e) {
+					System.out.println("[ERROR] Exception in createNewScene: " + e.getMessage());
+					e.printStackTrace();
+					showErrorDialog("Fehler", "Szene konnte nicht erstellt werden:\n" + e.getMessage());
+				}
+			}
 		};
 	}
 
