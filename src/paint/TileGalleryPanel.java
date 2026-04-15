@@ -366,7 +366,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
     public List<File> getSelectedImages() { return new ArrayList<>(selectedImages); }
 
-    /** Clears active highlight and multi-selection without firing callbacks. */
+    /** Clears active highlight, clicked state, and multi-selection without firing callbacks. */
     public void clearActiveAndSelection() {
         activeFile = null;
         selectedImages.clear();
@@ -375,6 +375,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         for (TilePanel t : tiles) {
             t.setActive(false);
             t.setSelected(false);
+            t.isClicked = false;
             t.showCheckbox(false);
             t.repaint();
         }
