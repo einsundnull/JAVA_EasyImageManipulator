@@ -2644,7 +2644,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		updateTitle();
 		updateDirtyUI();
 		refreshElementPanel();
-		refreshGalleryThumbnail();
+		refreshGalleryThumbnail(idx);
 		// Refresh all panels
 		if (mapsPanel != null) {
 			try {
@@ -2912,12 +2912,19 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Live-Composite aus Canvas + Elementen.
 	 */
 	private void refreshGalleryThumbnail() {
-		CanvasInstance c = ci();
-		if (c.sourceFile == null || c.workingImage == null)
-			return;
+		refreshGalleryThumbnail(activeCanvasIndex);
+	}
+
+	private void refreshGalleryThumbnail(int idx) {
+		CanvasInstance c = ci(idx);
+		if (c.sourceFile == null || c.workingImage == null) return;
 		BufferedImage thumb = renderCompositeForThumbnail(c);
-		if (thumb != null)
-			c.tileGallery.refreshThumbnailFor(c.sourceFile, thumb);
+		if (thumb == null) return;
+		// Update image gallery tile
+		c.tileGallery.refreshThumbnailFor(c.sourceFile, thumb);
+		// Update scene gallery tile if a scene is loaded
+		if (c.activeSceneFile != null)
+			c.scenesPanel.refreshThumbnailFor(c.activeSceneFile, thumb);
 	}
 
 	private ElementLayerPanel.Callbacks buildElementLayerCallbacks(int idx) {
@@ -2988,41 +2995,17 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			@Override
 			public void exportElementAsImage(Layer el) {
-				if (c().workingImage == null || c().sourceFile == null)
-					return;
-				// Get live layer
-				Layer live = c().activeElements.stream().filter(e -> e.id() == el.id()).findFirst().orElse(el);
+				if (c().workingImage == null || c().sourceFile == null) return;
+				Layer live = c().activeElements.stream()
+						.filter(e -> e.id() == el.id()).findFirst().orElse(el);
+				BufferedImage imgToExport = renderLayerToImage(live);
+				if (imgToExport == null) return;
 
-				// Render element to image
-				BufferedImage imgToExport;
-				if (live instanceof TextLayer tl) {
-					imgToExport = renderTextLayerToImage(tl);
-				} else {
-					ImageLayer il = (ImageLayer) live;
-					imgToExport = PaintEngine.scale(il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
-				}
-
-				// Generate default filename: originalName + _layer_<id>
-				String sourceName = c().sourceFile.getName();
-				int lastDot = sourceName.lastIndexOf('.');
-				String baseName = lastDot > 0 ? sourceName.substring(0, lastDot) : sourceName;
-				String extension = lastDot > 0 ? sourceName.substring(lastDot) : ".png";
-				String defaultName = baseName + "_layer_" + live.id() + extension;
-
-				// Find unique filename if file already exists
 				File exportDir = c().sourceFile.getParentFile();
-				File targetFile = new File(exportDir, defaultName);
-				int counter = 1;
-				while (targetFile.exists()) {
-					String uniqueName = baseName + "_layer_" + live.id() + "_" + counter + extension;
-					targetFile = new File(exportDir, uniqueName);
-					counter++;
-					defaultName = uniqueName;
-				}
+				String defaultName = uniqueLayerExportFile(c().sourceFile, live.id()).getName();
 
 				// Show dialog for filename confirmation
 				final File exportDirFinal = exportDir;
-				final String defaultNameFinal = defaultName;
 				javax.swing.JTextField fileNameField = new javax.swing.JTextField(defaultName);
 				fileNameField.selectAll();
 
@@ -3035,7 +3018,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				fileNameField.addActionListener(ev -> {
 					String fileName = fileNameField.getText().trim();
 					if (!fileName.isEmpty()) {
-						saveElementAsImageFile(imgToExport, new File(exportDirFinal, fileName));
+						saveLayerAsImageFile(imgToExport, new File(exportDirFinal, fileName), idx);
 					}
 				});
 
@@ -3046,31 +3029,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				if (result == javax.swing.JOptionPane.OK_OPTION) {
 					String fileName = fileNameField.getText().trim();
 					if (!fileName.isEmpty()) {
-						saveElementAsImageFile(imgToExport, new File(exportDirFinal, fileName));
+						saveLayerAsImageFile(imgToExport, new File(exportDirFinal, fileName), idx);
 					}
-				}
-			}
-
-			private void saveElementAsImageFile(BufferedImage img, File file) {
-				try {
-					javax.imageio.ImageIO.write(img, "PNG", file);
-
-					// Add the new image to the gallery of this canvas
-					if (c().tileGallery != null) {
-						java.util.List<File> newFiles = new java.util.ArrayList<>();
-						newFiles.add(file);
-						c().tileGallery.addFiles(newFiles);
-					}
-
-					javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this,
-							"Bild gespeichert:\n" + file.getName(), "Erfolg",
-							javax.swing.JOptionPane.INFORMATION_MESSAGE);
-				} catch (Exception ex) {
-					System.err.println("[ERROR] Failed to export element: " + ex.getMessage());
-					ex.printStackTrace();
-					javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this,
-							"Fehler beim Speichern:\n" + ex.getMessage(), "Fehler",
-							javax.swing.JOptionPane.ERROR_MESSAGE);
 				}
 			}
 
@@ -4273,6 +4233,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			}
 
 			@Override
+			public void onElementTransformed() {
+				refreshGalleryThumbnail(idx);
+			}
+
+			@Override
 			public void clearSelection() {
 				c().selectedAreas.clear();
 				c().isSelecting = false;
@@ -4411,6 +4376,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			@Override
 			public void onDragStarted(File file) {
+				// Show the "drop to Canvas 2" zone when dragging from Canvas 1's gallery,
+				// or show a "drop to Canvas 1" zone when dragging from Canvas 2's gallery.
 				if (idx == 0 && !secondCanvasBtn.isSelected() && ci(0).workingImage != null) {
 					repositionRightDropZone();
 					rightDropZone.setVisible(true);
@@ -4420,53 +4387,22 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			@Override
 			public void onDragEnded() {
-				if (idx == 0) {
-					rightDropZone.setVisible(false);
-					ci(0).layeredPane.repaint();
-				}
+				rightDropZone.setVisible(false);
+				if (ci(0).layeredPane != null) ci(0).layeredPane.repaint();
 			}
 
 			// ── Case 5: LayerTile dropped onto TileGallery → save as PNG ─────
 			@Override
 			public void onLayerDropped(Layer layer) {
 				CanvasInstance c = canvases[idx];
-				if (c.sourceFile == null)
-					return;
-				// Render layer to image
-				BufferedImage img = null;
-				Layer live = c.activeElements.stream().filter(e -> e.id() == layer.id()).findFirst().orElse(layer);
-				if (live instanceof ImageLayer il) {
-					img = PaintEngine.scale(il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
-				} else if (live instanceof TextLayer tl) {
-					img = renderTextLayerToImage(tl);
-				} else {
-					return; // PathLayer not supported for image export
-				}
-				// Auto-generate unique filename (same logic as exportElementAsImage)
-				String sourceName = c.sourceFile.getName();
-				int lastDot = sourceName.lastIndexOf('.');
-				String baseName = lastDot > 0 ? sourceName.substring(0, lastDot) : sourceName;
-				String extension = lastDot > 0 ? sourceName.substring(lastDot) : ".png";
-				String name = baseName + "_layer_" + live.id() + extension;
-				File exportDir = c.sourceFile.getParentFile();
-				File target = new File(exportDir, name);
-				int counter = 1;
-				while (target.exists()) {
-					target = new File(exportDir, baseName + "_layer_" + live.id() + "_" + counter + extension);
-					counter++;
-				}
-				final File finalTarget = target;
-				final BufferedImage finalImg = img;
-				// saveElementAsImageFile lives in buildElementLayerCallbacks – replicate inline
-				try {
-					javax.imageio.ImageIO.write(finalImg, "PNG", finalTarget);
-					List<File> added = new java.util.ArrayList<>();
-					added.add(finalTarget);
-					canvases[idx].tileGallery.addFiles(added);
-					ToastNotification.show(SelectiveAlphaEditor.this, "Gespeichert: " + finalTarget.getName());
-				} catch (Exception ex) {
-					showErrorDialog("Fehler", "Speichern fehlgeschlagen: " + ex.getMessage());
-				}
+				if (c.sourceFile == null) return;
+				Layer live = c.activeElements.stream()
+						.filter(e -> e.id() == layer.id()).findFirst().orElse(layer);
+				BufferedImage img = renderLayerToImage(live);
+				if (img == null) return;
+				File target = uniqueLayerExportFile(c.sourceFile, live.id());
+				saveLayerAsImageFile(img, target, idx);
+				ToastNotification.show(SelectiveAlphaEditor.this, "Gespeichert: " + target.getName());
 			}
 
 			// ── File copied via right-drag in gallery ─────────────────────────
@@ -4543,9 +4479,19 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			@Override
 			public void onSelectionChanged(List<File> selectedFiles) {
-				// Deselect image gallery when scene multi-selection changes
 				if (!selectedFiles.isEmpty())
 					ci(idx).tileGallery.clearActiveAndSelection();
+			}
+
+			@Override
+			public void onDragStarted(File file) {
+				// Scene tiles dragged out — no drop zone needed, just hide any stale one
+			}
+
+			@Override
+			public void onDragEnded() {
+				rightDropZone.setVisible(false);
+				if (ci(0).layeredPane != null) ci(0).layeredPane.repaint();
 			}
 		};
 	}
@@ -6505,6 +6451,48 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	@Override
 	public RulerUnit getRulerUnit() {
 		return rulerUnit;
+	}
+
+	// =========================================================================
+	// Shared layer-export helpers
+	// =========================================================================
+
+	/** Renders a layer to a BufferedImage. Returns null for PathLayer (not supported). */
+	private BufferedImage renderLayerToImage(Layer live) {
+		if (live instanceof TextLayer tl) {
+			return renderTextLayerToImage(tl);
+		} else if (live instanceof ImageLayer il) {
+			return PaintEngine.scale(il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
+		}
+		return null; // PathLayer not supported for pixel export
+	}
+
+	/** Returns a unique File in sourceFile's directory for exporting a layer. */
+	private File uniqueLayerExportFile(File sourceFile, int layerId) {
+		String sourceName = sourceFile.getName();
+		int dot = sourceName.lastIndexOf('.');
+		String base = dot > 0 ? sourceName.substring(0, dot) : sourceName;
+		String ext  = dot > 0 ? sourceName.substring(dot)    : ".png";
+		File dir    = sourceFile.getParentFile();
+		File target = new File(dir, base + "_layer_" + layerId + ext);
+		int counter = 1;
+		while (target.exists()) {
+			target = new File(dir, base + "_layer_" + layerId + "_" + counter + ext);
+			counter++;
+		}
+		return target;
+	}
+
+	/** Writes img to file, adds file to the gallery of canvas idx, shows error on failure. */
+	private void saveLayerAsImageFile(BufferedImage img, File file, int idx) {
+		try {
+			javax.imageio.ImageIO.write(img, "PNG", file);
+			if (ci(idx).tileGallery != null)
+				ci(idx).tileGallery.addFiles(java.util.Arrays.asList(file));
+		} catch (Exception ex) {
+			System.err.println("[ERROR] Failed to export layer: " + ex.getMessage());
+			showErrorDialog("Fehler", "Speichern fehlgeschlagen:\n" + ex.getMessage());
+		}
 	}
 
 	// =========================================================================

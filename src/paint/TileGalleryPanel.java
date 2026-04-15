@@ -200,30 +200,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         tilesContainer.setBackground(new Color(36, 36, 36));
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
 
-        // DnD drop target on tilesContainer: accept file lists
-        tilesContainer.setTransferHandler(new TransferHandler() {
-            @Override
-            public boolean canImport(TransferSupport support) {
-                return support.isDataFlavorSupported(DataFlavor.javaFileListFlavor);
-            }
-            @Override
-            public boolean importData(TransferSupport support) {
-                if (!canImport(support)) return false;
-                try {
-                    @SuppressWarnings("unchecked")
-                    List<File> files = (List<File>) support.getTransferable()
-                            .getTransferData(DataFlavor.javaFileListFlavor);
-                    if (files != null && !files.isEmpty()) {
-                        callbacks.onFilesAdded(new ArrayList<>(files));
-                    }
-                    return true;
-                } catch (UnsupportedFlavorException | IOException ex) {
-                    return false;
-                }
-            }
-        });
-
-        // ── Drop target: accept Layer drags (Case 5: save layer as image) ────
+        // ── Drop target: accept Layer drags and file-list drops ─────────────
         new DropTarget(tilesContainer, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
             @Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
             @Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde)  { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
@@ -825,8 +802,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             boolean hover = getMousePosition() != null;
 
             // ── Background ───────────────────────────────────────────────────
-            Color bg = isActive ? AppColors.TILE_ACTIVE_BG
-                     : hover   ? AppColors.TILE_HOVER_BG
+            Color bg = (isActive || isClicked) ? AppColors.TILE_ACTIVE_BG
+                     : hover                  ? AppColors.TILE_HOVER_BG
                      : AppColors.TILE_DEFAULT_BG;
             g2.setColor(bg);
             g2.fillRoundRect(0, 0, w - 1, TILE_H - 1, 8, 8);
@@ -881,14 +858,11 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             } else if (isUnlinked) {
                 g2.setColor(AppColors.DANGER);            // red – unlinked from current scene
                 g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
-            } else if (isClicked) {
-                g2.setColor(new Color(255, 255, 0));      // yellow – clicked state
-                g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
-            } else if (isActive) {
-                g2.setColor(AppColors.SUCCESS);           // green
+            } else if (isClicked || isActive) {
+                g2.setColor(AppColors.SUCCESS);           // green – selected / active
                 g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (isInSelection) {
-                g2.setColor(AppColors.SELECTION);
+                g2.setColor(new Color(255, 220, 0));      // yellow – multi-selection
                 g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (hover) {
                 g2.setStroke(new BasicStroke(1f));

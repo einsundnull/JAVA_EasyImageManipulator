@@ -117,6 +117,8 @@ public interface CanvasCallbacks {
     void updateSelectedElement(Layer el);
     /** Double-click on an ImageLayer on the canvas: open it in the other canvas for pixel editing. */
     void openImageLayerForEditing(Layer el);
+    /** Called during element drag/scale so gallery tiles update live. */
+    default void onElementTransformed() {}
 
     // Utilities
     int hitHandle(Point screenPt);

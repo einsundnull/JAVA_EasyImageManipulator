@@ -579,6 +579,7 @@ public class CanvasPanel extends JPanel {
 						double currentAngle = Math.toDegrees(Math.atan2(e.getY() - cy, e.getX() - cx));
 						double newAngle = rotDragBaseAngle + (currentAngle - rotDragStartAngle);
 						callbacks.updateSelectedElement(il.withRotation(newAngle));
+						callbacks.onElementTransformed();
 						repaint();
 					}
 					return;
@@ -623,6 +624,7 @@ public class CanvasPanel extends JPanel {
 						if (dx != 0 || dy != 0) {
 							callbacks.moveSelectedElements(dx, dy);
 							elemLastImgPt = imgPt;
+							callbacks.onElementTransformed();
 						}
 					}
 					repaint();
@@ -682,6 +684,7 @@ public class CanvasPanel extends JPanel {
 
 					Layer updated = el.withBounds((int) nx, (int) ny, (int) nw, (int) nh);
 					callbacks.updateSelectedElement(updated);
+					callbacks.onElementTransformed();
 					repaint();
 					return;
 				}
