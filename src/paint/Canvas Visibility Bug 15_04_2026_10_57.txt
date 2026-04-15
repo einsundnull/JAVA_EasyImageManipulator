@@ -1,0 +1,54 @@
+● Perfekt. Hier ist die detaillierte Vergleichstabelle der Canvas-Zustände:
+
+  ═════════════════════════════════════════════════════════════════════════════════════════
+  ZUSTAND                    │ INIT   │ BILD LADEN         │ CANVAS EIN    │ CANVAS AUS                                   ═════════════════════════════════════════════════════════════════════════════════════════
+                                                                                                                          firstCanvasBtn.isSelected()│ true   │ true (unchanged)   │ true → true   │ true → false
+  ───────────────────────────────────────────────────────────────────────────────────────
+
+  layeredPane.isVisible()    │ true   │ true               │ true          │ false
+  viewportPanel.isVisible()  │ false  │ true ✓             │ true ✓        │ false
+  ───────────────────────────────────────────────────────────────────────────────────────
+
+  viewportPanel.getParent()  │ null   │ layeredPane ✓      │ layeredPane   │ layeredPane
+  dropHintPanel.getParent()  │ layer. │ NULL ✓ (removed)   │ NULL ✓ (rem.) │ layeredPane
+
+  workingImage               │ null   │ image ✓            │ image         │ image
+  ───────────────────────────────────────────────────────────────────────────────────────
+
+  LAYOUT-OPERATIONEN:
+    canvasWrapper.revalidate()│ ❌    │ ✓ (ja)             │ ✓ (ja)        │ ❌
+    canvasWrapper.validate()  │ ❌    │ ✓ (ja)             │ ✓ (ja)        │ ❌
+    layeredPane.revalidate()  │ ❌    │ ✓ (ja)             │ ✓ (ja)        │ ❌
+    galleryWrapper.validate() │ ❌    │ ❌                 │ ✓ (ja)        │ ✓ (ja)
+    dropHintPanel.remove()    │ ❌    │ ✓ (ja)             │ ✓ (ja)        │ ❌
+  ───────────────────────────────────────────────────────────────────────────────────────
+
+  ASYNCRONE OPERATIONEN (SwingUtilities.invokeLater):
+    fitToViewport()           │ ❌    │ ✓ (ja)             │ ✓ (ja)        │ ❌
+    layeredPane.repaint()     │ ❌    │ ✓ (ja)             │ ✓ (ja)        │ ❌
+    viewportPanel.repaint()   │ ❌    │ ✓ (ja)             │ ✓ (ja)        │ ❌
+    canvasPanel.repaint()     │ ❌    │ ✓ (ja)             │ ✓ (ja)        │ ❌
+  ───────────────────────────────────────────────────────────────────────────────────────
+
+  BUTTON CALLBACKS:
+    centerCanvas() aufgerufen?│ ❌    │ ❌                 │ ✓ (ja)        │ ❌
+  ───────────────────────────────────────────────────────────────────────────────────────
+
+  Aufgefallene PROBLEME:
+
+  1. Canvas EIN (show0=true): Bedingung ist if (show0 && ci(0).canvasPanel != null && ci(0).workingImage != null)
+    - ✓ viewportPanel wird SICHTBAR gemacht
+    - ✓ dropHintPanel wird ENTFERNT
+    - ✓ revalidate/validate werden aufgerufen
+    - ✓ fitToViewport wird aufgerufen
+  2. Canvas AUS (show0=false): Bedingung if (show0 && ...) ist FALSE
+    - ✓ layeredPane wird UNSICHTBAR
+    - ✓ viewportPanel wird UNSICHTBAR
+    - ❌ Aber: dropHintPanel wird NICHT wieder hinzugefügt!
+    - ❌ Keine revalidate/validate wenn Canvas AUS
+    - ❌ Kein repaint wenn Canvas AUS
+
+  Das könnte das Problem sein: Wenn du den Canvas ausblendest, wird die dropHintPanel nicht zurück hinzugefügt. Dann
+  wenn du ihn wieder einblendest, ist alles durcheinander.
+
+  Sollen wir die dropHintPanel auch bei Canvas AUS wieder hinzufügen?

@@ -7,6 +7,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,9 @@ public class CanvasInstance {
     public final ArrayDeque<BufferedImage>   undoStack  = new ArrayDeque<>();
     public final ArrayDeque<BufferedImage>   redoStack  = new ArrayDeque<>();
     public final Map<File, CanvasFileState>  fileCache  = new LinkedHashMap<>();
+
+    // ── Preload Cache (for hover/browsing optimization) ───────────────────────
+    public final Map<File, PreloadedFileState> preloadCache = new HashMap<>();
 
     // ── Layers / Elements ─────────────────────────────────────────────────────
     public List<Layer>    activeElements   = new ArrayList<>();
@@ -101,6 +105,27 @@ public class CanvasInstance {
 
         public CanvasFileState(BufferedImage img) {
             this.image = img;
+        }
+    }
+
+    // ── Preloaded file state (for hover/browsing optimization) ────────────────
+    /**
+     * Preloaded and normalized image ready for instant display.
+     * Image is already normalized (TYPE_INT_ARGB) and ready to be fitted to viewport.
+     * When this exists in cache, fitToViewport() will use the preloaded image
+     * instead of reading from disk, making the load instant without jumping.
+     */
+    public static class PreloadedFileState {
+        public BufferedImage image;
+        public long timestamp; // For cache cleanup
+
+        public PreloadedFileState(BufferedImage img) {
+            this.image = img;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        public boolean isStale(long maxAgeMs) {
+            return (System.currentTimeMillis() - timestamp) > maxAgeMs;
         }
     }
 }

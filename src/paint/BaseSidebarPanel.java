@@ -199,4 +199,66 @@ public abstract class BaseSidebarPanel extends JPanel {
         }
         return idx;
     }
+
+    // ── Preload-on-Hover Utilities ─────────────────────────────────────────────
+
+    /**
+     * Callback interface for preload operations.
+     */
+    public interface PreloadCallback {
+        /**
+         * Called when user hovers over an item.
+         * Implementation should start preloading asynchronously.
+         * @return A handle to cancel the preload if user moves away
+         */
+        PreloadHandle onHoverStart();
+    }
+
+    /**
+     * Handle for controlling an active preload operation.
+     */
+    public interface PreloadHandle {
+        /**
+         * Cancel the preload operation.
+         */
+        void cancel();
+
+        /**
+         * Check if preload is still active.
+         */
+        boolean isActive();
+    }
+
+    /**
+     * Installs hover-based preloading on a JComponent.
+     * When user hovers over the component, a preload callback is triggered.
+     * When user leaves, the preload is cancelled.
+     *
+     * @param item              Component to monitor for hover
+     * @param preloadCallback   Callback that starts preloading
+     */
+    protected static void installPreloadOnHover(JComponent item, PreloadCallback preloadCallback) {
+        PreloadHandle[] activeHandle = {null};
+
+        item.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                // Cancel any existing preload
+                if (activeHandle[0] != null && activeHandle[0].isActive()) {
+                    activeHandle[0].cancel();
+                }
+                // Start new preload
+                activeHandle[0] = preloadCallback.onHoverStart();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                // Cancel preload when leaving
+                if (activeHandle[0] != null && activeHandle[0].isActive()) {
+                    activeHandle[0].cancel();
+                    activeHandle[0] = null;
+                }
+            }
+        });
+    }
 }

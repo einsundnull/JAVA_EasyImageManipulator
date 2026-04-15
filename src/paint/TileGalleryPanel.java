@@ -92,8 +92,15 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         default void onFileCopied(File copiedFile, int insertIndex) {}
     }
 
+    // ── Callback for preloading ───────────────────────────────────────────────
+    @FunctionalInterface
+    public interface FilePreloadCallback {
+        void preloadFile(File file);
+    }
+
     // ── State ─────────────────────────────────────────────────────────────────
     private final Callbacks       callbacks;
+    private final FilePreloadCallback filePreloadCallback;
     private final List<TilePanel> tiles          = new ArrayList<>();
     private final List<File>      selectedImages = new ArrayList<>();
     private       boolean         multiSelectMode = false;
@@ -109,7 +116,12 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     // Constructor
     // =========================================================================
     public TileGalleryPanel(Callbacks callbacks) {
+        this(callbacks, null);
+    }
+
+    public TileGalleryPanel(Callbacks callbacks, FilePreloadCallback filePreloadCallback) {
         this.callbacks = callbacks;
+        this.filePreloadCallback = filePreloadCallback;
         setLayout(new BorderLayout());
         setBackground(new Color(36, 36, 36));
         setPreferredSize(new Dimension(GALLERY_W, 0));
@@ -547,7 +559,13 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                     onTileClicked(TilePanel.this, e.isShiftDown());
                     repaint();
                 }
-                @Override public void mouseEntered(MouseEvent e) { repaint(); }
+                @Override public void mouseEntered(MouseEvent e) {
+                    // Trigger hover-based preloading if callback is available
+                    if (filePreloadCallback != null) {
+                        filePreloadCallback.preloadFile(imageFile);
+                    }
+                    repaint();
+                }
                 @Override public void mouseExited (MouseEvent e) { repaint(); }
             });
             addMouseMotionListener(new MouseMotionAdapter() {

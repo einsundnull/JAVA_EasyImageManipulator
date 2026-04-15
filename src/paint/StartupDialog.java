@@ -14,15 +14,28 @@ import java.awt.RenderingHints;
 /**
  * Startup-Dialog: "Zuletzt verwendet" - zeigt Projekte pro Kategorie in Tabs.
  * Styled mit AppColors (dunkles Theme).
+ * Kann auch als Schnellauswahl-Dialog (Mode.QUICK_OPEN) verwendet werden.
  */
 public class StartupDialog extends JDialog {
 
+    public enum Mode { STARTUP, QUICK_OPEN }
+
     private File selectedPath = null;
     private final Map<String, List<String>> recentByCategory;
+    private final Mode mode;
+    private final int canvasIdx;
 
+    // Alt-Konstruktor (Startup-Modus, rückwärtskompatibel)
     public StartupDialog(JFrame owner, Map<String, List<String>> recentByCategory) {
-        super(owner, "Zuletzt verwendet", true);
+        this(owner, recentByCategory, Mode.STARTUP, 0);
+    }
+
+    // Neuer Hauptkonstruktor (für beide Modi)
+    public StartupDialog(JFrame owner, Map<String, List<String>> recentByCategory, Mode mode, int canvasIdx) {
+        super(owner, mode == Mode.STARTUP ? "Zuletzt verwendet" : "Schnellauswahl", true);
         this.recentByCategory = recentByCategory;
+        this.mode = mode;
+        this.canvasIdx = canvasIdx;
         initUI();
     }
 
@@ -37,8 +50,9 @@ public class StartupDialog extends JDialog {
         mainPanel.setBackground(AppColors.BG_DARK);
         mainPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
 
-        // Title
-        JLabel titleLabel = new JLabel("Zuletzt geöffnete Projekte");
+        // Title (mode-abhängig)
+        String titleText = mode == Mode.STARTUP ? "Zuletzt geöffnete Projekte" : "Schnellauswahl – Zuletzt verwendet";
+        JLabel titleLabel = new JLabel(titleText);
         titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16f));
         titleLabel.setForeground(AppColors.TEXT);
         mainPanel.add(titleLabel, BorderLayout.NORTH);
@@ -50,7 +64,8 @@ public class StartupDialog extends JDialog {
             LastProjectsManager.CAT_TEACHING,
             LastProjectsManager.CAT_BOOKS,
             LastProjectsManager.CAT_GAMES,
-            LastProjectsManager.CAT_IMAGES
+            LastProjectsManager.CAT_IMAGES,
+            LastProjectsManager.CAT_MAPS
         };
 
         for (String cat : categories) {
@@ -66,25 +81,52 @@ public class StartupDialog extends JDialog {
         centerPanel.add(tabPane, BorderLayout.CENTER);
         mainPanel.add(centerPanel, BorderLayout.CENTER);
 
-        // Buttons
+        // Buttons (mode-abhängig)
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonPanel.setBackground(AppColors.BG_DARK);
 
-        JButton newProjectBtn = UIComponentFactory.buildButton("Neues Projekt", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
-        JButton skipBtn = UIComponentFactory.buildButton("Überspringen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        if (mode == Mode.STARTUP) {
+            // Startup-Mode: Neues Projekt + Überspringen
+            JButton newProjectBtn = UIComponentFactory.buildButton("Neues Projekt", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
+            JButton skipBtn = UIComponentFactory.buildButton("Überspringen", AppColors.BTN_BG, AppColors.BTN_HOVER);
 
-        newProjectBtn.addActionListener(e -> {
-            // TODO: Open new project dialog
-            dispose();
-        });
+            newProjectBtn.addActionListener(e -> {
+                // TODO: Open new project dialog
+                dispose();
+            });
 
-        skipBtn.addActionListener(e -> {
-            selectedPath = null;
-            dispose();
-        });
+            skipBtn.addActionListener(e -> {
+                selectedPath = null;
+                dispose();
+            });
 
-        buttonPanel.add(newProjectBtn);
-        buttonPanel.add(skipBtn);
+            buttonPanel.add(newProjectBtn);
+            buttonPanel.add(skipBtn);
+        } else {
+            // Quick-Open-Mode: Durchsuchen + Schließen
+            JButton browseBtn = UIComponentFactory.buildButton("Durchsuchen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+            JButton closeBtn = UIComponentFactory.buildButton("Schließen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+
+            browseBtn.addActionListener(e -> {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+                chooser.addChoosableFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                        "Images", "png", "jpg", "jpeg", "gif", "bmp"));
+                chooser.setAcceptAllFileFilterUsed(false);
+                if (chooser.showOpenDialog(StartupDialog.this) == JFileChooser.APPROVE_OPTION) {
+                    selectedPath = chooser.getSelectedFile();
+                    dispose();
+                }
+            });
+
+            closeBtn.addActionListener(e -> {
+                selectedPath = null;
+                dispose();
+            });
+
+            buttonPanel.add(browseBtn);
+            buttonPanel.add(closeBtn);
+        }
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
 
         setContentPane(mainPanel);
@@ -428,11 +470,20 @@ public class StartupDialog extends JDialog {
 
     private String capitalize(String s) {
         if (s == null || s.isEmpty()) return s;
+        if ("maps".equals(s)) return "Scenes";
         return s.substring(0, 1).toUpperCase() + s.substring(1);
     }
 
     public File getSelectedPath() {
         return selectedPath;
+    }
+
+    public int getCanvasIdx() {
+        return canvasIdx;
+    }
+
+    public Mode getMode() {
+        return mode;
     }
 
     /**
