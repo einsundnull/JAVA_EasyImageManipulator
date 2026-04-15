@@ -60,12 +60,20 @@ public class SceneFileWriter {
         int imageCounter = 1;
         for (Layer layer : layers) {
             if (layer instanceof ImageLayer il) {
-                // ImageLayer: speichere Bild als Datei
+                // ImageLayer: speichere Bild als Datei mit Positions-/Größen-Metadaten
                 if (il.image() != null) {
                     String imageFileName = "image_" + imageCounter + ".png";
                     File imageFile = new File(imagesDir, imageFileName);
                     javax.imageio.ImageIO.write(il.image(), "png", imageFile);
-                    imageRefs.append("-").append(imageFileName).append("\n");
+                    // Format: -filename x y w h rotation opacity
+                    imageRefs.append("-").append(imageFileName)
+                             .append(" ").append(il.x())
+                             .append(" ").append(il.y())
+                             .append(" ").append(il.width())
+                             .append(" ").append(il.height())
+                             .append(" ").append(il.rotationAngle())
+                             .append(" ").append(il.opacity())
+                             .append("\n");
                     imageCounter++;
                 }
             } else if (layer instanceof TextLayer tl) {

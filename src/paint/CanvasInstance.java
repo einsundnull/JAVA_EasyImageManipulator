@@ -91,7 +91,7 @@ public class CanvasInstance {
     public JLayeredPane     layeredPane;
     public JPanel           dropHintPanel;
     public TileGalleryPanel tileGallery;
-    public ScenesPanel      scenesPanel;     // Scene browser for Tool/Game scenes
+    public TileGalleryPanel scenesPanel;     // Scene browser for Tool/Game scenes
     public JButton          prevNavButton;
     public JButton          nextNavButton;
     public JPanel           elementEditBar;  // floating action bar shown when editing a layer

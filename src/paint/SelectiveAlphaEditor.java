@@ -824,6 +824,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		// NOTE: When SHRINK_GALLERY = false, remove setMaximumSize() calls below
 		// so galleries keep full width and canvases shrink instead
 		ci(0).scenesPanel.setVisible(false); // Start HIDDEN - only open by user action or Recent dialog
+		if (SHRINK_GALLERY) {
+			ci(0).scenesPanel.setMaximumSize(new Dimension(TileGalleryPanel.GALLERY_W, Integer.MAX_VALUE));
+		}
 		ci(0).scenesPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
 
 		ci(0).tileGallery.setVisible(true); // Start VISIBLE
@@ -843,6 +846,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		elementLayerPanel2.setAlignmentY(Component.CENTER_ALIGNMENT);
 
 		ci(1).scenesPanel.setVisible(false); // Start hidden until Canvas 2 is activated
+		if (SHRINK_GALLERY) {
+			ci(1).scenesPanel.setMaximumSize(new Dimension(TileGalleryPanel.GALLERY_W, Integer.MAX_VALUE));
+		}
 		ci(1).scenesPanel.setAlignmentY(Component.CENTER_ALIGNMENT);
 
 		ci(1).tileGallery.setVisible(false); // Start hidden until Canvas 2 is activated
@@ -1175,8 +1181,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			System.out.println("[INFO] Keine letzten Bilder gefunden: " + ex.getMessage());
 		}
 
-		// Scenes panel for this canvas
-		c.scenesPanel = new ScenesPanel(buildScenesCallbacks(idx), () -> c.scenesPanel.setVisible(false));
+		// Scenes panel for this canvas (exact TileGalleryPanel instance, populated from SceneLocator)
+		c.scenesPanel = new TileGalleryPanel(buildScenesCallbacks(idx), null, "Szenen",
+				() -> setScenesPanelVisible(idx, false),
+				() -> refreshSceneFiles(idx));
+		c.scenesPanel.setFileDropOverride(files -> createSceneFromDrop(files, idx));
 		c.scenesPanel.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
@@ -1593,6 +1602,47 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		preloadNextImages(idx);
 	}
 
+	/**
+	 * Loads a scene background image onto the canvas WITHOUT touching the image
+	 * TileGalleryPanel — no indexDirectory(), no tileGallery.setFiles().
+	 * Used exclusively when clicking a scene tile.
+	 */
+	private void loadSceneBackground(File file, int idx) {
+		CanvasInstance c = ci(idx);
+		if (c.sourceFile != null) saveCurrentState(idx);
+		try {
+			java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(file);
+			if (img == null) return;
+			c.originalImage = img;
+			c.workingImage  = normalizeImage(c.originalImage);
+			c.undoStack.clear();
+			c.redoStack.clear();
+			c.activeElements = new ArrayList<>();
+			c.selectedElements.clear();
+			c.fileCache.put(file, new CanvasInstance.CanvasFileState(c.workingImage));
+		} catch (java.io.IOException e) {
+			System.err.println("[ERROR] loadSceneBackground: " + e.getMessage());
+			return;
+		}
+		c.sourceFile = file;
+		c.hasUnsavedChanges = false;
+		c.selectedAreas.clear();
+		c.isSelecting = false;
+		c.floatingImg = null;
+		c.floatRect = null;
+		c.lastPaintPoint = null;
+		c.shapeStartPoint = null;
+		c.paintSnapshot = null;
+		activeCanvasIndex = idx;
+		updateCanvasFocusBorder();
+		swapToImageView(idx);
+		SwingUtilities.invokeLater(() -> fitToViewport(idx));
+		refreshElementPanel();
+		updateTitle();
+		updateStatus();
+		setBottomButtonsEnabled(true);
+	}
+
 	/** Saves the current canvas state back into the file cache. */
 	public void saveCurrentState() {
 		saveCurrentState(activeCanvasIndex);
@@ -1705,6 +1755,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			secondScenesBtn.setSelected(visible);
 		}
 		c.scenesPanel.setVisible(visible);
+		if (visible) {
+			refreshSceneFiles(idx);
+		}
 		updateLayoutVisibility();
 		// Wait for layout to settle before recalculating image zoom/position
 		SwingUtilities.invokeLater(() -> {
@@ -4435,47 +4488,36 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// Scenes Panel Callbacks
 	// =========================================================================
 
-	private ScenesPanel.Callbacks buildScenesCallbacks(int idx) {
-		return new ScenesPanel.Callbacks() {
+	private TileGalleryPanel.Callbacks buildScenesCallbacks(int idx) {
+		return new TileGalleryPanel.Callbacks() {
 			@Override
-			public void loadScene(File sceneFile) {
+			public void onTileOpened(File sceneFile) {
+				if (!sceneFile.getName().endsWith(".txt") && !sceneFile.getName().endsWith(".json"))
+					return;
 				CanvasInstance c = ci(idx);
 				try {
-					// Szenen sind jetzt .txt Dateien im neuen Format
-					if (!sceneFile.getName().endsWith(".txt")) {
-						showErrorDialog("Fehler", "Ungültiges Scene-Format");
-						return;
-					}
-
-					// Szene-Verzeichnis ist der Parent der .txt Datei
 					File sceneDir = sceneFile.getParentFile();
-					String sceneName = sceneFile.getName().replace(".txt", "");
+					String sceneName = sceneFile.getName().replaceAll("\\.(txt|json)$", "");
 
-					// Lade Scene mit neuer Struktur
 					SceneFileReader.SceneData sceneData = SceneFileReader.readScene(sceneDir, sceneName);
 
-					// Lade Background-Bild (erstes Image)
+					// Load background onto canvas WITHOUT touching the image TileGallery
 					if (sceneData.backgroundImage != null) {
-						loadFile(sceneData.backgroundImage);
+						loadSceneBackground(sceneData.backgroundImage, idx);
 					}
 
-					// Sammle alle Layers
 					List<Layer> allLayers = new ArrayList<>();
-
-					// Lade weitere Images als ImageLayers
 					int nextId = System.identityHashCode(new Object());
-					for (File imageFile : sceneData.imageLayers) {
-						java.awt.image.BufferedImage img = ImageLoader.loadImage(imageFile);
+					for (SceneFileReader.ImageLayerRef ref : sceneData.imageLayers) {
+						java.awt.image.BufferedImage img = ImageLoader.loadImage(ref.file);
 						if (img != null) {
-							ImageLayer il = new ImageLayer(nextId++, img, 0, 0, img.getWidth(), img.getHeight());
+							int w = ref.w > 0 ? ref.w : img.getWidth();
+							int h = ref.h > 0 ? ref.h : img.getHeight();
+							ImageLayer il = new ImageLayer(nextId++, img, ref.x, ref.y, w, h, ref.rotation, ref.opacity);
 							allLayers.add(il);
 						}
 					}
-
-					// Füge TextLayers hinzu
 					allLayers.addAll(sceneData.textLayers);
-
-					// Füge PathLayers hinzu
 					allLayers.addAll(sceneData.pathLayers);
 
 					c.activeElements = allLayers;
@@ -4483,87 +4525,77 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 					refreshElementPanel();
 					c.canvasPanel.repaint();
 
-					showInfoDialog("Szene geladen", sceneName + " erfolgreich geladen");
 				} catch (Exception e) {
 					System.err.println("[ERROR] loadScene failed: " + e.getMessage());
-					e.printStackTrace();
-					showErrorDialog("Fehler", "Szene konnte nicht geladen werden:\n" + e.getMessage());
+					showErrorDialog("Fehler", "Scene konnte nicht geladen werden:\n" + e.getMessage());
 				}
 			}
 
 			@Override
-			public void copyScene(File source, String targetProject) {
-				// TODO: Copy-Dialog implementieren
-				showInfoDialog("TODO", "Szene kopieren - in Entwicklung");
-			}
-
-			@Override
-			public void deleteScene(File sceneFile) {
-				// Bereits in ScenesPanel implementiert
-			}
-
-			@Override
-			public void refreshScenes() {
-				ci(idx).scenesPanel.refresh();
-			}
-
-			@Override
-			public void createNewScene(File backgroundImage, List<Layer> elements, String sceneName) {
-				CanvasInstance c = ci(idx);
-				try {
-					System.out.println("[DEBUG] createNewScene: " + sceneName);
-
-					// Get or initialize project
-					String projectName = projectManager.getProjectName();
-					if (projectName == null || projectName.isEmpty()) {
-						projectName = "Default";
-						projectManager.newProject(projectName);
-						System.out.println("[DEBUG] Created default project: " + projectName);
-					}
-
-					// Use provided image or current sourceFile
-					File imageToUse = backgroundImage;
-					if (imageToUse == null) {
-						if (c.sourceFile != null) {
-							imageToUse = c.sourceFile;
-						} else {
-							showErrorDialog("Fehler", "Kein Bild verfügbar");
-							return;
-						}
-					}
-
-					// Use provided elements or current activeElements
-					List<Layer> elementsToUse = elements != null ? new ArrayList<>(elements) : new ArrayList<>(c.activeElements);
-
-					// Create scene directory structure
-					String cleanedName = sceneName.replaceAll("[^a-zA-Z0-9_-]", "_");
-					File scenesDir = AppPaths.getProjectScenesDir(projectName);
-					File sceneDir = new File(scenesDir, cleanedName);
-
-					// Ensure unique scene name
-					int counter = 1;
-					while (sceneDir.exists()) {
-						String uniqueName = cleanedName + "_" + counter;
-						sceneDir = new File(scenesDir, uniqueName);
-						counter++;
-					}
-
-					System.out.println("[DEBUG] Scene directory: " + sceneDir.getAbsolutePath());
-
-					// Schreibe Scene mit neuer Struktur
-					SceneFileWriter.writeScene(sceneDir, sceneDir.getName(), imageToUse, elementsToUse);
-
-					String successMsg = "Szene '" + sceneDir.getName() + "' erstellt\n\nPfad:\n" + sceneDir.getAbsolutePath();
-					showInfoDialog("Erfolgreich", successMsg);
-
-					ci(idx).scenesPanel.refresh();
-				} catch (Exception e) {
-					System.out.println("[ERROR] Exception in createNewScene: " + e.getMessage());
-					e.printStackTrace();
-					showErrorDialog("Fehler", "Szene konnte nicht erstellt werden:\n" + e.getMessage());
-				}
-			}
+			public void onSelectionChanged(List<File> selectedFiles) {}
 		};
+	}
+
+	/**
+	 * Called when image files are dropped from TileGalleryPanel onto the scenes panel.
+	 * Creates a new scene: dropped image = background, current canvas layers = scene layers.
+	 */
+	private void createSceneFromDrop(List<File> files, int idx) {
+		if (files == null || files.isEmpty()) return;
+		File imageFile = files.get(0);
+		String n = imageFile.getName().toLowerCase();
+		boolean isImage = n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg")
+				|| n.endsWith(".gif") || n.endsWith(".bmp") || n.endsWith(".webp");
+		if (!isImage) return;
+
+		CanvasInstance c = ci(idx);
+
+		String defaultName = "Scene_" + new java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss")
+				.format(new java.util.Date());
+		String sceneName = (String) javax.swing.JOptionPane.showInputDialog(
+				SelectiveAlphaEditor.this,
+				"Szenen-Name:",
+				"Neue Szene erstellen",
+				javax.swing.JOptionPane.PLAIN_MESSAGE,
+				null, null, defaultName);
+		if (sceneName == null || sceneName.isBlank()) return;
+		sceneName = sceneName.trim();
+
+		List<String> projects = SceneLocator.getToolProjects();
+		String projectName = projects.isEmpty() ? "Default" : projects.get(0);
+		File scenesRoot = SceneLocator.getToolScenesDir(projectName);
+		File sceneDir   = new File(scenesRoot, sceneName);
+
+		List<Layer> layers = new ArrayList<>(c.activeElements);
+		final String finalName = sceneName;
+		new javax.swing.SwingWorker<Void, Void>() {
+			@Override protected Void doInBackground() throws Exception {
+				SceneFileWriter.writeScene(sceneDir, finalName, imageFile, layers);
+				return null;
+			}
+			@Override protected void done() {
+				try { get(); } catch (Exception ex) {
+					System.err.println("[ERROR] Scene save failed: " + ex.getMessage());
+					showErrorDialog("Fehler", "Scene konnte nicht gespeichert werden:\n" + ex.getMessage());
+					return;
+				}
+				refreshSceneFiles(idx);
+				ToastNotification.show(SelectiveAlphaEditor.this, "Scene gespeichert: " + finalName);
+			}
+		}.execute();
+	}
+
+	/** Collects all scene .txt files from SceneLocator and populates the scenes panel. */
+	void refreshSceneFiles(int idx) {
+		CanvasInstance c = ci(idx);
+		List<File> allScenes = new ArrayList<>();
+		for (String project : SceneLocator.getToolProjects()) {
+			allScenes.addAll(SceneLocator.getToolScenes(project));
+		}
+		for (String game : SceneLocator.getAvailableGames()) {
+			allScenes.addAll(SceneLocator.getGameScenes(game));
+		}
+		c.scenesPanel.setFiles(allScenes, null);
 	}
 
 	/**

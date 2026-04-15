@@ -107,6 +107,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     private       java.util.Set<File> dirtyFiles = new java.util.HashSet<>();
     private       boolean         showAll = false;  // Toggle: false = Only, true = All
     private       File            linkedScene = null;  // Scene to filter by when in "Only" mode
+    /** When set, replaces the default copy-to-directory behavior on javaFileListFlavor drops. */
+    private java.util.function.Consumer<List<File>> fileDropOverride = null;
 
     // ── UI refs ───────────────────────────────────────────────────────────────
     private final JPanel      tilesContainer;
@@ -117,10 +119,22 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     // Constructor
     // =========================================================================
     public TileGalleryPanel(Callbacks callbacks) {
-        this(callbacks, null);
+        this(callbacks, null, "Bilder", null, null);
     }
 
     public TileGalleryPanel(Callbacks callbacks, FilePreloadCallback filePreloadCallback) {
+        this(callbacks, filePreloadCallback, "Bilder", null, null);
+    }
+
+    public TileGalleryPanel(Callbacks callbacks, FilePreloadCallback filePreloadCallback, String title) {
+        this(callbacks, filePreloadCallback, title, null, null);
+    }
+
+    public TileGalleryPanel(Callbacks callbacks, FilePreloadCallback filePreloadCallback, String title, Runnable onClose) {
+        this(callbacks, filePreloadCallback, title, onClose, null);
+    }
+
+    public TileGalleryPanel(Callbacks callbacks, FilePreloadCallback filePreloadCallback, String title, Runnable onClose, Runnable onRefresh) {
         this.callbacks = callbacks;
         this.filePreloadCallback = filePreloadCallback;
         setLayout(new BorderLayout());
@@ -130,15 +144,17 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 BorderFactory.createMatteBorder(0, 0, 0, 1, AppColors.BORDER),
                 BorderFactory.createEmptyBorder(0, 0, 16, 0)));
 
+        Runnable refreshAction = onRefresh != null ? onRefresh : this::refreshGallery;
+
         // ── Header mit All/Only Toggle, Refresh-Button ──────────────────────
-        JPanel header = buildSidebarHeader("Bilder", this::refreshGallery, isAll -> {
+        JPanel header = buildSidebarHeader(title, refreshAction, isAll -> {
             // Toggle between All Images vs Only Images of the Scene
             showAll = isAll;
             // Redraw all tiles to reflect linked/unlinked status
             for (TilePanel t : tiles) {
                 t.repaint();
             }
-        }, null);
+        }, onClose);
 
         // ── Select-All / Deselect-All (initially hidden) ──────────────────────
         actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
@@ -163,14 +179,23 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         // ── Tiles container inside scroll pane ────────────────────────────────
         // Override getPreferredSize so JViewport sizes this panel to the viewport width,
         // which causes BoxLayout Y_AXIS to resize tiles accordingly.
-        tilesContainer = new JPanel() {
-            @Override public java.awt.Dimension getPreferredSize() {
-                java.awt.Dimension d = super.getPreferredSize();
-                if (getParent() != null && getParent().getWidth() > 0)
-                    d.width = getParent().getWidth();
-                return d;
+        // Implements Scrollable so JScrollPane stretches it to fill the full
+        // viewport width AND height — making it the target for any drop anywhere
+        // in the scroll area, with no gaps below the tiles.
+        // ScrollablePanel fills the full viewport width AND height so it is always
+        // the component under the cursor — no drop gaps below the tiles.
+        class ScrollableTilesContainer extends JPanel implements javax.swing.Scrollable {
+            @Override public java.awt.Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+            @Override public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) { return 14; }
+            @Override public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) { return 100; }
+            @Override public boolean getScrollableTracksViewportWidth()  { return true; }
+            // Only fill viewport height when content is shorter — allows normal scrolling when content is taller
+            @Override public boolean getScrollableTracksViewportHeight() {
+                java.awt.Container p = getParent();
+                return p == null || getPreferredSize().height < p.getHeight();
             }
-        };
+        }
+        tilesContainer = new ScrollableTilesContainer();
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));
         tilesContainer.setBackground(new Color(36, 36, 36));
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
@@ -200,6 +225,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
         // ── Drop target: accept Layer drags (Case 5: save layer as image) ────
         new DropTarget(tilesContainer, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
+            @Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
+            @Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde)  { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
             @Override public void drop(DropTargetDropEvent dtde) {
                 dtde.acceptDrop(DnDConstants.ACTION_COPY);
                 try {
@@ -234,6 +261,12 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                         @SuppressWarnings("unchecked")
                         java.util.List<File> droppedFiles = (java.util.List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
                         if (droppedFiles != null && !droppedFiles.isEmpty()) {
+                            // If an override handler is registered, delegate entirely to it
+                            if (fileDropOverride != null) {
+                                fileDropOverride.accept(new ArrayList<>(droppedFiles));
+                                dtde.dropComplete(true);
+                                return;
+                            }
                             Point dropPt = dtde.getLocation();
                             int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, dropPt.y);
                             // Copy files from external source to current gallery directory
@@ -279,6 +312,15 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     // =========================================================================
     // Public API
     // =========================================================================
+
+    /**
+     * Override the default javaFileListFlavor drop behavior.
+     * The tilesContainer (which fills the full viewport via Scrollable) catches
+     * all drops and delegates here when set.
+     */
+    public void setFileDropOverride(java.util.function.Consumer<List<File>> handler) {
+        this.fileDropOverride = handler;
+    }
 
     /** Full refresh – called when a new directory is loaded. */
     public void setFiles(List<File> files, File active) {
@@ -562,6 +604,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             // DnD: left-drag → javaFileListFlavor; right-drag → FILE_AS_ELEMENT_FLAVOR
             setTransferHandler(new TransferHandler() {
                 @Override public int getSourceActions(JComponent c) { return COPY; }
+                @Override public boolean canImport(TransferSupport s) { return false; } // never a drop target
                 @Override protected Transferable createTransferable(JComponent c) {
                     if (rightDrag) {
                         FileForElement ffe = new FileForElement(imageFile);
@@ -587,6 +630,9 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                     }
                 }
             });
+            // Remove the DropTarget Swing installs automatically via setTransferHandler.
+            // TilePanel is a drag SOURCE only; incoming drops must reach tilesContainer.
+            setDropTarget(null);
 
             addMouseListener(new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e) {
@@ -703,7 +749,19 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         private void loadThumbAsync() {
             new SwingWorker<BufferedImage, Void>() {
                 @Override protected BufferedImage doInBackground() throws Exception {
-                    BufferedImage img = ImageIO.read(imageFile);
+                    BufferedImage img = null;
+
+                    // Check if this is a Scene file (.txt or .json) and load via SceneImageAdapter
+                    if (imageFile.getName().endsWith(".txt") || imageFile.getName().endsWith(".json")) {
+                        SceneImageAdapter.SceneAsImage sceneImg = SceneImageAdapter.loadSceneAsImage(imageFile);
+                        if (sceneImg != null) {
+                            img = sceneImg.thumbnail;
+                        }
+                    } else {
+                        // Regular image file
+                        img = ImageIO.read(imageFile);
+                    }
+
                     if (img == null) return null;
                     int maxW = TILE_W - 10;
                     int maxH = THUMB_H;

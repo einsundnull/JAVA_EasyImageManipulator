@@ -13,10 +13,21 @@ import java.util.List;
  */
 public class SceneFileReader {
 
+    public static class ImageLayerRef {
+        public File file;
+        public int x, y, w, h;
+        public double rotation;
+        public int opacity;
+        public ImageLayerRef(File f, int x, int y, int w, int h, double rot, int op) {
+            this.file = f; this.x = x; this.y = y; this.w = w; this.h = h;
+            this.rotation = rot; this.opacity = op;
+        }
+    }
+
     public static class SceneData {
         public String sceneName;
         public File backgroundImage;
-        public List<File> imageLayers = new ArrayList<>();  // Weitere Images als Layers
+        public List<ImageLayerRef> imageLayers = new ArrayList<>();
         public List<TextLayer> textLayers = new ArrayList<>();
         public List<PathLayer> pathLayers = new ArrayList<>();
     }
@@ -70,25 +81,30 @@ public class SceneFileReader {
 
                     case "Images:":
                         if (!trimmed.isEmpty()) {
-                            // Bilder können im images/ Verzeichnis oder als absolute Pfade gespeichert sein
+                            // Format: "filename [x y w h rotation opacity]"
+                            String[] parts = trimmed.split("\\s+");
+                            String fileName = parts[0];
+
                             File imageFile;
-                            if (imagesDir.exists() && !new File(trimmed).isAbsolute()) {
-                                // Relativer Pfad → suche in images/
-                                imageFile = new File(imagesDir, trimmed);
+                            if (imagesDir.exists() && !new File(fileName).isAbsolute()) {
+                                imageFile = new File(imagesDir, fileName);
                             } else {
-                                // Absoluter Pfad oder Dateiname ohne images/
-                                imageFile = new File(trimmed);
-                                if (!imageFile.isAbsolute()) {
-                                    imageFile = new File(sceneDir, trimmed);
-                                }
+                                imageFile = new File(fileName);
+                                if (!imageFile.isAbsolute()) imageFile = new File(sceneDir, fileName);
                             }
 
-                            // Erstes Bild = Background
                             if (data.backgroundImage == null) {
                                 data.backgroundImage = imageFile;
                             } else {
-                                // Alle folgenden = ImageLayers
-                                data.imageLayers.add(imageFile);
+                                // Parse optional metadata: x y w h rotation opacity
+                                int x = 0, y = 0, w = 0, h = 0, opacity = 100;
+                                double rotation = 0.0;
+                                try {
+                                    if (parts.length >= 5) { x = Integer.parseInt(parts[1]); y = Integer.parseInt(parts[2]); w = Integer.parseInt(parts[3]); h = Integer.parseInt(parts[4]); }
+                                    if (parts.length >= 6) rotation = Double.parseDouble(parts[5]);
+                                    if (parts.length >= 7) opacity  = Integer.parseInt(parts[6]);
+                                } catch (NumberFormatException ignored) {}
+                                data.imageLayers.add(new ImageLayerRef(imageFile, x, y, w, h, rotation, opacity));
                             }
                         }
                         break;
