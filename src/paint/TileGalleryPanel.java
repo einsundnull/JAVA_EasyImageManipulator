@@ -366,6 +366,20 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
     public List<File> getSelectedImages() { return new ArrayList<>(selectedImages); }
 
+    /** Clears active highlight and multi-selection without firing callbacks. */
+    public void clearActiveAndSelection() {
+        activeFile = null;
+        selectedImages.clear();
+        multiSelectMode = false;
+        actionRow.setVisible(false);
+        for (TilePanel t : tiles) {
+            t.setActive(false);
+            t.setSelected(false);
+            t.showCheckbox(false);
+            t.repaint();
+        }
+    }
+
     /**
      * Mark which files have unsaved changes.
      * These tiles get a red border instead of the normal green/orange one.

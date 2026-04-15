@@ -4396,13 +4396,17 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		return new TileGalleryPanel.Callbacks() {
 			@Override
 			public void onTileOpened(File f) {
-				// No unsaved-changes dialog: dirty state is kept in cache + red border
+				// Deselect the scenes panel when an image is opened
+				if (ci(idx).scenesPanel != null) ci(idx).scenesPanel.clearActiveAndSelection();
 				loadFile(f, idx);
 			}
 
 			@Override
 			public void onSelectionChanged(List<File> files) {
 				selectedImages = files;
+				// Deselect scenes panel when image multi-selection changes
+				if (!files.isEmpty() && ci(idx).scenesPanel != null)
+					ci(idx).scenesPanel.clearActiveAndSelection();
 			}
 
 			@Override
@@ -4497,6 +4501,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			public void onTileOpened(File sceneFile) {
 				if (!sceneFile.getName().endsWith(".txt") && !sceneFile.getName().endsWith(".json"))
 					return;
+				// Deselect the image gallery when a scene is opened
+				ci(idx).tileGallery.clearActiveAndSelection();
 				CanvasInstance c = ci(idx);
 				try {
 					File sceneDir = sceneFile.getParentFile();
@@ -4536,7 +4542,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			}
 
 			@Override
-			public void onSelectionChanged(List<File> selectedFiles) {}
+			public void onSelectionChanged(List<File> selectedFiles) {
+				// Deselect image gallery when scene multi-selection changes
+				if (!selectedFiles.isEmpty())
+					ci(idx).tileGallery.clearActiveAndSelection();
+			}
 		};
 	}
 
@@ -6404,14 +6414,21 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		String sceneName = c.activeSceneFile.getName().replaceAll("\\.(txt|json)$", "");
 		List<Layer> layers = new ArrayList<>(c.activeElements);
 		File bgFile = c.sourceFile;
-		new javax.swing.SwingWorker<Void, Void>() {
-			@Override protected Void doInBackground() throws Exception {
+		File sceneFileFinal = c.activeSceneFile;
+		new javax.swing.SwingWorker<BufferedImage, Void>() {
+			@Override protected BufferedImage doInBackground() throws Exception {
 				SceneFileWriter.writeScene(sceneDir, sceneName, bgFile, layers);
-				return null;
+				// Re-render thumbnail from updated scene file
+				SceneImageAdapter.SceneAsImage updated = SceneImageAdapter.loadSceneAsImage(sceneFileFinal);
+				return updated != null ? updated.thumbnail : null;
 			}
 			@Override protected void done() {
-				try { get(); }
-				catch (Exception ex) {
+				try {
+					BufferedImage thumb = get();
+					if (thumb != null) {
+						ci(idx).scenesPanel.refreshThumbnailFor(sceneFileFinal, thumb);
+					}
+				} catch (Exception ex) {
 					System.err.println("[ERROR] Scene persist failed: " + ex.getMessage());
 				}
 			}
