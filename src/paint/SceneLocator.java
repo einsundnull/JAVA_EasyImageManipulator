@@ -48,16 +48,21 @@ public class SceneLocator {
     }
 
     /**
-     * Gibt alle JSON-Szenen eines TransparencyTool-Projekts zurück.
+     * Gibt alle Szenen eines TransparencyTool-Projekts zurück.
+     * Sucht nach Verzeichnissen mit {sceneName}.txt Dateien.
      */
     public static List<File> getToolScenes(String projectName) {
         List<File> scenes = new ArrayList<>();
         File scenesDir = getToolScenesDir(projectName);
         if (scenesDir.exists()) {
-            File[] files = scenesDir.listFiles((dir, name) -> name.endsWith(".json"));
-            if (files != null) {
-                for (File f : files) {
-                    scenes.add(f);
+            File[] dirs = scenesDir.listFiles(File::isDirectory);
+            if (dirs != null) {
+                for (File dir : dirs) {
+                    // Suche nach {dirName}.txt innerhalb des Verzeichnisses
+                    File sceneFile = new File(dir, dir.getName() + ".txt");
+                    if (sceneFile.exists()) {
+                        scenes.add(sceneFile);
+                    }
                 }
             }
         }

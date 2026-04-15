@@ -1,0 +1,51 @@
+● Verstanden! Hier ist mein Implementierungs-Plan:
+
+  Plan: Kompatible Scene-Serialisierung                                                                                                                                                                                           
+  1. Struktur der Scene-Datei (z.B. myScene.txt):                                                                                                                                                                                 
+  #Name:
+  -myScene
+
+  #Images:
+  -image1.png
+  -image2.png
+
+  #Paths:
+  -path_walk.txt
+  -path_run.txt
+
+  #Texts:
+  -text_intro.txt
+  -text_title.txt
+
+  2. Separate .txt Dateien (GameII43-kompatibel):
+
+  scenes/
+  ├── myScene.txt           ← Hauptdatei (References)
+  ├── paths/
+  │   ├── path_walk.txt     ← PathWriter-Format
+  │   └── path_run.txt
+  └── texts/
+      ├── text_intro.txt    ← TextWriter-Format
+      └── text_title.txt
+
+  3. Ordner-Struktur (AppData):
+
+  C:\Users\{user}\AppData\Roaming\TransparencyTool\projects\{projectName}\scenes\
+  └── myScene/
+      ├── myScene.txt
+      ├── paths/
+      └── texts/
+
+  4. Neue Klassen (in TransparencyTool):
+
+  - TextWriter.java - schreibt TextLayer wie PathWriter
+  - TextReader.java - liest TextLayer wie PathReader
+  - SceneFileWriter.java - schreibt Haupt-Scene-Datei
+  - SceneFileReader.java - liest Haupt-Scene-Datei
+
+  ---
+  Soll ich damit starten? Folgende Schritte:
+  1. ✅ TextWriter/Reader implementieren (basierend auf PathWriter/Reader)
+  2. ✅ SceneFileWriter/Reader implementieren
+  3. ✅ Scene-Speicherung in createNewScene() anpassen
+  4. ✅ Scene-Laden in loadScene() anpassen

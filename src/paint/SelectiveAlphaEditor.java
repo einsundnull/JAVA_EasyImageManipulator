@@ -4441,25 +4441,41 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			public void loadScene(File sceneFile) {
 				CanvasInstance c = ci(idx);
 				try {
-					SceneLocator.SceneFormat format = SceneLocator.getSceneFormat(sceneFile);
-
-					if (format == SceneLocator.SceneFormat.JSON) {
-						// Lade JSON-Szene via SceneSerializer
-						String json = new String(java.nio.file.Files.readAllBytes(sceneFile.toPath()));
-						String layersJson = extractJsonField(json, "layers");
-						if (layersJson != null) {
-							List<Layer> layers = SceneSerializer.layersFromJson(layersJson);
-							c.activeElements = layers;
-							c.selectedElements.clear();
-							refreshElementPanel();
-							c.canvasPanel.repaint();
-							showInfoDialog("Szene geladen", sceneFile.getName() + " geladen");
-						}
-					} else if (format == SceneLocator.SceneFormat.TXT) {
-						// Legacy-Format - TODO: Implementieren wenn nötig
-						showInfoDialog("Legacy Format", "TXT-Format wird noch nicht unterstützt");
+					// Szenen sind jetzt .txt Dateien im neuen Format
+					if (!sceneFile.getName().endsWith(".txt")) {
+						showErrorDialog("Fehler", "Ungültiges Scene-Format");
+						return;
 					}
+
+					// Szene-Verzeichnis ist der Parent der .txt Datei
+					File sceneDir = sceneFile.getParentFile();
+					String sceneName = sceneFile.getName().replace(".txt", "");
+
+					// Lade Scene mit neuer Struktur
+					SceneFileReader.SceneData sceneData = SceneFileReader.readScene(sceneDir, sceneName);
+
+					// Lade Background-Bild
+					if (sceneData.backgroundImage != null) {
+						File bgImageFile = new File(sceneData.backgroundImage.getAbsolutePath());
+						if (bgImageFile.exists()) {
+							loadFile(bgImageFile);
+						}
+					}
+
+					// Füge alle geladenen Layers hinzu
+					List<Layer> allLayers = new ArrayList<>();
+					allLayers.addAll(sceneData.textLayers);
+					allLayers.addAll(sceneData.pathLayers);
+
+					c.activeElements = allLayers;
+					c.selectedElements.clear();
+					refreshElementPanel();
+					c.canvasPanel.repaint();
+
+					showInfoDialog("Szene geladen", sceneName + " erfolgreich geladen");
 				} catch (Exception e) {
+					System.err.println("[ERROR] loadScene failed: " + e.getMessage());
+					e.printStackTrace();
 					showErrorDialog("Fehler", "Szene konnte nicht geladen werden:\n" + e.getMessage());
 				}
 			}
@@ -4484,91 +4500,52 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			public void createNewScene(File backgroundImage, List<Layer> elements, String sceneName) {
 				CanvasInstance c = ci(idx);
 				try {
-					System.out.println("[DEBUG] createNewScene: backgroundImage=" + backgroundImage + ", elements=" + (elements != null ? elements.size() : "null") + ", sceneName=" + sceneName);
+					System.out.println("[DEBUG] createNewScene: " + sceneName);
 
 					// Get or initialize project
 					String projectName = projectManager.getProjectName();
 					if (projectName == null || projectName.isEmpty()) {
-						// Create default project if none exists
 						projectName = "Default";
 						projectManager.newProject(projectName);
 						System.out.println("[DEBUG] Created default project: " + projectName);
 					}
-					System.out.println("[DEBUG] projectName: " + projectName);
 
-					// Use provided image or current workingImage
+					// Use provided image or current sourceFile
 					File imageToUse = backgroundImage;
 					if (imageToUse == null) {
-						if (c.workingImage == null) {
-							showErrorDialog("Fehler", "Kein Bild geladen");
-							return;
-						}
-						// Use current sourceFile
 						if (c.sourceFile != null) {
 							imageToUse = c.sourceFile;
 						} else {
-							showErrorDialog("Fehler", "Quellbild nicht verfügbar");
+							showErrorDialog("Fehler", "Kein Bild verfügbar");
 							return;
 						}
 					}
-					System.out.println("[DEBUG] imageToUse: " + imageToUse.getAbsolutePath());
 
 					// Use provided elements or current activeElements
-					List<Layer> elementsToUse = elements != null ? elements : new ArrayList<>(c.activeElements);
-					System.out.println("[DEBUG] elementsToUse count: " + elementsToUse.size());
+					List<Layer> elementsToUse = elements != null ? new ArrayList<>(elements) : new ArrayList<>(c.activeElements);
 
-					// Get and ensure scenes directory exists
-					File scenesDir = SceneLocator.getToolScenesDir(projectName);
-					if (!scenesDir.exists()) {
-						scenesDir.mkdirs();
-						System.out.println("[DEBUG] Created scenes directory: " + scenesDir.getAbsolutePath());
-					}
-					System.out.println("[DEBUG] scenesDir: " + scenesDir.getAbsolutePath());
+					// Create scene directory structure
+					String cleanedName = sceneName.replaceAll("[^a-zA-Z0-9_-]", "_");
+					File scenesDir = AppPaths.getProjectScenesDir(projectName);
+					File sceneDir = new File(scenesDir, cleanedName);
 
-					// Generate scene file name
-					String fileName = sceneName.replaceAll("[^a-zA-Z0-9_-]", "_") + ".json";
-					File sceneFile = new File(scenesDir, fileName);
-
-					// Ensure unique filename
+					// Ensure unique scene name
 					int counter = 1;
-					while (sceneFile.exists()) {
-						String baseName = sceneName.replaceAll("[^a-zA-Z0-9_-]", "_");
-						fileName = baseName + "_" + counter + ".json";
-						sceneFile = new File(scenesDir, fileName);
+					while (sceneDir.exists()) {
+						String uniqueName = cleanedName + "_" + counter;
+						sceneDir = new File(scenesDir, uniqueName);
 						counter++;
 					}
-					System.out.println("[DEBUG] Final sceneFile: " + sceneFile.getAbsolutePath());
 
-					// Save scene
-					String layersJson = SceneSerializer.layersToJson(elementsToUse);
-					System.out.println("[DEBUG] layersJson: " + layersJson.substring(0, Math.min(100, layersJson.length())));
+					System.out.println("[DEBUG] Scene directory: " + sceneDir.getAbsolutePath());
 
-					try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(sceneFile))) {
-						writer.write("{\n");
-						writer.write("  \"canvasWidth\": " + c.workingImage.getWidth() + ",\n");
-						writer.write("  \"canvasHeight\": " + c.workingImage.getHeight() + ",\n");
-						writer.write("  \"imageFile\": \"" + imageToUse.getAbsolutePath() + "\",\n");
-						writer.write("  \"zoom\": 1.0,\n");
-						writer.write("  \"appMode\": \"" + appMode.toString() + "\",\n");
-						writer.write("  \"layers\": " + layersJson + "\n");
-						writer.write("}\n");
-					}
-					System.out.println("[DEBUG] Scene file written successfully");
+					// Schreibe Scene mit neuer Struktur
+					SceneFileWriter.writeScene(sceneDir, sceneDir.getName(), imageToUse, elementsToUse);
 
-					// Verify file was created
-					if (sceneFile.exists()) {
-						System.out.println("[DEBUG] Scene file verified: " + sceneFile.length() + " bytes");
-						String successMsg = "Szene '" + fileName + "' erstellt\n\nPfad:\n" + sceneFile.getAbsolutePath();
-						showInfoDialog("Erfolgreich", successMsg);
-					} else {
-						System.out.println("[ERROR] Scene file was not created!");
-						showErrorDialog("Fehler", "Szene-Datei wurde nicht erstellt");
-						return;
-					}
+					String successMsg = "Szene '" + sceneDir.getName() + "' erstellt\n\nPfad:\n" + sceneDir.getAbsolutePath();
+					showInfoDialog("Erfolgreich", successMsg);
 
-					System.out.println("[DEBUG] About to refresh scenes panel");
 					ci(idx).scenesPanel.refresh();
-					System.out.println("[DEBUG] Scenes panel refreshed");
 				} catch (Exception e) {
 					System.out.println("[ERROR] Exception in createNewScene: " + e.getMessage());
 					e.printStackTrace();
