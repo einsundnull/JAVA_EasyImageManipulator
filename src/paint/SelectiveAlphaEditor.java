@@ -4454,17 +4454,28 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 					// Lade Scene mit neuer Struktur
 					SceneFileReader.SceneData sceneData = SceneFileReader.readScene(sceneDir, sceneName);
 
-					// Lade Background-Bild
+					// Lade Background-Bild (erstes Image)
 					if (sceneData.backgroundImage != null) {
-						File bgImageFile = new File(sceneData.backgroundImage.getAbsolutePath());
-						if (bgImageFile.exists()) {
-							loadFile(bgImageFile);
+						loadFile(sceneData.backgroundImage);
+					}
+
+					// Sammle alle Layers
+					List<Layer> allLayers = new ArrayList<>();
+
+					// Lade weitere Images als ImageLayers
+					int nextId = System.identityHashCode(new Object());
+					for (File imageFile : sceneData.imageLayers) {
+						java.awt.image.BufferedImage img = ImageLoader.loadImage(imageFile);
+						if (img != null) {
+							ImageLayer il = new ImageLayer(nextId++, img, 0, 0, img.getWidth(), img.getHeight());
+							allLayers.add(il);
 						}
 					}
 
-					// Füge alle geladenen Layers hinzu
-					List<Layer> allLayers = new ArrayList<>();
+					// Füge TextLayers hinzu
 					allLayers.addAll(sceneData.textLayers);
+
+					// Füge PathLayers hinzu
 					allLayers.addAll(sceneData.pathLayers);
 
 					c.activeElements = allLayers;

@@ -16,6 +16,7 @@ public class SceneFileReader {
     public static class SceneData {
         public String sceneName;
         public File backgroundImage;
+        public List<File> imageLayers = new ArrayList<>();  // Weitere Images als Layers
         public List<TextLayer> textLayers = new ArrayList<>();
         public List<PathLayer> pathLayers = new ArrayList<>();
     }
@@ -38,6 +39,7 @@ public class SceneFileReader {
 
         File pathsDir = new File(sceneDir, "paths");
         File textsDir = new File(sceneDir, "texts");
+        File imagesDir = new File(sceneDir, "images");
 
         try (BufferedReader r = new BufferedReader(new FileReader(sceneFile))) {
             String line;
@@ -67,11 +69,27 @@ public class SceneFileReader {
                         break;
 
                     case "Images:":
-                        // Background-Bild laden
                         if (!trimmed.isEmpty()) {
-                            // TODO: Hier könnte das Bild geladen werden
-                            // Für jetzt nur Referenz speichern
-                            data.backgroundImage = new File(trimmed);
+                            // Bilder können im images/ Verzeichnis oder als absolute Pfade gespeichert sein
+                            File imageFile;
+                            if (imagesDir.exists() && !new File(trimmed).isAbsolute()) {
+                                // Relativer Pfad → suche in images/
+                                imageFile = new File(imagesDir, trimmed);
+                            } else {
+                                // Absoluter Pfad oder Dateiname ohne images/
+                                imageFile = new File(trimmed);
+                                if (!imageFile.isAbsolute()) {
+                                    imageFile = new File(sceneDir, trimmed);
+                                }
+                            }
+
+                            // Erstes Bild = Background
+                            if (data.backgroundImage == null) {
+                                data.backgroundImage = imageFile;
+                            } else {
+                                // Alle folgenden = ImageLayers
+                                data.imageLayers.add(imageFile);
+                            }
                         }
                         break;
 
@@ -106,6 +124,7 @@ public class SceneFileReader {
         }
 
         System.out.println("[SceneFileReader] Scene geladen: " + sceneName);
+        System.out.println("  - ImageLayers: " + data.imageLayers.size());
         System.out.println("  - TextLayers: " + data.textLayers.size());
         System.out.println("  - PathLayers: " + data.pathLayers.size());
 
