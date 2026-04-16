@@ -741,6 +741,16 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                         if (sceneImg != null) {
                             img = sceneImg.thumbnail;
                         }
+                    } else if (imageFile.isDirectory()) {
+                        // GameII scene directory — use first sprite image as thumbnail
+                        File imagesDir = new File(new File(imageFile, "sprites"), "images");
+                        if (imagesDir.exists()) {
+                            File[] imgs = imagesDir.listFiles(f ->
+                                    f.isFile() && f.getName().toLowerCase().endsWith(".png"));
+                            if (imgs != null && imgs.length > 0) {
+                                img = ImageIO.read(imgs[0]);
+                            }
+                        }
                     } else {
                         // Regular image file
                         img = ImageIO.read(imageFile);

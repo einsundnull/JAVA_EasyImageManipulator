@@ -13,7 +13,7 @@ import java.awt.image.BufferedImage;
  *
  * All mutations return new instances (value-object semantics).
  */
-public final class ImageLayer extends Layer {
+public class ImageLayer extends Layer {
 
     private final BufferedImage image;
     private final double rotationAngle;

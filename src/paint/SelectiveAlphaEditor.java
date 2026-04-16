@@ -4452,6 +4452,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		return new TileGalleryPanel.Callbacks() {
 			@Override
 			public void onTileOpened(File sceneFile) {
+				// GameII scene directory (no manifest) — load directly
+				if (sceneFile.isDirectory()) {
+					if (new File(sceneFile, "sprites").isDirectory()) {
+						ci(idx).tileGallery.clearActiveAndSelection();
+						loadGameIISceneDir(sceneFile, idx);
+					}
+					return;
+				}
 				if (!sceneFile.getName().endsWith(".txt") && !sceneFile.getName().endsWith(".json"))
 					return;
 				// Deselect the image gallery when a scene is opened
@@ -4645,6 +4653,69 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			allScenes.addAll(SceneLocator.getAppDataGameScenes(game));
 		}
 		c.scenesPanel.setFiles(allScenes, null);
+	}
+
+	/**
+	 * Loads a GameII scene from its directory (sprites/ subdir is the indicator).
+	 * No .txt manifest required — the directory name is used as the scene name.
+	 */
+	private void loadGameIISceneDir(File sceneDir, int idx) {
+		CanvasInstance c = ci(idx);
+		String sceneName = sceneDir.getName();
+		try {
+			GameSceneReader.GameSceneData gameData = GameSceneReader.readScene(sceneDir, sceneName);
+
+			if (c.workingImage == null
+					|| c.workingImage.getWidth()  != gameData.canvasW
+					|| c.workingImage.getHeight() != gameData.canvasH) {
+				java.awt.image.BufferedImage blank = new java.awt.image.BufferedImage(
+						gameData.canvasW, gameData.canvasH,
+						java.awt.image.BufferedImage.TYPE_INT_ARGB);
+				java.awt.Graphics2D g2 = blank.createGraphics();
+				g2.setColor(new java.awt.Color(30, 30, 40));
+				g2.fillRect(0, 0, gameData.canvasW, gameData.canvasH);
+				g2.dispose();
+				c.workingImage  = blank;
+				c.originalImage = blank;
+			}
+
+			// Use a synthetic .txt path for activeSceneFile (needed by persistSceneIfActive)
+			File syntheticManifest = new File(sceneDir, sceneName + ".txt");
+			c.gameSceneRoot   = sceneDir;
+			c.gameCanvasW     = gameData.canvasW;
+			c.gameCanvasH     = gameData.canvasH;
+			c.activeElements  = gameData.layers;
+			c.selectedElements.clear();
+			c.activeSceneFile = syntheticManifest;
+			c.sourceFile      = syntheticManifest;
+			ci(idx).tileGallery.clearActiveAndSelection();
+			refreshElementPanel();
+			if (c.canvasPanel != null) c.canvasPanel.repaint();
+
+			// Open scenes panel and populate it with scenes of this game only
+			File gameScenesDir = sceneDir.getParentFile(); // …/DefaultGame/scenes/
+			List<File> gameScenes = new ArrayList<>();
+			if (gameScenesDir != null && gameScenesDir.isDirectory()) {
+				File[] siblings = gameScenesDir.listFiles(File::isDirectory);
+				if (siblings != null) {
+					java.util.Arrays.sort(siblings,
+							(a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+					for (File s : siblings) {
+						if (new File(s, "sprites").isDirectory()) gameScenes.add(s);
+					}
+				}
+			}
+			if (idx == 0) scenesBtn.setSelected(true);
+			else if (idx == 1) secondScenesBtn.setSelected(true);
+			c.scenesPanel.setVisible(true);
+			c.scenesPanel.setFiles(gameScenes, sceneDir);
+			updateLayoutVisibility();
+			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> reloadCurrentImage(idx)));
+
+		} catch (Exception e) {
+			System.err.println("[ERROR] loadGameIISceneDir failed: " + e.getMessage());
+			showErrorDialog("Fehler", "GameII-Scene konnte nicht geladen werden:\n" + e.getMessage());
+		}
 	}
 
 	/**
@@ -6206,6 +6277,23 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			if (chosen == null) return;
 			String category = dlg.getSelectedCategory();
 			if (chosen.isDirectory()) {
+				// GameII game directory: has scenes/ subdir → open first scene
+				File scenesSubDir = new File(chosen, "scenes");
+				if (scenesSubDir.exists() && scenesSubDir.isDirectory()) {
+					File[] sceneDirs = scenesSubDir.listFiles(
+							f -> f.isDirectory() && new File(f, "sprites").isDirectory());
+					if (sceneDirs != null && sceneDirs.length > 0) {
+						Arrays.sort(sceneDirs, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+						loadGameIISceneDir(sceneDirs[0], canvasIdx);
+						return;
+					}
+				}
+				// GameII scene directory: directly has sprites/ subdir
+				if (new File(chosen, "sprites").isDirectory()) {
+					loadGameIISceneDir(chosen, canvasIdx);
+					return;
+				}
+				// Standard: image directory
 				File[] images = chosen.listFiles(f -> f.isFile() && isSupportedFile(f));
 				if (images != null && images.length > 0) {
 					Arrays.sort(images, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));

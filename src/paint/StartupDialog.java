@@ -105,7 +105,24 @@ public class StartupDialog extends JDialog {
         int initialTabIndex = 0;
         for (int i = 0; i < categories.length; i++) {
             String cat = categories[i];
-            List<String> paths = recentByCategory.getOrDefault(cat, new ArrayList<>());
+            List<String> paths = new ArrayList<>(recentByCategory.getOrDefault(cat, new ArrayList<>()));
+
+            // Augment CAT_GAMES with live-scanned game directories from AppData\Games\
+            if (cat.equals(LastProjectsManager.CAT_GAMES)) {
+                File gamesDir = SceneLocator.getAppDataGamesDir();
+                if (gamesDir.exists()) {
+                    File[] gameDirs = gamesDir.listFiles(File::isDirectory);
+                    if (gameDirs != null) {
+                        for (File gameDir : gameDirs) {
+                            String absPath = gameDir.getAbsolutePath();
+                            if (!paths.contains(absPath)) {
+                                paths.add(absPath);
+                            }
+                        }
+                    }
+                }
+            }
+
             JPanel tabPanel = (cat.equals(LastProjectsManager.CAT_IMAGES))
                     ? createImagesPanel(paths)
                     : createCategoryTab(paths, cat);

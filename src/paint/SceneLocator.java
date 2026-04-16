@@ -281,7 +281,12 @@ public class SceneLocator {
         if (dirs == null) return scenes;
         for (File dir : dirs) {
             File sceneFile = new File(dir, dir.getName() + ".txt");
-            if (sceneFile.exists()) scenes.add(sceneFile);
+            if (sceneFile.exists()) {
+                scenes.add(sceneFile);
+            } else if (new File(dir, "sprites").isDirectory()) {
+                // GameII scene without manifest — use directory itself
+                scenes.add(dir);
+            }
         }
         return scenes;
     }
