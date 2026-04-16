@@ -194,6 +194,9 @@ class LayoutController {
 		if (ed.bookPagesPanel  != null) ed.bookPagesIBtn .setSelected(ed.bookPagesPanel .isVisible());
 		if (ed.bookListPanel2  != null) ed.bookListIIBtn .setSelected(ed.bookListPanel2 .isVisible());
 		if (ed.bookPagesPanel2 != null) ed.bookPagesIIBtn.setSelected(ed.bookPagesPanel2.isVisible());
+		// Page-layout toolbar
+		if (ed.pageLayoutBtn    != null && ed.pageLayoutToolbar != null)
+			ed.pageLayoutBtn.setSelected(ed.pageLayoutToolbar.isVisible());
 	}
 
 	// ── Dirty / refresh ───────────────────────────────────────────────────────

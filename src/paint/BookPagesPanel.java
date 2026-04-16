@@ -1,14 +1,18 @@
 package paint;
 
 import java.awt.*;
-import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.*;
 import java.awt.dnd.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.List;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.TransferHandler;
 
 /**
  * Sidebar panel showing the pages of the currently selected book.
@@ -21,6 +25,10 @@ class BookPagesPanel extends BaseSidebarPanel {
 	static final int PANEL_W = BaseSidebarPanel.DEFAULT_PANEL_W;
 	static final int THUMB_W = PANEL_W - 16;
 	static final int THUMB_H = (int) (THUMB_W * 1.4142); // A4 ratio
+
+	/** DataFlavor for intra-panel page-copy drags (left-click drag within this panel). */
+	private static final DataFlavor PAGE_DRAG_FLAVOR =
+			new DataFlavor(File.class, "BookPageFile");
 
 	private final SelectiveAlphaEditor ed;
 	private File   currentBookDir  = null;
@@ -42,17 +50,46 @@ class BookPagesPanel extends BaseSidebarPanel {
 
 		add(buildSidebarScrollPane(tilesContainer), BorderLayout.CENTER);
 
-		// Drop target — accepts image drops and internal TT tile drags
+		// Drop target — accepts image drops, internal TT tile drags, and intra-panel page copies
 		new DropTarget(tilesContainer, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
 			@Override public void dragEnter(DropTargetDragEvent e) { e.acceptDrag(DnDConstants.ACTION_COPY); }
 			@Override public void dragOver(DropTargetDragEvent e)  { e.acceptDrag(DnDConstants.ACTION_COPY); }
 			@Override public void drop(DropTargetDropEvent dtde) {
-				if (currentBookDir == null) { dtde.rejectDrop(); return; }
 				dtde.acceptDrop(DnDConstants.ACTION_COPY);
+				var trans = dtde.getTransferable();
+
+				// ── Intra-panel page copy: drag a page tile within this panel ──────
+				if (trans.isDataFlavorSupported(PAGE_DRAG_FLAVOR)) {
+					if (currentBookDir == null) { dtde.dropComplete(false); return; }
+					try {
+						File srcPage = (File) trans.getTransferData(PAGE_DRAG_FLAVOR);
+						BookController.copyPage(srcPage, currentBookDir);
+						dtde.dropComplete(true);
+						SwingUtilities.invokeLater(() -> loadBook(currentBookDir));
+					} catch (Exception ex) {
+						System.err.println("[BookPagesPanel] Seiten-Kopie fehlgeschlagen: " + ex.getMessage());
+						dtde.dropComplete(false);
+					}
+					return;
+				}
+
+				// ── External image / file / TT drag → new page ────────────────────
 				BufferedImage img = resolveDroppedImage(dtde);
 				dtde.dropComplete(true);
-				ed.bookController.showNewPageDialog(img, currentBookDir,
-						() -> SwingUtilities.invokeLater(() -> loadBook(currentBookDir)));
+
+				if (currentBookDir == null) {
+					// No book selected yet → ask the user to pick or create one
+					SwingUtilities.invokeLater(() -> {
+						File book = ed.bookController.pickOrCreateBook();
+						if (book == null) return;
+						currentBookDir = book;
+						ed.bookController.showNewPageDialog(img, book,
+								() -> SwingUtilities.invokeLater(() -> loadBook(book)));
+					});
+				} else {
+					ed.bookController.showNewPageDialog(img, currentBookDir,
+							() -> SwingUtilities.invokeLater(() -> loadBook(currentBookDir)));
+				}
 			}
 		});
 
@@ -139,6 +176,38 @@ class BookPagesPanel extends BaseSidebarPanel {
 				tile.setBackground(AppColors.BG_PANEL);
 			}
 		});
+
+		// ── Intra-panel drag-to-copy: left-click drag within BookPagesPanel ───
+		tile.setTransferHandler(new TransferHandler() {
+			@Override public int getSourceActions(JComponent c) { return COPY; }
+			@Override protected Transferable createTransferable(JComponent c) {
+				return new Transferable() {
+					@Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[]{ PAGE_DRAG_FLAVOR }; }
+					@Override public boolean isDataFlavorSupported(DataFlavor f) { return PAGE_DRAG_FLAVOR.equals(f); }
+					@Override public Object getTransferData(DataFlavor f) { return pageFile; }
+				};
+			}
+		});
+
+		Point[] dragStart = { null };
+		tile.addMouseListener(new MouseAdapter() {
+			@Override public void mousePressed(MouseEvent e) {
+				if (SwingUtilities.isLeftMouseButton(e)) dragStart[0] = e.getPoint();
+			}
+			@Override public void mouseReleased(MouseEvent e) { dragStart[0] = null; }
+		});
+		tile.addMouseMotionListener(new MouseMotionAdapter() {
+			@Override public void mouseDragged(MouseEvent e) {
+				if (dragStart[0] == null) return;
+				int dx = Math.abs(e.getX() - dragStart[0].x);
+				int dy = Math.abs(e.getY() - dragStart[0].y);
+				if (dx > 6 || dy > 6) {
+					dragStart[0] = null;
+					tile.getTransferHandler().exportAsDrag(tile, e, TransferHandler.COPY);
+				}
+			}
+		});
+
 		return tile;
 	}
 

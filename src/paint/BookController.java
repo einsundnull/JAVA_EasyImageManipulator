@@ -114,6 +114,149 @@ class BookController {
 		return bookDir;
 	}
 
+	// ── Book selection dialog ─────────────────────────────────────────────────
+
+	/**
+	 * Shows a modal "Buch wählen oder erstellen" dialog.
+	 *
+	 * <ul>
+	 *   <li>If books exist: shows a list of them plus a "Neues Buch" name field.</li>
+	 *   <li>If no books exist: shows only the name field.</li>
+	 * </ul>
+	 *
+	 * @return the chosen or newly-created book directory, or {@code null} if cancelled.
+	 */
+	File pickOrCreateBook() {
+		List<File> books = listBooks();
+		boolean hasBooks = !books.isEmpty();
+
+		int dlgH = hasBooks ? 310 : 170;
+		JDialog dialog = ed.createBaseDialog("Buch wählen", 360, dlgH);
+		JPanel content = ed.centeredColumnPanel(10, 16, 12);
+
+		File[] result = { null };
+
+		// ── Existing books list (only when books are present) ─────────────────
+		JList<String> bookList = null;
+		if (hasBooks) {
+			JLabel listLbl = new JLabel("Bestehendes Buch:");
+			listLbl.setForeground(AppColors.TEXT);
+			listLbl.setFont(new Font("SansSerif", Font.BOLD, 11));
+			listLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+			content.add(listLbl);
+			content.add(Box.createVerticalStrut(4));
+
+			DefaultListModel<String> model = new DefaultListModel<>();
+			for (File b : books) model.addElement(b.getName());
+			bookList = new JList<>(model);
+			bookList.setBackground(AppColors.BTN_BG);
+			bookList.setForeground(AppColors.TEXT);
+			bookList.setSelectionBackground(AppColors.ACCENT_ACTIVE);
+			bookList.setFont(new Font("SansSerif", Font.PLAIN, 12));
+			bookList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			bookList.setSelectedIndex(0);
+
+			JScrollPane sp = new JScrollPane(bookList);
+			sp.setPreferredSize(new Dimension(316, 110));
+			sp.setMaximumSize(new Dimension(316, 110));
+			sp.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
+			sp.setAlignmentX(Component.LEFT_ALIGNMENT);
+			TileGalleryPanel.applyDarkScrollBar(sp.getVerticalScrollBar());
+			content.add(sp);
+			content.add(Box.createVerticalStrut(10));
+
+			JLabel sep = new JLabel("── oder Neues Buch ──────────────────");
+			sep.setForeground(AppColors.TEXT_MUTED);
+			sep.setFont(new Font("SansSerif", Font.PLAIN, 10));
+			sep.setAlignmentX(Component.LEFT_ALIGNMENT);
+			content.add(sep);
+			content.add(Box.createVerticalStrut(6));
+		}
+
+		// ── New book name row ─────────────────────────────────────────────────
+		JPanel nameRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+		nameRow.setOpaque(false);
+		nameRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		JLabel nameLbl = new JLabel(hasBooks ? "Neues Buch:" : "Name:");
+		nameLbl.setForeground(AppColors.TEXT);
+		nameLbl.setFont(new Font("SansSerif", Font.PLAIN, 11));
+
+		JTextField nameField = new JTextField(18);
+		nameField.setBackground(AppColors.BTN_BG);
+		nameField.setForeground(AppColors.TEXT);
+		nameField.setCaretColor(AppColors.TEXT);
+		nameField.setBorder(BorderFactory.createCompoundBorder(
+				BorderFactory.createLineBorder(AppColors.BORDER),
+				BorderFactory.createEmptyBorder(2, 4, 2, 4)));
+		nameField.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+		nameRow.add(nameLbl);
+		nameRow.add(nameField);
+		content.add(nameRow);
+		content.add(Box.createVerticalStrut(14));
+
+		// ── Buttons ───────────────────────────────────────────────────────────
+		JButton okBtn     = UIComponentFactory.buildButton("OK",        AppColors.ACCENT, AppColors.ACCENT_HOVER);
+		JButton cancelBtn = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		okBtn.setForeground(Color.WHITE);
+
+		JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+		btnRow.setOpaque(false);
+		btnRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+		btnRow.add(okBtn);
+		btnRow.add(cancelBtn);
+		content.add(btnRow);
+
+		// ── Wiring ────────────────────────────────────────────────────────────
+		final JList<String> finalList  = bookList;
+		final List<File>    finalBooks = books;
+
+		Runnable confirm = () -> {
+			String newName = nameField.getText().trim();
+			if (!newName.isEmpty()) {
+				// Create new book
+				try {
+					result[0] = createBook(newName);
+				} catch (IOException ex) {
+					ed.showErrorDialog("Fehler", "Buch konnte nicht erstellt werden:\n" + ex.getMessage());
+					return;
+				}
+			} else if (finalList != null && finalList.getSelectedIndex() >= 0) {
+				result[0] = finalBooks.get(finalList.getSelectedIndex());
+			} else {
+				// Nothing selected and no name typed
+				nameField.requestFocusInWindow();
+				return;
+			}
+			dialog.dispose();
+		};
+
+		okBtn    .addActionListener(e -> confirm.run());
+		cancelBtn.addActionListener(e -> dialog.dispose());
+		nameField.addActionListener(e -> confirm.run());
+
+		// If a book is selected in the list, clear the name field and vice-versa
+		if (bookList != null) {
+			final JList<String> bl = bookList;
+			bl.addListSelectionListener(e -> {
+				if (!e.getValueIsAdjusting() && bl.getSelectedIndex() >= 0)
+					nameField.setText("");
+			});
+			nameField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+				void clearList() { if (!nameField.getText().isEmpty()) bl.clearSelection(); }
+				@Override public void insertUpdate (javax.swing.event.DocumentEvent e) { clearList(); }
+				@Override public void removeUpdate (javax.swing.event.DocumentEvent e) { clearList(); }
+				@Override public void changedUpdate(javax.swing.event.DocumentEvent e) { clearList(); }
+			});
+		}
+
+		dialog.add(content, BorderLayout.CENTER);
+		if (!hasBooks) nameField.requestFocusInWindow();
+		dialog.setVisible(true); // blocks – modal
+		return result[0];
+	}
+
 	// ── Page dialog ───────────────────────────────────────────────────────────
 
 	/**
@@ -253,6 +396,29 @@ class BookController {
 		content.add(row);
 		dialog.add(content);
 		dialog.setVisible(true);
+	}
+
+	// ── Page copy ─────────────────────────────────────────────────────────────
+
+	/**
+	 * Copies {@code sourcePage} as a new page at the end of {@code bookDir}.
+	 * Updates the manifest so the copy appears in the page list.
+	 *
+	 * @param sourcePage page file to duplicate (must be inside {@code bookDir/pages/})
+	 * @param bookDir    book directory containing the pages/ sub-folder
+	 * @return the newly created copy file
+	 */
+	static File copyPage(File sourcePage, File bookDir) throws IOException {
+		File pagesDir = getPagesDir(bookDir);
+		String newName = nextPageName(bookDir);
+		File dest = new File(pagesDir, newName);
+		java.nio.file.Files.copy(sourcePage.toPath(), dest.toPath());
+
+		List<String> pages = readManifestPages(bookDir);
+		pages.add(newName);
+		writeManifest(bookDir, bookDir.getName(), pages);
+		System.out.println("[BookController] Seite kopiert: " + dest.getAbsolutePath());
+		return dest;
 	}
 
 	// ── Helpers ───────────────────────────────────────────────────────────────

@@ -307,6 +307,14 @@ class UIBuilder {
 		center.add(ed.paintModeBtn);
 		center.add(ed.bookModeBtn);
 		center.add(ed.sceneModeBtn);
+		center.add(Box.createHorizontalStrut(4));
+		ed.pageLayoutBtn = UIComponentFactory.buildModeToggleBtn("SL", "SeitenLayout ein/ausblenden");
+		ed.pageLayoutBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		ed.pageLayoutBtn.addActionListener(e -> {
+			if (ed.pageLayoutToolbar != null)
+				ed.pageLayoutToolbar.setVisible(ed.pageLayoutBtn.isSelected());
+		});
+		center.add(ed.pageLayoutBtn);
 		center.add(Box.createHorizontalStrut(6));
 		center.add(ed.mapsBtn);
 		center.add(ed.toggleDropZoneBtn);
@@ -633,10 +641,18 @@ class UIBuilder {
 	// ── Bottom bar ────────────────────────────────────────────────────────────
 
 	JPanel buildBottomBar() {
-		ed.paintToolbar = new PaintToolbar(ed, ed.buildPaintCallbacks());
+		ed.paintToolbar     = new PaintToolbar(ed, ed.buildPaintCallbacks());
+		ed.pageLayoutToolbar = new PageLayoutToolbar(ed);
+
+		// Stack: pageLayoutToolbar (top) + paintToolbar (below)
+		JPanel toolbarStack = new JPanel(new BorderLayout());
+		toolbarStack.setOpaque(false);
+		toolbarStack.add(ed.pageLayoutToolbar, BorderLayout.NORTH);
+		toolbarStack.add(ed.paintToolbar,      BorderLayout.SOUTH);
+
 		JPanel wrapper = new JPanel(new BorderLayout());
 		wrapper.setBackground(AppColors.BG_DARK);
-		wrapper.add(ed.paintToolbar, BorderLayout.NORTH);
+		wrapper.add(toolbarStack, BorderLayout.NORTH);
 		return wrapper;
 	}
 

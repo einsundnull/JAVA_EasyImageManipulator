@@ -158,6 +158,10 @@ class FileLoadController {
 		ed.updateStatus();
 		ed.setBottomButtonsEnabled(true);
 		ed.preloadNextImages(idx);
+
+		// Notify page-layout toolbar so it can load the page's .layout manifest
+		if (ed.pageLayoutToolbar != null)
+			ed.pageLayoutToolbar.loadFromPage(file);
 	}
 
 	/**

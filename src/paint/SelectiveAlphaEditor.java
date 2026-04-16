@@ -197,6 +197,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	BookListPanel  bookListPanel2;
 	BookPagesPanel bookPagesPanel2;
 
+	// Page-layout toolbar (horizontal, above PaintToolbar)
+	PageLayoutToolbar pageLayoutToolbar;
+	JToggleButton     pageLayoutBtn;   // "SL" toggle in top bar
+
 	PaintToolbar paintToolbar;
 
 	// =========================================================================
