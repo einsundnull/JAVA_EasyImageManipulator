@@ -129,10 +129,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	private List<Layer> clipboardLayers; // For copying/pasting layers between canvases
 	private Point pasteOffset;
 
-	private AppMode appMode = AppMode.ALPHA_EDITOR;
+	/** Default appMode applied to new canvases on first load (from settings). */
+	private AppMode defaultAppMode = AppMode.ALPHA_EDITOR;
 	private boolean floodfillMode = false;
 	private boolean alphaPaintMode = false; // true = Pinsel-basiertes Alpha-Malen
-	private boolean showGrid = false;
+	// showGrid is now per-canvas: ci(idx).showGrid
 	private boolean showRuler = false;
 	private RulerUnit rulerUnit = RulerUnit.PX;
 
@@ -294,7 +295,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			canvasBg2 = new Color(settings.getBg2());
 
 			// View-Optionen
-			showGrid = settings.isShowGrid();
+			ci(0).showGrid = settings.isShowGrid(); ci(1).showGrid = settings.isShowGrid();
 			showRuler = settings.isShowRuler();
 			rulerUnit = RulerUnit.valueOf(settings.getRulerUnit());
 
@@ -306,9 +307,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			// App-Modus
 			try {
-				appMode = AppMode.valueOf(settings.getAppMode());
+				defaultAppMode = AppMode.valueOf(settings.getAppMode());
 			} catch (IllegalArgumentException e) {
-				appMode = AppMode.ALPHA_EDITOR;
+				defaultAppMode = AppMode.ALPHA_EDITOR;
 			}
 
 			// PaintToolbar-Einstellungen
@@ -399,7 +400,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		try {
 			// Speichere aktuelle Szene
 			if (ci(0).sourceFile != null && ci(0).workingImage != null) {
-				projectManager.saveScene(ci(0).sourceFile, ci(0).activeElements, ci(0).zoom, appMode,
+				projectManager.saveScene(ci(0).sourceFile, ci(0).activeElements, ci(0).zoom, ci(0).appMode,
 						ci(0).workingImage.getWidth(), ci(0).workingImage.getHeight());
 			}
 
@@ -407,10 +408,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			AppSettings settings = AppSettings.getInstance();
 			settings.setBg1(canvasBg1.getRGB());
 			settings.setBg2(canvasBg2.getRGB());
-			settings.setShowGrid(showGrid);
+			settings.setShowGrid(ci().showGrid);
 			settings.setShowRuler(showRuler);
 			settings.setRulerUnit(rulerUnit.toString());
-			settings.setAppMode(appMode.toString());
+			settings.setAppMode(ci().appMode.toString());
 			settings.setZoomMin(ZOOM_MIN);
 			settings.setZoomMax(ZOOM_MAX);
 			settings.setZoomStep(ZOOM_STEP);
@@ -923,6 +924,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				c.layeredPane.setBorder(null);
 			}
 		}
+
+		// Sync toolbar buttons to reflect the newly active canvas's mode
+		boolean isPaint = ci().appMode == AppMode.PAINT;
+		paintModeBtn.setSelected(isPaint);
+		canvasModeBtn.setEnabled(isPaint);
+		updateModeLabel();
 
 		// Update element panels
 		refreshElementPanel();
@@ -1520,6 +1527,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		if (c.canvasPanel != null)
 			c.canvasPanel.resetInputState();
 
+		// Apply default mode for new files (overridden below if saved mode exists)
+		c.appMode = defaultAppMode;
+
 		// Load saved scene data (Layer, Zoom, Mode)
 		try {
 			if (projectManager.getProjectName() != null) {
@@ -1537,7 +1547,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 				AppMode savedMode = projectManager.loadSceneMode(file);
 				if (savedMode != null) {
-					appMode = savedMode;
+					c.appMode = savedMode;
 				}
 			}
 		} catch (IOException e) {
@@ -2044,7 +2054,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	private String getSaveSuffix() {
-		return (appMode == AppMode.PAINT) ? "_painted" : floodfillMode ? "_floodfill_alpha" : "_selective_alpha";
+		return (ci().appMode == AppMode.PAINT) ? "_painted" : floodfillMode ? "_floodfill_alpha" : "_selective_alpha";
 	}
 
 	private void resetImage() {
@@ -2083,7 +2093,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			// Speichere Szene wenn Projekt aktiv ist
 			if (projectManager.getProjectName() != null) {
-				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode, c.workingImage.getWidth(),
+				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode, c.workingImage.getWidth(),
 						c.workingImage.getHeight());
 			}
 
@@ -2180,7 +2190,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			// Speichere Szene wenn Projekt aktiv ist
 			if (projectManager.getProjectName() != null) {
-				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode, c.workingImage.getWidth(),
+				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode, c.workingImage.getWidth(),
 						c.workingImage.getHeight());
 			}
 
@@ -2421,7 +2431,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			// Speichere Szene wenn Projekt aktiv ist
 			if (projectManager.getProjectName() != null) {
-				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, appMode, c.workingImage.getWidth(),
+				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode, c.workingImage.getWidth(),
 						c.workingImage.getHeight());
 			}
 
@@ -2644,7 +2654,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// =========================================================================
 	private void toggleAlphaMode() {
 		CanvasInstance c = ci();
-		if (appMode != AppMode.ALPHA_EDITOR)
+		if (ci().appMode != AppMode.ALPHA_EDITOR)
 			return;
 		// Cycle through 3 modes: Selective Alpha → Floodfill → Alpha Paint → Selective
 		// Alpha
@@ -2674,14 +2684,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		CanvasInstance c = ci();
 		boolean entering = paintModeBtn.isSelected();
 		if (entering) {
-			appMode = AppMode.PAINT;
+			ci().appMode = AppMode.PAINT;
 		} else {
 			// Leaving Paint: also deactivate Canvas sub-mode
 			if (canvasModeBtn.isSelected()) {
 				canvasModeBtn.setSelected(false);
 				setElementPanelVisible(false);
 			}
-			appMode = AppMode.ALPHA_EDITOR;
+			ci().appMode = AppMode.ALPHA_EDITOR;
 		}
 		// Canvas sub-mode button is only meaningful inside Paint
 		canvasModeBtn.setEnabled(entering);
@@ -2722,7 +2732,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 */
 	private void toggleCanvasMode() {
 		boolean entering = canvasModeBtn.isSelected();
-		// appMode stays PAINT in both cases — Canvas is just a sub-mode flag
+		// ci().appMode stays PAINT in both cases — Canvas is just a sub-mode flag
 		if (entering) {
 			setElementPanelVisible(true);
 		} else {
@@ -2743,7 +2753,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				sceneModeBtn.setSelected(false);
 			}
 		}
-		// appMode stays unchanged (PAINT or ALPHA_EDITOR)
+		// ci().appMode stays unchanged (PAINT or ALPHA_EDITOR)
 		updateModeLabel();
 		ci().canvasPanel.repaint();
 	}
@@ -2757,7 +2767,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				bookModeBtn.setSelected(false);
 			}
 		}
-		// appMode stays unchanged (PAINT or ALPHA_EDITOR)
+		// ci().appMode stays unchanged (PAINT or ALPHA_EDITOR)
 		updateModeLabel();
 		ci().canvasPanel.repaint();
 	}
@@ -2792,7 +2802,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 	/** Updates modeLabel to show all active mode flags dynamically. */
 	private void updateModeLabel() {
-		if (appMode == AppMode.PAINT) {
+		if (ci().appMode == AppMode.PAINT) {
 			StringBuilder sb = new StringBuilder("Modus: Paint");
 			if (canvasModeBtn.isSelected())
 				sb.append(" / Canvas");
@@ -3245,7 +3255,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		}
 
 		// Apply to canvas
-		Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
+		Rectangle sel = (ci().appMode == AppMode.PAINT) ? getActiveSelection() : null;
 		pushUndo();
 		if (sel != null) {
 			PaintEngine.flipHorizontalInRegion(c.workingImage, sel);
@@ -3286,7 +3296,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		}
 
 		// Apply to canvas
-		Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
+		Rectangle sel = (ci().appMode == AppMode.PAINT) ? getActiveSelection() : null;
 		pushUndo();
 		if (sel != null) {
 			PaintEngine.flipVerticalInRegion(c.workingImage, sel);
@@ -3328,7 +3338,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		}
 
 		// Apply to canvas
-		Rectangle sel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
+		Rectangle sel = (ci().appMode == AppMode.PAINT) ? getActiveSelection() : null;
 		pushUndo();
 		if (sel != null) {
 			PaintEngine.flipVerticalInRegion(c.workingImage, sel);
@@ -3364,7 +3374,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		JButton ok = UIComponentFactory.buildButton("OK", AppColors.ACCENT, AppColors.ACCENT_HOVER);
 		JButton can = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
 		ok.setForeground(Color.WHITE);
-		final boolean rotateHasSel = (appMode == AppMode.PAINT && getActiveSelection() != null);
+		final boolean rotateHasSel = (ci().appMode == AppMode.PAINT && getActiveSelection() != null);
 		final Rectangle rotateSel = rotateHasSel ? getActiveSelection() : null;
 		ok.addActionListener(e -> {
 			try {
@@ -3395,7 +3405,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		CanvasInstance c = ci();
 		if (c.workingImage == null)
 			return;
-		Rectangle scaleSel = (appMode == AppMode.PAINT) ? getActiveSelection() : null;
+		Rectangle scaleSel = (ci().appMode == AppMode.PAINT) ? getActiveSelection() : null;
 		int origW = scaleSel != null ? scaleSel.width : c.workingImage.getWidth();
 		int origH = scaleSel != null ? scaleSel.height : c.workingImage.getHeight();
 
@@ -3507,7 +3517,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			return;
 		BufferedImage scaled = PaintEngine.scale(c.floatingImg, Math.max(1, c.floatRect.width),
 				Math.max(1, c.floatRect.height));
-		if (appMode == AppMode.PAINT) {
+		if (ci().appMode == AppMode.PAINT) {
 			// Non-destructive: become an ImageLayer
 			Layer el = new ImageLayer(c.nextElementId++, scaled, c.floatRect.x, c.floatRect.y, c.floatRect.width,
 					c.floatRect.height);
@@ -3729,7 +3739,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			@Override
 			public void onToggleGrid(boolean show) {
-				showGrid = show;
+				ci().showGrid = show;
 				ci().canvasPanel.repaint();
 			}
 
@@ -3802,7 +3812,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 			@Override
 			public AppMode getAppMode() {
-				return appMode;
+				return c().appMode;
 			}
 
 			@Override
@@ -3813,6 +3823,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			@Override
 			public boolean isAlphaPaintMode() {
 				return alphaPaintMode;
+			}
+
+			@Override
+			public boolean isGridVisible() {
+				return c().showGrid;
 			}
 
 			@Override
@@ -4805,7 +4820,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * non-destructive layer.
 	 */
 	private void addElementFromClipboard(BufferedImage img, int x, int y) {
-		if (img == null || appMode != AppMode.PAINT)
+		if (img == null || ci().appMode != AppMode.PAINT)
 			return;
 		CanvasInstance c = ci();
 		Layer el = new ImageLayer(c.nextElementId++, deepCopy(img), x, y, img.getWidth(), img.getHeight());
@@ -5436,7 +5451,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		am.put("selectAll", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if (appMode == AppMode.PAINT) {
+				if (ci().appMode == AppMode.PAINT) {
 					CanvasInstance c = ci();
 					c.selectedElements.clear();
 					c.selectedElements.addAll(c.activeElements);
@@ -6077,7 +6092,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	public void setBottomButtonsEnabled(boolean enabled) {
-		boolean sel = !floodfillMode && appMode == AppMode.ALPHA_EDITOR;
+		boolean sel = !floodfillMode && ci().appMode == AppMode.ALPHA_EDITOR;
 		applyButton.setEnabled(enabled && sel);
 		clearSelectionsButton.setEnabled(enabled && sel);
 		if (actionPanel == null)

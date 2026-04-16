@@ -25,6 +25,10 @@ import javax.swing.Timer;
  */
 public class CanvasInstance {
 
+    // ── Per-canvas mode & display state ──────────────────────────────────────
+    public AppMode        appMode           = AppMode.ALPHA_EDITOR;
+    public boolean        showGrid          = false;
+
     // ── Image state ───────────────────────────────────────────────────────────
     public BufferedImage  workingImage;
     public BufferedImage  originalImage;

@@ -2127,6 +2127,31 @@ public class CanvasPanel extends JPanel {
 				g2.drawRect(hr.x, hr.y, hr.width, hr.height);
 			}
 		}
+
+		// ── Grid overlay ──────────────────────────────────────────────────────
+		if (callbacks.isGridVisible()) {
+			drawGrid(g2, callbacks.getZoom());
+		}
+	}
+
+	private static final int GRID_PX = 32; // grid cell size in image pixels
+
+	private void drawGrid(Graphics2D g2, double zoom) {
+		java.awt.image.BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		int W = img.getWidth(), H = img.getHeight();
+		int step = Math.max(1, (int) Math.round(GRID_PX * zoom));
+		int screenW = (int) Math.round(W * zoom);
+		int screenH = (int) Math.round(H * zoom);
+		g2.setStroke(new BasicStroke(0.5f));
+		// Minor lines (every cell)
+		g2.setColor(new java.awt.Color(255, 255, 255, 30));
+		for (int x = 0; x <= screenW; x += step) g2.drawLine(x, 0, x, screenH);
+		for (int y = 0; y <= screenH; y += step) g2.drawLine(0, y, screenW, y);
+		// Major lines (every 4 cells)
+		g2.setColor(new java.awt.Color(255, 255, 255, 70));
+		for (int x = 0; x <= screenW; x += step * 4) g2.drawLine(x, 0, x, screenH);
+		for (int y = 0; y <= screenH; y += step * 4) g2.drawLine(0, y, screenW, y);
 	}
 
 	// =========================================================================
