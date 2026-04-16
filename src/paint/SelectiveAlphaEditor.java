@@ -4689,8 +4689,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			c.activeSceneFile = syntheticManifest;
 			c.sourceFile      = syntheticManifest;
 			ci(idx).tileGallery.clearActiveAndSelection();
+			activeCanvasIndex = idx;
+			updateCanvasFocusBorder();
+			swapToImageView(idx);
+			SwingUtilities.invokeLater(() -> fitToViewport(idx));
 			refreshElementPanel();
-			if (c.canvasPanel != null) c.canvasPanel.repaint();
+			updateTitle();
+			updateStatus();
+			setBottomButtonsEnabled(true);
 
 			// Open scenes panel and populate it with scenes of this game only
 			File gameScenesDir = sceneDir.getParentFile(); // …/DefaultGame/scenes/
