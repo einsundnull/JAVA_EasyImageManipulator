@@ -468,32 +468,48 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		bar.setBackground(AppColors.BG_PANEL);
 		bar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
 
-		// ── LEFT: filmstrip toggle + mode + status labels ──────────────────────
-		JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 5));
-		left.setOpaque(false);
+		// ── Construct all field-buttons (needed by other methods) ──────────────
+		// These are assigned to fields but only some are added to the bar.
 
-		// \u2261 (≡) is in Basic Multilingual Plane — safe on all Windows systems
-		filmstripBtn = UIComponentFactory.buildModeToggleBtn("\u2261", "Bilder ein-/ausblenden");
+		// SI – Scenes I
+		scenesBtn = UIComponentFactory.buildModeToggleBtn("SI", "Szenen I ein-/ausblenden");
+		scenesBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+		scenesBtn.setSelected(false);
+		scenesBtn.addActionListener(e -> setScenesPanelVisible(0, scenesBtn.isSelected()));
+
+		// II – Images I (filmstrip)
+		filmstripBtn = UIComponentFactory.buildModeToggleBtn("II", "Bilder I ein-/ausblenden");
 		filmstripBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-		filmstripBtn.setSelected(true); // Start VISIBLE
+		filmstripBtn.setSelected(true);
 		filmstripBtn.addActionListener(e -> {
 			ci(0).tileGallery.setVisible(filmstripBtn.isSelected());
 			updateLayoutVisibility();
-			// Wait for layout to settle before recalculating image zoom/position
-			SwingUtilities.invokeLater(() -> {
-				SwingUtilities.invokeLater(() -> reloadCurrentImage(0));
-			});
+			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> reloadCurrentImage(0)));
 		});
 
-		scenesBtn = UIComponentFactory.buildModeToggleBtn("S", "Szenen ein-/ausblenden");
-		scenesBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-		scenesBtn.setSelected(false); // Start HIDDEN - only open by user action or Recent dialog
-		scenesBtn.addActionListener(e -> setScenesPanelVisible(0, scenesBtn.isSelected()));
+		// EI – Elements I
+		firstElementsBtn = UIComponentFactory.buildModeToggleBtn("EI", "Ebenen I ein-/ausblenden");
+		firstElementsBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+		firstElementsBtn.setSelected(false);
+		firstElementsBtn.setEnabled(false);
+		firstElementsBtn.addActionListener(e -> {
+			if (elementLayerPanel != null) elementLayerPanel.setVisible(firstElementsBtn.isSelected());
+			updateLayoutVisibility();
+			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex)));
+		});
 
+		// FI – Open folder → Canvas I
+		quickOpenBtn = UIComponentFactory.buildButton("\uD83D\uDCC2 I", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		quickOpenBtn.setToolTipText("Ordner öffnen / Recent Projekte (Canvas I)");
+		quickOpenBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+		quickOpenBtn.setForeground(AppColors.TEXT);
+		quickOpenBtn.addActionListener(e -> showQuickOpenDialog(0));
+
+		// Canvas buttons (fields required by other code, not shown in bar)
 		firstCanvasBtn = UIComponentFactory.buildModeToggleBtn("1", "1. Canvas ein-/ausblenden");
 		firstCanvasBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-		firstCanvasBtn.setSelected(true); // Canvas 1 starts visible
-		firstCanvasBtn.setEnabled(false); // Enabled once canvas 0 has content
+		firstCanvasBtn.setSelected(true);
+		firstCanvasBtn.setEnabled(false);
 		firstCanvasBtn.addActionListener(e -> updateLayoutVisibility());
 
 		secondCanvasBtn = UIComponentFactory.buildModeToggleBtn("2", "2. Canvas ein-/ausblenden");
@@ -502,120 +518,54 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		secondCanvasBtn.setEnabled(false);
 		secondCanvasBtn.addActionListener(e -> updateLayoutVisibility());
 
-		secondGalleryBtn = UIComponentFactory.buildModeToggleBtn("B", "2. Bilder ein-/ausblenden");
+		// III – Images II
+		secondGalleryBtn = UIComponentFactory.buildModeToggleBtn("III", "Bilder II ein-/ausblenden");
 		secondGalleryBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 		secondGalleryBtn.setSelected(false);
 		secondGalleryBtn.setEnabled(false);
 		secondGalleryBtn.addActionListener(e -> {
-			if (ci(1).tileGallery != null) {
-				ci(1).tileGallery.setVisible(secondGalleryBtn.isSelected());
-			}
+			if (ci(1).tileGallery != null) ci(1).tileGallery.setVisible(secondGalleryBtn.isSelected());
 			updateLayoutVisibility();
-			// Wait for layout to settle before recalculating image zoom/position
-			SwingUtilities.invokeLater(() -> {
-				SwingUtilities.invokeLater(() -> reloadCurrentImage(1));
-			});
+			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> reloadCurrentImage(1)));
 		});
 
-		secondScenesBtn = UIComponentFactory.buildModeToggleBtn("S2", "2. Szenen ein-/ausblenden");
+		// SII – Scenes II
+		secondScenesBtn = UIComponentFactory.buildModeToggleBtn("SII", "Szenen II ein-/ausblenden");
 		secondScenesBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 		secondScenesBtn.setSelected(false);
-		secondScenesBtn.setEnabled(false);
+		secondScenesBtn.setEnabled(true);
 		secondScenesBtn.addActionListener(e -> setScenesPanelVisible(1, secondScenesBtn.isSelected()));
 
-		firstElementsBtn = UIComponentFactory.buildModeToggleBtn("E1", "1. Ebenen ein-/ausblenden");
-		firstElementsBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-		firstElementsBtn.setSelected(false);
-		firstElementsBtn.setEnabled(false);
-		firstElementsBtn.addActionListener(e -> {
-			if (elementLayerPanel != null) {
-				elementLayerPanel.setVisible(firstElementsBtn.isSelected());
-			}
-			updateLayoutVisibility();
-			// Wait for layout to settle before recalculating image zoom/position
-			SwingUtilities.invokeLater(() -> {
-				SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex));
-			});
-		});
-
-		secondElementsBtn = UIComponentFactory.buildModeToggleBtn("E2", "2. Ebenen ein-/ausblenden");
+		// EII – Elements II
+		secondElementsBtn = UIComponentFactory.buildModeToggleBtn("EII", "Ebenen II ein-/ausblenden");
 		secondElementsBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 		secondElementsBtn.setSelected(false);
 		secondElementsBtn.setEnabled(false);
 		secondElementsBtn.addActionListener(e -> {
-			if (elementLayerPanel2 != null) {
-				elementLayerPanel2.setVisible(secondElementsBtn.isSelected());
-			}
+			if (elementLayerPanel2 != null) elementLayerPanel2.setVisible(secondElementsBtn.isSelected());
 			updateLayoutVisibility();
-			// Wait for layout to settle before recalculating image zoom/position
-			SwingUtilities.invokeLater(() -> {
-				SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex));
-			});
+			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex)));
 		});
 
-		mapsBtn = UIComponentFactory.buildModeToggleBtn("🗺", "Translation Maps ein-/ausblenden");
+		// mapsBtn – not shown, keep as field for other code
+		mapsBtn = UIComponentFactory.buildModeToggleBtn("M", "Maps ein-/ausblenden");
 		mapsBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 		mapsBtn.setSelected(false);
 		mapsBtn.addActionListener(e -> {
-			if (mapsPanel != null) {
-				mapsPanel.setVisible(mapsBtn.isSelected());
-			}
+			if (mapsPanel != null) mapsPanel.setVisible(mapsBtn.isSelected());
 			updateLayoutVisibility();
-			// Wait for layout to settle before recalculating image zoom/position
-			SwingUtilities.invokeLater(() -> {
-				SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex));
-			});
+			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex)));
 		});
 
-		quickOpenBtn = UIComponentFactory.buildButton("📂", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		quickOpenBtn.setToolTipText("Schnellauswahl: Recent Projekte");
-		quickOpenBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-		quickOpenBtn.setForeground(AppColors.TEXT);
-		quickOpenBtn.addActionListener(e -> showQuickOpenDialog());
-
-		toggleDropZoneBtn = UIComponentFactory.buildModeToggleBtn("⬇", "Drop-Feld für 2. Canvas");
+		// toggleDropZoneBtn – not shown, keep as field
+		toggleDropZoneBtn = UIComponentFactory.buildModeToggleBtn("\u2193", "Drop-Feld");
 		toggleDropZoneBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 		toggleDropZoneBtn.setSelected(false);
 		toggleDropZoneBtn.addActionListener(e -> {
-			if (rightDropZone != null) {
-				rightDropZone.setVisible(toggleDropZoneBtn.isSelected());
-			}
+			if (rightDropZone != null) rightDropZone.setVisible(toggleDropZoneBtn.isSelected());
 		});
 
-		modeLabel = new JLabel("Modus: Selective Alpha");
-		modeLabel.setForeground(AppColors.TEXT_MUTED);
-		modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-
-		statusLabel = new JLabel("Keine Datei geladen");
-		statusLabel.setForeground(AppColors.TEXT_MUTED);
-		statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-		statusLabel.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
-
-		// Scenes panel toggle (ganz links)
-		left.add(scenesBtn);
-		left.add(filmstripBtn);
-		left.add(firstCanvasBtn);
-		left.add(firstElementsBtn);
-		left.add(secondCanvasBtn);
-		left.add(secondElementsBtn);
-		left.add(mapsBtn);
-		left.add(quickOpenBtn);
-		left.add(toggleDropZoneBtn);
-		left.add(modeLabel);
-		left.add(statusLabel);
-		bar.add(left, BorderLayout.WEST);
-
-		// ── RIGHT: all action + layer + file + mode + zoom buttons ─────────────
-		JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 5));
-		right.setOpaque(false);
-
-		// Scenes2 und Gallery2 buttons (ganz rechts)
-		right.add(secondGalleryBtn);
-		right.add(secondScenesBtn);
-
-		// — Selection/alpha actions (formerly statusBar) —
-		// applyButton and clearSelectionsButton are fields accessed by
-		// setBottomButtonsEnabled()
+		// applyButton / clearSelectionsButton – fields required by setBottomButtonsEnabled()
 		applyButton = UIComponentFactory.buildButton("\u2713", AppColors.ACCENT, AppColors.ACCENT_HOVER);
 		applyButton.setForeground(Color.WHITE);
 		applyButton.setToolTipText("Auswahl auf Alpha anwenden");
@@ -629,52 +579,20 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		clearSelectionsButton.setEnabled(false);
 		clearSelectionsButton.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 
-		// — Non-destructive layer buttons (moved from statusBar) —
-		// \u2295 (⊕) = circled plus \u229e (⊞) = squared plus — both BMP, safe
-		JButton insertElemBtn = UIComponentFactory.buildButton("\u2295", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		insertElemBtn.setToolTipText("Als nicht-destruktiven Layer einfügen (ENTER=zusammenführen, DEL=löschen)");
-		insertElemBtn.addActionListener(e -> insertSelectionAsElement());
-		insertElemBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-
-		JButton mergeElemBtn = UIComponentFactory.buildButton("\u229e", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		mergeElemBtn.setToolTipText("Ausgewähltes Element auf Canvas rendern (ENTER)");
-		mergeElemBtn.addActionListener(e -> {
-			if (!ci().selectedElements.isEmpty())
-				mergeSelectedElements();
-		});
-		mergeElemBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-
-		// — File/image operations (formerly statusBar) —
-		// actionPanel is a field used by setBottomButtonsEnabled() to find
-		// resetButton/saveButton by name
+		// actionPanel – field required by setBottomButtonsEnabled()
 		actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 		actionPanel.setOpaque(false);
 
-		JButton newBitmapBtn = UIComponentFactory.buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		newBitmapBtn.setToolTipText("Neue leere Bitmap erstellen");
-		newBitmapBtn.addActionListener(e -> doNewBitmap());
-		newBitmapBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-
-		JButton bgColorBtn = UIComponentFactory.buildButton("BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		bgColorBtn.setToolTipText("Canvas-Hintergrundfarbe einstellen");
-		bgColorBtn.addActionListener(e -> showCanvasBgDialog());
-		bgColorBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-
-		// QuickBG toggle: temporarily hide/show BG Color 1
-		JButton quickBgBtn = UIComponentFactory.buildButton("Q-BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		quickBgBtn.setToolTipText("BG Color 1 temporär aus-/einblenden");
-		quickBgBtn.addActionListener(e -> toggleQuickBG());
-		quickBgBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-
-		// \u21ba (↺) = anticlockwise arrow — BMP, safe
-		JButton resetButton = UIComponentFactory.buildButton("\u21ba", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		// RL – Reload (resetButton field)
+		JButton resetButton = UIComponentFactory.buildButton("RL", AppColors.BTN_BG, AppColors.BTN_HOVER);
 		resetButton.setName("resetButton");
-		resetButton.setToolTipText("Bild zurücksetzen");
+		resetButton.setToolTipText("Bild neu laden / zurücksetzen");
 		resetButton.addActionListener(e -> resetImage());
 		resetButton.setEnabled(false);
 		resetButton.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 
-		JButton saveButton = UIComponentFactory.buildButton("Save", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
+		// SV – Save (saveButton field)
+		JButton saveButton = UIComponentFactory.buildButton("SV", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
 		saveButton.setName("saveButton");
 		saveButton.setForeground(Color.WHITE);
 		saveButton.setToolTipText("Bild speichern (STRG+S)");
@@ -685,78 +603,123 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		actionPanel.add(resetButton);
 		actionPanel.add(saveButton);
 
-		// Mode toggle buttons
-		canvasModeBtn = UIComponentFactory.buildModeToggleBtn("\u25a6",
-				"Canvas-Modus: Layer-Verwaltung – nur im Paint-Modus (STRG+A = Alle auswählen)");
+		// CM – Canvas Mode
+		canvasModeBtn = UIComponentFactory.buildModeToggleBtn("CM",
+				"Canvas-Modus: Layer-Verwaltung (STRG+A = Alle auswählen)");
 		canvasModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
-		canvasModeBtn.setEnabled(false); // enabled only while Paint mode is active
+		canvasModeBtn.setEnabled(false);
 		canvasModeBtn.addActionListener(e -> toggleCanvasMode());
 
-		paintModeBtn = UIComponentFactory.buildModeToggleBtn("\u270f", "Paint-Modus aktivieren / deaktivieren");
+		// PT – Paint toolbar
+		paintModeBtn = UIComponentFactory.buildModeToggleBtn("PT", "Paint-Leiste ein-/ausblenden");
 		paintModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 		paintModeBtn.addActionListener(e -> togglePaintMode());
 
-		bookModeBtn = UIComponentFactory.buildModeToggleBtn("Book", "Buch-Modus aktivieren / deaktivieren");
-		bookModeBtn.setPreferredSize(new Dimension(50, TOPBAR_BTN_H));
+		// BK – Book mode
+		bookModeBtn = UIComponentFactory.buildModeToggleBtn("BK", "Buch-Modus");
+		bookModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 		bookModeBtn.addActionListener(e -> toggleBookMode());
 
-		sceneModeBtn = UIComponentFactory.buildModeToggleBtn("Scene", "Szenen-Modus aktivieren / deaktivieren");
-		sceneModeBtn.setPreferredSize(new Dimension(50, TOPBAR_BTN_H));
+		// sceneModeBtn – not shown, keep as field
+		sceneModeBtn = UIComponentFactory.buildModeToggleBtn("SC", "Szenen-Modus");
+		sceneModeBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
 		sceneModeBtn.addActionListener(e -> toggleSceneMode());
 
-		// — Zoom controls —
+		// modeLabel / statusLabel – fields used elsewhere, not shown in bar
+		modeLabel = new JLabel("");
+		modeLabel.setForeground(AppColors.TEXT_MUTED);
+		modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+		statusLabel = new JLabel("");
+		statusLabel.setForeground(AppColors.TEXT_MUTED);
+		statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+		// ── Zoom controls ──────────────────────────────────────────────────────
+		JButton zoomInBtn  = UIComponentFactory.buildButton("+",      AppColors.BTN_BG, AppColors.BTN_HOVER);
 		JButton zoomOutBtn = UIComponentFactory.buildButton("\u2212", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		JButton zoomInBtn = UIComponentFactory.buildButton("+", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		JButton zoomResetBtn = UIComponentFactory.buildButton("1:1", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		JButton zoomFitBtn = UIComponentFactory.buildButton("Fit", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		JButton zoomFitBtn = UIComponentFactory.buildButton("Fit",    AppColors.BTN_BG, AppColors.BTN_HOVER);
+		// 1:1 button exists but is not shown per spec
+		JButton zoomResetBtn = UIComponentFactory.buildButton("1:1",  AppColors.BTN_BG, AppColors.BTN_HOVER);
 
 		zoomLabel = new JLabel("100%");
 		zoomLabel.setForeground(AppColors.TEXT_MUTED);
 		zoomLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
 		zoomLabel.setPreferredSize(new Dimension(46, 20));
-		zoomLabel.setHorizontalAlignment(JLabel.RIGHT);
-		zoomLabel.setToolTipText("Doppelklick: Zoom direkt eingeben");
+		zoomLabel.setHorizontalAlignment(JLabel.CENTER);
+		zoomLabel.setToolTipText("Doppelklick: Zoom eingeben");
 		zoomLabel.setCursor(Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR));
 		zoomLabel.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				if (e.getClickCount() == 2)
-					showZoomInput();
+			@Override public void mouseClicked(MouseEvent e) {
+				if (e.getClickCount() == 2) showZoomInput();
 			}
 		});
 
-		zoomOutBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
 		zoomInBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
-		zoomResetBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
+		zoomOutBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
 		zoomFitBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
+		zoomResetBtn.setPreferredSize(new Dimension(TOPBAR_ZOOM_BTN_W, TOPBAR_ZOOM_BTN_H));
+		zoomInBtn.addActionListener(e  -> setZoom(ci().zoom + ZOOM_STEP, null));
 		zoomOutBtn.addActionListener(e -> setZoom(ci().zoom - ZOOM_STEP, null));
-		zoomInBtn.addActionListener(e -> setZoom(ci().zoom + ZOOM_STEP, null));
 		zoomResetBtn.addActionListener(e -> setZoom(1.0, null));
-		zoomFitBtn.addActionListener(e -> fitToViewport());
+		zoomFitBtn.addActionListener(e  -> fitToViewport());
 
-		// — Assemble right panel (left-to-right order in FlowLayout.RIGHT =
-		// right-to-left visual) —
-		right.add(applyButton);
-		right.add(clearSelectionsButton);
-		right.add(Box.createHorizontalStrut(4));
-		right.add(insertElemBtn);
-		right.add(mergeElemBtn);
-		right.add(Box.createHorizontalStrut(4));
-		right.add(newBitmapBtn);
-		right.add(bgColorBtn);
-		right.add(quickBgBtn);
-		right.add(actionPanel);
-		right.add(Box.createHorizontalStrut(4));
-		right.add(canvasModeBtn);
-		right.add(paintModeBtn);
-		right.add(bookModeBtn);
-		right.add(sceneModeBtn);
-		right.add(Box.createHorizontalStrut(4));
-		right.add(zoomOutBtn);
-		right.add(zoomLabel);
-		right.add(zoomInBtn);
-		right.add(zoomResetBtn);
-		right.add(zoomFitBtn);
+		// BG – Background color
+		JButton bgColorBtn = UIComponentFactory.buildButton("BG", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		bgColorBtn.setToolTipText("Canvas-Hintergrundfarbe");
+		bgColorBtn.addActionListener(e -> showCanvasBgDialog());
+		bgColorBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+		// Qu – Quick BG toggle
+		JButton quickBgBtn = UIComponentFactory.buildButton("Qu", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		quickBgBtn.setToolTipText("BG Color temporär aus-/einblenden");
+		quickBgBtn.addActionListener(e -> toggleQuickBG());
+		quickBgBtn.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+
+		// FII – Open folder → Canvas II
+		JButton openFolderII = UIComponentFactory.buildButton("\uD83D\uDCC2 II", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		openFolderII.setToolTipText("Ordner öffnen (Canvas II)");
+		openFolderII.setForeground(AppColors.TEXT);
+		openFolderII.setPreferredSize(new Dimension(TOPBAR_BTN_W, TOPBAR_BTN_H));
+		openFolderII.addActionListener(e -> showQuickOpenDialog(1));
+
+		// ── Assemble bar ───────────────────────────────────────────────────────
+		// LEFT group: SI | II | EI | FI | [gap]
+		JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 5));
+		left.setOpaque(false);
+		left.add(scenesBtn);
+		left.add(filmstripBtn);
+		left.add(firstElementsBtn);
+		left.add(quickOpenBtn);
+		left.add(Box.createHorizontalStrut(12));
+		bar.add(left, BorderLayout.WEST);
+
+		// CENTER group: + | 66% | - | Fit | BG | Qu | RL | SV | CM | PT | BK
+		JPanel center = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 5));
+		center.setOpaque(false);
+		center.add(zoomInBtn);
+		center.add(zoomLabel);
+		center.add(zoomOutBtn);
+		center.add(zoomFitBtn);
+		center.add(Box.createHorizontalStrut(6));
+		center.add(bgColorBtn);
+		center.add(quickBgBtn);
+		center.add(Box.createHorizontalStrut(6));
+		center.add(resetButton);
+		center.add(saveButton);
+		center.add(Box.createHorizontalStrut(6));
+		center.add(canvasModeBtn);
+		center.add(paintModeBtn);
+		center.add(bookModeBtn);
+		bar.add(center, BorderLayout.CENTER);
+
+		// RIGHT group: [gap] | FII | EII | III | SII
+		JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 5));
+		right.setOpaque(false);
+		right.add(Box.createHorizontalStrut(12));
+		right.add(openFolderII);
+		right.add(secondElementsBtn);
+		right.add(secondGalleryBtn);
+		right.add(secondScenesBtn);
 		bar.add(right, BorderLayout.EAST);
 
 		return bar;
@@ -1816,6 +1779,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			secondCanvasBtn.setEnabled(true);
 			secondGalleryBtn.setEnabled(true);
 			secondElementsBtn.setEnabled(true);
+			secondScenesBtn.setEnabled(true);
 		}
 
 		repositionNavButtons(idx);
