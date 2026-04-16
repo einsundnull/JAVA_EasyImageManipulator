@@ -1674,27 +1674,29 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	private void indexDirectory(File file) {
-		indexDirectory(file, activeCanvasIndex);
+		indexDirectory(file, activeCanvasIndex, LastProjectsManager.CAT_IMAGES);
 	}
 
 	private void indexDirectory(File file, int idx) {
+		indexDirectory(file, idx, LastProjectsManager.CAT_IMAGES);
+	}
+
+	private void indexDirectory(File file, int idx, String category) {
 		CanvasInstance c = ci(idx);
 		File dir = file.getParentFile();
-		if (dir == null)
-			return;
+		if (dir == null) return;
 		boolean sameDir = dir.equals(c.lastIndexedDir);
 		if (!sameDir) {
 			File[] files = dir.listFiles(f -> f.isFile() && isSupportedFile(f));
-			if (files == null)
-				return;
+			if (files == null) return;
 			Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
 			c.directoryImages = new ArrayList<>(Arrays.asList(files));
 			c.lastIndexedDir = dir;
 			c.tileGallery.setFiles(c.directoryImages, file);
 
-			// Track last opened image directory
+			// Record into the correct category (images, scenes, books, etc.)
 			try {
-				LastProjectsManager.addRecent(LastProjectsManager.CAT_IMAGES, dir.getAbsolutePath());
+				LastProjectsManager.addRecent(category, dir.getAbsolutePath());
 			} catch (IOException e) {
 				System.err.println("[WARN] Konnte lastProjects nicht speichern: " + e.getMessage());
 			}
@@ -1702,8 +1704,6 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			c.tileGallery.setActiveFile(file);
 		}
 		c.currentImageIndex = c.directoryImages.indexOf(file);
-
-		// Show TileGallery (user should manually toggle Scenes if needed)
 		c.tileGallery.setVisible(true);
 	}
 
@@ -6153,23 +6153,26 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 	/** Show quick open dialog with recent projects (uses StartupDialog). */
 	private void showQuickOpenDialog(int canvasIdx) {
+		showQuickOpenDialog(canvasIdx, LastProjectsManager.CAT_IMAGES);
+	}
+
+	private void showQuickOpenDialog(int canvasIdx, String initialCategory) {
 		try {
 			Map<String, List<String>> recent = LastProjectsManager.loadAll();
-			StartupDialog dlg = new StartupDialog(this, recent, StartupDialog.Mode.QUICK_OPEN, canvasIdx);
+			StartupDialog dlg = new StartupDialog(this, recent, StartupDialog.Mode.QUICK_OPEN, canvasIdx, initialCategory);
 			dlg.setVisible(true);
 			File chosen = dlg.getSelectedPath();
-			if (chosen != null) {
-				if (chosen.isDirectory()) {
-					// If directory chosen, load first image from it
-					File[] images = chosen.listFiles(f -> f.isFile() && isSupportedFile(f));
-					if (images != null && images.length > 0) {
-						Arrays.sort(images, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-						indexDirectory(images[0], canvasIdx);
-					}
-				} else {
-					// If file chosen, load directly
-					loadFile(chosen, canvasIdx);
+			if (chosen == null) return;
+			String category = dlg.getSelectedCategory();
+			if (chosen.isDirectory()) {
+				File[] images = chosen.listFiles(f -> f.isFile() && isSupportedFile(f));
+				if (images != null && images.length > 0) {
+					Arrays.sort(images, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+					indexDirectory(images[0], canvasIdx, category);
 				}
+			} else {
+				loadFile(chosen, canvasIdx);
+				try { LastProjectsManager.addRecent(category, chosen.getParent()); } catch (IOException ignored) {}
 			}
 		} catch (IOException ex) {
 			showErrorDialog("Fehler", "Schnellauswahl konnte nicht geöffnet werden:\n" + ex.getMessage());

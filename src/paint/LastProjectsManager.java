@@ -22,6 +22,7 @@ public class LastProjectsManager {
     public static final String CAT_GAMES    = "games";
     public static final String CAT_IMAGES   = "images";
     public static final String CAT_MAPS     = "maps";
+    public static final String CAT_SCENES   = "scenes";
 
     private static final int MAX_RECENT = 10;
 
@@ -51,24 +52,35 @@ public class LastProjectsManager {
 
     /**
      * Fügt einen Pfad vorne in die Liste ein und speichert sofort.
-     * Löscht Duplikate, behält max 10 Einträge.
+     * Normalisiert den Pfad (kanonisch, kein trailing Slash) und
+     * löscht Duplikate, behält max 10 Einträge.
      */
     public static void addRecent(String category, String path) throws IOException {
-        if (path == null || path.trim().isEmpty()) {
-            return;
-        }
-        path = path.trim();
+        if (path == null || path.trim().isEmpty()) return;
+        final String normalized = normalize(path);
 
         List<String> recent = load(category);
-        recent.remove(path); // Remove if already exists
-        recent.add(0, path); // Add at the beginning
+        // Remove any existing entry that normalizes to the same path
+        recent.removeIf(p -> normalize(p).equalsIgnoreCase(normalized));
+        recent.add(0, path);
 
-        // Keep only latest 10
         while (recent.size() > MAX_RECENT) {
             recent.remove(recent.size() - 1);
         }
-
         save(category, recent);
+    }
+
+    /** Returns canonical, trailing-slash-free, platform-consistent path string. */
+    private static String normalize(String path) {
+        try {
+            String canonical = new File(path.trim()).getCanonicalPath();
+            // Remove trailing separator
+            while (canonical.endsWith(File.separator) && canonical.length() > 1)
+                canonical = canonical.substring(0, canonical.length() - 1);
+            return canonical;
+        } catch (Exception e) {
+            return path.trim();
+        }
     }
 
     /**
@@ -91,10 +103,11 @@ public class LastProjectsManager {
      */
     public static Map<String, List<String>> loadAll() throws IOException {
         Map<String, List<String>> result = new LinkedHashMap<>();
-        result.put(CAT_TEACHING, load(CAT_TEACHING));
+        result.put(CAT_SCENES,   load(CAT_SCENES));
+        result.put(CAT_IMAGES,   load(CAT_IMAGES));
         result.put(CAT_BOOKS,    load(CAT_BOOKS));
         result.put(CAT_GAMES,    load(CAT_GAMES));
-        result.put(CAT_IMAGES,   load(CAT_IMAGES));
+        result.put(CAT_TEACHING, load(CAT_TEACHING));
         result.put(CAT_MAPS,     load(CAT_MAPS));
         return result;
     }

@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import javax.swing.event.ChangeListener;
+
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
@@ -44,21 +46,29 @@ public class StartupDialog extends JDialog {
     public enum Mode { STARTUP, QUICK_OPEN }
 
     private File selectedPath = null;
+    private String selectedCategory = LastProjectsManager.CAT_IMAGES;
     private final Map<String, List<String>> recentByCategory;
     private final Mode mode;
     private final int canvasIdx;
+    private final String initialCategory;
 
     // Alt-Konstruktor (Startup-Modus, rückwärtskompatibel)
     public StartupDialog(JFrame owner, Map<String, List<String>> recentByCategory) {
-        this(owner, recentByCategory, Mode.STARTUP, 0);
+        this(owner, recentByCategory, Mode.STARTUP, 0, LastProjectsManager.CAT_IMAGES);
     }
 
     // Neuer Hauptkonstruktor (für beide Modi)
     public StartupDialog(JFrame owner, Map<String, List<String>> recentByCategory, Mode mode, int canvasIdx) {
+        this(owner, recentByCategory, mode, canvasIdx, LastProjectsManager.CAT_IMAGES);
+    }
+
+    public StartupDialog(JFrame owner, Map<String, List<String>> recentByCategory, Mode mode, int canvasIdx, String initialCategory) {
         super(owner, mode == Mode.STARTUP ? "Zuletzt verwendet" : "Schnellauswahl", true);
         this.recentByCategory = recentByCategory;
         this.mode = mode;
         this.canvasIdx = canvasIdx;
+        this.initialCategory = initialCategory;
+        this.selectedCategory = initialCategory;
         initUI();
     }
 
@@ -84,20 +94,30 @@ public class StartupDialog extends JDialog {
         JTabbedPane tabPane = createStyledTabbedPane();
 
         String[] categories = {
-            LastProjectsManager.CAT_TEACHING,
+            LastProjectsManager.CAT_SCENES,
+            LastProjectsManager.CAT_IMAGES,
             LastProjectsManager.CAT_BOOKS,
             LastProjectsManager.CAT_GAMES,
-            LastProjectsManager.CAT_IMAGES,
+            LastProjectsManager.CAT_TEACHING,
             LastProjectsManager.CAT_MAPS
         };
 
-        for (String cat : categories) {
+        int initialTabIndex = 0;
+        for (int i = 0; i < categories.length; i++) {
+            String cat = categories[i];
             List<String> paths = recentByCategory.getOrDefault(cat, new ArrayList<>());
             JPanel tabPanel = (cat.equals(LastProjectsManager.CAT_IMAGES))
                     ? createImagesPanel(paths)
                     : createCategoryTab(paths, cat);
             tabPane.addTab(capitalize(cat), tabPanel);
+            if (cat.equals(initialCategory)) initialTabIndex = i;
         }
+        tabPane.setSelectedIndex(initialTabIndex);
+        tabPane.addChangeListener(e -> {
+            int sel = tabPane.getSelectedIndex();
+            if (sel >= 0 && sel < categories.length)
+                selectedCategory = categories[sel];
+        });
 
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.setBackground(AppColors.BG_DARK);
@@ -497,13 +517,9 @@ public class StartupDialog extends JDialog {
         return s.substring(0, 1).toUpperCase() + s.substring(1);
     }
 
-    public File getSelectedPath() {
-        return selectedPath;
-    }
-
-    public int getCanvasIdx() {
-        return canvasIdx;
-    }
+    public File getSelectedPath() { return selectedPath; }
+    public String getSelectedCategory() { return selectedCategory; }
+    public int getCanvasIdx() { return canvasIdx; }
 
     public Mode getMode() {
         return mode;
