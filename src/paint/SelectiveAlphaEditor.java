@@ -117,6 +117,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	final ElementEditController elementEditController = new ElementEditController(this);
 	private final QuickOpenController quickOpenController = new QuickOpenController(this);
 	final EditorDialogs editorDialogs = new EditorDialogs(this);
+	final BookController bookController = new BookController(this);
 	final ZoomController zoomController = new ZoomController(this);
 
 	// ── Secondary Canvas Window (F1/F2/F3/F4/F5/F7) ──────────────────────────────
@@ -181,6 +182,20 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	JToggleButton canvasModeBtn;
 	JToggleButton bookModeBtn;
 	JToggleButton sceneModeBtn;
+
+	// Book-mode context buttons (shown only when bookModeBtn is active)
+	JToggleButton bookListIBtn;   // BI  – Books ListView Canvas I
+	JToggleButton bookPagesIBtn;  // PI  – Pages of Book I
+	JToggleButton bookListIIBtn;  // BII – Books ListView Canvas II
+	JToggleButton bookPagesIIBtn; // PII – Pages of Book II
+	JPanel        topBarLeft;     // left panel of the top bar (for revalidation)
+	JPanel        topBarRight;    // right panel of the top bar (for revalidation)
+
+	// Book panels
+	BookListPanel  bookListPanel;
+	BookPagesPanel bookPagesPanel;
+	BookListPanel  bookListPanel2;
+	BookPagesPanel bookPagesPanel2;
 
 	PaintToolbar paintToolbar;
 
@@ -366,7 +381,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	void centerCanvasX()                   { fileLoader.centerCanvasX(activeCanvasIndex); }
 	public void swapToImageView()          { swapToImageView(activeCanvasIndex); }
 	private void showZoomInput()           { editorDialogs.showZoomInput(); }
-	private void doNewBitmap()             { newFileController.doNewBitmap(); }
+	void doNewBitmap()                     { newFileController.doNewBitmap(); }
 	private void showCanvasBgDialog()      { newFileController.showCanvasBgDialog(); }
 	private void toggleQuickBG()           { newFileController.toggleQuickBG(); }
 

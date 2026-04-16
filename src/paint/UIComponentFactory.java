@@ -136,6 +136,43 @@ public class UIComponentFactory {
         return btn;
     }
 
+    /**
+     * Like {@link #buildModeToggleBtn} but with a slightly blue-tinted base color
+     * to visually distinguish book-context buttons from regular mode buttons.
+     */
+    public static JToggleButton buildBookToggleBtn(String symbol, String tooltip) {
+        Color bookBg      = new Color(45, 52, 72);
+        Color bookHover   = new Color(58, 66, 90);
+        JToggleButton btn = new JToggleButton(symbol) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color bg = isSelected() ? AppColors.ACCENT_ACTIVE
+                        : (getModel().isRollover() ? bookHover : bookBg);
+                g2.setColor(bg);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                if (isSelected()) {
+                    g2.setColor(AppColors.ACCENT);
+                    g2.setStroke(new BasicStroke(2f));
+                    g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 8, 8);
+                }
+                super.paintComponent(g);
+            }
+        };
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        btn.setForeground(AppColors.TEXT);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(false);
+        btn.setOpaque(false);
+        btn.setPreferredSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
+        btn.setToolTipText(tooltip);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setVisible(false); // hidden until book mode is active
+        return btn;
+    }
+
     public static JButton buildNavButton(String symbol) {
         JButton btn = new JButton() {
             @Override

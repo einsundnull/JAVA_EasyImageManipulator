@@ -3,9 +3,13 @@ package paint;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Liest eine GameII-Scene und gibt TT-Layer zurück.
@@ -32,9 +36,11 @@ public class GameSceneReader {
     // ── Ergebnis-Container ────────────────────────────────────────────────────
 
     public static class GameSceneData {
-        public int         canvasW = 800;
-        public int         canvasH = 600;
-        public List<Layer> layers  = new ArrayList<>();
+        public int            canvasW         = 800;
+        public int            canvasH         = 600;
+        public List<Layer>    layers          = new ArrayList<>();
+        /** Bild des als Background geflaggten Sprites – null wenn keines gesetzt. */
+        public BufferedImage  backgroundImage = null;
     }
 
     // ── Haupt-Methode ─────────────────────────────────────────────────────────
@@ -48,30 +54,37 @@ public class GameSceneReader {
     public static GameSceneData readScene(File sceneRoot, String sceneName) throws IOException {
         GameSceneData data = new GameSceneData();
 
-        // Canvas-Größe aus Manifest lesen
+        // Manifest lesen: Canvas-Größe + Background-Flags
         File manifest = new File(sceneRoot, sceneName + ".txt");
-        if (manifest.exists()) readManifest(manifest, data);
+        Map<String, Boolean> bgFlags = manifest.exists()
+                ? readManifest(manifest, data)
+                : new LinkedHashMap<>();
 
         int nextId = 1;
 
         // ── Sprites ──────────────────────────────────────────────────────────
         File spritesDir = new File(sceneRoot, "sprites");
-        // Images are stored alongside the .txt files in sprites/ directly.
-        // Skip "sprites.txt" – it is a container/index file, not a sprite entity.
         if (spritesDir.exists()) {
             File[] txts = spritesDir.listFiles(f ->
                     f.isFile() && f.getName().endsWith(".txt")
                     && !f.getName().equalsIgnoreCase("sprites.txt"));
             if (txts != null) {
-                java.util.Arrays.sort(txts);
+                Arrays.sort(txts);
                 System.out.println("[GameSceneReader] Verarbeite " + txts.length + " Sprite-Dateien in: " + spritesDir);
                 for (File f : txts) {
-                    SpriteLayer sl = readSprite(f, spritesDir, nextId++, data.canvasW, data.canvasH);
+                    boolean isBg = Boolean.TRUE.equals(bgFlags.get(f.getName()));
+                    SpriteLayer sl = readSprite(f, spritesDir, nextId++, data.canvasW, data.canvasH, isBg);
                     if (sl != null) {
-                        data.layers.add(sl);
-                        System.out.println("[GameSceneReader]   + " + f.getName()
-                                + " → x=" + sl.x() + " y=" + sl.y()
-                                + " w=" + sl.width() + " h=" + sl.height());
+                        if (sl.isBackground()) {
+                            data.backgroundImage = sl.image();
+                            System.out.println("[GameSceneReader]   BG " + f.getName()
+                                    + " → " + sl.image().getWidth() + "×" + sl.image().getHeight());
+                        } else {
+                            data.layers.add(sl);
+                            System.out.println("[GameSceneReader]   + " + f.getName()
+                                    + " → x=" + sl.x() + " y=" + sl.y()
+                                    + " w=" + sl.width() + " h=" + sl.height());
+                        }
                     } else {
                         System.err.println("[GameSceneReader]   ! " + f.getName() + " → null (übersprungen)");
                     }
@@ -84,6 +97,7 @@ public class GameSceneReader {
         if (keyAreasDir.exists()) {
             File[] txts = keyAreasDir.listFiles(f -> f.isFile() && f.getName().endsWith(".txt"));
             if (txts != null) {
+                Arrays.sort(txts);
                 for (File f : txts) {
                     PathLayer pl = readKeyArea(f, nextId++, data.canvasW, data.canvasH);
                     if (pl != null) data.layers.add(pl);
@@ -96,6 +110,7 @@ public class GameSceneReader {
         if (pathsDir.exists()) {
             File[] txts = pathsDir.listFiles(f -> f.isFile() && f.getName().endsWith(".txt"));
             if (txts != null) {
+                Arrays.sort(txts);
                 for (File f : txts) {
                     PathLayer pl = readScenePath(f, nextId++, data.canvasW, data.canvasH);
                     if (pl != null) data.layers.add(pl);
@@ -104,44 +119,70 @@ public class GameSceneReader {
         }
 
         System.out.println("[GameSceneReader] Scene geladen: " + sceneName
-                + " – " + data.layers.size() + " Layer, Canvas " + data.canvasW + "×" + data.canvasH);
+                + " – " + data.layers.size() + " Layer, Canvas " + data.canvasW + "×" + data.canvasH
+                + (data.backgroundImage != null ? ", Background gesetzt" : ", kein Background"));
+
+        // Manifest auto-erstellen wenn noch keines vorhanden
+        if (!manifest.exists()) {
+            try {
+                GameSceneWriter.writeManifest(sceneRoot, sceneName, data.layers, data.canvasW, data.canvasH);
+            } catch (IOException e) {
+                System.err.println("[GameSceneReader] Manifest konnte nicht erstellt werden: " + e.getMessage());
+            }
+        }
+
         return data;
     }
 
     // ── Manifest ─────────────────────────────────────────────────────────────
 
-    /** Liest canvasWidth / canvasHeight aus dem #GameII:-Abschnitt des Manifests. */
-    private static void readManifest(File manifest, GameSceneData data) {
+    /**
+     * Liest das Manifest: Canvas-Größe aus {@code #GameII:} und
+     * Background-Flags aus {@code #Sprites:}.
+     *
+     * @return Map filename → isBackground für alle gelisteten Sprites
+     */
+    private static Map<String, Boolean> readManifest(File manifest, GameSceneData data) {
+        Map<String, Boolean> bgFlags = new LinkedHashMap<>();
         try {
-            List<String> lines = Files.readAllLines(manifest.toPath());
-            boolean inGameII = false;
+            List<String> lines = Files.readAllLines(manifest.toPath(), StandardCharsets.ISO_8859_1);
+            String section = null;
             for (String line : lines) {
                 String t = line.trim();
                 if (t.startsWith("#")) {
-                    inGameII = t.equals("#GameII:");
+                    section = t;
                     continue;
                 }
-                if (!inGameII) continue;
+                if (t.isEmpty()) continue;
                 if (t.startsWith("-")) t = t.substring(1).trim();
-                if (t.startsWith("canvasWidth:")) {
-                    try { data.canvasW = Integer.parseInt(t.substring("canvasWidth:".length()).trim()); }
-                    catch (NumberFormatException ignored) {}
-                } else if (t.startsWith("canvasHeight:")) {
-                    try { data.canvasH = Integer.parseInt(t.substring("canvasHeight:".length()).trim()); }
-                    catch (NumberFormatException ignored) {}
+
+                if ("#GameII:".equals(section)) {
+                    if (t.startsWith("canvasWidth:"))
+                        try { data.canvasW = Integer.parseInt(t.substring("canvasWidth:".length()).trim()); }
+                        catch (NumberFormatException ignored) {}
+                    else if (t.startsWith("canvasHeight:"))
+                        try { data.canvasH = Integer.parseInt(t.substring("canvasHeight:".length()).trim()); }
+                        catch (NumberFormatException ignored) {}
+                } else if ("#Sprites:".equals(section)) {
+                    // Format: new_sprite_3.txt | isBackground: true
+                    int pipe = t.indexOf('|');
+                    String filename = (pipe > 0 ? t.substring(0, pipe) : t).trim();
+                    boolean isBg = pipe > 0 && t.substring(pipe + 1).trim().equals("isBackground: true");
+                    bgFlags.put(filename, isBg);
                 }
             }
         } catch (IOException e) {
             System.err.println("[GameSceneReader] Manifest nicht lesbar: " + e.getMessage());
         }
+        return bgFlags;
     }
 
     // ── Sprite ────────────────────────────────────────────────────────────────
 
     private static SpriteLayer readSprite(File file, File imagesDir, int id,
-                                          int canvasW, int canvasH) {
+                                          int canvasW, int canvasH, boolean isBackground) {
         try {
-            List<String> rawLines = Files.readAllLines(file.toPath());
+            List<String> rawLines = Files.readAllLines(file.toPath(), StandardCharsets.ISO_8859_1);
 
             // Felder extrahieren
             double x = 50, y = 50, z = 1;
@@ -200,7 +241,7 @@ public class GameSceneReader {
             int layerY  = anchorY - frameH;       // Ankerpunkt = Unterkante
 
             return new SpriteLayer(id, img, layerX, layerY, frameW, frameH,
-                                   file.getAbsolutePath(), rawLines, z);
+                                   file.getAbsolutePath(), rawLines, z, isBackground);
 
         } catch (IOException e) {
             System.err.println("[GameSceneReader] Sprite IOException: " + file.getName() + " – " + e.getMessage());
@@ -216,7 +257,7 @@ public class GameSceneReader {
 
     private static PathLayer readKeyArea(File file, int id, int canvasW, int canvasH) {
         try {
-            List<String> lines = Files.readAllLines(file.toPath());
+            List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.ISO_8859_1);
             List<Point3D> points = new ArrayList<>();
             double offsetXPct = 0, offsetYPct = 0;
             String section = null;
@@ -256,7 +297,7 @@ public class GameSceneReader {
 
     private static PathLayer readScenePath(File file, int id, int canvasW, int canvasH) {
         try {
-            List<String> lines = Files.readAllLines(file.toPath());
+            List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.ISO_8859_1);
             List<Point3D> points = new ArrayList<>();
             double offsetXPct = 0, offsetYPct = 0;
             String section = null;

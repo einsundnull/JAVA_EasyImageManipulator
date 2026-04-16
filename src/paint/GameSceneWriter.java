@@ -1,9 +1,12 @@
 package paint;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -108,6 +111,68 @@ public class GameSceneWriter {
             out.add(line);
         }
         return out;
+    }
+
+    // ── Manifest ─────────────────────────────────────────────────────────────
+
+    /**
+     * Schreibt (oder überschreibt) das Scene-Manifest {@code <sceneName>.txt}.
+     * Enthält Canvas-Größe, alle Sprites mit isBackground-Flag, KeyAreas und Paths.
+     *
+     * Nur ein Sprite darf {@code isBackground: true} tragen – wird hier
+     * nicht erzwungen, aber im Format klar ausgedrückt.
+     *
+     * @param sceneRoot  Scene-Verzeichnis
+     * @param sceneName  Name des Verzeichnisses (= Manifest-Dateiname ohne .txt)
+     * @param layers     aktive TT-Layer (SpriteLayer-Einträge werden gelistet)
+     * @param canvasW    Canvas-Breite in Pixel
+     * @param canvasH    Canvas-Höhe  in Pixel
+     */
+    public static void writeManifest(File sceneRoot, String sceneName,
+            List<Layer> layers, int canvasW, int canvasH) throws IOException {
+        List<String> out = new ArrayList<>();
+        out.add("#GameII:");
+        out.add("canvasWidth: " + canvasW);
+        out.add("canvasHeight: " + canvasH);
+        out.add("");
+        out.add("#Sprites:");
+        for (Layer layer : layers) {
+            if (layer instanceof SpriteLayer sl) {
+                String filename = new File(sl.spriteFilePath()).getName();
+                out.add(filename + " | isBackground: " + sl.isBackground());
+            }
+        }
+        out.add("");
+        out.add("#KeyAreas:");
+        File keyAreasDir = new File(sceneRoot, "keyAreas");
+        if (keyAreasDir.exists()) {
+            File[] txts = keyAreasDir.listFiles(f -> f.isFile() && f.getName().endsWith(".txt"));
+            if (txts != null) { Arrays.sort(txts); for (File f : txts) out.add(f.getName()); }
+        }
+        out.add("");
+        out.add("#Paths:");
+        File pathsDir = new File(sceneRoot, "paths");
+        if (pathsDir.exists()) {
+            File[] txts = pathsDir.listFiles(f -> f.isFile() && f.getName().endsWith(".txt"));
+            if (txts != null) { Arrays.sort(txts); for (File f : txts) out.add(f.getName()); }
+        }
+        File manifest = new File(sceneRoot, sceneName + ".txt");
+        Files.createDirectories(sceneRoot.toPath());
+        Files.write(manifest.toPath(), out, StandardCharsets.UTF_8);
+        System.out.println("[GameSceneWriter] Manifest gespeichert: " + manifest.getAbsolutePath());
+    }
+
+    /**
+     * Löscht das Scene-Manifest. Muss aufgerufen werden wenn eine Scene gelöscht wird.
+     */
+    public static void deleteManifest(File sceneRoot, String sceneName) {
+        File manifest = new File(sceneRoot, sceneName + ".txt");
+        if (manifest.exists()) {
+            if (manifest.delete())
+                System.out.println("[GameSceneWriter] Manifest gelöscht: " + manifest.getAbsolutePath());
+            else
+                System.err.println("[GameSceneWriter] Manifest konnte nicht gelöscht werden: " + manifest.getAbsolutePath());
+        }
     }
 
     /** Formatiert einen Double-Wert ohne unnötige Nullen nach dem Komma. */

@@ -260,14 +260,28 @@ class UIBuilder {
 		openFolderII.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		openFolderII.addActionListener(e -> ed.showQuickOpenDialog(1));
 
+		// Book-mode context buttons (hidden until bookModeBtn is active)
+		ed.bookListIBtn   = UIComponentFactory.buildBookToggleBtn("BI",  "Bücher I – Buch-Liste Canvas I");
+		ed.bookPagesIBtn  = UIComponentFactory.buildBookToggleBtn("PI",  "Seiten I – Seiten des Buches Canvas I");
+		ed.bookListIIBtn  = UIComponentFactory.buildBookToggleBtn("BII", "Bücher II – Buch-Liste Canvas II");
+		ed.bookPagesIIBtn = UIComponentFactory.buildBookToggleBtn("PII", "Seiten II – Seiten des Buches Canvas II");
+		ed.bookListIBtn  .setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		ed.bookPagesIBtn .setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		ed.bookListIIBtn .setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		ed.bookPagesIIBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+
 		// Assemble bar
 		JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 5));
 		left.setOpaque(false);
+		left.add(ed.bookListIBtn);   // ganz links – nur sichtbar in Book-Modus
+		left.add(ed.bookPagesIBtn);  // ganz links – nur sichtbar in Book-Modus
 		left.add(ed.scenesBtn);
 		left.add(ed.filmstripBtn);
 		left.add(ed.firstElementsBtn);
+		left.add(ed.firstCanvasBtn);
 		left.add(ed.quickOpenBtn);
 		left.add(Box.createHorizontalStrut(12));
+		ed.topBarLeft = left;
 		bar.add(left, BorderLayout.WEST);
 
 		JPanel center = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 5));
@@ -280,21 +294,35 @@ class UIBuilder {
 		center.add(bgColorBtn);
 		center.add(quickBgBtn);
 		center.add(Box.createHorizontalStrut(6));
+		JButton newBitmapBtn = UIComponentFactory.buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		newBitmapBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		newBitmapBtn.setToolTipText("Neue leere Bitmap erstellen");
+		newBitmapBtn.setForeground(AppColors.TEXT);
+		newBitmapBtn.addActionListener(e -> ed.doNewBitmap());
+		center.add(newBitmapBtn);
 		center.add(resetButton);
 		center.add(saveButton);
 		center.add(Box.createHorizontalStrut(6));
 		center.add(ed.canvasModeBtn);
 		center.add(ed.paintModeBtn);
 		center.add(ed.bookModeBtn);
+		center.add(ed.sceneModeBtn);
+		center.add(Box.createHorizontalStrut(6));
+		center.add(ed.mapsBtn);
+		center.add(ed.toggleDropZoneBtn);
 		bar.add(center, BorderLayout.CENTER);
 
 		JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 5));
 		right.setOpaque(false);
 		right.add(Box.createHorizontalStrut(12));
 		right.add(openFolderII);
+		right.add(ed.secondCanvasBtn);
 		right.add(ed.secondElementsBtn);
 		right.add(ed.secondGalleryBtn);
 		right.add(ed.secondScenesBtn);
+		right.add(ed.bookPagesIIBtn); // ganz rechts – nur sichtbar in Book-Modus
+		right.add(ed.bookListIIBtn);  // ganz rechts – nur sichtbar in Book-Modus
+		ed.topBarRight = right;
 		bar.add(right, BorderLayout.EAST);
 
 		return bar;
@@ -383,10 +411,18 @@ class UIBuilder {
 		ed.ci(0).layeredPane.add(ed.rightDropZone, JLayeredPane.PALETTE_LAYER);
 		ed.rightDropZone.setVisible(false);
 
+		// Book panels (hidden by default, shown via BI/PI buttons)
+		ed.bookPagesPanel  = new BookPagesPanel(ed);
+		ed.bookListPanel   = new BookListPanel(ed, ed.bookPagesPanel);
+		ed.bookPagesPanel2 = new BookPagesPanel(ed);
+		ed.bookListPanel2  = new BookListPanel(ed, ed.bookPagesPanel2);
+
 		ed.galleryWrapper = new JPanel();
 		ed.galleryWrapper.setLayout(new BoxLayout(ed.galleryWrapper, BoxLayout.X_AXIS));
 		ed.galleryWrapper.setBackground(AppColors.BG_DARK);
 
+		ed.galleryWrapper.add(ed.bookListPanel);    // BI  – ganz links
+		ed.galleryWrapper.add(ed.bookPagesPanel);   // PI  – links
 		ed.galleryWrapper.add(ed.ci(0).scenesPanel);
 		ed.galleryWrapper.add(ed.ci(0).tileGallery);
 		ed.galleryWrapper.add(ed.elementLayerPanel);
@@ -397,6 +433,8 @@ class UIBuilder {
 		ed.galleryWrapper.add(ed.ci(1).tileGallery);
 		ed.galleryWrapper.add(ed.ci(1).scenesPanel);
 		ed.galleryWrapper.add(ed.mapsPanel);
+		ed.galleryWrapper.add(ed.bookPagesPanel2);  // PII – rechts
+		ed.galleryWrapper.add(ed.bookListPanel2);   // BII – ganz rechts
 
 		ed.updateLayoutVisibility();
 

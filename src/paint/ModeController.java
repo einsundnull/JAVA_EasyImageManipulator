@@ -93,11 +93,50 @@ class ModeController {
 
 	void toggleBookMode() {
 		boolean entering = ed.bookModeBtn.isSelected();
-		if (entering && ed.sceneModeBtn.isSelected()) {
+		if (entering && ed.sceneModeBtn.isSelected())
 			ed.sceneModeBtn.setSelected(false);
+
+		// Show/hide book context buttons in top bar
+		ed.bookListIBtn  .setVisible(entering);
+		ed.bookPagesIBtn .setVisible(entering);
+		ed.bookListIIBtn .setVisible(entering);
+		ed.bookPagesIIBtn.setVisible(entering);
+		if (ed.topBarLeft  != null) { ed.topBarLeft .revalidate(); ed.topBarLeft .repaint(); }
+		if (ed.topBarRight != null) { ed.topBarRight.revalidate(); ed.topBarRight.repaint(); }
+
+		// Hide book panels when leaving book mode
+		if (!entering) {
+			if (ed.bookListPanel   != null) ed.bookListPanel  .setVisible(false);
+			if (ed.bookPagesPanel  != null) ed.bookPagesPanel .setVisible(false);
+			if (ed.bookListPanel2  != null) ed.bookListPanel2 .setVisible(false);
+			if (ed.bookPagesPanel2 != null) ed.bookPagesPanel2.setVisible(false);
 		}
+
+		// Wire button actions (only once — idempotent via lambda replace is fine on first call)
+		wireBookButtons();
+
 		updateModeLabel();
+		ed.galleryWrapper.revalidate();
+		ed.galleryWrapper.repaint();
 		ed.ci().canvasPanel.repaint();
+	}
+
+	private boolean bookButtonsWired = false;
+
+	private void wireBookButtons() {
+		if (bookButtonsWired) return;
+		bookButtonsWired = true;
+		ed.bookListIBtn  .addActionListener(e -> toggleBookPanel(ed.bookListPanel,   ed.bookListIBtn));
+		ed.bookPagesIBtn .addActionListener(e -> toggleBookPanel(ed.bookPagesPanel,  ed.bookPagesIBtn));
+		ed.bookListIIBtn .addActionListener(e -> toggleBookPanel(ed.bookListPanel2,  ed.bookListIIBtn));
+		ed.bookPagesIIBtn.addActionListener(e -> toggleBookPanel(ed.bookPagesPanel2, ed.bookPagesIIBtn));
+	}
+
+	private void toggleBookPanel(BaseSidebarPanel panel, javax.swing.JToggleButton btn) {
+		if (panel == null) return;
+		panel.setVisible(btn.isSelected());
+		ed.galleryWrapper.revalidate();
+		ed.galleryWrapper.repaint();
 	}
 
 	void toggleSceneMode() {
@@ -128,6 +167,7 @@ class ModeController {
 		}
 		ed.galleryWrapper.revalidate();
 		ed.galleryWrapper.repaint();
+		ed.layoutController.syncToggleButtons();
 		SwingUtilities.invokeLater(
 				() -> SwingUtilities.invokeLater(() -> ed.reloadCurrentImage(ed.activeCanvasIndex)));
 	}

@@ -1,0 +1,26 @@
+
+● Das ist der vollständige Bild-Ladepfad. Zusammenfassung:
+
+  ---
+  Klasse: GameSceneReader.java (src/paint/GameSceneReader.java)                                                                                                                                                                   
+  Verzeichnisstruktur erwartet:                                                                                                                                                                                                     <sceneRoot>/
+    <SceneName>.txt          ← Manifest
+    sprites/
+      <sprite>.txt           ← Sprite-Definitionen (Position, Größe, Bildname)
+      <image>.png            ← Sprite-Bilder (liegen direkt in sprites/, NICHT in images/)
+
+  Wo das Directory gesetzt wird:
+
+  In readScene() (Zeile 58):
+  File spritesDir = new File(sceneRoot, "sprites");
+  sceneRoot kommt von außen — gesetzt in ScenesController.java, wenn der User auf eine Scene-Kachel klickt (Zeile 41):
+  File spritesSubDir = new File(sceneDir, "sprites");
+
+  Wie das Bild konkret geladen wird:
+
+  In readSprite() (Zeile 186), imagesDir ist dasselbe spritesDir:
+  File imgFile = new File(imagesDir, firstImageName);
+  img = ImageIO.read(imgFile);
+  Der Bildname (firstImageName) kommt aus dem #IMAGES-Abschnitt der jeweiligen Sprite-.txt-Datei.
+
+  Fallback: Wenn kein Bild gefunden wird, erzeugt createPlaceholder() ein grau-kariertes Platzhalterbild.

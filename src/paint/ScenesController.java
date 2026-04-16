@@ -44,7 +44,10 @@ class ScenesController {
 						GameSceneReader.GameSceneData gameData =
 								GameSceneReader.readScene(sceneDir, sceneName);
 
-						if (c.workingImage == null
+						if (gameData.backgroundImage != null) {
+							c.workingImage  = ed.normalizeImage(gameData.backgroundImage);
+							c.originalImage = c.workingImage;
+						} else if (c.workingImage == null
 								|| c.workingImage.getWidth()  != gameData.canvasW
 								|| c.workingImage.getHeight() != gameData.canvasH) {
 							java.awt.image.BufferedImage blank = new java.awt.image.BufferedImage(
@@ -227,7 +230,10 @@ class ScenesController {
 		try {
 			GameSceneReader.GameSceneData gameData = GameSceneReader.readScene(sceneDir, sceneName);
 
-			if (c.workingImage == null
+			if (gameData.backgroundImage != null) {
+				c.workingImage  = ed.normalizeImage(gameData.backgroundImage);
+				c.originalImage = c.workingImage;
+			} else if (c.workingImage == null
 					|| c.workingImage.getWidth()  != gameData.canvasW
 					|| c.workingImage.getHeight() != gameData.canvasH) {
 				java.awt.image.BufferedImage blank = new java.awt.image.BufferedImage(

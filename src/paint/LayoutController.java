@@ -144,6 +144,56 @@ class LayoutController {
 			ed.galleryWrapper.revalidate();
 			ed.galleryWrapper.repaint();
 		}
+		// Re-center visible canvases at their current zoom after layout change
+		SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> {
+			if (ed.ci(0).workingImage != null && ed.firstCanvasBtn.isSelected())
+				ed.centerCanvas(0);
+			if (ed.ci(1).workingImage != null && ed.secondCanvasBtn.isSelected())
+				ed.centerCanvas(1);
+		}));
+		syncToggleButtons();
+	}
+
+	// ── Button ↔ visibility sync ─────────────────────────────────────────────
+
+	/**
+	 * Reads the actual visibility of every panel and writes it into the
+	 * corresponding toggle button's selected-state.  Call this after any
+	 * code path that changes panel visibility without going through a button.
+	 * Safe to call programmatically: setSelected() never fires ActionListeners.
+	 */
+	void syncToggleButtons() {
+		// Canvas I / II
+		if (ed.ci(0).layeredPane != null)
+			ed.firstCanvasBtn.setSelected(ed.ci(0).layeredPane.isVisible());
+		if (ed.ci(1).layeredPane != null)
+			ed.secondCanvasBtn.setSelected(ed.ci(1).layeredPane.isVisible());
+		// Gallery I / II
+		if (ed.ci(0).tileGallery != null)
+			ed.filmstripBtn.setSelected(ed.ci(0).tileGallery.isVisible());
+		if (ed.ci(1).tileGallery != null)
+			ed.secondGalleryBtn.setSelected(ed.ci(1).tileGallery.isVisible());
+		// Scenes I / II
+		if (ed.ci(0).scenesPanel != null)
+			ed.scenesBtn.setSelected(ed.ci(0).scenesPanel.isVisible());
+		if (ed.ci(1).scenesPanel != null)
+			ed.secondScenesBtn.setSelected(ed.ci(1).scenesPanel.isVisible());
+		// Elements I / II
+		if (ed.elementLayerPanel != null)
+			ed.firstElementsBtn.setSelected(ed.elementLayerPanel.isVisible());
+		if (ed.elementLayerPanel2 != null)
+			ed.secondElementsBtn.setSelected(ed.elementLayerPanel2.isVisible());
+		// Maps
+		if (ed.mapsPanel != null)
+			ed.mapsBtn.setSelected(ed.mapsPanel.isVisible());
+		// Drop-zone (only sync if not inside a drag, i.e. not temporarily forced)
+		if (ed.rightDropZone != null)
+			ed.toggleDropZoneBtn.setSelected(ed.rightDropZone.isVisible());
+		// Book panels
+		if (ed.bookListPanel   != null) ed.bookListIBtn  .setSelected(ed.bookListPanel  .isVisible());
+		if (ed.bookPagesPanel  != null) ed.bookPagesIBtn .setSelected(ed.bookPagesPanel .isVisible());
+		if (ed.bookListPanel2  != null) ed.bookListIIBtn .setSelected(ed.bookListPanel2 .isVisible());
+		if (ed.bookPagesPanel2 != null) ed.bookPagesIIBtn.setSelected(ed.bookPagesPanel2.isVisible());
 	}
 
 	// ── Dirty / refresh ───────────────────────────────────────────────────────

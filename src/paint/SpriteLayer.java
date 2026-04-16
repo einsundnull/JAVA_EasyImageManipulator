@@ -40,13 +40,17 @@ public final class SpriteLayer extends ImageLayer {
     private final List<String> rawLines;
     /** Z-Tiefe des Sprites (Zoom-Faktor, z. B. 1.0 = normal). */
     private final double       zDepth;
+    /** Wenn true: Sprite dient als Scene-Hintergrund (nur eines pro Scene erlaubt). */
+    private final boolean      isBackground;
 
     public SpriteLayer(int id, BufferedImage image, int x, int y, int w, int h,
-                       String spriteFilePath, List<String> rawLines, double zDepth) {
+                       String spriteFilePath, List<String> rawLines, double zDepth,
+                       boolean isBackground) {
         super(id, image, x, y, w, h, 0.0, 100);
         this.spriteFilePath = spriteFilePath;
         this.rawLines       = List.copyOf(rawLines);
         this.zDepth         = zDepth;
+        this.isBackground   = isBackground;
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────
@@ -54,19 +58,25 @@ public final class SpriteLayer extends ImageLayer {
     public String       spriteFilePath() { return spriteFilePath; }
     public List<String> rawLines()       { return rawLines; }
     public double       zDepth()         { return zDepth; }
+    public boolean      isBackground()   { return isBackground; }
 
     // ── Mutations – erhalten rawLines / zDepth ────────────────────────────────
 
     @Override
     public SpriteLayer withPosition(int nx, int ny) {
         return new SpriteLayer(id(), image(), nx, ny, width(), height(),
-                               spriteFilePath, rawLines, zDepth);
+                               spriteFilePath, rawLines, zDepth, isBackground);
     }
 
     @Override
     public SpriteLayer withBounds(int nx, int ny, int nw, int nh) {
         return new SpriteLayer(id(), image(), nx, ny, nw, nh,
-                               spriteFilePath, rawLines, zDepth);
+                               spriteFilePath, rawLines, zDepth, isBackground);
+    }
+
+    public SpriteLayer withBackground(boolean bg) {
+        return new SpriteLayer(id(), image(), x(), y(), width(), height(),
+                               spriteFilePath, rawLines, zDepth, bg);
     }
 
     // ── Convenience ───────────────────────────────────────────────────────────
