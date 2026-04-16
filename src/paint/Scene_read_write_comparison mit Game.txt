@@ -1,0 +1,418 @@
+C:\Users\pc\eclipse-workspace\GameII\SCENE_FORMAT_READ_WRITE.md
+C:\Users\pc\eclipse-workspace\TransparencyTool\SCENE_FORMAT_READ_WRITE.md
+
+C:\Users\pc\eclipse-workspace\GameII\src\main
+C:\Users\pc\AppData\Roaming\TransparencyTool\Games\DefaultGame\scenes\<nameOfScene>
+
+  Vergleich: Scene-Format GameII vs. TransparencyTool
+
+  Allgemein
+
+  ┌─────────────────────┬─────────────────────────────────────────────┬─────────────────────────────────────────────────┐
+  │       Merkmal       │                   GameII                    │                TransparencyTool                 │
+  ├─────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Zweck               │ Spielszenen (Sprites, Pfade, Bereiche)      │ Bild-/Layer-Editor (Images, Texte)              │
+  ├─────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Einheit einer Scene │ Einzelne .txt-Dateien in getrennten Ordnern │ Ein Verzeichnis pro Scene (scenes/<Name>/)      │
+  ├─────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Speicherort         │ <Projekt>/src/ und <Projekt>/bin/           │ %APPDATA%\TransparencyTool\projects\<P>\scenes\ │
+  ├─────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Datei-Encoding      │ nicht explizit angegeben                    │ UTF-8 ohne BOM                                  │
+  ├─────────────────────┼─────────────────────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Leerzeilen          │ —                                           │ werden beim Parsen ignoriert                    │
+  └─────────────────────┴─────────────────────────────────────────────┴─────────────────────────────────────────────────┘
+
+  ---
+  Verzeichnisstruktur
+
+  ┌──────────────┬─────────────────────────────────────────────┬────────────────────────────────────────────┐
+  │   Merkmal    │                   GameII                    │              TransparencyTool              │
+  ├──────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────┤
+  │ Hauptordner  │ src/sprites/, src/keyAreas/, src/paths/     │ scenes/<SceneName>/                        │
+  ├──────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────┤
+  │ Unterordner  │ src/animations/, bin/sprites/, bin/paths/   │ images/, texts/, paths/                    │
+  ├──────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────┤
+  │ Binär-Mirror │ Sprites + Paths werden nach bin/ gespiegelt │ Kein Mirror                                │
+  ├──────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────┤
+  │ Haupt-Datei  │ mehrere Einzeldateien je Typ                │ <SceneName>.txt als zentrale Referenzliste │
+  └──────────────┴─────────────────────────────────────────────┴────────────────────────────────────────────┘
+
+  ---
+  Dateiformat-Syntax
+
+  ┌────────────────────────────┬────────────────────────────────────────────┬──────────────────────────────────────────────┐
+  │          Merkmal           │                   GameII                   │               TransparencyTool               │
+  ├────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────────────────────┤
+  │ Sektions-Präfix            │ #SEKTIONSNAME (Großbuchstaben)             │ #Name:, #Images: (gemischt, mit Doppelpunkt) │
+  ├────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────────────────────┤
+  │ Wert-Präfix                │ - (KeyArea/ScenePath) oder direkt (Sprite) │ - (einheitlich)                              │
+  ├────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────────────────────┤
+  │ Unter-Abschnitte           │ ##KATEGORIE (Sprite-Animationen)           │ keine                                        │
+  ├────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────────────────────┤
+  │ Schlüssel=Wert-Format      │ key: value                                 │ key=value (TextLayer) oder Inline-Parameter  │
+  ├────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────────────────────┤
+  │ Inline-Parameter           │ nein                                       │ ja: -image.png x y w h rotation opacity      │
+  ├────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────────────────────┤
+  │ Referenzen                 │ @name (Cross-Referenz auf andere Entities) │ Dateinamen-Referenz (text_42.txt)            │
+  ├────────────────────────────┼────────────────────────────────────────────┼──────────────────────────────────────────────┤
+  │ Reihenfolge der Abschnitte │ fest/implizit                              │ beliebig (parser ist abschnittsbasiert)      │
+  └────────────────────────────┴────────────────────────────────────────────┴──────────────────────────────────────────────┘
+
+  ---
+  Entity-Typen
+
+  ┌───────────────────┬────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────────────────┐
+  │    Entity-Typ     │                               GameII                               │                            TransparencyTool                            │
+  ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+  │ Sprites / Bilder  │ Sprite (src/sprites/<id>.txt) – komplex mit Physik, Animationen    │ ImageLayer (inline in #Images:) – einfach mit x,y,w,h,rotation,opacity │
+  ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+  │ Hintergrund       │ —                                                                  │ Erster #Images:-Eintrag (kein Metadaten)                               │
+  ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+  │ Textebenen        │ #HOVER_TEXT in Sprite                                              │ Eigene Datei texts/text_<id>.txt                                       │
+  ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+  │ Bereiche/Polygone │ KeyArea (src/keyAreas/<id>.txt) – Polygon mit Editor-Konfiguration │ —                                                                      │
+  ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+  │ Pfade             │ ScenePath (src/paths/<id>.txt) – Hierarchische Punkte + Handles    │ paths/<id>.txt – nicht implementiert                                   │
+  ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+  │ Animationen       │ src/animations/<name>.txt (referenziert von Sprites)               │ —                                                                      │
+  └───────────────────┴────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────────────────┘
+
+  ---
+  Sprite vs. ImageLayer im Detail
+
+  ┌─────────────────┬──────────────────────────────────────────────────┬─────────────────────────────┐
+  │   Eigenschaft   │                  GameII Sprite                   │ TransparencyTool ImageLayer │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Position        │ #INIT_POSITION (Prozent 0–100)                   │ x y (Canvas-Pixel)          │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Größe           │ #SIZE (scaleX, scaleY)                           │ w h (Pixel)                 │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Rotation        │ rotation Angle: 0° (pro Image)                   │ rotation (Double, Grad)     │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Deckkraft       │ —                                                │ opacity (0–100)             │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Spiegelung      │ mirror horizontally/vertically                   │ —                           │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Z-Tiefe         │ z in #INIT_POSITION, ScenePath-Interpolation     │ —                           │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Physik/Bewegung │ movable, speed, follow                           │ —                           │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Animationen     │ #ANIMATIONS mit IDLE/WALKING-Kategorien          │ —                           │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Kollision       │ #CUSTOM_CLICK_AREA, #MOVING_RANGE, #AVOID_AREAS  │ —                           │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Verlinkung      │ #SPRITE_LINKS (ORIENTATION, MOVE, FOLLOW, AVOID) │ —                           │
+  ├─────────────────┼──────────────────────────────────────────────────┼─────────────────────────────┤
+  │ Tooltip         │ #HOVER_TEXT                                      │ —                           │
+  └─────────────────┴──────────────────────────────────────────────────┴─────────────────────────────┘
+
+  ---
+  Laden & Speichern
+
+  ┌──────────────────┬────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────┐
+  │      Aspekt      │                             GameII                             │                    TransparencyTool                    │
+  ├──────────────────┼────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ Laden beim Start │ LevelLoader liest alle *.txt rekursiv                          │ Iteriert scenes/-Unterverzeichnisse, prüft <S>/<S>.txt │
+  ├──────────────────┼────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ Speichern        │ Autosave nach jeder Änderung                                   │ Explizit (beim Speichern)                              │
+  ├──────────────────┼────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ Neues Entity     │ Neue .txt-Datei in src/<typ>/                                  │ Inline in Haupt-Datei + Unterordner-Dateien            │
+  ├──────────────────┼────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ Löschen          │ Files.deleteIfExists() + ggf. bin/-Kopie                       │ — (nicht beschrieben)                                  │
+  ├──────────────────┼────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ Cross-Referenzen │ @name werden nach Laden aufgelöst (resolvePluginConnections()) │ Nur Dateinamen-Referenzen, keine Cross-Referenzen      │
+  ├──────────────────┼────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+  │ ID-Ableitung     │ Dateiname ohne .txt → sprite.id                                │ Scene-Verzeichnisname = Scene-Name                     │
+  └──────────────────┴────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────┘
+
+  ---
+  Komplexität
+
+  ┌────────────────────┬──────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────┐
+  │                    │                            GameII                            │                     TransparencyTool                      │
+  ├────────────────────┼──────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────┤
+  │ Komplexität        │ Hoch – viele Entity-Typen, Physik, Referenzen, bin-Mirror    │ Niedrig – einfaches Layer-System, eine zentrale Datei     │
+  ├────────────────────┼──────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────┤
+  │ Erweiterbarkeit    │ Gut durch separate Dateien je Entity                         │ Einfach durch neue #Abschnitt:-Einträge                   │
+  ├────────────────────┼──────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────┤
+  │ Externes Schreiben │ Aufwendiger (Referenzen, bin-Mirror, Format exakt einhalten) │ Einfach (minimales Format, Defaults bei fehlenden Werten) │
+  └────────────────────┴──────────────────────────────────────────────────────────────┴───────────────────────────────────────────────────────────┘
+
+
+● Nur noch der eine verbleibende src/sprites/-Pfad – das ist der Classpath-Eintrag für AssetLoader (der via getResource("/sprites/...") Bilder lädt). Der bleibt absichtlich so, weil AssetLoader Bilder aus dem Java-Classpath
+  lädt, nicht aus dem AppData-Verzeichnis. Das ist korrekt.
+
+  Alle Änderungen sind abgeschlossen. Hier ist eine Zusammenfassung:
+                                                                                                                                                                                                                                    ---
+  Geänderte Dateien                                                                                                                                                                                                               
+  LevelLoader.java (neu strukturiert)
+
+  - Neues SCENE_NAME = "DefaultScene" (änderbar)
+  - getSceneRoot() → %APPDATA%\TransparencyTool\Games\DefaultGame\scenes\DefaultScene
+  - Statische Helfer: spritesDir(), keyAreasDir(), pathsDir(), animationsDir()
+  - Alle Paths.get("src", ...) ersetzt durch die neuen Helfer
+
+  GameWindow.java
+
+  - createDefaultSprite / createDefaultKeyArea / createDefaultScenePath → LevelLoader.*Dir()
+  - copySelectedEntity (alle 3 Typen) → LevelLoader.*Dir()
+  - pasteSprite / pasteKeyArea → LevelLoader.*Dir()
+  - uniqueSpriteName / uniqueKeyAreaName → Files.exists(LevelLoader.*Dir()...)
+  - idle.txt-Erstellung → LevelLoader.animationsDir()
+
+  SpriteWriter.java
+
+  - bin/sprites/-Mirror entfernt, createDirectories hinzugefügt
+
+  PathWriter.java
+
+  - bin/paths/-Mirror entfernt
+
+  KeyAreaWriter.java
+
+  - createDirectories hinzugefügt
+
+  AnimationWriter.java
+
+  - Schreibt nach LevelLoader.animationsDir(), kein bin/-Mirror mehr
+
+  AnimationReader.java
+
+  - Liest aus LevelLoader.animationsDir()
+
+  SpriteReader.java / KeyAreaReader.java / PathReader.java
+
+  - Fallback-Pfade auf LevelLoader.*Dir() aktualisiert
+
+  ---
+  Hinweis: Den Scene-Namen DefaultScene kannst du in LevelLoader.java Zeile SCENE_NAME anpassen. Das Verzeichnis wird beim ersten Speichern automatisch angelegt (alle Writer haben createDirectories).
+
+
+
+
+> Kann das Game eine Scenen-Datei von TransparencyTool lesen und schreiben und kann TransparencyTool eine GameScene lesen und schreiben (ohne sie zu zerstören?                                                                   
+● Gute Frage – lass mich das systematisch analysieren.
+
+  Searched for 1 pattern, read 4 files (ctrl+o to expand)
+
+● Jetzt habe ich ein vollständiges Bild. Hier ist die ehrliche Antwort:
+
+  ---
+  Kurzantwort: Nein – sie können sich gegenseitig nicht lesen. Aber sie zerstören sich auch nicht.
+                                                                                                                                                                                                                                    ---
+  1. Pfade – sie sind sowieso getrennt                                                                                                                                                                                            
+  ┌───────────────────────────────┬──────────────────────────────────────────────────────────────┐
+  │             Tool              │                             Pfad                             │
+  ├───────────────────────────────┼──────────────────────────────────────────────────────────────┤
+  │ TransparencyTool              │ %APPDATA%\TransparencyTool\**projects**\DefaultGame\scenes\… │
+  ├───────────────────────────────┼──────────────────────────────────────────────────────────────┤
+  │ GameII (nach meiner Änderung) │ %APPDATA%\TransparencyTool\**Games**\DefaultGame\scenes\…    │
+  └───────────────────────────────┴──────────────────────────────────────────────────────────────┘
+
+  projects\ ≠ Games\ → sie schreiben in völlig verschiedene Verzeichnisse. Keine Überschneidung.
+
+  ---
+  2. Warum GameII eine TT-Scene nicht lesen kann
+
+  LevelLoader sucht nach .txt-Dateien in den Unterordnern sprites/, keyAreas/, paths/. Eine TransparencyTool-Scene hat:
+  - eine <SceneName>.txt-Hauptdatei direkt im Scene-Ordner
+  - Unterordner images/, texts/
+
+  → GameII findet nichts, weil der sprites/-Ordner fehlt. Kein Fehler, einfach leere Listen.
+
+  ---
+  3. Warum TransparencyTool eine GameII-Scene nicht lesen kann
+
+  SceneFileReader.readScene() sucht als erstes nach <SceneName>.txt im Scene-Ordner:
+  File sceneFile = new File(sceneDir, sceneName + ".txt");
+  if (!sceneFile.exists()) {
+      throw new IOException("Scene-Datei nicht gefunden: ...");
+  }
+  GameII erstellt keine solche Hauptdatei. → IOException.
+
+  ---
+  4. Würden sie sich gegenseitig zerstören, wenn sie im selben Ordner lägen?
+
+  ┌─────────────┬─────────────────┬───────────────────────────────┬─────────────────────────────────────────────────────┐
+  │ Unterordner │ GameII schreibt │          TT schreibt          │                      Konflikt?                      │
+  ├─────────────┼─────────────────┼───────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ sprites/    │ ✓ Sprite-.txt   │ ✗                             │ Nein                                                │
+  ├─────────────┼─────────────────┼───────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ keyAreas/   │ ✓ KeyArea-.txt  │ ✗                             │ Nein                                                │
+  ├─────────────┼─────────────────┼───────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ paths/      │ ✓ Path-.txt     │ ✓ (TODO, nicht implementiert) │ Theoretisch möglich – gleiches Format-Präfix #Name: │
+  ├─────────────┼─────────────────┼───────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ animations/ │ ✓ Anim-.txt     │ ✗                             │ Nein                                                │
+  ├─────────────┼─────────────────┼───────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ images/     │ ✗               │ ✓ PNG-Bilder                  │ Nein                                                │
+  ├─────────────┼─────────────────┼───────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ texts/      │ ✗               │ ✓ Text-.txt                   │ Nein                                                │
+  ├─────────────┼─────────────────┼───────────────────────────────┼─────────────────────────────────────────────────────┤
+  │ <Name>.txt  │ ✗               │ ✓ Hauptdatei                  │ Nein                                                │
+  └─────────────┴─────────────────┴───────────────────────────────┴─────────────────────────────────────────────────────┘
+
+  Ergebnis: Selbst im selben Ordner wären sie sicher – bis auf paths/, aber TT schreibt dort noch gar nichts (TODO-Kommentar im Code).
+
+  ---
+  5. Was fehlt für echte Interoperabilität
+
+  Damit beide Tools sich gegenseitig lesen könnten, bräuchte man einen Adapter – das ist aber eine separate, nicht triviale Aufgabe:
+
+  - GameII → TT lesen: GameII müsste <SceneName>.txt parsen und ImageLayer daraus ableiten (Hintergrundbild aus Sprites?)
+  - TT → GameII lesen: TransparencyTool müsste Sprites aus sprites/*.txt laden und als ImageLayer darstellen
+
+  Soll ich einen solchen Adapter implementieren, oder reicht die aktuelle getrennte Koexistenz?
+
+
+> Was müssten wir ändern, damit ich Scenen im TT genauso bearbeiten kann wie im Game?                                                                                                                                             
+● Lass mich zuerst die Layer-Architektur von TT und den aktuellen Stand der GameII-Integration verstehen.
+
+● Bash(find "C:/Users/pc/eclipse-workspace/TransparencyTool/src/paint" -name "*.java" | xargs grep -l "Layer\|layer" | head -20)
+  ⎿  C:/Users/pc/eclipse-workspace/TransparencyTool/src/paint/BaseSidebarPanel.java
+     C:/Users/pc/eclipse-workspace/TransparencyTool/src/paint/CanvasCallbacks.java
+     C:/Users/pc/eclipse-workspace/TransparencyTool/src/paint/CanvasInstance.java
+     … +17 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, read 6 files (ctrl+o to expand)
+
+● Jetzt habe ich das vollständige Bild. Hier ist die ehrliche Architektur-Analyse:
+
+  ---
+  Was müsste sich ändern
+                                                                                                                                                                                                                                    Das Kernproblem in 3 Punkten
+                                                                                                                                                                                                                                    ┌───────────────┬──────────────────────────────────┬───────────────────────────────────┐
+  │               │              GameII              │         TransparencyTool          │
+  ├───────────────┼──────────────────────────────────┼───────────────────────────────────┤
+  │ Koordinaten   │ Position in % (0–100) des Canvas │ Absolute Pixel                    │
+  ├───────────────┼──────────────────────────────────┼───────────────────────────────────┤
+  │ Scene-Einheit │ Viele .txt-Dateien je Entity     │ Eine Haupt-Datei + Unterordner    │
+  ├───────────────┼──────────────────────────────────┼───────────────────────────────────┤
+  │ Hintergrund   │ Kein Konzept                     │ Pflicht (erstes #Images:-Element) │
+  └───────────────┴──────────────────────────────────┴───────────────────────────────────┘
+
+  ---
+  Was bereits vorhanden ist und passt
+
+  ┌──────────────────────────┬────────────────────────────────────┬────────────────────────────────────────────────────────────────┐
+  │        TT-Klasse         │           GameII-Konzept           │                            Mapping                             │
+  ├──────────────────────────┼────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ ImageLayer               │ Sprite                             │ Bild + x/y/w/h → fast direkt nutzbar                           │
+  ├──────────────────────────┼────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ PathLayer (closed=true)  │ KeyArea                            │ Polygon-Punkte → bereits da                                    │
+  ├──────────────────────────┼────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ PathLayer (closed=false) │ ScenePath                          │ Offener Pfad → bereits da, aber flach (kein Hierarchy-Support) │
+  ├──────────────────────────┼────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ ElementLayerState        │ sprites/keyAreas/scenePaths Listen │ Architektur passt                                              │
+  ├──────────────────────────┼────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ SceneFileReader/Writer   │ LevelLoader + SpriteWriter usw.    │ Muss für GameII-Format erweitert werden                        │
+  └──────────────────────────┴────────────────────────────────────┴────────────────────────────────────────────────────────────────┘
+
+  ---
+  Neue Klassen (müssen erstellt werden)
+
+  1. SpriteLayer.java (in TT)
+
+  Erweitert ImageLayer, hält alle GameII-Felder die TT nicht bearbeitet:
+  SpriteLayer extends ImageLayer {
+      String  spriteFilePath;   // Pfad zur .txt-Datei – für Rückschreiben
+      String  spriteId;
+      boolean movable, followMouse, mouseTransparent;
+      double  speed;
+      String  hoverText;
+      double  z;                // Z-Tiefe (Zoom-Faktor)
+      // alle Animations-, Link-, Area-Namen – nur aufbewahrt, nicht editiert
+      Map<String, Object> preservedFields;
+  }
+  → TT zeigt das Sprite-Bild, bewegt es, ignoriert den Rest.
+
+  2. GameSceneReader.java (in TT)
+
+  Liest aus sprites/*.txt, keyAreas/*.txt, paths/*.txt:
+  List<Layer> readGameScene(File sceneRoot, int canvasW, int canvasH) {
+      // Sprites: x%/y% → canvas-Pixel
+      // KeyAreas: Punkte sind schon Pixel, nur offset (%) konvertieren
+      // ScenePaths: Punkte relativ zu path.x/path.y offset
+  }
+  Koordinaten-Umrechnung: xPixel = (sprite.x / 100.0) * canvasW
+
+  3. GameSceneWriter.java (in TT)
+
+  Schreibt nur geänderte Felder zurück (Position, Größe) – Rest aus SpriteLayer.preservedFields:
+  void writeGameScene(List<Layer> layers, File sceneRoot, int canvasW, int canvasH) {
+      for (SpriteLayer sl : sprites) {
+          // NUR #INIT_POSITION und #SIZE neu schreiben
+          // Alles andere (Animationen, Links, Physics) aus preservedFields kopieren
+      }
+  }
+
+  ---
+  Bestehende Klassen, die geändert werden müssen
+
+  SelectiveAlphaEditor.java
+
+  - Beim Öffnen: erkennen ob Scene-Verzeichnis eine GameII-Scene ist (sprites/-Ordner vorhanden) → GameSceneReader statt SceneFileReader aufrufen
+  - Beim Speichern: wenn GameII-Scene geladen → GameSceneWriter statt SceneFileWriter
+  - Hintergrund: bei GameII-Scenes ein konfigurierbares oder leeres Hintergrundbild erzeugen
+
+  CanvasState.java
+
+  Ein Feld dazufügen:
+  public enum SceneType { TRANSPARENCY_TOOL, GAME_II }
+  public SceneType sceneType = SceneType.TRANSPARENCY_TOOL;
+  public File gameSceneRoot = null;  // Pfad zur DefaultScene/
+  public int gameCanvasW = 800, gameCanvasH = 600;  // für % ↔ Pixel
+
+  SceneFileReader.java / SceneFileWriter.java
+
+  Kein Umbau nötig – die neue GameSceneReader/Writer-Klasse ist parallel dazu.
+
+  ---
+  Problem: Hintergrundgröße
+
+  GameII hat keine feste Canvas-Größe – Sprites werden relativ positioniert. TT braucht aber eine konkrete Pixel-Canvas-Größe, um x% → Pixel zu rechnen.
+
+  Lösung: Eine kleine Konfig-Datei DefaultScene/game.txt mit:
+  canvasWidth: 1920
+  canvasHeight: 1080
+  GameII schreibt sie, TT liest sie beim Öffnen.
+
+  ---
+  Problem: Sprite-Bilder
+
+  GameII lädt Bilder via Java-Classpath (AssetLoader.loadImageSafe("/sprites/filename.png")). TT kann das nicht direkt.
+
+  Lösung: In GameSceneWriter zusätzlich die Bilder in einen images/-Unterordner der Scene kopieren (oder Symlinks). GameSceneReader liest aus sceneRoot/sprites/images/.
+
+  ---
+  Problem: ScenePath-Hierarchie
+
+  TT's PathLayer hat nur flache Punkte. GameII's ScenePath hat verschachtelte Influence-Handles (Tiefe 1, 2, 3…).
+
+  Optionen:
+  - Einfach: Nur Hauptpunkte (depth=1) laden/bearbeiten, Handles erhalten aber nicht anzeigen → preservedFields hält die Handles
+  - Vollständig: Eigene ScenePathLayer extends PathLayer mit Baum-Struktur
+
+  ---
+  Zusammenfassung: Aufwand
+
+  ┌───────────────────────────────┬─────────────────┬─────────────────────────────────────────┐
+  │            Aufgabe            │     Aufwand     │                 Dateien                 │
+  ├───────────────────────────────┼─────────────────┼─────────────────────────────────────────┤
+  │ SpriteLayer.java              │ mittel          │ 1 neue Datei                            │
+  ├───────────────────────────────┼─────────────────┼─────────────────────────────────────────┤
+  │ GameSceneReader.java          │ mittel          │ 1 neue Datei, nutzt GameII-Reader-Logik │
+  ├───────────────────────────────┼─────────────────┼─────────────────────────────────────────┤
+  │ GameSceneWriter.java          │ mittel          │ 1 neue Datei                            │
+  ├───────────────────────────────┼─────────────────┼─────────────────────────────────────────┤
+  │ CanvasState erweitern         │ klein           │ 3 Zeilen                                │
+  ├───────────────────────────────┼─────────────────┼─────────────────────────────────────────┤
+  │ SelectiveAlphaEditor anpassen │ mittel          │ ~50 Zeilen im Öffnen/Speichern-Pfad     │
+  ├───────────────────────────────┼─────────────────┼─────────────────────────────────────────┤
+  │ Canvas-Größe game.txt         │ klein           │ je 5 Zeilen in GameII + TT              │
+  ├───────────────────────────────┼─────────────────┼─────────────────────────────────────────┤
+  │ Bilder-Kopier-Logik           │ klein           │ in GameSceneWriter                      │
+  ├───────────────────────────────┼─────────────────┼─────────────────────────────────────────┤
+  │ ScenePath-Hierarchie          │ groß (optional) │ ScenePathLayer + Render-Code            │
+  └───────────────────────────────┴─────────────────┴─────────────────────────────────────────┘
+
+  Minimal-Version (Sprites verschieben/skalieren, KeyAreas als Polygone bearbeiten) wäre mit ~4 neuen Klassen und ~100 Zeilen Änderungen in SelectiveAlphaEditor machbar.

@@ -103,13 +103,35 @@ public class LastProjectsManager {
      */
     public static Map<String, List<String>> loadAll() throws IOException {
         Map<String, List<String>> result = new LinkedHashMap<>();
-        result.put(CAT_SCENES,   load(CAT_SCENES));
+
+        // Scenes: always ensure the Default project scenes dir appears first
+        List<String> scenes = load(CAT_SCENES);
+        ensureDefaultScenesDirs(scenes);
+        result.put(CAT_SCENES,   scenes);
+
         result.put(CAT_IMAGES,   load(CAT_IMAGES));
         result.put(CAT_BOOKS,    load(CAT_BOOKS));
         result.put(CAT_GAMES,    load(CAT_GAMES));
         result.put(CAT_TEACHING, load(CAT_TEACHING));
         result.put(CAT_MAPS,     load(CAT_MAPS));
         return result;
+    }
+
+    /**
+     * Adds the scenes directories for all existing Tool projects to the list
+     * if they are not already present. Ensures the user always sees them
+     * even before they have manually opened the folder.
+     */
+    private static void ensureDefaultScenesDirs(List<String> scenes) {
+        List<String> projects = SceneLocator.getToolProjects();
+        if (projects.isEmpty()) projects = java.util.Arrays.asList("Default");
+        for (String project : projects) {
+            java.io.File dir = SceneLocator.getToolScenesDir(project);
+            dir.mkdirs(); // create if not present
+            String canonical = normalize(dir.getAbsolutePath());
+            boolean already = scenes.stream().anyMatch(p -> normalize(p).equalsIgnoreCase(canonical));
+            if (!already) scenes.add(canonical);
+        }
     }
 
     /**
