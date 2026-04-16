@@ -416,3 +416,45 @@ C:\Users\pc\AppData\Roaming\TransparencyTool\Games\DefaultGame\scenes\<nameOfSce
   └───────────────────────────────┴─────────────────┴─────────────────────────────────────────┘
 
   Minimal-Version (Sprites verschieben/skalieren, KeyAreas als Polygone bearbeiten) wäre mit ~4 neuen Klassen und ~100 Zeilen Änderungen in SelectiveAlphaEditor machbar.
+
+
+Alle 9 Tasks erledigt. Hier ist die Zusammenfassung was jetzt funktioniert:
+
+  ---
+  Was implementiert wurde                                                                                                                                                                                                         
+  GameII schreibt für TT                                                                                                                                                                                                          
+  ┌───────────────────┬───────────────────────────────────────────────────────────────────────────────────────┐
+  │       Datei       │                                       Änderung                                        │
+  ├───────────────────┼───────────────────────────────────────────────────────────────────────────────────────┤
+  │ LevelLoader.java  │ spritesImagesDir() + writeSceneManifest(w,h) → schreibt DefaultScene.txt mit #GameII: │
+  ├───────────────────┼───────────────────────────────────────────────────────────────────────────────────────┤
+  │ SpriteWriter.java │ syncImages() – kopiert Sprite-PNGs nach sprites/images/ damit TT sie findet           │
+  ├───────────────────┼───────────────────────────────────────────────────────────────────────────────────────┤
+  │ GameWindow.java   │ Ruft writeSceneManifest(800, 600) am Ende des Konstruktors auf                        │
+  └───────────────────┴───────────────────────────────────────────────────────────────────────────────────────┘
+
+  TT liest und schreibt GameII
+
+  ┌───────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │           Datei           │                                                     Funktion                                                      │
+  ├───────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ SpriteLayer.java          │ Wrapper um ImageLayer mit spriteFilePath + rawLines für verlustfreies Rückschreiben                               │
+  ├───────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ GameSceneReader.java      │ Liest sprites/*.txt → SpriteLayer, keyAreas/*.txt → PathLayer (closed), paths/*.txt → PathLayer (open)            │
+  ├───────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ GameSceneWriter.java      │ Schreibt nur #INIT_POSITION und #SIZE zurück – alle anderen Felder (Animationen, Physik, Links) bleiben unberührt │
+  ├───────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ CanvasInstance.java       │ gameSceneRoot, gameCanvasW, gameCanvasH Felder                                                                    │
+  ├───────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ SelectiveAlphaEditor.java │ Erkennt GameII-Scene am sprites/-Ordner, lädt via GameSceneReader, speichert via GameSceneWriter                  │
+  ├───────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ SceneLocator.java         │ getAppDataGames() + getAppDataGameScenes() scannt AppData\TransparencyTool\Games\                                 │
+  └───────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  Workflow
+
+  1. GameII starten → schreibt DefaultScene.txt + synct Bilder beim ersten Sprite-Save
+  2. TT öffnen → Scene-Browser zeigt DefaultScene unter Games/DefaultGame
+  3. Scene in TT anklicken → Sprites erscheinen als bewegbare/skalierbare Layer
+  4. In TT verschieben/skalieren → beim Schließen/Speichern werden nur Position + Größe zurückgeschrieben, Animationen etc. bleiben erhalten
+  5. GameII neu starten → Sprites sind an den neuen Positionen

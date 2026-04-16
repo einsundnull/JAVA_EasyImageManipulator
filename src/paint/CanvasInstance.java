@@ -66,6 +66,14 @@ public class CanvasInstance {
     // ── Active scene (set when a scene is loaded, null otherwise) ────────────
     public File             activeSceneFile;   // the .txt file of the currently loaded scene
 
+    // ── GameII-Scene-Integration ──────────────────────────────────────────────
+    /** Nicht-null wenn eine GameII-Scene geladen ist (= Scene-Verzeichnis). */
+    public File             gameSceneRoot = null;
+    /** Canvas-Breite in Pixel für % ↔ Pixel-Umrechnung. */
+    public int              gameCanvasW   = 800;
+    /** Canvas-Höhe in Pixel für % ↔ Pixel-Umrechnung. */
+    public int              gameCanvasH   = 600;
+
     // ── Alpha-editor selection ────────────────────────────────────────────────
     public boolean        isSelecting      = false;
     public Point          selectionStart;

@@ -245,6 +245,48 @@ public class SceneLocator {
     }
 
     // =====================================================
+    // AppData-Games (GameII-Scenes unter %APPDATA%\TransparencyTool\Games\)
+    // =====================================================
+
+    /**
+     * Gibt das Basis-Verzeichnis für GameII-Spiele im AppData-Ordner zurück.
+     * Pfad: %APPDATA%\TransparencyTool\Games\
+     */
+    public static File getAppDataGamesDir() {
+        return new File(AppPaths.getAppDataDir(), "Games");
+    }
+
+    /**
+     * Gibt alle GameII-Spielnamen zurück, die unter AppData\Games\ liegen.
+     */
+    public static List<String> getAppDataGames() {
+        List<String> games = new ArrayList<>();
+        File dir = getAppDataGamesDir();
+        if (dir.exists()) {
+            File[] subdirs = dir.listFiles(File::isDirectory);
+            if (subdirs != null) for (File d : subdirs) games.add(d.getName());
+        }
+        return games;
+    }
+
+    /**
+     * Gibt alle Szenen eines GameII-Spiels zurück (AppData-Pfad).
+     * Sucht nach Verzeichnissen mit &lt;dirName&gt;.txt (= Scene-Manifest).
+     */
+    public static List<File> getAppDataGameScenes(String gameName) {
+        List<File> scenes = new ArrayList<>();
+        File scenesDir = new File(new File(getAppDataGamesDir(), gameName), "scenes");
+        if (!scenesDir.exists()) return scenes;
+        File[] dirs = scenesDir.listFiles(File::isDirectory);
+        if (dirs == null) return scenes;
+        for (File dir : dirs) {
+            File sceneFile = new File(dir, dir.getName() + ".txt");
+            if (sceneFile.exists()) scenes.add(sceneFile);
+        }
+        return scenes;
+    }
+
+    // =====================================================
     // Legacy Format Support (Struktur-Skeleton)
     // =====================================================
 

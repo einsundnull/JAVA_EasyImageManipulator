@@ -4461,32 +4461,67 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 					File sceneDir = sceneFile.getParentFile();
 					String sceneName = sceneFile.getName().replaceAll("\\.(txt|json)$", "");
 
-					SceneFileReader.SceneData sceneData = SceneFileReader.readScene(sceneDir, sceneName);
+					// GameII-Scene erkennen: hat sprites/-Unterordner
+					File spritesSubDir = new File(sceneDir, "sprites");
+					if (spritesSubDir.exists() && spritesSubDir.isDirectory()) {
+						// ── GameII-Scene ──────────────────────────────────
+						GameSceneReader.GameSceneData gameData =
+								GameSceneReader.readScene(sceneDir, sceneName);
 
-					// Load background onto canvas WITHOUT touching the image TileGallery
-					if (sceneData.backgroundImage != null) {
-						loadSceneBackground(sceneData.backgroundImage, idx);
-					}
-
-					List<Layer> allLayers = new ArrayList<>();
-					int nextId = System.identityHashCode(new Object());
-					for (SceneFileReader.ImageLayerRef ref : sceneData.imageLayers) {
-						java.awt.image.BufferedImage img = ImageLoader.loadImage(ref.file);
-						if (img != null) {
-							int w = ref.w > 0 ? ref.w : img.getWidth();
-							int h = ref.h > 0 ? ref.h : img.getHeight();
-							ImageLayer il = new ImageLayer(nextId++, img, ref.x, ref.y, w, h, ref.rotation, ref.opacity);
-							allLayers.add(il);
+						// Leeres Hintergrundbild als Canvas-Grundlage
+						if (c.workingImage == null
+								|| c.workingImage.getWidth()  != gameData.canvasW
+								|| c.workingImage.getHeight() != gameData.canvasH) {
+							java.awt.image.BufferedImage blank = new java.awt.image.BufferedImage(
+									gameData.canvasW, gameData.canvasH,
+									java.awt.image.BufferedImage.TYPE_INT_ARGB);
+							java.awt.Graphics2D g2 = blank.createGraphics();
+							g2.setColor(new java.awt.Color(30, 30, 40));
+							g2.fillRect(0, 0, gameData.canvasW, gameData.canvasH);
+							g2.dispose();
+							c.workingImage  = blank;
+							c.originalImage = blank;
 						}
-					}
-					allLayers.addAll(sceneData.textLayers);
-					allLayers.addAll(sceneData.pathLayers);
 
-					c.activeElements = allLayers;
-					c.selectedElements.clear();
-					c.activeSceneFile = sceneFile;  // track loaded scene
-					refreshElementPanel();
-					c.canvasPanel.repaint();
+						c.gameSceneRoot = sceneDir;
+						c.gameCanvasW   = gameData.canvasW;
+						c.gameCanvasH   = gameData.canvasH;
+						c.activeElements   = gameData.layers;
+						c.selectedElements.clear();
+						c.activeSceneFile  = sceneFile;
+						c.sourceFile       = sceneFile; // persistSceneIfActive braucht sourceFile != null
+						refreshElementPanel();
+						c.canvasPanel.repaint();
+
+					} else {
+						// ── Standard TT-Scene ─────────────────────────────
+						SceneFileReader.SceneData sceneData = SceneFileReader.readScene(sceneDir, sceneName);
+
+						if (sceneData.backgroundImage != null) {
+							loadSceneBackground(sceneData.backgroundImage, idx);
+						}
+
+						List<Layer> allLayers = new ArrayList<>();
+						int nextId = System.identityHashCode(new Object());
+						for (SceneFileReader.ImageLayerRef ref : sceneData.imageLayers) {
+							java.awt.image.BufferedImage img = ImageLoader.loadImage(ref.file);
+							if (img != null) {
+								int w = ref.w > 0 ? ref.w : img.getWidth();
+								int h = ref.h > 0 ? ref.h : img.getHeight();
+								ImageLayer il = new ImageLayer(nextId++, img, ref.x, ref.y, w, h, ref.rotation, ref.opacity);
+								allLayers.add(il);
+							}
+						}
+						allLayers.addAll(sceneData.textLayers);
+						allLayers.addAll(sceneData.pathLayers);
+
+						c.gameSceneRoot = null; // keine GameII-Scene
+						c.activeElements   = allLayers;
+						c.selectedElements.clear();
+						c.activeSceneFile  = sceneFile;
+						refreshElementPanel();
+						c.canvasPanel.repaint();
+					}
 
 				} catch (Exception e) {
 					System.err.println("[ERROR] loadScene failed: " + e.getMessage());
@@ -4597,11 +4632,17 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	void refreshSceneFiles(int idx) {
 		CanvasInstance c = ci(idx);
 		List<File> allScenes = new ArrayList<>();
+		// TransparencyTool-Projekte (projects/)
 		for (String project : SceneLocator.getToolProjects()) {
 			allScenes.addAll(SceneLocator.getToolScenes(project));
 		}
+		// GameII-Spiele (Games/ im alten Games-Ordner – Legacy)
 		for (String game : SceneLocator.getAvailableGames()) {
 			allScenes.addAll(SceneLocator.getGameScenes(game));
+		}
+		// GameII-Spiele (AppData\TransparencyTool\Games\ – neuer Pfad)
+		for (String game : SceneLocator.getAppDataGames()) {
+			allScenes.addAll(SceneLocator.getAppDataGameScenes(game));
 		}
 		c.scenesPanel.setFiles(allScenes, null);
 	}
@@ -6406,16 +6447,37 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 */
 	private void persistSceneIfActive(int idx) {
 		CanvasInstance c = ci(idx);
-		if (c.activeSceneFile == null || c.sourceFile == null) return;
-		File sceneDir  = c.activeSceneFile.getParentFile();
-		String sceneName = c.activeSceneFile.getName().replaceAll("\\.(txt|json)$", "");
+		if (c.activeSceneFile == null) return;
+
+		// ── GameII-Scene ──────────────────────────────────────────────────────
+		if (c.gameSceneRoot != null) {
+			List<Layer> layers = new ArrayList<>(c.activeElements);
+			int gw = c.gameCanvasW, gh = c.gameCanvasH;
+			new javax.swing.SwingWorker<Void, Void>() {
+				@Override protected Void doInBackground() throws Exception {
+					GameSceneWriter.writeScene(layers, gw, gh);
+					return null;
+				}
+				@Override protected void done() {
+					try { get(); }
+					catch (Exception ex) {
+						System.err.println("[ERROR] GameII scene persist failed: " + ex.getMessage());
+					}
+				}
+			}.execute();
+			return;
+		}
+
+		// ── Standard TT-Scene ────────────────────────────────────────────────
+		if (c.sourceFile == null) return;
+		File sceneDir     = c.activeSceneFile.getParentFile();
+		String sceneName  = c.activeSceneFile.getName().replaceAll("\\.(txt|json)$", "");
 		List<Layer> layers = new ArrayList<>(c.activeElements);
-		File bgFile = c.sourceFile;
+		File bgFile        = c.sourceFile;
 		File sceneFileFinal = c.activeSceneFile;
 		new javax.swing.SwingWorker<BufferedImage, Void>() {
 			@Override protected BufferedImage doInBackground() throws Exception {
 				SceneFileWriter.writeScene(sceneDir, sceneName, bgFile, layers);
-				// Re-render thumbnail from updated scene file
 				SceneImageAdapter.SceneAsImage updated = SceneImageAdapter.loadSceneAsImage(sceneFileFinal);
 				return updated != null ? updated.thumbnail : null;
 			}
