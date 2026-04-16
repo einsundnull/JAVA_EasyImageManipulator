@@ -237,7 +237,9 @@ public class ElementLayerPanel extends BaseSidebarPanel {
 
         // ── Drop target: accept Layer and image-file-as-element drags ─────────
         new DropTarget(tilesContainer, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
+            @Override public void dragEnter(DropTargetDragEvent dtde) { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
             @Override public void dragOver(DropTargetDragEvent dtde) {
+                dtde.acceptDrag(DnDConstants.ACTION_COPY);
                 dropIndicatorY = computeDropIndicatorY(dtde.getLocation().y);
                 tilesContainer.repaint();
             }

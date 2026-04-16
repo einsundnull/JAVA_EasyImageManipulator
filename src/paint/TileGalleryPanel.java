@@ -87,8 +87,12 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         default void onDragEnded() {}
         /** A LayerTile was dropped on this gallery – save it as a PNG image file. */
         default void onLayerDropped(Layer layer) {}
-        /** A file was copied via right-drag in the gallery at a specific position. */
-        default void onFileCopied(File copiedFile, int insertIndex) {}
+        /**
+         * A file was right-dragged from another panel and dropped on this gallery.
+         * The callback decides what to do based on the source file type (.txt = scene,
+         * image = PNG/JPG/etc.) and the destination panel type (image vs. scene gallery).
+         */
+        default void onFileElementDropped(File sourceFile, int insertIndex) {}
     }
 
     // ── Callback for preloading ───────────────────────────────────────────────
@@ -209,26 +213,12 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 try {
                     Transferable t = dtde.getTransferable();
 
-                    // Handle right-drag within gallery: copy file
+                    // Right-drag from any panel: delegate fully to callback
                     if (t.isDataFlavorSupported(FILE_AS_ELEMENT_FLAVOR)) {
                         FileForElement ffe = (FileForElement) t.getTransferData(FILE_AS_ELEMENT_FLAVOR);
-                        File sourceFile = ffe.file;
-
-                        // Copy file in same directory using BaseSidebarPanel utility
-                        File destDir = sourceFile.getParentFile();
-                        if (destDir != null) {
-                            File destFile = BaseSidebarPanel.copyFileWithUniqueName(sourceFile, destDir);
-                            if (destFile != null) {
-                                // Calculate insertion index based on drop position
-                                Point dropPt = dtde.getLocation();
-                                int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, dropPt.y);
-                                // Notify callback about the copied file with position
-                                callbacks.onFileCopied(destFile, insertIndex);
-                                dtde.dropComplete(true);
-                                return;
-                            }
-                        }
-                        dtde.dropComplete(false);
+                        int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, dtde.getLocation().y);
+                        callbacks.onFileElementDropped(ffe.file, insertIndex);
+                        dtde.dropComplete(true);
                     } else if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
                         Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
                         callbacks.onLayerDropped(layer);
@@ -258,7 +248,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                                         // Copy file to destination directory using BaseSidebarPanel utility
                                         File destFile = BaseSidebarPanel.copyFileWithUniqueName(sourceFile, destDir);
                                         if (destFile != null) {
-                                            callbacks.onFileCopied(destFile, insertIndex);
+                                            callbacks.onFileElementDropped(destFile, insertIndex);
                                         }
                                     } catch (Exception ex) {
                                         System.err.println("[ERROR] Failed to copy file: " + ex.getMessage());
@@ -593,12 +583,13 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             checkbox.addActionListener(e -> onTileClicked(this, true));
             add(checkbox);
 
-            // DnD: left-drag → javaFileListFlavor; right-drag → FILE_AS_ELEMENT_FLAVOR
+            // DnD: left-drag → FILE_AS_ELEMENT_FLAVOR; right-drag → javaFileListFlavor (load file)
             setTransferHandler(new TransferHandler() {
                 @Override public int getSourceActions(JComponent c) { return COPY; }
                 @Override public boolean canImport(TransferSupport s) { return false; } // never a drop target
                 @Override protected Transferable createTransferable(JComponent c) {
-                    if (rightDrag) {
+                    if (!rightDrag) {
+                        // Left-drag → FILE_AS_ELEMENT_FLAVOR (cross-panel operations)
                         FileForElement ffe = new FileForElement(imageFile);
                         return new Transferable() {
                             @Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[]{FILE_AS_ELEMENT_FLAVOR}; }
@@ -609,6 +600,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                             }
                         };
                     } else {
+                        // Right-drag → javaFileListFlavor (load file into canvas)
                         return new Transferable() {
                             @Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[]{DataFlavor.javaFileListFlavor}; }
                             @Override public boolean isDataFlavorSupported(DataFlavor f) { return DataFlavor.javaFileListFlavor.equals(f); }

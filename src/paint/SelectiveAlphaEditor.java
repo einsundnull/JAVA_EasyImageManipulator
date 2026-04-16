@@ -1255,6 +1255,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	private void setupDropTarget(java.awt.Component target, int idx) {
 		new java.awt.dnd.DropTarget(target, java.awt.dnd.DnDConstants.ACTION_COPY,
 				new java.awt.dnd.DropTargetAdapter() {
+					@Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) { dtde.acceptDrag(java.awt.dnd.DnDConstants.ACTION_COPY); }
+					@Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde)  { dtde.acceptDrag(java.awt.dnd.DnDConstants.ACTION_COPY); }
 					@Override
 					public void drop(java.awt.dnd.DropTargetDropEvent ev) {
 						try {
@@ -1316,12 +1318,18 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	private void insertFileAsElement(File f, int targetIdx) {
 		CanvasInstance c = ci(targetIdx);
 		if (c.workingImage == null) {
-			if (isSupportedFile(f))
-				loadFile(f, targetIdx);
+			if (isSupportedFile(f)) loadFile(f, targetIdx);
 			return;
 		}
 		try {
-			BufferedImage img = javax.imageio.ImageIO.read(f);
+			BufferedImage img;
+			if (f.getName().endsWith(".txt") || f.getName().endsWith(".json")) {
+				// Scene file → render composite thumbnail at full resolution
+				SceneImageAdapter.SceneAsImage s = SceneImageAdapter.loadSceneAsImage(f);
+				img = (s != null) ? s.thumbnail : null;
+			} else {
+				img = javax.imageio.ImageIO.read(f);
+			}
 			if (img == null)
 				return;
 			img = normalizeImage(img);
@@ -4405,15 +4413,45 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				ToastNotification.show(SelectiveAlphaEditor.this, "Gespeichert: " + target.getName());
 			}
 
-			// ── File copied via right-drag in gallery ─────────────────────────
+			// ── Right-drag from any panel onto image gallery ─────────────────
 			@Override
-			public void onFileCopied(File copiedFile, int insertIndex) {
+			public void onFileElementDropped(File src, int insertIndex) {
 				CanvasInstance c = canvases[idx];
-				// Add the copied file at the drop position
-				c.tileGallery.addFileAtIndex(copiedFile, insertIndex);
-				// Set as active (auto-select in gallery)
-				c.tileGallery.setActiveFile(copiedFile);
-				ToastNotification.show(SelectiveAlphaEditor.this, "Kopie erstellt: " + copiedFile.getName());
+				boolean isScene = src.getName().endsWith(".txt") || src.getName().endsWith(".json");
+				if (isScene) {
+					// Scene → Image gallery: flatten scene composite to PNG
+					new javax.swing.SwingWorker<File, Void>() {
+						@Override protected File doInBackground() throws Exception {
+							SceneImageAdapter.SceneAsImage s = SceneImageAdapter.loadSceneAsImage(src);
+							if (s == null || s.thumbnail == null) return null;
+							String base = src.getName().replaceAll("\\.(txt|json)$", "");
+							File dir = (c.sourceFile != null) ? c.sourceFile.getParentFile()
+									: SceneLocator.getToolScenesDir(
+											SceneLocator.getToolProjects().isEmpty() ? "Default"
+													: SceneLocator.getToolProjects().get(0));
+							File out = new File(dir, base + ".png");
+							int n = 1; while (out.exists()) out = new File(dir, base + "_" + n++ + ".png");
+							javax.imageio.ImageIO.write(s.thumbnail, "PNG", out);
+							return out;
+						}
+						@Override protected void done() {
+							try {
+								File out = get(); if (out == null) return;
+								c.tileGallery.addFileAtIndex(out, insertIndex);
+								c.tileGallery.setActiveFile(out);
+								ToastNotification.show(SelectiveAlphaEditor.this, "Scene → Bild: " + out.getName());
+							} catch (Exception ex) { showErrorDialog("Fehler", ex.getMessage()); }
+						}
+					}.execute();
+				} else {
+					// Image → Image gallery: copy file
+					File dest = BaseSidebarPanel.copyFileWithUniqueName(src, src.getParentFile());
+					if (dest != null) {
+						c.tileGallery.addFileAtIndex(dest, insertIndex);
+						c.tileGallery.setActiveFile(dest);
+						ToastNotification.show(SelectiveAlphaEditor.this, "Kopie: " + dest.getName());
+					}
+				}
 			}
 		};
 	}
@@ -4492,6 +4530,37 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			public void onDragEnded() {
 				rightDropZone.setVisible(false);
 				if (ci(0).layeredPane != null) ci(0).layeredPane.repaint();
+			}
+
+			// ── Right-drag from any panel onto scenes gallery ─────────────────
+			@Override
+			public void onFileElementDropped(File src, int insertIndex) {
+				boolean isScene = src.getName().endsWith(".txt") || src.getName().endsWith(".json");
+				if (isScene) {
+					// Scene → Scene gallery: copy whole scene directory
+					copySceneDirectory(src, idx);
+				} else {
+					// Image → Scene gallery: create scene from image + current canvas layers
+					createSceneFromDrop(java.util.Arrays.asList(src), idx);
+				}
+			}
+
+			// ── Layer dragged from ElementLayerPanel onto scenes gallery ──────
+			@Override
+			public void onLayerDropped(Layer layer) {
+				CanvasInstance c = ci(idx);
+				// Render layer to image to use as background
+				BufferedImage img = renderLayerToImage(layer);
+				if (img == null) return;
+				// Save temp image, then create scene
+				try {
+					File tmp = File.createTempFile("layer_scene_", ".png");
+					tmp.deleteOnExit();
+					javax.imageio.ImageIO.write(img, "PNG", tmp);
+					createSceneFromDrop(java.util.Arrays.asList(tmp), idx);
+				} catch (Exception ex) {
+					showErrorDialog("Fehler", "Layer → Scene fehlgeschlagen:\n" + ex.getMessage());
+				}
 			}
 		};
 	}
@@ -6451,6 +6520,49 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	@Override
 	public RulerUnit getRulerUnit() {
 		return rulerUnit;
+	}
+
+	// =========================================================================
+	// Scene helpers
+	// =========================================================================
+
+	/**
+	 * Copies an entire scene directory (sceneFile's parent) to a new name in the
+	 * same scenes root, then refreshes the scene panel.
+	 */
+	private void copySceneDirectory(File sceneFile, int idx) {
+		File srcDir = sceneFile.getParentFile();
+		File scenesRoot = srcDir.getParentFile();
+		String baseName = srcDir.getName();
+		File destDir = new File(scenesRoot, baseName + "_copy");
+		int n = 2;
+		while (destDir.exists()) destDir = new File(scenesRoot, baseName + "_copy" + n++);
+		File finalDest = destDir;
+		new javax.swing.SwingWorker<Void, Void>() {
+			@Override protected Void doInBackground() throws Exception {
+				copyDirRecursive(srcDir, finalDest);
+				// Rename the .txt inside to match the new directory name
+				File oldTxt = new File(finalDest, baseName + ".txt");
+				File newTxt = new File(finalDest, finalDest.getName() + ".txt");
+				if (oldTxt.exists()) oldTxt.renameTo(newTxt);
+				return null;
+			}
+			@Override protected void done() {
+				try { get(); } catch (Exception ex) { showErrorDialog("Fehler", ex.getMessage()); return; }
+				refreshSceneFiles(idx);
+				ToastNotification.show(SelectiveAlphaEditor.this, "Scene kopiert: " + finalDest.getName());
+			}
+		}.execute();
+	}
+
+	private static void copyDirRecursive(File src, File dest) throws java.io.IOException {
+		dest.mkdirs();
+		for (File f : src.listFiles()) {
+			File d = new File(dest, f.getName());
+			if (f.isDirectory()) copyDirRecursive(f, d);
+			else java.nio.file.Files.copy(f.toPath(), d.toPath(),
+					java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+		}
 	}
 
 	// =========================================================================
