@@ -1,0 +1,318 @@
+package paint;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.swing.SwingUtilities;
+
+/**
+ * Handles scene panel callbacks, scene loading (including GameII scenes),
+ * and scene creation from dropped files. Extracted from SelectiveAlphaEditor.
+ */
+class ScenesController {
+
+	private final SelectiveAlphaEditor ed;
+
+	ScenesController(SelectiveAlphaEditor ed) {
+		this.ed = ed;
+	}
+
+	TileGalleryPanel.Callbacks buildScenesCallbacks(int idx) {
+		return new TileGalleryPanel.Callbacks() {
+			@Override
+			public void onTileOpened(File sceneFile) {
+				if (sceneFile.isDirectory()) {
+					if (new File(sceneFile, "sprites").isDirectory()) {
+						ed.ci(idx).tileGallery.clearActiveAndSelection();
+						loadGameIISceneDir(sceneFile, idx);
+					}
+					return;
+				}
+				if (!sceneFile.getName().endsWith(".txt") && !sceneFile.getName().endsWith(".json"))
+					return;
+				ed.ci(idx).tileGallery.clearActiveAndSelection();
+				CanvasInstance c = ed.ci(idx);
+				try {
+					File sceneDir = sceneFile.getParentFile();
+					String sceneName = sceneFile.getName().replaceAll("\\.(txt|json)$", "");
+
+					File spritesSubDir = new File(sceneDir, "sprites");
+					if (spritesSubDir.exists() && spritesSubDir.isDirectory()) {
+						// ── GameII-Scene ──────────────────────────────────
+						GameSceneReader.GameSceneData gameData =
+								GameSceneReader.readScene(sceneDir, sceneName);
+
+						if (c.workingImage == null
+								|| c.workingImage.getWidth()  != gameData.canvasW
+								|| c.workingImage.getHeight() != gameData.canvasH) {
+							java.awt.image.BufferedImage blank = new java.awt.image.BufferedImage(
+									gameData.canvasW, gameData.canvasH,
+									java.awt.image.BufferedImage.TYPE_INT_ARGB);
+							java.awt.Graphics2D g2 = blank.createGraphics();
+							g2.setColor(new java.awt.Color(30, 30, 40));
+							g2.fillRect(0, 0, gameData.canvasW, gameData.canvasH);
+							g2.dispose();
+							c.workingImage  = blank;
+							c.originalImage = blank;
+						}
+
+						c.gameSceneRoot    = sceneDir;
+						c.gameCanvasW      = gameData.canvasW;
+						c.gameCanvasH      = gameData.canvasH;
+						c.activeElements   = gameData.layers;
+						c.selectedElements.clear();
+						c.activeSceneFile  = sceneFile;
+						c.sourceFile       = sceneFile;
+						ed.refreshElementPanel();
+						c.canvasPanel.repaint();
+
+					} else {
+						// ── Standard TT-Scene ─────────────────────────────
+						SceneFileReader.SceneData sceneData = SceneFileReader.readScene(sceneDir, sceneName);
+
+						if (sceneData.backgroundImage != null) {
+							ed.loadSceneBackground(sceneData.backgroundImage, idx);
+						}
+
+						List<Layer> allLayers = new ArrayList<>();
+						int nextId = System.identityHashCode(new Object());
+						for (SceneFileReader.ImageLayerRef ref : sceneData.imageLayers) {
+							java.awt.image.BufferedImage img = ImageLoader.loadImage(ref.file);
+							if (img != null) {
+								int w = ref.w > 0 ? ref.w : img.getWidth();
+								int h = ref.h > 0 ? ref.h : img.getHeight();
+								ImageLayer il = new ImageLayer(nextId++, img, ref.x, ref.y, w, h, ref.rotation, ref.opacity);
+								allLayers.add(il);
+							}
+						}
+						allLayers.addAll(sceneData.textLayers);
+						allLayers.addAll(sceneData.pathLayers);
+
+						c.gameSceneRoot    = null;
+						c.activeElements   = allLayers;
+						c.selectedElements.clear();
+						c.activeSceneFile  = sceneFile;
+						ed.refreshElementPanel();
+						c.canvasPanel.repaint();
+					}
+
+				} catch (Exception e) {
+					System.err.println("[ERROR] loadScene failed: " + e.getMessage());
+					ed.showErrorDialog("Fehler", "Scene konnte nicht geladen werden:\n" + e.getMessage());
+				}
+			}
+
+			@Override
+			public void onSelectionChanged(List<File> selectedFiles) {
+				if (!selectedFiles.isEmpty())
+					ed.ci(idx).tileGallery.clearActiveAndSelection();
+			}
+
+			@Override
+			public void onDragStarted(File file) {
+				// Scene tiles dragged out — no drop zone needed
+			}
+
+			@Override
+			public void onDragEnded() {
+				ed.rightDropZone.setVisible(false);
+				if (ed.ci(0).layeredPane != null)
+					ed.ci(0).layeredPane.repaint();
+			}
+
+			// ── Right-drag from any panel onto scenes gallery ─────────────────
+			@Override
+			public void onFileElementDropped(File src, int insertIndex) {
+				boolean isScene = src.getName().endsWith(".txt") || src.getName().endsWith(".json");
+				if (isScene) {
+					ed.copySceneDirectory(src, idx);
+				} else {
+					createSceneFromDrop(Arrays.asList(src), idx);
+				}
+			}
+
+			// ── Layer dragged from ElementLayerPanel onto scenes gallery ──────
+			@Override
+			public void onLayerDropped(Layer layer) {
+				CanvasInstance c = ed.ci(idx);
+				java.awt.image.BufferedImage img = ed.renderLayerToImage(layer);
+				if (img == null)
+					return;
+				try {
+					File tmp = File.createTempFile("layer_scene_", ".png");
+					tmp.deleteOnExit();
+					javax.imageio.ImageIO.write(img, "PNG", tmp);
+					createSceneFromDrop(Arrays.asList(tmp), idx);
+				} catch (Exception ex) {
+					ed.showErrorDialog("Fehler", "Layer → Scene fehlgeschlagen:\n" + ex.getMessage());
+				}
+			}
+		};
+	}
+
+	void createSceneFromDrop(List<File> files, int idx) {
+		if (files == null || files.isEmpty())
+			return;
+		File imageFile = files.get(0);
+		String n = imageFile.getName().toLowerCase();
+		boolean isImage = n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg")
+				|| n.endsWith(".gif") || n.endsWith(".bmp") || n.endsWith(".webp");
+		if (!isImage)
+			return;
+
+		CanvasInstance c = ed.ci(idx);
+
+		String defaultName = "Scene_" + new java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss")
+				.format(new java.util.Date());
+		String sceneName = (String) javax.swing.JOptionPane.showInputDialog(
+				ed,
+				"Szenen-Name:",
+				"Neue Szene erstellen",
+				javax.swing.JOptionPane.PLAIN_MESSAGE,
+				null, null, defaultName);
+		if (sceneName == null || sceneName.isBlank())
+			return;
+		sceneName = sceneName.trim();
+
+		List<String> projects = SceneLocator.getToolProjects();
+		String projectName = projects.isEmpty() ? "Default" : projects.get(0);
+		File scenesRoot = SceneLocator.getToolScenesDir(projectName);
+		File sceneDir   = new File(scenesRoot, sceneName);
+
+		List<Layer> layers = new ArrayList<>(c.activeElements);
+		final String finalName = sceneName;
+		new javax.swing.SwingWorker<Void, Void>() {
+			@Override
+			protected Void doInBackground() throws Exception {
+				SceneFileWriter.writeScene(sceneDir, finalName, imageFile, layers);
+				return null;
+			}
+
+			@Override
+			protected void done() {
+				try {
+					get();
+				} catch (Exception ex) {
+					System.err.println("[ERROR] Scene save failed: " + ex.getMessage());
+					ed.showErrorDialog("Fehler", "Scene konnte nicht gespeichert werden:\n" + ex.getMessage());
+					return;
+				}
+				refreshSceneFiles(idx);
+				ToastNotification.show(ed, "Scene gespeichert: " + finalName);
+			}
+		}.execute();
+	}
+
+	/** Collects all scene .txt files from SceneLocator and populates the scenes panel. */
+	void refreshSceneFiles(int idx) {
+		CanvasInstance c = ed.ci(idx);
+		List<File> allScenes = new ArrayList<>();
+		for (String project : SceneLocator.getToolProjects()) {
+			allScenes.addAll(SceneLocator.getToolScenes(project));
+		}
+		for (String game : SceneLocator.getAvailableGames()) {
+			allScenes.addAll(SceneLocator.getGameScenes(game));
+		}
+		for (String game : SceneLocator.getAppDataGames()) {
+			allScenes.addAll(SceneLocator.getAppDataGameScenes(game));
+		}
+		c.scenesPanel.setFiles(allScenes, null);
+	}
+
+	void loadGameIISceneDir(File sceneDir, int idx) {
+		CanvasInstance c = ed.ci(idx);
+		String sceneName = sceneDir.getName();
+		try {
+			GameSceneReader.GameSceneData gameData = GameSceneReader.readScene(sceneDir, sceneName);
+
+			if (c.workingImage == null
+					|| c.workingImage.getWidth()  != gameData.canvasW
+					|| c.workingImage.getHeight() != gameData.canvasH) {
+				java.awt.image.BufferedImage blank = new java.awt.image.BufferedImage(
+						gameData.canvasW, gameData.canvasH,
+						java.awt.image.BufferedImage.TYPE_INT_ARGB);
+				java.awt.Graphics2D g2 = blank.createGraphics();
+				g2.setColor(new java.awt.Color(30, 30, 40));
+				g2.fillRect(0, 0, gameData.canvasW, gameData.canvasH);
+				g2.dispose();
+				c.workingImage  = blank;
+				c.originalImage = blank;
+			}
+
+			File syntheticManifest = new File(sceneDir, sceneName + ".txt");
+			c.gameSceneRoot   = sceneDir;
+			c.gameCanvasW     = gameData.canvasW;
+			c.gameCanvasH     = gameData.canvasH;
+			c.activeElements  = gameData.layers;
+			c.selectedElements.clear();
+			c.activeSceneFile = syntheticManifest;
+			c.sourceFile      = syntheticManifest;
+			ed.ci(idx).tileGallery.clearActiveAndSelection();
+			ed.activeCanvasIndex = idx;
+			ed.updateCanvasFocusBorder();
+			ed.swapToImageView(idx);
+			SwingUtilities.invokeLater(() -> ed.fitToViewport(idx));
+			ed.refreshElementPanel();
+			ed.updateTitle();
+			ed.updateStatus();
+			ed.setBottomButtonsEnabled(true);
+
+			File gameScenesDir = sceneDir.getParentFile();
+			List<File> gameScenes = new ArrayList<>();
+			if (gameScenesDir != null && gameScenesDir.isDirectory()) {
+				File[] siblings = gameScenesDir.listFiles(File::isDirectory);
+				if (siblings != null) {
+					Arrays.sort(siblings, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+					for (File s : siblings) {
+						if (new File(s, "sprites").isDirectory())
+							gameScenes.add(s);
+					}
+				}
+			}
+			if (idx == 0)
+				ed.scenesBtn.setSelected(true);
+			else if (idx == 1)
+				ed.secondScenesBtn.setSelected(true);
+			c.scenesPanel.setVisible(true);
+			c.scenesPanel.setFiles(gameScenes, sceneDir);
+			ed.updateLayoutVisibility();
+			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> ed.reloadCurrentImage(idx)));
+
+		} catch (Exception e) {
+			System.err.println("[ERROR] loadGameIISceneDir failed: " + e.getMessage());
+			ed.showErrorDialog("Fehler", "GameII-Scene konnte nicht geladen werden:\n" + e.getMessage());
+		}
+	}
+
+	static String extractJsonField(String json, String fieldName) {
+		String pattern = "\"" + fieldName + "\":";
+		int idx = json.indexOf(pattern);
+		if (idx < 0)
+			return null;
+
+		int start = idx + pattern.length();
+		while (start < json.length() && Character.isWhitespace(json.charAt(start)))
+			start++;
+
+		if (start >= json.length() || json.charAt(start) != '[')
+			return null;
+
+		int depth = 0;
+		int end = start;
+		while (end < json.length()) {
+			if (json.charAt(end) == '[')
+				depth++;
+			if (json.charAt(end) == ']') {
+				depth--;
+				if (depth == 0) {
+					end++;
+					break;
+				}
+			}
+			end++;
+		}
+		return json.substring(start, end).trim();
+	}
+}

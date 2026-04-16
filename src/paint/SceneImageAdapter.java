@@ -6,7 +6,6 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.awt.Font;
 
 /**
  * Konvertiert eine SceneFile zu einem "Virtual Image" mit Layers.

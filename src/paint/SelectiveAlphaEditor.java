@@ -12,61 +12,37 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridLayout;
-import java.awt.Image;
-import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
-import java.awt.Toolkit;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.Transferable;
-import java.awt.datatransfer.UnsupportedFlavorException;
-import java.awt.event.ActionEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
-import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import javax.imageio.ImageIO;
-import javax.swing.AbstractAction;
-import javax.swing.ActionMap;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.InputMap;
 import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.JViewport;
-import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
-import javax.swing.SwingWorker;
-import javax.swing.Timer;
-
-import book.PaperFormat;
 
 /**
  * Main application window.
@@ -89,10 +65,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	private boolean[] canvasWasVisible = new boolean[2]; // Track canvas visibility for transitions
 
 	// Zoom settings (non-final for runtime adjustment)
-	private double ZOOM_MIN = 0.05;
-	private double ZOOM_MAX = 16.0; // max: 16x16 pixels
-	private double ZOOM_STEP = 0.10;
-	private double ZOOM_FACTOR = 1.08; // progressive zoom: 8% per notch
+	double ZOOM_MIN = 0.05;
+	double ZOOM_MAX = 16.0; // max: 16x16 pixels
+	double ZOOM_STEP = 0.10;
+	double ZOOM_FACTOR = 1.08; // progressive zoom: 8% per notch
 
 	private static final int GRID_CELL = 16; // image-space pixels per grid cell
 	private static final int RULER_THICK = 20; // pixels wide/tall for ruler strip
@@ -112,127 +88,125 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// RulerUnit is now defined in RulerUnit.java (extracted as separate enum)
 
 	// ── Canvas array (multiple independent canvases) ────────────────────────────
-	private final CanvasInstance[] canvases = new CanvasInstance[2];
-	private int activeCanvasIndex = 0;
+	final CanvasInstance[] canvases = new CanvasInstance[2];
+	int activeCanvasIndex = 0;
 
 	// Convenience accessors
-	private CanvasInstance ci() {
+	CanvasInstance ci() {
 		return canvases[activeCanvasIndex];
 	}
 
-	private CanvasInstance ci(int idx) {
+	CanvasInstance ci(int idx) {
 		return canvases[idx];
 	}
 
 	// ── Shared global state (not per-canvas) ───────────────────────────────────
-	private BufferedImage clipboard;
-	private List<Layer> clipboardLayers; // For copying/pasting layers between canvases
-	private Point pasteOffset;
+	BufferedImage clipboard;
+	List<Layer> clipboardLayers; // For copying/pasting layers between canvases
+	Point pasteOffset;
 
 	/** Default appMode applied to new canvases on first load (from settings). */
-	private AppMode defaultAppMode = AppMode.ALPHA_EDITOR;
-	private boolean floodfillMode = false;
-	private boolean alphaPaintMode = false; // true = Pinsel-basiertes Alpha-Malen
+	AppMode defaultAppMode = AppMode.ALPHA_EDITOR;
+	boolean floodfillMode = false;
+	boolean alphaPaintMode = false; // true = Pinsel-basiertes Alpha-Malen
 	// showGrid is now per-canvas: ci(idx).showGrid
-	private boolean showRuler = false;
-	private RulerUnit rulerUnit = RulerUnit.PX;
+	boolean showRuler = false;
+	RulerUnit rulerUnit = RulerUnit.PX;
 
 	// ── File cache (images stay alive while navigating, dirty until saved) ────
 	/** Files with unsaved changes (shown red in gallery). */
-	private final Set<File> dirtyFiles = new HashSet<>();
+	final Set<File> dirtyFiles = new HashSet<>();
 
 	// ── Directory browsing (gallery multiselect) ──────────────────────────────
-	private List<File> selectedImages = new ArrayList<>();
+	List<File> selectedImages = new ArrayList<>();
 
 	// ── Project Management ────────────────────────────────────────────────────
-	private ProjectManager projectManager = new ProjectManager();
+	ProjectManager projectManager = new ProjectManager();
 
-	// ── NEW: State Managers (Modularization) ───────────────────────────────────
-	private ZoomState zoomState = new ZoomState();
-	private FloatSelectionState floatSelectionState = new FloatSelectionState();
-	private FileStateCache fileCacheManager = new FileStateCache();
+
+	// ── Controllers (Modularization) ─────────────────────────────────────────
+	private final ClipboardController clipboardController = new ClipboardController(this);
+	private final SecondaryWindowController secWinController = new SecondaryWindowController(this);
+	final FileLoadController fileLoader = new FileLoadController(this);
+	private final ModeController modeController = new ModeController(this);
+	private final TransformController transformController = new TransformController(this);
+	final ScenesController scenesController = new ScenesController(this);
+	private final NewFileController newFileController = new NewFileController(this);
+	final ElementController elementController = new ElementController(this);
+	private final PreloadController preloadController = new PreloadController(this);
+	final DropController dropController = new DropController(this);
+	private final SaveController saveController = new SaveController(this);
+	final ElementEditController elementEditController = new ElementEditController(this);
+	private final QuickOpenController quickOpenController = new QuickOpenController(this);
+	final EditorDialogs editorDialogs = new EditorDialogs(this);
+	final ZoomController zoomController = new ZoomController(this);
 
 	// ── Secondary Canvas Window (F1/F2/F3/F4/F5/F7) ──────────────────────────────
-	private enum PreviewMode {
-		SNAPSHOT, LIVE_ALL, LIVE_ALL_EDIT
-	}
+	// PreviewMode, AlwaysOnTopMode, CanvasDisplayMode → eigene Dateien
 
-	private enum AlwaysOnTopMode {
-		TO_FRONT, NORMAL, TO_BACKGROUND
-	}
-
-	private enum CanvasDisplayMode {
-		SHOW_CANVAS_I_ONLY, SHOW_CANVAS_II_ONLY, SHOW_ACTIVE_CANVAS
-	}
-
-	private JFrame secWin;
-	private SecondaryPanel secPanel;
-	private PreviewMode secMode = PreviewMode.LIVE_ALL;
-	private CanvasDisplayMode secCanvasMode = CanvasDisplayMode.SHOW_CANVAS_I_ONLY;
-	private BufferedImage secSnapshot;
-	private javax.swing.Timer secTimer;
-	private boolean secFullscreen = true;
-	private AlwaysOnTopMode secAlwaysOnTop = AlwaysOnTopMode.TO_BACKGROUND;
-	private int secOldX, secOldY, secOldW, secOldH; // For fullscreen restoration
+	JFrame secWin;
+	SecondaryPanel secPanel;
+	PreviewMode secMode = PreviewMode.LIVE_ALL;
+	CanvasDisplayMode secCanvasMode = CanvasDisplayMode.SHOW_CANVAS_I_ONLY;
+	BufferedImage secSnapshot;
+	javax.swing.Timer secTimer;
+	boolean secFullscreen = true;
+	AlwaysOnTopMode secAlwaysOnTop = AlwaysOnTopMode.TO_BACKGROUND;
+	int secOldX, secOldY, secOldW, secOldH; // For fullscreen restoration
 
 	// ── Element layers ────────────────────────────────────────────────────────
 	// All per-canvas element state now in CanvasInstance
 
 	// ── Canvas background ─────────────────────────────────────────────────────
-	private Color canvasBg1 = new Color(200, 200, 200);
-	private Color canvasBg2 = new Color(160, 160, 160);
-	private Color canvasBg1Backup = null; // for QuickBG toggle
+	Color canvasBg1 = new Color(200, 200, 200);
+	Color canvasBg2 = new Color(160, 160, 160);
+	Color canvasBg1Backup = null; // for QuickBG toggle
 
 	// ── Filmstrip sidebar + toggles ────────────────────────────────────────────
-	private JPanel galleryWrapper;
+	JPanel galleryWrapper;
 	private JToggleButton filmstripBtn;
-	private JToggleButton scenesBtn;
-	private JToggleButton secondCanvasBtn;
-	private JToggleButton secondGalleryBtn;
-	private JToggleButton secondScenesBtn;
+	JToggleButton scenesBtn;
+	JToggleButton secondCanvasBtn;
+	JToggleButton secondGalleryBtn;
+	JToggleButton secondScenesBtn;
 
 	// ── Element layer panels (shown in Canvas mode) ──────────────────────────
-	private ElementLayerPanel elementLayerPanel; // For canvas 0
-	private ElementLayerPanel elementLayerPanel2; // For canvas 1
-	private JToggleButton firstElementsBtn; // Toggle for elementLayerPanel
-	private JToggleButton secondElementsBtn; // Toggle for elementLayerPanel2
+	ElementLayerPanel elementLayerPanel; // For canvas 0
+	ElementLayerPanel elementLayerPanel2; // For canvas 1
+	JToggleButton firstElementsBtn; // Toggle for elementLayerPanel
+	JToggleButton secondElementsBtn; // Toggle for elementLayerPanel2
 
 	// ── Maps panel (toggle-able list view) ─────────────────────────────────────
-	private MapsPanel mapsPanel;
+	MapsPanel mapsPanel;
 	private JToggleButton mapsBtn; // Toggle for mapsPanel
 
 	// ── Quick open and drop zone toggle ────────────────────────────────────────
 	private JButton quickOpenBtn; // Quick open recent projects
 	private JToggleButton toggleDropZoneBtn; // Toggle drop zone visibility for canvas 2
 
-	// ── Element-edit mode (double-click on layer tile) ────────────────────────
-	private Layer elementEditSourceLayer; // the layer being edited
-	private int elementEditSourceIdx; // canvas that owns the layer
-	private int elementEditTargetIdx; // canvas where the temp image is loaded
-
 	// ── Shared UI components ───────────────────────────────────────────────────
-	private HRulerPanel hRuler;
-	private VRulerPanel vRuler;
+	HRulerPanel hRuler;
+	VRulerPanel vRuler;
 	private JPanel rulerCorner;
 	private JPanel rulerNorthBar; // container for rulerCorner + hRuler
 	private JPanel actionPanel; // Holds apply/clear/reset/save buttons
-	private JPanel rightDropZone; // drag-activation overlay
-	private JToggleButton firstCanvasBtn; // Toggle for ci(0).layeredPane visibility
+	JPanel rightDropZone; // drag-activation overlay
+	JToggleButton firstCanvasBtn; // Toggle for ci(0).layeredPane visibility
 	private JPanel mainDividerPanel; // Thin vertical separator between Canvas 1 and 2
 
 	private JLabel statusLabel;
-	private JLabel modeLabel;
-	private JLabel zoomLabel;
-	private JButton applyButton;
-	private JButton clearSelectionsButton;
+	JLabel modeLabel;
+	JLabel zoomLabel;
+	JButton applyButton;
+	JButton clearSelectionsButton;
 	private JButton prevNavButton;
 	private JButton nextNavButton;
-	private JToggleButton paintModeBtn;
-	private JToggleButton canvasModeBtn;
-	private JToggleButton bookModeBtn;
-	private JToggleButton sceneModeBtn;
+	JToggleButton paintModeBtn;
+	JToggleButton canvasModeBtn;
+	JToggleButton bookModeBtn;
+	JToggleButton sceneModeBtn;
 
-	private PaintToolbar paintToolbar;
+	PaintToolbar paintToolbar;
 
 	// =========================================================================
 	// main
@@ -367,7 +341,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			}
 		});
 
-		initSecondaryWindow();
+		secWinController.initSecondaryWindow();
 
 		// Show StartupDialog for recently used projects (always show)
 		SwingUtilities.invokeLater(() -> {
@@ -873,7 +847,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	/** Re-builds the ruler strip layout around the scrollPane. */
-	private void buildRulerLayout() {
+	void buildRulerLayout() {
 		// Remove the stable containers from canvas 0 viewportPanel
 		ci(0).viewportPanel.remove(rulerNorthBar);
 		ci(0).viewportPanel.remove(vRuler);
@@ -886,7 +860,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		ci(0).viewportPanel.repaint();
 	}
 
-	private void repositionNavButtons(int idx) {
+	void repositionNavButtons(int idx) {
 		CanvasInstance c = ci(idx);
 		if (c.prevNavButton == null)
 			return;
@@ -900,7 +874,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Updates focus borders and element panel: active canvas gets green border only
 	 * when second canvas is visible.
 	 */
-	private void updateCanvasFocusBorder() {
+	void updateCanvasFocusBorder() {
 		// Only show focus border if both canvas drawing areas are visible
 		boolean showBorder = secondCanvasBtn.isEnabled() && firstCanvasBtn.isSelected() && secondCanvasBtn.isSelected();
 
@@ -936,7 +910,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	/** Updates visibility of all 7 layout elements independently. */
-	private void updateLayoutVisibility() {
+	void updateLayoutVisibility() {
 		// Canvas drawing areas follow their buttons
 		if (ci(0).layeredPane != null) {
 			boolean show0 = firstCanvasBtn.isSelected();
@@ -1085,7 +1059,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		c.layeredPane.add(c.nextNavButton, JLayeredPane.PALETTE_LAYER);
 
 		// Element-edit action bar (hidden until a layer is opened for editing)
-		c.elementEditBar = buildElementEditBar(idx);
+		c.elementEditBar = elementEditController.buildElementEditBar(idx);
 		c.elementEditBar.setVisible(false);
 		c.layeredPane.add(c.elementEditBar, JLayeredPane.MODAL_LAYER);
 
@@ -1098,7 +1072,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				if (c.viewportPanel.getParent() == c.layeredPane)
 					c.viewportPanel.setBounds(0, 0, w, h);
 				repositionNavButtons(idx);
-				repositionElementEditBar(idx);
+				elementEditController.repositionElementEditBar(idx);
 				if (idx == 0)
 					repositionRightDropZone();
 
@@ -1114,7 +1088,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			@Override
 			public void mousePressed(MouseEvent e) {
 				if (activeCanvasIndex != idx)
-					resetElementDragState(activeCanvasIndex);
+					elementEditController.resetElementDragState(activeCanvasIndex);
 				activeCanvasIndex = idx;
 				updateCanvasFocusBorder();
 			}
@@ -1126,7 +1100,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			@Override
 			public void mousePressed(MouseEvent e) {
 				if (activeCanvasIndex != idx)
-					resetElementDragState(activeCanvasIndex);
+					elementEditController.resetElementDragState(activeCanvasIndex);
 				activeCanvasIndex = idx;
 				updateCanvasFocusBorder();
 			}
@@ -1160,7 +1134,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			@Override
 			public void mousePressed(MouseEvent e) {
 				if (activeCanvasIndex != idx)
-					resetElementDragState(activeCanvasIndex);
+					elementEditController.resetElementDragState(activeCanvasIndex);
 				activeCanvasIndex = idx;
 				updateCanvasFocusBorder();
 			}
@@ -1222,110 +1196,15 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// =========================================================================
 	// Drag & Drop
 	// =========================================================================
-	private void setupDropTarget(java.awt.Component target, int idx) {
-		new java.awt.dnd.DropTarget(target, java.awt.dnd.DnDConstants.ACTION_COPY,
-				new java.awt.dnd.DropTargetAdapter() {
-					@Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) { dtde.acceptDrag(java.awt.dnd.DnDConstants.ACTION_COPY); }
-					@Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde)  { dtde.acceptDrag(java.awt.dnd.DnDConstants.ACTION_COPY); }
-					@Override
-					public void drop(java.awt.dnd.DropTargetDropEvent ev) {
-						try {
-							ev.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY);
-							java.awt.datatransfer.Transferable t = ev.getTransferable();
-							if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
-								// Case 1: LayerTile dragged onto canvas → copy as element
-								Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
-								insertLayerCopyToCanvas(layer, idx);
-								ev.dropComplete(true);
-							} else if (t.isDataFlavorSupported(TileGalleryPanel.FILE_AS_ELEMENT_FLAVOR)) {
-								// Case 3: right-drag from TileGallery onto canvas → insert as element
-								TileGalleryPanel.FileForElement ffe = (TileGalleryPanel.FileForElement) t
-										.getTransferData(TileGalleryPanel.FILE_AS_ELEMENT_FLAVOR);
-								insertFileAsElement(ffe.file, idx);
-								ev.dropComplete(true);
-							} else if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-								@SuppressWarnings("unchecked")
-								List<File> files = (List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
-								if (!files.isEmpty()) {
-									File f = files.get(0);
-									if (isSupportedFile(f))
-										loadFile(f, idx);
-									else
-										showErrorDialog("Format nicht unterstützt",
-												"Erlaubt: PNG, JPG, BMP, GIF\nDatei: " + f.getName());
-								}
-								ev.dropComplete(true);
-							} else {
-								ev.dropComplete(false);
-							}
-						} catch (Exception ex) {
-							ev.dropComplete(false);
-							showErrorDialog("Drop-Fehler", ex.getMessage());
-						}
-					}
-				}, true);
-	}
-
-	/** Case 1: Copy a layer onto a canvas as a new element. */
-	private void insertLayerCopyToCanvas(Layer source, int targetIdx) {
-		CanvasInstance c = ci(targetIdx);
-		if (c.workingImage == null)
-			return;
-		Layer copy = copyLayerWithNewId(source, c.nextElementId++);
-		if (copy == null)
-			return;
-		c.activeElements.add(copy);
-		c.selectedElements.clear();
-		c.selectedElements.add(copy);
-		markDirty(targetIdx);
-		refreshElementPanel();
-		if (c.canvasPanel != null)
-			c.canvasPanel.repaint();
-		ToastNotification.show(this, "Layer kopiert");
-	}
-
-	/** Case 3: Load an image file and insert it as a new element on the canvas. */
-	private void insertFileAsElement(File f, int targetIdx) {
-		CanvasInstance c = ci(targetIdx);
-		if (c.workingImage == null) {
-			if (isSupportedFile(f)) loadFile(f, targetIdx);
-			return;
-		}
-		try {
-			BufferedImage img;
-			if (f.getName().endsWith(".txt") || f.getName().endsWith(".json")) {
-				// Scene file → render composite thumbnail at full resolution
-				SceneImageAdapter.SceneAsImage s = SceneImageAdapter.loadSceneAsImage(f);
-				img = (s != null) ? s.thumbnail : null;
-			} else {
-				img = javax.imageio.ImageIO.read(f);
-			}
-			if (img == null)
-				return;
-			img = normalizeImage(img);
-			int[] size = fitElementSize(img.getWidth(), img.getHeight(), c.workingImage.getWidth(),
-					c.workingImage.getHeight());
-			int cx = Math.max(0, (c.workingImage.getWidth() - size[0]) / 2);
-			int cy = Math.max(0, (c.workingImage.getHeight() - size[1]) / 2);
-			ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy, size[0], size[1]);
-			c.activeElements.add(layer);
-			c.selectedElements.clear();
-			c.selectedElements.add(layer);
-			markDirty(targetIdx);
-			refreshElementPanel();
-			if (c.canvasPanel != null)
-				c.canvasPanel.repaint();
-			ToastNotification.show(this, "Bild als Element eingefügt");
-		} catch (Exception ex) {
-			showErrorDialog("Fehler", "Bild konnte nicht geladen werden: " + ex.getMessage());
-		}
+	void setupDropTarget(java.awt.Component target, int idx) {
+		dropController.setupDropTarget(target, idx);
 	}
 
 	/**
 	 * Creates a copy of {@code src} with a new ID. Returns null for unsupported
 	 * types.
 	 */
-	private Layer copyLayerWithNewId(Layer src, int newId) {
+	Layer copyLayerWithNewId(Layer src, int newId) {
 		if (src instanceof ImageLayer il) {
 			BufferedImage normalized = normalizeImage(il.image());
 			return new ImageLayer(newId, normalized, il.x(), il.y(), normalized.getWidth(), normalized.getHeight());
@@ -1342,7 +1221,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Converts a visual drop index (0 = top) to a list insert index. Since display
 	 * is reversed (top = last element), insertIdx = listSize - visualIdx.
 	 */
-	private static int visualToInsertIndex(int visualIdx, int listSize) {
+	static int visualToInsertIndex(int visualIdx, int listSize) {
 		return Math.max(0, Math.min(listSize, listSize - visualIdx));
 	}
 
@@ -1356,7 +1235,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * image proportionally into MAX_ELEM_RATIO of the canvas size. Never upscales
 	 * (if image is already smaller, keeps original size).
 	 */
-	private static int[] fitElementSize(int imgW, int imgH, int canvasW, int canvasH) {
+	static int[] fitElementSize(int imgW, int imgH, int canvasW, int canvasH) {
 		float maxW = canvasW * MAX_ELEM_RATIO;
 		float maxH = canvasH * MAX_ELEM_RATIO;
 		float scale = Math.min(1.0f, Math.min(maxW / imgW, maxH / imgH));
@@ -1370,218 +1249,24 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// buildSecondArea() removed — now using buildCanvasArea(1) for canvas 2
 
 	private JPanel buildRightDropZone() {
-		JPanel zone = new JPanel() {
-			@Override
-			protected void paintComponent(Graphics g) {
-				super.paintComponent(g);
-				Graphics2D g2 = (Graphics2D) g;
-				g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-				int w = getWidth(), h = getHeight();
-				g2.setColor(new Color(0, 0, 0, 160));
-				g2.fillRoundRect(0, 0, w, h, 12, 12);
-				float[] dash = { 8f, 5f };
-				g2.setColor(AppColors.ACCENT);
-				g2.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, dash, 0));
-				g2.drawRoundRect(4, 4, w - 9, h - 9, 10, 10);
-				g2.setStroke(new BasicStroke(2));
-				// Arrow right symbol
-				int cx = w / 2, cy = h / 2;
-				g2.drawLine(cx - 12, cy, cx + 12, cy);
-				g2.drawLine(cx + 4, cy - 8, cx + 12, cy);
-				g2.drawLine(cx + 4, cy + 8, cx + 12, cy);
-				g2.setColor(AppColors.TEXT);
-				g2.setFont(new Font("SansSerif", Font.BOLD, 11));
-				String t = "2. Canvas";
-				FontMetrics fm = g2.getFontMetrics();
-				g2.drawString(t, cx - fm.stringWidth(t) / 2, cy + 28);
-			}
-		};
-		zone.setOpaque(false);
-		zone.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-		// Click handler: open quick select dialog for canvas 2
-		// Also hide dropzone on mouse exit or when clicking elsewhere
-		zone.addMouseListener(new java.awt.event.MouseAdapter() {
-			private javax.swing.Timer hideTimer;
-
-			@Override
-			public void mouseClicked(java.awt.event.MouseEvent e) {
-				e.consume();
-				showQuickOpenDialog(1); // Load into canvas 2 (index 1)
-			}
-
-			@Override
-			public void mouseExited(java.awt.event.MouseEvent e) {
-				// Hide dropzone after brief delay if mouse leaves it
-				hideTimer = new javax.swing.Timer(300, ev -> {
-					if (zone.isVisible()) {
-						zone.setVisible(false);
-						if (ci(0).layeredPane != null)
-							ci(0).layeredPane.repaint();
-					}
-				});
-				hideTimer.setRepeats(false);
-				hideTimer.start();
-			}
-
-			@Override
-			public void mouseEntered(java.awt.event.MouseEvent e) {
-				// Cancel hide timer when re-entering
-				if (hideTimer != null) {
-					hideTimer.stop();
-					hideTimer = null;
-				}
-			}
-		});
-
-		setupDropTarget(zone, 1);
-		return zone;
+		return dropController.buildRightDropZone();
 	}
 
-	private void repositionRightDropZone() {
-		if (rightDropZone == null || ci(0).workingImage == null)
-			return;
-		int imgRightInCanvas = (int) (ci(0).canvasPanel.getX() + ci(0).workingImage.getWidth() * ci(0).zoom);
-		int vpX = imgRightInCanvas - ci(0).scrollPane.getViewport().getViewPosition().x;
-		int x = vpX + 16;
-		int y = ci(0).layeredPane.getHeight() / 2 - 60;
-		int w = 90, h = 120;
-		if (x + w < ci(0).layeredPane.getWidth()) {
-			rightDropZone.setBounds(x, y, w, h);
-		} else {
-			rightDropZone.setVisible(false);
-		}
+	void repositionRightDropZone() {
+		dropController.repositionRightDropZone();
 	}
 
 	// =========================================================================
 	// File loading
 	// =========================================================================
 	// Convenience: loads into active canvas
-	private void loadFile(File file) {
-		loadFile(file, activeCanvasIndex);
+	void loadFile(File file) {
+		fileLoader.loadFile(file);
 	}
 
 	// Core version: loads into specified canvas
-	private void loadFile(File file, int idx) {
-		CanvasInstance c = ci(idx);
-
-		// Save current canvas state before switching
-		if (c.sourceFile != null)
-			saveCurrentState(idx);
-
-		// Check cache first
-		CanvasInstance.CanvasFileState cached = c.fileCache.get(file);
-		if (cached != null) {
-			// Restore from cache
-			c.workingImage = cached.image;
-			c.undoStack.clear();
-			c.undoStack.addAll(cached.undoStack);
-			c.redoStack.clear();
-			c.redoStack.addAll(cached.redoStack);
-			c.activeElements = new ArrayList<>(cached.elements);
-		} else {
-			// Load fresh from disk
-			try {
-				BufferedImage img = ImageIO.read(file);
-				if (img == null) {
-					showErrorDialog("Ladefehler", "Bild konnte nicht gelesen werden:\n" + file.getName());
-					return;
-				}
-				c.originalImage = img;
-				c.workingImage = normalizeImage(c.originalImage);
-				c.undoStack.clear();
-				c.redoStack.clear();
-				c.activeElements = new ArrayList<>();
-				c.selectedElements.clear();
-				CanvasInstance.CanvasFileState cs = new CanvasInstance.CanvasFileState(c.workingImage);
-				c.fileCache.put(file, cs);
-			} catch (IOException e) {
-				showErrorDialog("Ladefehler", "Fehler:\n" + e.getMessage());
-				return;
-			}
-		}
-
-		c.sourceFile = file;
-		c.hasUnsavedChanges = dirtyFiles.contains(file);
-		c.selectedAreas.clear();
-		c.isSelecting = false;
-		c.selectionStart = null;
-		c.selectionEnd = null;
-		c.lastPaintPoint = null;
-		c.shapeStartPoint = null;
-		c.paintSnapshot = null;
-		c.floatingImg = null;
-		c.floatRect = null;
-		c.isDraggingFloat = false;
-		c.floatDragAnchor = null;
-		c.activeHandle = -1;
-		c.scaleBaseRect = null;
-		c.scaleDragStart = null;
-		c.selectedElements.clear();
-		c.activeSceneFile = null;  // regular image load clears any active scene
-		c.draggingElement = false;
-		c.elemDragAnchor = null;
-		c.elemActiveHandle = -1;
-		c.elemScaleBase = null;
-		c.elemScaleStart = null;
-		if (c.canvasPanel != null)
-			c.canvasPanel.resetInputState();
-
-		// Apply default mode for new files (overridden below if saved mode exists)
-		c.appMode = defaultAppMode;
-
-		// Load saved scene data (Layer, Zoom, Mode)
-		try {
-			if (projectManager.getProjectName() != null) {
-				List<Layer> savedLayers = projectManager.loadScene(file);
-				if (savedLayers != null && !savedLayers.isEmpty()) {
-					c.activeElements = savedLayers;
-					c.selectedElements.clear();
-				}
-
-				double savedZoom = projectManager.loadSceneZoom(file);
-				if (savedZoom > 0) {
-					c.zoom = savedZoom;
-					c.userHasManuallyZoomed = true;
-				}
-
-				AppMode savedMode = projectManager.loadSceneMode(file);
-				if (savedMode != null) {
-					c.appMode = savedMode;
-				}
-			}
-		} catch (IOException e) {
-			System.err.println("[WARN] Fehler beim Laden der Szenen-Daten: " + e.getMessage());
-		}
-
-		// Set this canvas as active when loading an image
-		activeCanvasIndex = idx;
-		updateCanvasFocusBorder();
-
-		// Don't index temp files (element-edit mode) — would pollute nav with /tmp
-		if (!file.getParentFile().equals(new java.io.File(System.getProperty("java.io.tmpdir"))))
-			indexDirectory(file, idx);
-		swapToImageView(idx);
-
-		// Check if file was preloaded - use preloaded image if available
-		CanvasInstance.PreloadedFileState preloaded = c.preloadCache.get(file);
-		if (preloaded != null && preloaded.image != null) {
-			// Image is already loaded and normalized - use it directly
-			c.workingImage = preloaded.image;
-		}
-
-		// Fit to viewport - works with either preloaded or freshly loaded image
-		// This ensures correct zoom/centering calculations that match legacy behavior
-		SwingUtilities.invokeLater(() -> fitToViewport(idx));
-
-		refreshElementPanel();
-		updateNavigationButtons();
-		updateTitle();
-		updateStatus();
-		setBottomButtonsEnabled(true);
-
-		// Preload next/previous images for smooth browsing
-		preloadNextImages(idx);
+	void loadFile(File file, int idx) {
+		fileLoader.loadFile(file, idx);
 	}
 
 	/**
@@ -1589,434 +1274,109 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * TileGalleryPanel — no indexDirectory(), no tileGallery.setFiles().
 	 * Used exclusively when clicking a scene tile.
 	 */
-	private void loadSceneBackground(File file, int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.sourceFile != null) saveCurrentState(idx);
-		try {
-			java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(file);
-			if (img == null) return;
-			c.originalImage = img;
-			c.workingImage  = normalizeImage(c.originalImage);
-			c.undoStack.clear();
-			c.redoStack.clear();
-			c.activeElements = new ArrayList<>();
-			c.selectedElements.clear();
-			c.fileCache.put(file, new CanvasInstance.CanvasFileState(c.workingImage));
-		} catch (java.io.IOException e) {
-			System.err.println("[ERROR] loadSceneBackground: " + e.getMessage());
-			return;
-		}
-		c.sourceFile = file;
-		c.activeSceneFile = null;  // loading a background clears scene tracking; caller sets it after
-		c.hasUnsavedChanges = false;
-		c.selectedAreas.clear();
-		c.isSelecting = false;
-		c.floatingImg = null;
-		c.floatRect = null;
-		c.lastPaintPoint = null;
-		c.shapeStartPoint = null;
-		c.paintSnapshot = null;
-		activeCanvasIndex = idx;
-		updateCanvasFocusBorder();
-		swapToImageView(idx);
-		SwingUtilities.invokeLater(() -> fitToViewport(idx));
-		refreshElementPanel();
-		updateTitle();
-		updateStatus();
-		setBottomButtonsEnabled(true);
+	void loadSceneBackground(File file, int idx) {
+		fileLoader.loadSceneBackground(file, idx);
 	}
 
 	/** Saves the current canvas state back into the file cache. */
 	public void saveCurrentState() {
-		saveCurrentState(activeCanvasIndex);
+		fileLoader.saveCurrentState();
 	}
 
 	public void saveCurrentState(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.sourceFile == null || c.workingImage == null)
-			return;
-		CanvasInstance.CanvasFileState cs = c.fileCache.computeIfAbsent(c.sourceFile,
-				k -> new CanvasInstance.CanvasFileState(c.workingImage));
-		cs.image = c.workingImage;
-		cs.undoStack.clear();
-		cs.undoStack.addAll(c.undoStack);
-		cs.redoStack.clear();
-		cs.redoStack.addAll(c.redoStack);
-		cs.elements.clear();
-		cs.elements.addAll(c.activeElements);
+		fileLoader.saveCurrentState(idx);
 	}
 
 	/**
 	 * Recalculates zoom and centering for the canvas after layout changes.
 	 * Does NOT change the active canvas - just fixes the display of the current canvas.
 	 */
-	private void reloadCurrentImage(int idx) {
-		CanvasInstance c = ci(idx);
-		// Only recalculate if this canvas has an image and it's currently visible
-		if (c.workingImage == null || !c.viewportPanel.isVisible())
-			return;
-		// Just fit to viewport without changing activeCanvasIndex or reloading
-		fitToViewport(idx);
+	void reloadCurrentImage(int idx) {
+		fileLoader.reloadCurrentImage(idx);
 	}
 
 	/**
 	 * Converts the image to TYPE_INT_ARGB and ensures it is always stored in a
 	 * clean ARGB format so paint operations work correctly on any source.
 	 */
-	private BufferedImage normalizeImage(BufferedImage src) {
-		if (src.getType() == BufferedImage.TYPE_INT_ARGB)
+	BufferedImage normalizeImage(BufferedImage src) {
+		if (src.getType() == java.awt.image.BufferedImage.TYPE_INT_ARGB)
 			return deepCopy(src);
-		BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+		BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g2 = out.createGraphics();
 		g2.drawImage(src, 0, 0, null);
 		g2.dispose();
 		return out;
 	}
 
-	private void indexDirectory(File file) {
-		indexDirectory(file, activeCanvasIndex, LastProjectsManager.CAT_IMAGES);
+	void indexDirectory(File file) {
+		fileLoader.indexDirectory(file);
 	}
 
-	private void indexDirectory(File file, int idx) {
-		indexDirectory(file, idx, LastProjectsManager.CAT_IMAGES);
+	void indexDirectory(File file, int idx) {
+		fileLoader.indexDirectory(file, idx);
 	}
 
-	private void indexDirectory(File file, int idx, String category) {
-		CanvasInstance c = ci(idx);
-		File dir = file.getParentFile();
-		if (dir == null) return;
-		boolean sameDir = dir.equals(c.lastIndexedDir);
-		if (!sameDir) {
-			File[] files = dir.listFiles(f -> f.isFile() && isSupportedFile(f));
-			if (files == null) return;
-			Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-			c.directoryImages = new ArrayList<>(Arrays.asList(files));
-			c.lastIndexedDir = dir;
-			c.tileGallery.setFiles(c.directoryImages, file);
-
-			// Record into the correct category (images, scenes, books, etc.)
-			try {
-				LastProjectsManager.addRecent(category, dir.getAbsolutePath());
-			} catch (IOException e) {
-				System.err.println("[WARN] Konnte lastProjects nicht speichern: " + e.getMessage());
-			}
-		} else {
-			c.tileGallery.setActiveFile(file);
-		}
-		c.currentImageIndex = c.directoryImages.indexOf(file);
-		c.tileGallery.setVisible(true);
+	void indexDirectory(File file, int idx, String category) {
+		fileLoader.indexDirectory(file, idx, category);
 	}
 
-	private void navigateImage(int dir) {
-		navigateImage(dir, activeCanvasIndex);
+	void navigateImage(int dir) {
+		fileLoader.navigateImage(dir);
 	}
 
-	private void navigateImage(int dir, int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.directoryImages.isEmpty())
-			return;
-		int ni = c.currentImageIndex + dir;
-		if (ni < 0 || ni >= c.directoryImages.size())
-			return;
-		c.currentImageIndex = ni;
-		loadFile(c.directoryImages.get(c.currentImageIndex), idx);
-		c.tileGallery.scrollToActive();
-		// Preload next/previous images for smooth browsing
-		preloadNextImages(idx);
+	void navigateImage(int dir, int idx) {
+		fileLoader.navigateImage(dir, idx);
 	}
 
 	/**
 	 * Synchronize ScenesPanel visibility with button state. Single source of truth
 	 * to prevent button/panel mismatches.
 	 */
-	private void setScenesPanelVisible(int idx, boolean visible) {
-		CanvasInstance c = ci(idx);
-		// Update button and panel
-		if (idx == 0) {
-			scenesBtn.setSelected(visible);
-		} else if (idx == 1) {
-			secondScenesBtn.setSelected(visible);
-		}
-		c.scenesPanel.setVisible(visible);
-		if (visible) {
-			refreshSceneFiles(idx);
-		}
-		updateLayoutVisibility();
-		// Wait for layout to settle before recalculating image zoom/position
-		SwingUtilities.invokeLater(() -> {
-			SwingUtilities.invokeLater(() -> reloadCurrentImage(idx));
-		});
+	void setScenesPanelVisible(int idx, boolean visible) {
+		fileLoader.setScenesPanelVisible(idx, visible);
 	}
 
 	// ── Indexed canvas methods (array-based) ────────────────────────────────────
 	public void swapToImageView(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.dropHintPanel.getParent() == c.layeredPane)
-			c.layeredPane.remove(c.dropHintPanel);
-		if (c.viewportPanel.getParent() == null) {
-			int w = Math.max(c.layeredPane.getWidth(), 430);
-			int h = Math.max(c.layeredPane.getHeight(), 560);
-			c.viewportPanel.setBounds(0, 0, w, h);
-			c.layeredPane.add(c.viewportPanel, JLayeredPane.DEFAULT_LAYER);
-			setupDropTarget(c.viewportPanel, idx);
-			setupDropTarget(c.canvasPanel, idx);
-		}
-		c.viewportPanel.setVisible(true);
-
-		// Enable canvas-0 element and canvas buttons as soon as canvas 0 has content
-		if (idx == 0) {
-			firstElementsBtn.setEnabled(true);
-			firstCanvasBtn.setEnabled(true);
-		}
-
-		// If loading into canvas 1, manage visibility via buttons
-		if (idx == 1) {
-			boolean firstActivation = !secondCanvasBtn.isEnabled();
-			rightDropZone.setVisible(false);
-
-			if (firstActivation) {
-				// First load: auto-activate canvas button
-				secondCanvasBtn.setSelected(true);
-			} else if (!secondCanvasBtn.isSelected()) {
-				// Canvas was explicitly hidden by user → loading new image re-activates it
-				secondCanvasBtn.setSelected(true);
-			}
-
-			updateLayoutVisibility();
-			updateCanvasFocusBorder();
-
-			// Canvas II: only enable buttons — user decides visibility explicitly
-			secondCanvasBtn.setEnabled(true);
-			secondGalleryBtn.setEnabled(true);
-			secondElementsBtn.setEnabled(true);
-			secondScenesBtn.setEnabled(true);
-		}
-
-		repositionNavButtons(idx);
-		c.layeredPane.revalidate();
-		c.layeredPane.repaint();
+		fileLoader.swapToImageView(idx);
 	}
 
 	public void fitToViewport(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.workingImage == null || c.scrollPane == null)
-			return;
-		Dimension vd = c.scrollPane.getViewport().getSize();
-		if (vd.width <= 0 || vd.height <= 0) {
-			SwingUtilities.invokeLater(() -> fitToViewport(idx));
-			return;
-		}
-
-		// Stop any running animation and set zoom synchronously
-		if (c.zoomTimer != null) {
-			c.zoomTimer.stop();
-			c.zoomTimer = null;
-		}
-		c.userHasManuallyZoomed = false;
-		c.zoomImgPt = null;
-		c.zoomVpMouse = null;
-
-		double nz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX,
-				Math.min((vd.width - 80.0) / c.workingImage.getWidth(), (vd.height - 80.0) / c.workingImage.getHeight())
-						* 0.98));
-		c.zoom = c.zoomTarget = nz;
-		c.canvasWrapper.revalidate();
-
-		// Single invokeLater — layout has settled by the time this runs,
-		// so viewport size is accurate and centering is correct.
-		SwingUtilities.invokeLater(() -> {
-			if (c.workingImage == null || c.scrollPane == null)
-				return;
-			c.canvasWrapper.revalidate();
-			c.canvasWrapper.validate();
-			JViewport vp = c.scrollPane.getViewport();
-			Dimension vpSz = vp.getSize();
-			int cw = (int) Math.ceil(c.workingImage.getWidth() * c.zoom);
-			int ch = (int) Math.ceil(c.workingImage.getHeight() * c.zoom);
-			vp.setViewPosition(new Point(Math.max(0, (cw - vpSz.width) / 2), Math.max(0, (ch - vpSz.height) / 2)));
-			c.canvasWrapper.repaint();
-			if (zoomLabel != null)
-				zoomLabel.setText(Math.round(c.zoom * 100) + "%");
-		});
+		fileLoader.fitToViewport(idx);
 	}
 
 	public void centerCanvas(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.scrollPane == null || c.workingImage == null)
-			return;
-		SwingUtilities.invokeLater(() -> {
-			c.canvasWrapper.revalidate();
-			c.canvasWrapper.validate();
-			JViewport vp = c.scrollPane.getViewport();
-			Dimension vpSz = vp.getSize();
-			int cw = (int) Math.ceil(c.workingImage.getWidth() * c.zoom);
-			int ch = (int) Math.ceil(c.workingImage.getHeight() * c.zoom);
-			int viewX = Math.max(0, (cw - vpSz.width) / 2);
-			int viewY = Math.max(0, (ch - vpSz.height) / 2);
-			vp.setViewPosition(new Point(viewX, viewY));
-		});
+		fileLoader.centerCanvas(idx);
 	}
 
-	private void setZoomInstant(double nz, int idx) {
-		CanvasInstance c = ci(idx);
-		c.userHasManuallyZoomed = false;
-		if (c.zoomTimer != null) {
-			c.zoomTimer.stop();
-			c.zoomTimer = null;
-		}
-		c.zoom = c.zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
-		c.zoomImgPt = null;
-		c.zoomVpMouse = null;
-		if (c.canvasWrapper != null) {
-			c.canvasWrapper.revalidate();
-			c.canvasWrapper.repaint();
-		}
-		SwingUtilities.invokeLater(() -> c.scrollPane.getViewport().setViewPosition(new Point(0, 0)));
+	void setZoomInstant(double nz, int idx) {
+		fileLoader.setZoomInstant(nz, idx);
 	}
 
-	// =========================================================================
-	// Zoom
-	// =========================================================================
+	// ── Zoom → ZoomController ────────────────────────────────────────────────
 
-	/**
-	 * Set zoom level with smooth animation. If anchorCanvas != null, keep that
-	 * canvas point fixed on screen (zoom toward cursor).
-	 */
 	public void setZoom(double nz, Point anchorCanvas) {
-		setZoom(nz, anchorCanvas, activeCanvasIndex);
-	}
-
-	// Internal setZoom that works with indexed canvas
-	private void setZoom(double nz, Point anchorCanvas, int idx) {
-		CanvasInstance c = ci(idx);
-		c.userHasManuallyZoomed = true;
-		c.zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
-
-		// Capture anchor point only if a new gesture is starting (no animation running)
-		if (c.zoomTimer == null) {
-			if (anchorCanvas != null && c.scrollPane != null) {
-				JViewport vp = c.scrollPane.getViewport();
-				// image coord under cursor (using CURRENT zoom, before animation starts)
-				c.zoomImgPt = new Point2D.Double(anchorCanvas.x / c.zoom, anchorCanvas.y / c.zoom);
-				// viewport-relative mouse position (stays fixed during animation)
-				c.zoomVpMouse = SwingUtilities.convertPoint(c.canvasPanel, anchorCanvas, vp);
-			} else {
-				c.zoomImgPt = null;
-				c.zoomVpMouse = null;
-			}
-		}
-		// If animation is already running, just update zoomTarget and continue
-
-		startZoomAnimation(idx);
+		zoomController.setZoom(nz, anchorCanvas);
 	}
 
 	public void fitToViewport() {
 		fitToViewport(activeCanvasIndex);
 	}
 
-	/** Set zoom immediately without animation. Used for image load/browse. */
-	private void setZoomInstant(double nz) {
-		setZoomInstant(nz, activeCanvasIndex);
+	void startZoomAnimation(int idx) {
+		zoomController.startZoomAnimation(idx);
 	}
 
-	private void updateZoomLabel() {
-		if (zoomLabel != null)
-			zoomLabel.setText(Math.round(ci().zoom * 100) + "%");
+	void startZoomAnimation() {
+		zoomController.startZoomAnimation();
 	}
 
-	/**
-	 * Start or restart the zoom animation timer for indexed canvas. Each tick, zoom
-	 * approaches zoomTarget using exponential decay.
-	 */
-	private void startZoomAnimation(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.zoomTimer != null) {
-			c.zoomTimer.stop();
-			c.zoomTimer = null;
-		}
+	// ── Coordinate transform ──────────────────────────────────────────────────
 
-		final int INTERVAL_MS = 16; // ~60 FPS
-		final double FACTOR = 0.30; // 30% per tick — snappy but not jarring
-
-		c.zoomTimer = new Timer(INTERVAL_MS, null);
-		c.zoomTimer.addActionListener(e -> {
-			double diff = c.zoomTarget - c.zoom;
-			boolean done = Math.abs(diff) < 0.0005;
-			if (done) {
-				c.zoom = c.zoomTarget;
-				c.zoomTimer.stop();
-				c.zoomTimer = null;
-			} else {
-				c.zoom += diff * FACTOR;
-			}
-			applyZoomFrame(idx);
-			// After animation ends with no anchor: reset viewport to (0,0)
-			if (done && c.zoomImgPt == null && c.scrollPane != null) {
-				SwingUtilities.invokeLater(() -> c.scrollPane.getViewport().setViewPosition(new Point(0, 0)));
-			}
-		});
-		c.zoomTimer.setInitialDelay(0);
-		c.zoomTimer.start();
-	}
-
-	/**
-	 * Start or restart the zoom animation timer for active canvas.
-	 */
-	private void startZoomAnimation() {
-		startZoomAnimation(activeCanvasIndex);
-	}
-
-	/**
-	 * Apply current zoom to the UI for indexed canvas (called every animation
-	 * frame).
-	 */
-	private void applyZoomFrame(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.canvasWrapper == null)
-			return;
-
-		// Synchronous layout pass
-		c.canvasWrapper.revalidate();
-
-		// Adjust viewport so the anchor image pixel stays under the mouse.
-		if (c.zoomImgPt != null && c.zoomVpMouse != null && c.scrollPane != null && c.workingImage != null) {
-			JViewport vp = c.scrollPane.getViewport();
-			Dimension vs = vp.getViewSize();
-			Dimension vpSz = vp.getSize();
-			int cx = c.canvasPanel.getX();
-			int cy = c.canvasPanel.getY();
-			int newCanvasX = (int) (c.zoomImgPt.getX() * c.zoom);
-			int newCanvasY = (int) (c.zoomImgPt.getY() * c.zoom);
-			int vx = cx + newCanvasX - c.zoomVpMouse.x;
-			int vy = cy + newCanvasY - c.zoomVpMouse.y;
-			int maxVx = Math.max(0, vs.width - vpSz.width);
-			int maxVy = Math.max(0, vs.height - vpSz.height);
-			vp.setViewPosition(new Point(Math.max(0, Math.min(vx, maxVx)), Math.max(0, Math.min(vy, maxVy))));
-		}
-
-		c.canvasWrapper.repaint();
-	}
-
-	/**
-	 * Apply current zoom to the active canvas (called every animation frame).
-	 */
-	private void applyZoomFrame() {
-		applyZoomFrame(activeCanvasIndex);
-	}
-
-	// =========================================================================
-	// Coordinate transform
-	// =========================================================================
 	/** Convert a point in canvasPanel-local coordinates to image-space. */
 	public Point screenToImage(Point sp) {
-		CanvasInstance c = ci();
-		int ix = (int) Math.floor(sp.x / c.zoom);
-		int iy = (int) Math.floor(sp.y / c.zoom);
-		if (c.workingImage != null) {
-			ix = Math.max(0, Math.min(c.workingImage.getWidth() - 1, ix));
-			iy = Math.max(0, Math.min(c.workingImage.getHeight() - 1, iy));
-		}
-		return new Point(ix, iy);
+		return zoomController.screenToImage(sp);
 	}
 
 	// =========================================================================
@@ -2035,76 +1395,19 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	private void applySelectionsToAlpha() {
-		CanvasInstance c = ci();
-		if (c.selectedAreas.isEmpty()) {
-			showInfoDialog("Keine Auswahl", "Noch keine Bereiche ausgewählt.");
-			return;
-		}
-		pushUndo();
-		for (Rectangle r : c.selectedAreas)
-			PaintEngine.clearRegion(c.workingImage, r);
-		c.selectedAreas.clear();
-		markDirty();
-		showInfoDialog("Erledigt", "Ausgewählte Bereiche wurden transparent gemacht.");
+		saveController.applySelectionsToAlpha();
 	}
 
 	private void clearSelections() {
-		ci().selectedAreas.clear();
-		ci().canvasPanel.repaint();
-	}
-
-	private String getSaveSuffix() {
-		return (ci().appMode == AppMode.PAINT) ? "_painted" : floodfillMode ? "_floodfill_alpha" : "_selective_alpha";
+		saveController.clearSelections();
 	}
 
 	private void resetImage() {
-		CanvasInstance c = ci();
-		if (c.originalImage == null)
-			return;
-
-		c.workingImage = deepCopy(c.originalImage);
-		c.undoStack.clear();
-		c.redoStack.clear();
-		c.selectedAreas.clear();
-		c.floatingImg = null;
-		c.floatRect = null;
-		c.activeElements.clear();
-		c.selectedElements.clear();
-
-		c.hasUnsavedChanges = false;
-		if (c.sourceFile != null)
-			dirtyFiles.remove(c.sourceFile);
-		updateTitle();
-		updateDirtyUI();
-		refreshElementPanel();
-		refreshGalleryThumbnail(); // Update gallery thumbnail
-		c.canvasPanel.repaint();
+		saveController.resetImage();
 	}
 
 	private void saveImage() {
-		CanvasInstance c = ci();
-		if (c.sourceFile == null)
-			return;
-		try {
-			String suffix = getSaveSuffix();
-			String outPath = WhiteToAlphaConverter.getOutputPath(c.sourceFile, suffix);
-			File outFile = new File(outPath);
-			ImageIO.write(c.workingImage, "PNG", outFile);
-
-			// Speichere Szene wenn Projekt aktiv ist
-			if (projectManager.getProjectName() != null) {
-				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode, c.workingImage.getWidth(),
-						c.workingImage.getHeight());
-			}
-
-			c.hasUnsavedChanges = false;
-			dirtyFiles.remove(c.sourceFile);
-			updateTitle();
-			updateDirtyUI();
-			showInfoDialog("Gespeichert", "Gespeichert als:\n" + outFile.getName());
-		} catch (IOException e) {
-			showErrorDialog("Speicherfehler", e.getMessage());
-		}
+		saveController.saveImage();
 	}
 
 	/** Saves current workingImage to undo stack before a destructive operation. */
@@ -2127,491 +1430,50 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		ci().redoStack.clear();
 	}
 
-	private void doUndo() {
+	void doUndo() {
 		doUndo(activeCanvasIndex);
 	}
 
 	private void doUndo(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.undoStack.isEmpty())
-			return;
-		c.redoStack.push(deepCopy(c.workingImage));
-		c.workingImage = c.undoStack.pop();
-		afterUndoRedo(idx);
+		saveController.doUndo(idx);
 	}
 
-	private void doRedo() {
+	void doRedo() {
 		doRedo(activeCanvasIndex);
 	}
 
 	private void doRedo(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.redoStack.isEmpty())
-			return;
-		c.undoStack.push(deepCopy(c.workingImage));
-		c.workingImage = c.redoStack.pop();
-		afterUndoRedo(idx);
-	}
-
-	private void afterUndoRedo(int idx) {
-		CanvasInstance c = ci(idx);
-		// If undo stack is empty, we've undone all changes back to original state
-		if (c.undoStack.isEmpty()) {
-			c.hasUnsavedChanges = false;
-			if (c.sourceFile != null)
-				dirtyFiles.remove(c.sourceFile);
-		} else {
-			c.hasUnsavedChanges = true;
-			if (c.sourceFile != null)
-				dirtyFiles.add(c.sourceFile);
-		}
-		updateTitle();
-		updateDirtyUI();
-		refreshElementPanel(); // Update element panel
-		refreshGalleryThumbnail(); // Update gallery thumbnail
-		c.canvasWrapper.revalidate();
-		c.canvasPanel.repaint();
-		if (showRuler && idx == 0) {
-			hRuler.repaint();
-			vRuler.repaint();
-		}
+		saveController.doRedo(idx);
 	}
 
 	/**
 	 * CTRL+ALT+S: overwrite the original source file directly, no suffix, no
 	 * dialog.
 	 */
-	private void saveImageToOriginal() {
-		CanvasInstance c = ci();
-		if (c.sourceFile == null || c.workingImage == null)
-			return;
-		try {
-			ImageIO.write(c.workingImage, "PNG", c.sourceFile);
-
-			// Speichere Szene wenn Projekt aktiv ist
-			if (projectManager.getProjectName() != null) {
-				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode, c.workingImage.getWidth(),
-						c.workingImage.getHeight());
-			}
-
-			c.hasUnsavedChanges = false;
-			dirtyFiles.remove(c.sourceFile);
-			updateTitle();
-			updateDirtyUI();
-			refreshGalleryThumbnail();
-			ToastNotification.show(this, "Gespeichert: " + c.sourceFile.getName());
-			SwingUtilities.invokeLater(this::ensureElementEditBarVisible);
-		} catch (IOException e) {
-			showErrorDialog("Speicherfehler", e.getMessage());
-		}
+	void saveImageToOriginal() {
+		saveController.saveImageToOriginal();
 	}
 
-	// =========================================================================
-	// Element-edit mode (double-click on layer tile → open in other canvas)
-	// =========================================================================
+	// ── Element-edit mode → ElementEditController ────────────────────────────
 
-	/**
-	 * Builds the floating action bar shown in a canvas when it is in element-edit
-	 * mode.
-	 */
-	private JPanel buildElementEditBar(int idx) {
-		// Non-opaque panel with manual alpha-background paint — avoids JLayeredPane
-		// transparency glitch
-		JPanel bar = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 6, 6)) {
-			@Override
-			protected void paintComponent(java.awt.Graphics g) {
-				java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
-				g2.setColor(getBackground());
-				g2.fillRect(0, 0, getWidth(), getHeight());
-				g2.dispose();
-				super.paintComponent(g);
-			}
-		};
-		bar.setOpaque(false);
-		bar.setBackground(new Color(30, 30, 30, 220));
-		bar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppColors.BORDER));
+	// ── Save / burn → SaveController ─────────────────────────────────────────
 
-		JButton btnNewLayer = UIComponentFactory.buildButton("Als neues Layer", AppColors.ACCENT,
-				AppColors.ACCENT_HOVER);
-		JButton btnThisLayer = UIComponentFactory.buildButton("In diesem Layer übernehmen", new Color(60, 140, 60),
-				new Color(40, 110, 40));
-		JButton btnNewImage = UIComponentFactory.buildButton("Als neues Image", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		JButton btnAbort = UIComponentFactory.buildButton("Abbrechen", new Color(160, 50, 50), new Color(130, 30, 30));
-		JButton btnClose = UIComponentFactory.buildButton("Close", AppColors.BTN_BG, AppColors.BTN_HOVER);
-
-		for (JButton b : new JButton[] { btnNewLayer, btnThisLayer, btnNewImage, btnAbort, btnClose })
-			b.setForeground(Color.WHITE);
-
-		btnNewLayer.addActionListener(e -> elementEditAsNewLayer(idx));
-		btnThisLayer.addActionListener(e -> elementEditIntoSourceLayer(idx));
-		btnNewImage.addActionListener(e -> elementEditAsNewImage(idx));
-		btnAbort.addActionListener(e -> elementEditAbort(idx));
-		btnClose.addActionListener(e -> elementEditClose(idx));
-
-		bar.add(btnNewLayer);
-		bar.add(btnThisLayer);
-		bar.add(btnNewImage);
-		bar.add(btnAbort);
-		bar.add(btnClose);
-		return bar;
+	void saveImageSilent() {
+		saveController.saveImageSilent();
 	}
 
-	private void repositionElementEditBar(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.elementEditBar == null)
-			return;
-		int w = c.layeredPane.getWidth();
-		int h = c.layeredPane.getHeight();
-		int bh = 44;
-		c.elementEditBar.setBounds(0, h - bh, w, bh);
+	void saveBurnedElementsCopy() {
+		saveController.saveBurnedElementsCopy();
 	}
 
-	/**
-	 * Enter element-edit mode: load the element as a temp image into the target
-	 * canvas.
-	 */
-	private void activateElementEditMode(int targetIdx, Layer sourceLayer, int sourceIdx) {
-		// Guard: only allow one element edit at a time
-		if (elementEditSourceLayer != null) {
-			showErrorDialog("Bearbeitung aktiv", "Schließe zuerst die aktuelle Bearbeitung ab.");
-			return;
-		}
-		elementEditSourceLayer = sourceLayer;
-		elementEditSourceIdx = sourceIdx;
-		elementEditTargetIdx = targetIdx;
-
-		CanvasInstance c = ci(targetIdx);
-		repositionElementEditBar(targetIdx);
-		c.elementEditBar.setVisible(true);
-		c.layeredPane.revalidate();
-		c.layeredPane.repaint();
+	void saveBurnedElementsOriginal() {
+		saveController.saveBurnedElementsOriginal();
 	}
 
-	/** Exit element-edit mode without any transfer. */
-	private void exitElementEditMode(int targetIdx) {
-		elementEditSourceLayer = null;
-		CanvasInstance c = ci(targetIdx);
-		c.elementEditBar.setVisible(false);
-		c.layeredPane.repaint();
-	}
+	// ── Element-edit visibility ───────────────────────────────────────────────
 
-	/** Resets element drag/scale state for the given canvas when switching away. */
-	private void resetElementDragState(int canvasIdx) {
-		CanvasInstance c = ci(canvasIdx);
-		c.draggingElement = false;
-		c.elemDragAnchor = null;
-		c.elemActiveHandle = -1;
-		c.elemScaleBase = null;
-		c.elemScaleStart = null;
-	}
-
-	// ── Button actions ────────────────────────────────────────────────────────
-
-	/**
-	 * Add the current workingImage of the target canvas as a new layer on the
-	 * source canvas.
-	 */
-	private void elementEditAsNewLayer(int targetIdx) {
-		if (elementEditSourceLayer == null)
-			return;
-		CanvasInstance src = ci(elementEditSourceIdx);
-		CanvasInstance tgt = ci(targetIdx);
-		if (tgt.workingImage == null) {
-			exitElementEditMode(targetIdx);
-			return;
-		}
-
-		BufferedImage img = deepCopy(tgt.workingImage);
-		ImageLayer newLayer = new ImageLayer(src.nextElementId++, img, elementEditSourceLayer.x(),
-				elementEditSourceLayer.y(), img.getWidth(), img.getHeight());
-		src.activeElements.add(newLayer);
-		src.selectedElements.clear();
-		src.selectedElements.add(newLayer);
-		src.hasUnsavedChanges = true;
-		markDirty(elementEditSourceIdx);
-		refreshElementPanel();
-		if (src.canvasPanel != null)
-			src.canvasPanel.repaint();
-		exitElementEditMode(targetIdx);
-		ToastNotification.show(this, "Als neues Layer eingefügt");
-	}
-
-	/**
-	 * Replace the source layer's image with the current workingImage of the target
-	 * canvas.
-	 */
-	private void elementEditIntoSourceLayer(int targetIdx) {
-		if (elementEditSourceLayer == null)
-			return;
-		CanvasInstance src = ci(elementEditSourceIdx);
-		CanvasInstance tgt = ci(targetIdx);
-		if (tgt.workingImage == null) {
-			exitElementEditMode(targetIdx);
-			return;
-		}
-
-		if (!(elementEditSourceLayer instanceof ImageLayer)) {
-			showErrorDialog("Nicht möglich", "Nur ImageLayer können überschrieben werden.");
-			return;
-		}
-		BufferedImage img = deepCopy(tgt.workingImage);
-		// Replace layer in-place: find it by id and swap the image
-		List<Layer> els = src.activeElements;
-		for (int i = 0; i < els.size(); i++) {
-			if (els.get(i).id() == elementEditSourceLayer.id()) {
-				ImageLayer old = (ImageLayer) els.get(i);
-				ImageLayer replacement = new ImageLayer(old.id(), img, old.x(), old.y(), img.getWidth(),
-						img.getHeight());
-				els.set(i, replacement);
-				// Keep selectedElements in sync with activeElements
-				for (int j = 0; j < src.selectedElements.size(); j++) {
-					if (src.selectedElements.get(j).id() == old.id()) {
-						src.selectedElements.set(j, replacement);
-						break;
-					}
-				}
-				break;
-			}
-		}
-		src.hasUnsavedChanges = true;
-		markDirty(elementEditSourceIdx);
-		refreshElementPanel();
-		if (src.canvasPanel != null)
-			src.canvasPanel.repaint();
-		exitElementEditMode(targetIdx);
-		ToastNotification.show(this, "Layer übernommen");
-	}
-
-	/**
-	 * Keep the target canvas as a normal standalone image — just exit edit mode.
-	 */
-	private void elementEditAsNewImage(int targetIdx) {
-		exitElementEditMode(targetIdx);
-		ToastNotification.show(this, "Als neues Image behalten");
-	}
-
-	/** Discard changes: clear the target canvas and exit edit mode. */
-	private void elementEditAbort(int targetIdx) {
-		CanvasInstance c = ci(targetIdx);
-		c.workingImage = null;
-		c.originalImage = null;
-		c.sourceFile = null;
-		c.undoStack.clear();
-		c.redoStack.clear();
-		c.activeElements.clear();
-		c.selectedElements.clear();
-		c.hasUnsavedChanges = false;
-		c.viewportPanel.setVisible(false);
-		if (c.viewportPanel.getParent() != null)
-			c.layeredPane.remove(c.viewportPanel);
-		c.layeredPane.add(c.dropHintPanel, JLayeredPane.DEFAULT_LAYER);
-		int w = c.layeredPane.getWidth(), h = c.layeredPane.getHeight();
-		c.dropHintPanel.setBounds(0, 0, Math.max(w, 1), Math.max(h, 1));
-		exitElementEditMode(targetIdx);
-		refreshElementPanel();
-		updateTitle();
-		c.layeredPane.revalidate();
-		c.layeredPane.repaint();
-	}
-
-	/** Close the edit bar without any action (keep the canvas as-is). */
-	private void elementEditClose(int targetIdx) {
-		exitElementEditMode(targetIdx);
-	}
-
-	/** CTRL+S: save silently without any confirmation dialog. */
-	private void saveImageSilent() {
-		CanvasInstance c = ci();
-		if (c.sourceFile == null)
-			return;
-		try {
-			String suffix = getSaveSuffix();
-			String outPath = WhiteToAlphaConverter.getOutputPath(c.sourceFile, suffix);
-			ImageIO.write(c.workingImage, "PNG", new File(outPath));
-
-			// Speichere Szene wenn Projekt aktiv ist
-			if (projectManager.getProjectName() != null) {
-				projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode, c.workingImage.getWidth(),
-						c.workingImage.getHeight());
-			}
-
-			c.hasUnsavedChanges = false;
-			dirtyFiles.remove(c.sourceFile);
-			updateTitle();
-			updateDirtyUI();
-			refreshGalleryThumbnail();
-			ToastNotification.show(this, "Gespeichert");
-			SwingUtilities.invokeLater(this::ensureElementEditBarVisible);
-		} catch (IOException e) {
-			showErrorDialog("Speicherfehler", e.getMessage());
-		}
-	}
-
-	/** CTRL+SHIFT+S: burn visible elements, save as copy with new name. */
-	private void saveBurnedElementsCopy() {
-		CanvasInstance c = ci();
-		if (c.sourceFile == null || c.workingImage == null)
-			return;
-
-		// Burn elements into canvas
-		BufferedImage burned = burnVisibleElements();
-		if (burned == null)
-			return;
-
-		// Show save dialog
-		String suffix = "_burned";
-		String outPath = WhiteToAlphaConverter.getOutputPath(c.sourceFile, suffix);
-		File suggestedFile = new File(outPath);
-
-		javax.swing.JFileChooser chooser = new javax.swing.JFileChooser();
-		chooser.setSelectedFile(suggestedFile);
-		chooser.setAcceptAllFileFilterUsed(false);
-		chooser.addChoosableFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("PNG Images", "png"));
-
-		int result = chooser.showSaveDialog(this);
-		if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
-			try {
-				File target = chooser.getSelectedFile();
-				if (!target.getName().toLowerCase().endsWith(".png")) {
-					target = new File(target.getAbsolutePath() + ".png");
-				}
-				ImageIO.write(burned, "PNG", target);
-				ToastNotification.show(this, "Mit Elementen gespeichert: " + target.getName());
-			} catch (IOException e) {
-				showErrorDialog("Speicherfehler", e.getMessage());
-			}
-		}
-	}
-
-	/** CTRL+SHIFT+ALT+S: burn visible elements, save with same name (overwrite). */
-	private void saveBurnedElementsOriginal() {
-		CanvasInstance c = ci();
-		if (c.sourceFile == null || c.workingImage == null)
-			return;
-
-		// Burn elements into canvas
-		BufferedImage burned = burnVisibleElements();
-		if (burned == null)
-			return;
-
-		// Confirm overwrite
-		int result = javax.swing.JOptionPane.showConfirmDialog(this,
-				"Elemente einbrennen und Originaldatei überschreiben?\n" + c.sourceFile.getName(), "Bestätigung",
-				javax.swing.JOptionPane.OK_CANCEL_OPTION, javax.swing.JOptionPane.WARNING_MESSAGE);
-
-		if (result == javax.swing.JOptionPane.OK_OPTION) {
-			try {
-				ImageIO.write(burned, "PNG", c.sourceFile);
-				c.hasUnsavedChanges = false;
-				dirtyFiles.remove(c.sourceFile);
-				updateTitle();
-				updateDirtyUI();
-				ToastNotification.show(this, "Mit Elementen gespeichert: " + c.sourceFile.getName());
-			} catch (IOException e) {
-				showErrorDialog("Speicherfehler", e.getMessage());
-			}
-		}
-	}
-
-	/**
-	 * Burns all active elements into the canvas image. Merges all layers
-	 * (ImageLayer, TextLayer, PathLayer) into the working image. Returns a new
-	 * BufferedImage with burned elements, or null on error.
-	 */
-	private BufferedImage burnVisibleElements() {
-		CanvasInstance c = ci();
-		if (c.workingImage == null || c.activeElements.isEmpty()) {
-			return c.workingImage; // No elements to burn
-		}
-
-		try {
-			// Create a copy of the working image
-			BufferedImage result = new BufferedImage(c.workingImage.getWidth(), c.workingImage.getHeight(),
-					BufferedImage.TYPE_INT_ARGB);
-			Graphics2D g2 = result.createGraphics();
-
-			// Draw the base canvas
-			g2.drawImage(c.workingImage, 0, 0, null);
-
-			// Draw all active elements on top
-			for (Layer el : c.activeElements) {
-				if (el instanceof ImageLayer il) {
-					// Get opacity as alpha
-					float alpha = il.opacity() / 100.0f;
-					java.awt.Composite origComposite = g2.getComposite();
-					if (alpha < 1.0f) {
-						g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha));
-					}
-
-					// Draw with rotation if needed
-					if (Math.abs(il.rotationAngle()) > 0.001) {
-						java.awt.geom.AffineTransform orig = g2.getTransform();
-						double cx = il.x() + il.width() / 2.0;
-						double cy = il.y() + il.height() / 2.0;
-						g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
-						g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
-						g2.setTransform(orig);
-					} else {
-						g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
-					}
-
-					if (alpha < 1.0f) {
-						g2.setComposite(origComposite);
-					}
-				} else if (el instanceof TextLayer tl) {
-					// Render TextLayer
-					int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
-					Font font = new Font(tl.fontName(), style, tl.fontSize());
-					g2.setFont(font);
-					g2.setColor(tl.fontColor());
-					String[] lines = tl.text().split("\n", -1);
-					FontMetrics fm = g2.getFontMetrics();
-					for (int i = 0; i < lines.length; i++) {
-						g2.drawString(lines[i], tl.x() + 4, tl.y() + fm.getAscent() + i * fm.getHeight() + 4);
-					}
-				} else if (el instanceof PathLayer pl) {
-					// Render PathLayer (simple polygon outline)
-					java.util.List<Point3D> points = pl.points();
-					if (!points.isEmpty()) {
-						int[] xs = new int[points.size()];
-						int[] ys = new int[points.size()];
-						for (int i = 0; i < points.size(); i++) {
-							xs[i] = (int) points.get(i).x;
-							ys[i] = (int) points.get(i).y;
-						}
-						g2.setColor(new Color(100, 150, 200));
-						g2.setStroke(new BasicStroke(2));
-						if (pl.isClosed()) {
-							g2.drawPolygon(xs, ys, points.size());
-						} else {
-							g2.drawPolyline(xs, ys, points.size());
-						}
-					}
-				}
-			}
-
-			g2.dispose();
-			return result;
-		} catch (Exception ex) {
-			System.err.println("[ERROR] Failed to burn elements: " + ex.getMessage());
-			ex.printStackTrace();
-			return null;
-		}
-	}
-
-	/**
-	 * Re-asserts element-edit bar visibility after any operation that might disturb
-	 * it.
-	 */
-	private void ensureElementEditBarVisible() {
-		if (elementEditSourceLayer == null)
-			return;
-		CanvasInstance tc = canvases[elementEditTargetIdx];
-		if (tc.elementEditBar == null)
-			return;
-		repositionElementEditBar(elementEditTargetIdx);
-		tc.elementEditBar.setVisible(true);
-		tc.layeredPane.repaint();
+	void ensureElementEditBarVisible() {
+		elementEditController.ensureElementEditBarVisible();
 	}
 
 	public void markDirty() {
@@ -2642,7 +1504,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		}
 	}
 
-	private void updateDirtyUI() {
+	void updateDirtyUI() {
 		ci(0).tileGallery.setDirtyFiles(dirtyFiles);
 		if (ci(1).tileGallery != null) {
 			ci(1).tileGallery.setDirtyFiles(dirtyFiles);
@@ -2652,178 +1514,46 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// =========================================================================
 	// Mode toggles
 	// =========================================================================
-	private void toggleAlphaMode() {
-		CanvasInstance c = ci();
-		if (ci().appMode != AppMode.ALPHA_EDITOR)
-			return;
-		// Cycle through 3 modes: Selective Alpha → Floodfill → Alpha Paint → Selective
-		// Alpha
-		if (!floodfillMode && !alphaPaintMode) {
-			// Was Selective Alpha → switch to Floodfill
-			floodfillMode = true;
-			modeLabel.setText("Modus: Floodfill");
-		} else if (floodfillMode && !alphaPaintMode) {
-			// Was Floodfill → switch to Alpha Paint
-			floodfillMode = false;
-			alphaPaintMode = true;
-			modeLabel.setText("Modus: Alpha Paint (Pinsel)");
-		} else {
-			// Was Alpha Paint → switch to Selective Alpha
-			alphaPaintMode = false;
-			modeLabel.setText("Modus: Selective Alpha");
-		}
-		boolean sel = !floodfillMode && !alphaPaintMode;
-		applyButton.setEnabled(sel && c.sourceFile != null);
-		clearSelectionsButton.setEnabled(sel && c.sourceFile != null);
-		c.selectedAreas.clear();
-		c.lastPaintPoint = null; // Reset paint point for alpha paint mode
-		c.canvasPanel.repaint();
+	void toggleAlphaMode() {
+		modeController.toggleAlphaMode();
 	}
 
-	private void togglePaintMode() {
-		CanvasInstance c = ci();
-		boolean entering = paintModeBtn.isSelected();
-		if (entering) {
-			ci().appMode = AppMode.PAINT;
-		} else {
-			// Leaving Paint: also deactivate Canvas sub-mode
-			if (canvasModeBtn.isSelected()) {
-				canvasModeBtn.setSelected(false);
-				setElementPanelVisible(false);
-			}
-			ci().appMode = AppMode.ALPHA_EDITOR;
-		}
-		// Canvas sub-mode button is only meaningful inside Paint
-		canvasModeBtn.setEnabled(entering);
-		updateModeLabel();
-		if (entering) {
-			paintToolbar.showToolbar();
-			applyButton.setEnabled(false);
-			clearSelectionsButton.setEnabled(false);
-		} else {
-			paintToolbar.hideToolbar();
-			boolean sel = !floodfillMode;
-			applyButton.setEnabled(sel && c.sourceFile != null);
-			clearSelectionsButton.setEnabled(sel && c.sourceFile != null);
-		}
-		c.selectedAreas.clear();
-		c.lastPaintPoint = null;
-		c.shapeStartPoint = null;
-		// Refit or center after paint toolbar visibility changes.
-		// Double-deferred so the toolbar layout pass completes before we
-		// measure the viewport height for fitting.
-		SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> {
-			if (!c.userHasManuallyZoomed) {
-				fitToViewport();
-			} else {
-				centerCanvasX();
-			}
-			c.canvasPanel.repaint();
-		}));
-		c.paintSnapshot = null;
-		c.canvasPanel
-				.setCursor(entering ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR) : Cursor.getDefaultCursor());
-		c.canvasPanel.repaint();
+	void togglePaintMode() {
+		modeController.togglePaintMode();
 	}
 
 	/**
 	 * Canvas is a sub-mode of Paint: layers panel shown, drawing stays
 	 * non-destructive.
 	 */
-	private void toggleCanvasMode() {
-		boolean entering = canvasModeBtn.isSelected();
-		// ci().appMode stays PAINT in both cases — Canvas is just a sub-mode flag
-		if (entering) {
-			setElementPanelVisible(true);
-		} else {
-			setElementPanelVisible(false);
-		}
-		updateModeLabel();
-		ci().canvasPanel.repaint();
+	void toggleCanvasMode() {
+		modeController.toggleCanvasMode();
 	}
 
 	/**
 	 * Book mode: toggle paper layout editor. Paint, Canvas, and Book can coexist.
 	 */
-	private void toggleBookMode() {
-		boolean entering = bookModeBtn.isSelected();
-		if (entering) {
-			// Scene and Book are mutually exclusive
-			if (sceneModeBtn.isSelected()) {
-				sceneModeBtn.setSelected(false);
-			}
-		}
-		// ci().appMode stays unchanged (PAINT or ALPHA_EDITOR)
-		updateModeLabel();
-		ci().canvasPanel.repaint();
+	void toggleBookMode() {
+		modeController.toggleBookMode();
 	}
 
 	/** Scene mode: toggle scene editor. Paint, Canvas, and Scene can coexist. */
-	private void toggleSceneMode() {
-		boolean entering = sceneModeBtn.isSelected();
-		if (entering) {
-			// Book and Scene are mutually exclusive
-			if (bookModeBtn.isSelected()) {
-				bookModeBtn.setSelected(false);
-			}
-		}
-		// ci().appMode stays unchanged (PAINT or ALPHA_EDITOR)
-		updateModeLabel();
-		ci().canvasPanel.repaint();
+	void toggleSceneMode() {
+		modeController.toggleSceneMode();
 	}
 
 	/** Shows or hides the element layer panels based on active canvas and mode. */
-	private void setElementPanelVisible(boolean visible) {
-		if (visible) {
-			// Show appropriate element panel based on active canvas
-			if (activeCanvasIndex == 0) {
-				elementLayerPanel.setVisible(true);
-				if (elementLayerPanel2 != null)
-					elementLayerPanel2.setVisible(false);
-			} else {
-				elementLayerPanel.setVisible(false);
-				if (elementLayerPanel2 != null)
-					elementLayerPanel2.setVisible(true);
-			}
-			refreshElementPanel();
-		} else {
-			// Hide both panels
-			elementLayerPanel.setVisible(false);
-			if (elementLayerPanel2 != null)
-				elementLayerPanel2.setVisible(false);
-		}
-		galleryWrapper.revalidate();
-		galleryWrapper.repaint();
-		// Wait for layout to settle before recalculating image zoom/position
-		SwingUtilities.invokeLater(() -> {
-			SwingUtilities.invokeLater(() -> reloadCurrentImage(activeCanvasIndex));
-		});
+	void setElementPanelVisible(boolean visible) {
+		modeController.setElementPanelVisible(visible);
 	}
 
 	/** Updates modeLabel to show all active mode flags dynamically. */
-	private void updateModeLabel() {
-		if (ci().appMode == AppMode.PAINT) {
-			StringBuilder sb = new StringBuilder("Modus: Paint");
-			if (canvasModeBtn.isSelected())
-				sb.append(" / Canvas");
-			if (bookModeBtn.isSelected())
-				sb.append(" / Buch");
-			if (sceneModeBtn.isSelected())
-				sb.append(" / Szene");
-			modeLabel.setText(sb.toString());
-		} else {
-			// ALPHA_EDITOR base mode
-			StringBuilder sb = new StringBuilder("Modus: " + (floodfillMode ? "Floodfill" : "Selective Alpha"));
-			if (bookModeBtn.isSelected())
-				sb.append(" / Buch");
-			if (sceneModeBtn.isSelected())
-				sb.append(" / Szene");
-			modeLabel.setText(sb.toString());
-		}
+	void updateModeLabel() {
+		modeController.updateModeLabel();
 	}
 
 	/** Rebuilds the element layer panel tiles from the current activeElements. */
-	private void refreshElementPanel() {
+	void refreshElementPanel() {
 		if (elementLayerPanel != null && elementLayerPanel.isShowing())
 			elementLayerPanel.refresh(ci(0).activeElements);
 		if (elementLayerPanel2 != null && elementLayerPanel2.isShowing())
@@ -2839,7 +1569,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Helper: Update an ImageLayer in both activeElements and selectedElements
 	 * lists by ID. Used by flip/rotate/reset operations.
 	 */
-	private void replaceInLists(CanvasInstance c, Layer updated) {
+	void replaceInLists(CanvasInstance c, Layer updated) {
 		for (int i = 0; i < c.activeElements.size(); i++) {
 			if (c.activeElements.get(i).id() == updated.id()) {
 				c.activeElements.set(i, updated);
@@ -2859,7 +1589,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Gallery-Thumbnail). Nur ImageLayers mit Rotation werden mit g2.rotate()
 	 * gerendert.
 	 */
-	private BufferedImage renderCompositeForThumbnail(CanvasInstance c) {
+	BufferedImage renderCompositeForThumbnail(CanvasInstance c) {
 		if (c.workingImage == null)
 			return null;
 		int w = c.workingImage.getWidth(), h = c.workingImage.getHeight();
@@ -2893,11 +1623,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Aktualisiert das Gallery-Thumbnail für den aktuellen Canvas mit dem
 	 * Live-Composite aus Canvas + Elementen.
 	 */
-	private void refreshGalleryThumbnail() {
+	void refreshGalleryThumbnail() {
 		refreshGalleryThumbnail(activeCanvasIndex);
 	}
 
-	private void refreshGalleryThumbnail(int idx) {
+	void refreshGalleryThumbnail(int idx) {
 		CanvasInstance c = ci(idx);
 		if (c.sourceFile == null || c.workingImage == null) return;
 		BufferedImage thumb = renderCompositeForThumbnail(c);
@@ -2909,285 +1639,15 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			c.scenesPanel.refreshThumbnailFor(c.activeSceneFile, thumb);
 	}
 
-	private ElementLayerPanel.Callbacks buildElementLayerCallbacks(int idx) {
-		return new ElementLayerPanel.Callbacks() {
-			private CanvasInstance c() {
-				return canvases[idx];
-			}
-
-			@Override
-			public List<Layer> getActiveElements() {
-				return c().activeElements;
-			}
-
-			@Override
-			public List<Layer> getSelectedElements() {
-				return c().selectedElements;
-			}
-
-			@Override
-			public void setSelectedElement(Layer el) {
-				c().selectedElements.clear();
-				if (el != null)
-					c().selectedElements.add(el);
-				if (c().canvasPanel != null)
-					c().canvasPanel.repaint();
-			}
-
-			@Override
-			public void toggleElementSelection(Layer el) {
-				doToggleElementSelection(el);
-				if (c().canvasPanel != null)
-					c().canvasPanel.repaint();
-			}
-
-			@Override
-			public void deleteElement(Layer el) {
-				c().activeElements.removeIf(e -> e.id() == el.id());
-				c().selectedElements.removeIf(e -> e.id() == el.id());
-				markDirty();
-				refreshElementPanel();
-				if (c().canvasPanel != null)
-					c().canvasPanel.repaint();
-				persistSceneIfActive(idx);
-			}
-
-			@Override
-			public void burnElement(Layer el) {
-				if (c().workingImage == null)
-					return;
-				// Tile holds a snapshot — look up live layer so position/scale are current
-				Layer live = c().activeElements.stream().filter(e -> e.id() == el.id()).findFirst().orElse(el);
-				pushUndo();
-				BufferedImage imgToBurn;
-				if (live instanceof TextLayer tl) {
-					imgToBurn = renderTextLayerToImage(tl);
-				} else {
-					ImageLayer il = (ImageLayer) live;
-					imgToBurn = PaintEngine.scale(il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
-				}
-				PaintEngine.pasteRegion(c().workingImage, imgToBurn, new java.awt.Point(live.x(), live.y()));
-				c().activeElements.removeIf(e -> e.id() == el.id());
-				c().selectedElements.removeIf(e -> e.id() == el.id());
-				markDirty();
-				refreshElementPanel();
-				if (c().canvasPanel != null)
-					c().canvasPanel.repaint();
-			}
-
-			@Override
-			public void exportElementAsImage(Layer el) {
-				if (c().workingImage == null || c().sourceFile == null) return;
-				Layer live = c().activeElements.stream()
-						.filter(e -> e.id() == el.id()).findFirst().orElse(el);
-				BufferedImage imgToExport = renderLayerToImage(live);
-				if (imgToExport == null) return;
-
-				File exportDir = c().sourceFile.getParentFile();
-				String defaultName = uniqueLayerExportFile(c().sourceFile, live.id()).getName();
-
-				// Show dialog for filename confirmation
-				final File exportDirFinal = exportDir;
-				javax.swing.JTextField fileNameField = new javax.swing.JTextField(defaultName);
-				fileNameField.selectAll();
-
-				String[] options = { "Speichern", "Abbrechen" };
-				javax.swing.JPanel panel = new javax.swing.JPanel(new java.awt.BorderLayout(5, 5));
-				panel.add(new javax.swing.JLabel("Dateiname:"), java.awt.BorderLayout.WEST);
-				panel.add(fileNameField, java.awt.BorderLayout.CENTER);
-
-				// Allow Enter key to save immediately
-				fileNameField.addActionListener(ev -> {
-					String fileName = fileNameField.getText().trim();
-					if (!fileName.isEmpty()) {
-						saveLayerAsImageFile(imgToExport, new File(exportDirFinal, fileName), idx);
-					}
-				});
-
-				int result = javax.swing.JOptionPane.showOptionDialog(SelectiveAlphaEditor.this, panel,
-						"Exportieren als Bild", javax.swing.JOptionPane.OK_CANCEL_OPTION,
-						javax.swing.JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
-
-				if (result == javax.swing.JOptionPane.OK_OPTION) {
-					String fileName = fileNameField.getText().trim();
-					if (!fileName.isEmpty()) {
-						saveLayerAsImageFile(imgToExport, new File(exportDirFinal, fileName), idx);
-					}
-				}
-			}
-
-			@Override
-			public void repaintCanvas() {
-				if (c().canvasPanel != null)
-					c().canvasPanel.repaint();
-			}
-
-			@Override
-			public void onCloseRequested() {
-				canvasModeBtn.setSelected(false);
-				toggleCanvasMode();
-			}
-
-			@Override
-			public void onLayerPanelElementHover(int elementId) {
-				// Forward tile hover to canvas so it can highlight the matching element
-				if (c().canvasPanel != null)
-					c().canvasPanel.setHoveredElementId(elementId);
-			}
-
-			@Override
-			public void openElementInOtherCanvas(Layer el) {
-				doOpenImageLayerInOtherCanvas(idx, el);
-			}
-
-			@Override
-			public void openTextLayerForEditing(Layer el) {
-				// Focus the owning canvas and enter text-edit mode directly
-				if (!(el instanceof TextLayer))
-					return;
-				activeCanvasIndex = idx;
-				updateCanvasFocusBorder();
-				CanvasInstance ci = c();
-				if (ci.canvasPanel != null)
-					ci.canvasPanel.enterTextEditMode(el);
-			}
-
-			@Override
-			public void resetElementRotation(Layer el) {
-				CanvasInstance c = c();
-				if (!(el instanceof ImageLayer il))
-					return;
-				pushUndo();
-				ImageLayer updated = il.withRotation(0.0);
-				replaceInLists(c, updated);
-				markDirty(idx);
-				refreshElementPanel();
-				if (c.canvasPanel != null)
-					c.canvasPanel.repaint();
-			}
-
-			@Override
-			public void exportElementAsMap(Layer el) {
-				if (!(el instanceof TextLayer tl))
-					return;
-				// Get live layer
-				Layer live = c().activeElements.stream().filter(e -> e.id() == el.id()).findFirst().orElse(el);
-				if (!(live instanceof TextLayer textLive))
-					return;
-
-				// Get text content
-				String textContent = textLive.text();
-				if (textContent == null || textContent.isEmpty()) {
-					javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this, "TextLayer hat keinen Inhalt.",
-							"Fehler", javax.swing.JOptionPane.ERROR_MESSAGE);
-					return;
-				}
-
-				// Show dialog to select language and section
-				MapCreateDialog dialog = new MapCreateDialog(SelectiveAlphaEditor.this, textContent);
-				dialog.setVisible(true);
-
-				if (!dialog.isAccepted())
-					return;
-
-				try {
-					String mapId = MapManager.generateMapId();
-					TranslationMap newMap = new TranslationMap(mapId, dialog.getLanguage(), dialog.getSection(),
-							dialog.getTextI(), dialog.getTextII());
-					MapManager.addOrUpdateMap(newMap);
-
-					// Refresh maps panel if it exists
-					if (mapsPanel != null) {
-						mapsPanel.refreshMapsList();
-					}
-
-					javax.swing.JOptionPane.showMessageDialog(
-							SelectiveAlphaEditor.this, "Translation Map gespeichert:\nSprache: " + dialog.getLanguage()
-									+ "\nBereich: " + dialog.getSection(),
-							"Erfolg", javax.swing.JOptionPane.INFORMATION_MESSAGE);
-				} catch (Exception ex) {
-					System.err.println("[ERROR] Failed to export map: " + ex.getMessage());
-					ex.printStackTrace();
-					javax.swing.JOptionPane.showMessageDialog(SelectiveAlphaEditor.this,
-							"Fehler beim Speichern:\n" + ex.getMessage(), "Fehler",
-							javax.swing.JOptionPane.ERROR_MESSAGE);
-				}
-			}
-
-			@Override
-			public void toggleElementVisibility(Layer el) {
-				CanvasInstance c = c();
-				pushUndo();
-				Layer updated = null;
-				if (el instanceof ImageLayer il) {
-					updated = il.withHidden(!il.isHidden());
-				} else if (el instanceof TextLayer tl) {
-					updated = tl.withHidden(!tl.isHidden());
-				} else if (el instanceof PathLayer pl) {
-					updated = pl.withHidden(!pl.isHidden());
-				}
-				if (updated != null) {
-					replaceInLists(c, updated);
-					markDirty(idx);
-					refreshElementPanel();
-					if (c.canvasPanel != null)
-						c.canvasPanel.repaint();
-				}
-			}
-
-			// ── Case 2: LayerTile dropped onto another ElementLayerPanel ─────
-			@Override
-			public void insertLayerCopyAt(Layer layer, int visualIdx) {
-				CanvasInstance c = c();
-				Layer copy = copyLayerWithNewId(layer, c.nextElementId++);
-				if (copy == null)
-					return;
-				int insertIdx = visualToInsertIndex(visualIdx, c.activeElements.size());
-				c.activeElements.add(insertIdx, copy);
-				c.selectedElements.clear();
-				c.selectedElements.add(copy);
-				markDirty(idx);
-				if (c.canvasPanel != null)
-					c.canvasPanel.repaint();
-				SwingUtilities.invokeLater(() -> refreshElementPanel());
-			}
-
-			// ── Case 4: TileGallery right-drag dropped onto ElementLayerPanel ─
-			@Override
-			public void insertFileAsLayerAt(File file, int visualIdx) {
-				CanvasInstance c = c();
-				if (c.workingImage == null)
-					return;
-				try {
-					BufferedImage img = javax.imageio.ImageIO.read(file);
-					if (img == null)
-						return;
-					img = normalizeImage(img);
-					int[] size = fitElementSize(img.getWidth(), img.getHeight(), c.workingImage.getWidth(),
-							c.workingImage.getHeight());
-					int cx = Math.max(0, (c.workingImage.getWidth() - size[0]) / 2);
-					int cy = Math.max(0, (c.workingImage.getHeight() - size[1]) / 2);
-					ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy, size[0], size[1]);
-					int insertIdx = visualToInsertIndex(visualIdx, c.activeElements.size());
-					c.activeElements.add(insertIdx, layer);
-					c.selectedElements.clear();
-					c.selectedElements.add(layer);
-					markDirty(idx);
-					if (c.canvasPanel != null)
-						c.canvasPanel.repaint();
-					SwingUtilities.invokeLater(() -> refreshElementPanel());
-				} catch (Exception ex) {
-					showErrorDialog("Fehler", "Bild konnte nicht geladen werden: " + ex.getMessage());
-				}
-			}
-		};
+	ElementLayerPanel.Callbacks buildElementLayerCallbacks(int idx) {
+		return ElementLayerCallbacksFactory.build(this, idx);
 	}
 
 	/**
 	 * Opens an ImageLayer (or any renderable layer) in the other canvas for full
 	 * pixel editing.
 	 */
-	private void doOpenImageLayerInOtherCanvas(int sourceIdx, Layer el) {
+	void doOpenImageLayerInOtherCanvas(int sourceIdx, Layer el) {
 		BufferedImage img = null;
 		if (el instanceof ImageLayer il) {
 			img = il.image();
@@ -3215,7 +1675,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			}
 
 			loadFile(tmp, targetIdx);
-			activateElementEditMode(targetIdx, el, sourceIdx);
+			elementEditController.activateElementEditMode(targetIdx, el, sourceIdx);
 		} catch (IOException ex) {
 			showErrorDialog("Fehler", "Element konnte nicht geöffnet werden:\n" + ex.getMessage());
 		}
@@ -3224,282 +1684,24 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// =========================================================================
 	// Transformations
 	// =========================================================================
-	private void doFlipH() {
-		CanvasInstance c = ci();
-		if (c.workingImage == null)
-			return;
-
-		// Apply to selected elements first
-		if (!c.selectedElements.isEmpty()) {
-			pushUndo();
-			for (int i = 0; i < c.selectedElements.size(); i++) {
-				Layer el = c.selectedElements.get(i);
-				if (el instanceof ImageLayer il) {
-					BufferedImage flipped = PaintEngine.flipHorizontal(il.image());
-					ImageLayer updated = new ImageLayer(il.id(), flipped, il.x(), il.y(), il.width(), il.height());
-					c.selectedElements.set(i, updated);
-					// Also update in activeElements
-					for (int j = 0; j < c.activeElements.size(); j++) {
-						if (c.activeElements.get(j).id() == updated.id()) {
-							c.activeElements.set(j, updated);
-							break;
-						}
-					}
-				}
-			}
-			markDirty();
-			refreshElementPanel();
-			if (c.canvasPanel != null)
-				c.canvasPanel.repaint();
-			return;
-		}
-
-		// Apply to canvas
-		Rectangle sel = (ci().appMode == AppMode.PAINT) ? getActiveSelection() : null;
-		pushUndo();
-		if (sel != null) {
-			PaintEngine.flipHorizontalInRegion(c.workingImage, sel);
-		} else {
-			c.workingImage = PaintEngine.flipHorizontal(c.workingImage);
-		}
-		markDirty();
+	void doFlipH() {
+		transformController.doFlipH();
 	}
 
-	private void doFlipV() {
-		CanvasInstance c = ci();
-		if (c.workingImage == null)
-			return;
-
-		// Apply to selected elements first
-		if (!c.selectedElements.isEmpty()) {
-			pushUndo();
-			for (int i = 0; i < c.selectedElements.size(); i++) {
-				Layer el = c.selectedElements.get(i);
-				if (el instanceof ImageLayer il) {
-					BufferedImage flipped = PaintEngine.flipVertical(il.image());
-					ImageLayer updated = new ImageLayer(il.id(), flipped, il.x(), il.y(), il.width(), il.height());
-					c.selectedElements.set(i, updated);
-					// Also update in activeElements
-					for (int j = 0; j < c.activeElements.size(); j++) {
-						if (c.activeElements.get(j).id() == updated.id()) {
-							c.activeElements.set(j, updated);
-							break;
-						}
-					}
-				}
-			}
-			markDirty();
-			refreshElementPanel();
-			if (c.canvasPanel != null)
-				c.canvasPanel.repaint();
-			return;
-		}
-
-		// Apply to canvas
-		Rectangle sel = (ci().appMode == AppMode.PAINT) ? getActiveSelection() : null;
-		pushUndo();
-		if (sel != null) {
-			PaintEngine.flipVerticalInRegion(c.workingImage, sel);
-		} else {
-			c.workingImage = PaintEngine.flipVertical(c.workingImage);
-		}
-		markDirty();
+	void doFlipV() {
+		transformController.doFlipV();
 	}
 
-	private void doRotate(double angleDeg) {
-		CanvasInstance c = ci();
-		if (c.workingImage == null)
-			return;
-
-		// Apply to selected elements first
-		if (!c.selectedElements.isEmpty()) {
-			pushUndo();
-			for (int i = 0; i < c.selectedElements.size(); i++) {
-				Layer el = c.selectedElements.get(i);
-				if (el instanceof ImageLayer il) {
-					// Add angle to existing rotation (metadata, no pixel manipulation)
-					double newAngle = il.rotationAngle() + angleDeg;
-					ImageLayer updated = il.withRotation(newAngle);
-					c.selectedElements.set(i, updated);
-					// Also update in activeElements
-					for (int j = 0; j < c.activeElements.size(); j++) {
-						if (c.activeElements.get(j).id() == updated.id()) {
-							c.activeElements.set(j, updated);
-							break;
-						}
-					}
-				}
-			}
-			markDirty();
-			refreshElementPanel();
-			if (c.canvasPanel != null)
-				c.canvasPanel.repaint();
-			return;
-		}
-
-		// Apply to canvas
-		Rectangle sel = (ci().appMode == AppMode.PAINT) ? getActiveSelection() : null;
-		pushUndo();
-		if (sel != null) {
-			PaintEngine.flipVerticalInRegion(c.workingImage, sel);
-		} else {
-			c.workingImage = PaintEngine.flipVertical(c.workingImage);
-		}
-		markDirty();
+	void doRotate(double angleDeg) {
+		transformController.doRotate(angleDeg);
 	}
 
-	private void doRotate() {
-		if (ci().workingImage == null)
-			return;
-		// Dialog: enter angle
-		JTextField angleField = new JTextField("90", 6);
-		angleField.setBackground(AppColors.BTN_BG);
-		angleField.setForeground(AppColors.TEXT);
-		angleField.setCaretColor(AppColors.TEXT);
-
-		JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-		panel.setBackground(AppColors.BG_PANEL);
-		JLabel lbl = new JLabel("Winkel (°):");
-		lbl.setForeground(AppColors.TEXT);
-		panel.add(lbl);
-		panel.add(angleField);
-
-		JDialog dialog = createBaseDialog("Drehen", 280, 160);
-		JPanel content = centeredColumnPanel(16, 24, 12);
-		content.add(panel);
-		content.add(Box.createVerticalStrut(12));
-
-		JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
-		row.setOpaque(false);
-		JButton ok = UIComponentFactory.buildButton("OK", AppColors.ACCENT, AppColors.ACCENT_HOVER);
-		JButton can = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		ok.setForeground(Color.WHITE);
-		final boolean rotateHasSel = (ci().appMode == AppMode.PAINT && getActiveSelection() != null);
-		final Rectangle rotateSel = rotateHasSel ? getActiveSelection() : null;
-		ok.addActionListener(e -> {
-			try {
-				CanvasInstance c = ci();
-				double deg = Double.parseDouble(angleField.getText().trim());
-				pushUndo();
-				if (rotateHasSel) {
-					PaintEngine.rotateInRegion(c.workingImage, rotateSel, deg);
-				} else {
-					c.workingImage = PaintEngine.rotate(c.workingImage, deg);
-					c.canvasWrapper.revalidate();
-				}
-				markDirty();
-			} catch (NumberFormatException ex) {
-				showErrorDialog("Ungültige Eingabe", "Bitte eine Zahl eingeben.");
-			}
-			dialog.dispose();
-		});
-		can.addActionListener(e -> dialog.dispose());
-		row.add(ok);
-		row.add(can);
-		content.add(row);
-		dialog.add(content);
-		dialog.setVisible(true);
+	void doRotate() {
+		transformController.doRotate();
 	}
 
-	private void doScale() {
-		CanvasInstance c = ci();
-		if (c.workingImage == null)
-			return;
-		Rectangle scaleSel = (ci().appMode == AppMode.PAINT) ? getActiveSelection() : null;
-		int origW = scaleSel != null ? scaleSel.width : c.workingImage.getWidth();
-		int origH = scaleSel != null ? scaleSel.height : c.workingImage.getHeight();
-
-		JTextField wField = new JTextField(String.valueOf(origW), 5);
-		JTextField hField = new JTextField(String.valueOf(origH), 5);
-		JTextField pctField = new JTextField("100", 5);
-		JCheckBox lockAR = new JCheckBox("Proportional", true);
-
-		for (JTextField f : new JTextField[] { wField, hField, pctField }) {
-			f.setBackground(AppColors.BTN_BG);
-			f.setForeground(AppColors.TEXT);
-			f.setCaretColor(AppColors.TEXT);
-		}
-		lockAR.setOpaque(false);
-		lockAR.setForeground(AppColors.TEXT);
-
-		// Keep fields in sync
-		pctField.addActionListener(ev -> {
-			try {
-				double pct = Double.parseDouble(pctField.getText().trim()) / 100.0;
-				wField.setText(String.valueOf((int) (origW * pct)));
-				hField.setText(String.valueOf((int) (origH * pct)));
-			} catch (NumberFormatException ignored) {
-			}
-		});
-		wField.addActionListener(ev -> {
-			if (lockAR.isSelected()) {
-				try {
-					int nw = Integer.parseInt(wField.getText().trim());
-					hField.setText(String.valueOf((int) (origH * ((double) nw / origW))));
-					pctField.setText(String.format("%.1f", 100.0 * nw / origW));
-				} catch (NumberFormatException ignored) {
-				}
-			}
-		});
-
-		JPanel grid = new JPanel(new GridLayout(4, 2, 6, 4));
-		grid.setOpaque(false);
-		for (String lbl : new String[] { "Breite (px):", "Höhe (px):", "Prozent:", "" }) {
-			JLabel l = new JLabel(lbl);
-			l.setForeground(AppColors.TEXT);
-			grid.add(l);
-		}
-		// Replace last label with lockAR checkbox
-		Component[] comps = grid.getComponents();
-		grid.remove(comps[comps.length - 1]);
-		grid.add(lockAR);
-		// interleave fields (already added labels, now add fields interleaved)
-		// simpler: rebuild
-		grid.removeAll();
-		String[] labels = { "Breite (px):", "Höhe (px):", "Prozent:", "" };
-		JComponent[] fields = { wField, hField, pctField, lockAR };
-		for (int i = 0; i < labels.length; i++) {
-			JLabel l = new JLabel(labels[i]);
-			l.setForeground(AppColors.TEXT);
-			grid.add(l);
-			grid.add(fields[i]);
-		}
-
-		JDialog dialog = createBaseDialog("Skalieren", 300, 230);
-		JPanel content = centeredColumnPanel(16, 20, 12);
-		content.add(grid);
-		content.add(Box.createVerticalStrut(12));
-
-		JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
-		row.setOpaque(false);
-		JButton ok = UIComponentFactory.buildButton("OK", AppColors.ACCENT, AppColors.ACCENT_HOVER);
-		JButton can = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		ok.setForeground(Color.WHITE);
-		ok.addActionListener(e -> {
-			try {
-				int nw = Integer.parseInt(wField.getText().trim());
-				int nh = Integer.parseInt(hField.getText().trim());
-				pushUndo();
-				if (scaleSel != null) {
-					Rectangle newSel = PaintEngine.scaleInRegion(c.workingImage, scaleSel, nw, nh);
-					c.selectedAreas.clear();
-					c.selectedAreas.add(newSel);
-				} else {
-					c.workingImage = PaintEngine.scale(c.workingImage, nw, nh);
-					c.canvasWrapper.revalidate();
-				}
-				markDirty();
-			} catch (NumberFormatException ex) {
-				showErrorDialog("Ungültige Eingabe", "Bitte ganzzahlige Pixelwerte eingeben.");
-			}
-			dialog.dispose();
-		});
-		can.addActionListener(e -> dialog.dispose());
-		row.add(ok);
-		row.add(can);
-		content.add(row);
-		dialog.add(content);
-		dialog.setVisible(true);
+	void doScale() {
+		transformController.doScale();
 	}
 
 	// =========================================================================
@@ -3541,7 +1743,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	/** Discard the float and undo to the state before it was lifted. */
-	private void cancelFloat() {
+	void cancelFloat() {
 		CanvasInstance c = ci();
 		c.floatingImg = null;
 		c.floatRect = null;
@@ -3694,754 +1896,26 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// =========================================================================
 	// PaintToolbar callbacks
 	// =========================================================================
-	private PaintToolbar.Callbacks buildPaintCallbacks() {
-		return new PaintToolbar.Callbacks() {
-			@Override
-			public void onToolChanged(PaintEngine.Tool tool) {
-				ci().canvasPanel.repaint();
-			}
-
-			@Override
-			public void onColorChanged(Color p, Color s) {
-			}
-
-			@Override
-			public void onStrokeChanged(int w) {
-			}
-
-			@Override
-			public void onFillModeChanged(PaintEngine.FillMode m) {
-			}
-
-			@Override
-			public void onBrushShapeChanged(PaintEngine.BrushShape s) {
-			}
-
-			@Override
-			public void onAntialiasingChanged(boolean aa) {
-				ci().canvasPanel.repaint();
-			}
-
-			@Override
-			public void onCut() {
-				doCut();
-			}
-
-			@Override
-			public void onCopy() {
-				doCopy();
-			}
-
-			@Override
-			public void onPaste() {
-				doPaste();
-			}
-
-			@Override
-			public void onToggleGrid(boolean show) {
-				ci().showGrid = show;
-				ci().canvasPanel.repaint();
-			}
-
-			@Override
-			public void onToggleRuler(boolean show) {
-				showRuler = show;
-				buildRulerLayout();
-			}
-
-			@Override
-			public void onRulerUnitChanged(int idx) {
-				rulerUnit = RulerUnit.values()[idx];
-				if (showRuler) {
-					hRuler.repaint();
-					vRuler.repaint();
-				}
-			}
-
-			@Override
-			public void onFlipHorizontal() {
-				doFlipH();
-			}
-
-			@Override
-			public void onFlipVertical() {
-				doFlipV();
-			}
-
-			@Override
-			public void onRotate() {
-				doRotate();
-			}
-
-			@Override
-			public void onScale() {
-				doScale();
-			}
-
-			@Override
-			public void onUndo() {
-				doUndo();
-			}
-
-			@Override
-			public void onRedo() {
-				doRedo();
-			}
-
-			@Override
-			public BufferedImage getWorkingImage() {
-				return ci().workingImage;
-			}
-		};
+	PaintToolbar.Callbacks buildPaintCallbacks() {
+		return PaintCallbacksFactory.build(this);
 	}
 
 	// =========================================================================
 	// Canvas callbacks (indexed)
 	// =========================================================================
-	private CanvasCallbacks buildCanvasCallbacks(int idx) {
-		return new CanvasCallbacks() {
-			private CanvasInstance c() {
-				return ci(idx);
-			}
-
-			// ── Image & state ──
-			@Override
-			public BufferedImage getWorkingImage() {
-				return c().workingImage;
-			}
-
-			@Override
-			public AppMode getAppMode() {
-				return c().appMode;
-			}
-
-			@Override
-			public boolean isFloodfillMode() {
-				return floodfillMode;
-			}
-
-			@Override
-			public boolean isAlphaPaintMode() {
-				return alphaPaintMode;
-			}
-
-			@Override
-			public boolean isGridVisible() {
-				return c().showGrid;
-			}
-
-			@Override
-			public double getZoom() {
-				return c().zoom;
-			}
-
-			@Override
-			public void setZoom(double nz, Point anchor) {
-				c().userHasManuallyZoomed = true;
-				c().zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nz));
-				if (c().zoomTimer == null) {
-					if (anchor != null && c().scrollPane != null) {
-						JViewport vp = c().scrollPane.getViewport();
-						c().zoomImgPt = new Point2D.Double(anchor.x / c().zoom, anchor.y / c().zoom);
-						c().zoomVpMouse = SwingUtilities.convertPoint(c().canvasPanel, anchor, vp);
-					} else {
-						c().zoomImgPt = null;
-						c().zoomVpMouse = null;
-					}
-				}
-				startZoomAnimation(idx);
-			}
-
-			@Override
-			public JScrollPane getScrollPane() {
-				return c().scrollPane;
-			}
-
-			@Override
-			public Point screenToImage(Point screenPt) {
-				int ix = (int) Math.floor(screenPt.x / c().zoom);
-				int iy = (int) Math.floor(screenPt.y / c().zoom);
-				if (c().workingImage != null) {
-					ix = Math.max(0, Math.min(c().workingImage.getWidth() - 1, ix));
-					iy = Math.max(0, Math.min(c().workingImage.getHeight() - 1, iy));
-				}
-				return new Point(ix, iy);
-			}
-
-			// ── Selection ──
-			@Override
-			public List<Rectangle> getSelectedAreas() {
-				return c().selectedAreas;
-			}
-
-			@Override
-			public boolean isSelecting() {
-				return c().isSelecting;
-			}
-
-			@Override
-			public void setSelecting(boolean s) {
-				c().isSelecting = s;
-			}
-
-			@Override
-			public Point getSelectionStart() {
-				return c().selectionStart;
-			}
-
-			@Override
-			public void setSelectionStart(Point p) {
-				c().selectionStart = p;
-			}
-
-			@Override
-			public Point getSelectionEnd() {
-				return c().selectionEnd;
-			}
-
-			@Override
-			public void setSelectionEnd(Point p) {
-				c().selectionEnd = p;
-			}
-
-			// ── Layers ──
-			@Override
-			public List<Layer> getActiveElements() {
-				return c().activeElements;
-			}
-
-			@Override
-			public Layer getSelectedElement() {
-				return c().selectedElements.isEmpty() ? null : c().selectedElements.iterator().next();
-			}
-
-			@Override
-			public void setSelectedElement(Layer el) {
-				c().selectedElements.clear();
-				if (el != null)
-					c().selectedElements.add(el);
-			}
-
-			@Override
-			public List<Layer> getSelectedElements() {
-				return new ArrayList<>(c().selectedElements);
-			}
-
-			@Override
-			public void setSelectedElements(List<Layer> els) {
-				c().selectedElements.clear();
-				c().selectedElements.addAll(els);
-			}
-
-			@Override
-			public void toggleElementSelection(Layer el) {
-				if (c().selectedElements.contains(el))
-					c().selectedElements.remove(el);
-				else
-					c().selectedElements.add(el);
-			}
-
-			@Override
-			public void moveSelectedElements(int dx, int dy) {
-				List<Layer> sel = c().selectedElements;
-				List<Layer> active = c().activeElements;
-				// Update positions for all selected layers
-				for (int i = 0; i < sel.size(); i++) {
-					Layer oldLayer = sel.get(i);
-					Layer newLayer = oldLayer.withPosition(oldLayer.x() + dx, oldLayer.y() + dy);
-					sel.set(i, newLayer);
-					// Also update in activeElements
-					for (int j = 0; j < active.size(); j++) {
-						if (active.get(j).id() == oldLayer.id()) {
-							active.set(j, newLayer);
-							break;
-						}
-					}
-				}
-			}
-
-			@Override
-			public int getNextElementId() {
-				return c().nextElementId++;
-			}
-
-			@Override
-			public void addElement(Layer el) {
-				c().activeElements.add(el);
-			}
-
-			// ── Float ──
-			@Override
-			public BufferedImage getFloatingImage() {
-				return c().floatingImg;
-			}
-
-			@Override
-			public Rectangle getFloatRect() {
-				return c().floatRect;
-			}
-
-			@Override
-			public boolean isDraggingFloat() {
-				return c().isDraggingFloat;
-			}
-
-			@Override
-			public void setDraggingFloat(boolean d) {
-				c().isDraggingFloat = d;
-			}
-
-			@Override
-			public Point getFloatDragAnchor() {
-				return c().floatDragAnchor;
-			}
-
-			@Override
-			public void setFloatDragAnchor(Point p) {
-				c().floatDragAnchor = p;
-			}
-
-			@Override
-			public int getActiveHandle() {
-				return c().activeHandle;
-			}
-
-			@Override
-			public void setActiveHandle(int h) {
-				c().activeHandle = h;
-			}
-
-			@Override
-			public Rectangle getScaleBaseRect() {
-				return c().scaleBaseRect;
-			}
-
-			@Override
-			public void setScaleBaseRect(Rectangle r) {
-				c().scaleBaseRect = r;
-			}
-
-			@Override
-			public Point getScaleDragStart() {
-				return c().scaleDragStart;
-			}
-
-			@Override
-			public void setScaleDragStart(Point p) {
-				c().scaleDragStart = p;
-			}
-
-			// ── Paint ──
-			@Override
-			public Point getLastPaintPoint() {
-				return c().lastPaintPoint;
-			}
-
-			@Override
-			public void setLastPaintPoint(Point p) {
-				c().lastPaintPoint = p;
-			}
-
-			@Override
-			public Point getShapeStartPoint() {
-				return c().shapeStartPoint;
-			}
-
-			@Override
-			public void setShapeStartPoint(Point p) {
-				c().shapeStartPoint = p;
-			}
-
-			@Override
-			public BufferedImage getPaintSnapshot() {
-				return c().paintSnapshot;
-			}
-
-			@Override
-			public void setPaintSnapshot(BufferedImage img) {
-				c().paintSnapshot = img;
-			}
-
-			// ── Layer elem ──
-			@Override
-			public int getElemActiveHandle() {
-				return c().elemActiveHandle;
-			}
-
-			@Override
-			public void setElemActiveHandle(int h) {
-				c().elemActiveHandle = h;
-			}
-
-			@Override
-			public Rectangle getElemScaleBase() {
-				return c().elemScaleBase;
-			}
-
-			@Override
-			public void setElemScaleBase(Rectangle r) {
-				c().elemScaleBase = r;
-			}
-
-			@Override
-			public Point getElemScaleStart() {
-				return c().elemScaleStart;
-			}
-
-			@Override
-			public void setElemScaleStart(Point p) {
-				c().elemScaleStart = p;
-			}
-
-			@Override
-			public boolean isDraggingElement() {
-				return c().draggingElement;
-			}
-
-			@Override
-			public void setDraggingElement(boolean d) {
-				c().draggingElement = d;
-			}
-
-			@Override
-			public Point getElemDragAnchor() {
-				return c().elemDragAnchor;
-			}
-
-			@Override
-			public void setElemDragAnchor(Point p) {
-				c().elemDragAnchor = p;
-			}
-
-			// ── Toolbar ──
-			@Override
-			public PaintToolbar getPaintToolbar() {
-				return paintToolbar;
-			}
-
-			// ── Layer panel ──
-			@Override
-			public boolean isShowAllLayerOutlines() {
-				return false;
-			}
-
-			@Override
-			public void commitTextAsElement(BufferedImage img, int x, int y) {
-				if (img == null)
-					return;
-				CanvasInstance ci = c();
-				Layer el = new ImageLayer(ci.nextElementId++, deepCopy(img), x, y, img.getWidth(), img.getHeight());
-				ci.activeElements.add(el);
-				ci.selectedElements.clear();
-				ci.selectedElements.add(el);
-				markDirty(); // Update gallery thumbnail when text element is added
-				refreshElementPanel();
-				if (ci.canvasPanel != null)
-					ci.canvasPanel.repaint();
-			}
-
-			@Override
-			public void commitTextLayer(int id, String text, String font, int size, boolean bold, boolean italic,
-					Color col, int x, int y) {
-				CanvasInstance ci = c();
-				TextLayer updated = (id >= 0) ? TextLayer.of(id, text, font, size, bold, italic, col, x, y)
-						: TextLayer.of(ci.nextElementId++, text, font, size, bold, italic, col, x, y);
-				// Replace in activeElements if present (element stays in list during editing);
-				// add if new
-				boolean found = false;
-				for (int i = 0; i < ci.activeElements.size(); i++) {
-					if (ci.activeElements.get(i).id() == updated.id()) {
-						ci.activeElements.set(i, updated);
-						found = true;
-						break;
-					}
-				}
-				if (!found)
-					ci.activeElements.add(updated);
-				ci.selectedElements.clear();
-				ci.selectedElements.add(updated);
-
-				// Persist text font settings
-				AppSettings settings = AppSettings.getInstance();
-				settings.setFontName(font);
-				settings.setFontSize(size);
-				settings.setTextBold(bold);
-				settings.setTextItalic(italic);
-				settings.setFontColor(col.getRGB());
-				try {
-					settings.save();
-				} catch (IOException e) {
-					System.err.println("[WARN] Konnte Schriftart-Einstellungen nicht speichern: " + e.getMessage());
-				}
-
-				markDirty(); // Update gallery thumbnail when text layer is created/updated
-				refreshElementPanel();
-				if (ci.canvasPanel != null)
-					ci.canvasPanel.repaint();
-			}
-
-			// ── Actions ──
-			@Override
-			public void pushUndo() {
-				if (c().workingImage != null)
-					c().undoStack.push(deepCopy(c().workingImage));
-			}
-
-			@Override
-			public void markDirty() {
-				SelectiveAlphaEditor.this.markDirty(idx);
-			}
-
-			@Override
-			public void performFloodfill(Point screenPt) {
-			}
-
-			@Override
-			public void paintDot(Point imagePt) {
-			}
-
-			@Override
-			public void commitFloat() {
-			}
-
-			@Override
-			public void repaintCanvas() {
-				if (c().canvasPanel != null)
-					c().canvasPanel.repaint();
-			}
-
-			@Override
-			public void rotateSelectedElements(double angleDeg) {
-				doRotate(angleDeg);
-			}
-
-			@Override
-			public void onCanvasElementHover(int id) {
-			}
-
-			@Override
-			public void onElementTransformed() {
-				refreshGalleryThumbnail(idx);
-			}
-
-			@Override
-			public void clearSelection() {
-				c().selectedAreas.clear();
-				c().isSelecting = false;
-			}
-
-			@Override
-			public void liftSelectionToFloat() {
-			}
-
-			@Override
-			public boolean isCanvasSubMode() {
-				return canvasModeBtn.isSelected();
-			}
-
-			@Override
-			public void liftSelectionToElement(Rectangle sel) {
-				CanvasInstance ci = c();
-				if (sel == null || ci.workingImage == null)
-					return;
-				BufferedImage src = PaintEngine.cropRegion(ci.workingImage, sel);
-				if (src == null)
-					return;
-				Layer el = new ImageLayer(ci.nextElementId++, src, sel.x, sel.y, src.getWidth(), src.getHeight());
-				ci.activeElements.add(el);
-				ci.selectedElements.clear();
-				ci.selectedElements.add(el);
-				ci.selectedAreas.clear();
-				ci.isSelecting = false;
-				refreshElementPanel();
-				markDirty(); // Update gallery thumbnail when element is added
-				if (ci.canvasPanel != null)
-					ci.canvasPanel.repaint();
-			}
-
-			@Override
-			public void deleteSelection() {
-			}
-
-			@Override
-			public void updateSelectedElement(Layer el) {
-				if (el == null)
-					return;
-				CanvasInstance ci = c();
-				for (int i = 0; i < ci.selectedElements.size(); i++) {
-					if (ci.selectedElements.get(i).id() == el.id()) {
-						ci.selectedElements.set(i, el);
-						break;
-					}
-				}
-				for (int i = 0; i < ci.activeElements.size(); i++) {
-					if (ci.activeElements.get(i).id() == el.id()) {
-						ci.activeElements.set(i, el);
-						break;
-					}
-				}
-			}
-
-			@Override
-			public void openImageLayerForEditing(Layer el) {
-				doOpenImageLayerInOtherCanvas(idx, el);
-			}
-
-			// ── Utilities ──
-			@Override
-			public int hitHandle(Point screenPt) {
-				return SelectiveAlphaEditor.this.hitHandle(screenPt);
-			}
-
-			@Override
-			public Rectangle floatRectScreen() {
-				return SelectiveAlphaEditor.this.floatRectScreen();
-			}
-
-			@Override
-			public Rectangle elemRectScreen(Layer el) {
-				return SelectiveAlphaEditor.this.elemRectScreen(el, ci(idx).zoom);
-			}
-
-			@Override
-			public Rectangle[] handleRects(Rectangle r) {
-				return SelectiveAlphaEditor.this.handleRects(r);
-			}
-
-			@Override
-			public Point getRotationHandlePos(Rectangle sr) {
-				return SelectiveAlphaEditor.this.getRotationHandlePos(sr);
-			}
-
-			@Override
-			public Rectangle getRotationHandleRect(Rectangle sr) {
-				return SelectiveAlphaEditor.this.getRotationHandleRect(sr);
-			}
-
-			@Override
-			public Rectangle getActiveSelection() {
-				return SelectiveAlphaEditor.this.getActiveSelection();
-			}
-
-			@Override
-			public BufferedImage deepCopy(BufferedImage src) {
-				return SelectiveAlphaEditor.this.deepCopy(src);
-			}
-
-			// ── Colors ──
-			@Override
-			public Color getCanvasBg1() {
-				return canvasBg1;
-			}
-
-			@Override
-			public Color getCanvasBg2() {
-				return canvasBg2;
-			}
-		};
+	CanvasCallbacks buildCanvasCallbacks(int idx) {
+		return CanvasCallbacksFactory.build(this, idx);
 	}
 
 	// =========================================================================
 	// TileGallery callbacks
 	// =========================================================================
-	private TileGalleryPanel.Callbacks buildGalleryCallbacks(int idx) {
-		return new TileGalleryPanel.Callbacks() {
-			@Override
-			public void onTileOpened(File f) {
-				// Deselect the scenes panel when an image is opened
-				if (ci(idx).scenesPanel != null) ci(idx).scenesPanel.clearActiveAndSelection();
-				loadFile(f, idx);
-			}
-
-			@Override
-			public void onSelectionChanged(List<File> files) {
-				selectedImages = files;
-				// Deselect scenes panel when image multi-selection changes
-				if (!files.isEmpty() && ci(idx).scenesPanel != null)
-					ci(idx).scenesPanel.clearActiveAndSelection();
-			}
-
-			@Override
-			public void onDragStarted(File file) {
-				// Show the "drop to Canvas 2" zone when dragging from Canvas 1's gallery,
-				// or show a "drop to Canvas 1" zone when dragging from Canvas 2's gallery.
-				if (idx == 0 && !secondCanvasBtn.isSelected() && ci(0).workingImage != null) {
-					repositionRightDropZone();
-					rightDropZone.setVisible(true);
-					ci(0).layeredPane.repaint();
-				}
-			}
-
-			@Override
-			public void onDragEnded() {
-				rightDropZone.setVisible(false);
-				if (ci(0).layeredPane != null) ci(0).layeredPane.repaint();
-			}
-
-			// ── Case 5: LayerTile dropped onto TileGallery → save as PNG ─────
-			@Override
-			public void onLayerDropped(Layer layer) {
-				CanvasInstance c = canvases[idx];
-				if (c.sourceFile == null) return;
-				Layer live = c.activeElements.stream()
-						.filter(e -> e.id() == layer.id()).findFirst().orElse(layer);
-				BufferedImage img = renderLayerToImage(live);
-				if (img == null) return;
-				File target = uniqueLayerExportFile(c.sourceFile, live.id());
-				saveLayerAsImageFile(img, target, idx);
-				ToastNotification.show(SelectiveAlphaEditor.this, "Gespeichert: " + target.getName());
-			}
-
-			// ── Right-drag from any panel onto image gallery ─────────────────
-			@Override
-			public void onFileElementDropped(File src, int insertIndex) {
-				CanvasInstance c = canvases[idx];
-				boolean isScene = src.getName().endsWith(".txt") || src.getName().endsWith(".json");
-				if (isScene) {
-					// Scene → Image gallery: flatten scene composite to PNG
-					new javax.swing.SwingWorker<File, Void>() {
-						@Override protected File doInBackground() throws Exception {
-							SceneImageAdapter.SceneAsImage s = SceneImageAdapter.loadSceneAsImage(src);
-							if (s == null || s.thumbnail == null) return null;
-							String base = src.getName().replaceAll("\\.(txt|json)$", "");
-							File dir = (c.sourceFile != null) ? c.sourceFile.getParentFile()
-									: SceneLocator.getToolScenesDir(
-											SceneLocator.getToolProjects().isEmpty() ? "Default"
-													: SceneLocator.getToolProjects().get(0));
-							File out = new File(dir, base + ".png");
-							int n = 1; while (out.exists()) out = new File(dir, base + "_" + n++ + ".png");
-							javax.imageio.ImageIO.write(s.thumbnail, "PNG", out);
-							return out;
-						}
-						@Override protected void done() {
-							try {
-								File out = get(); if (out == null) return;
-								c.tileGallery.addFileAtIndex(out, insertIndex);
-								c.tileGallery.setActiveFile(out);
-								ToastNotification.show(SelectiveAlphaEditor.this, "Scene → Bild: " + out.getName());
-							} catch (Exception ex) { showErrorDialog("Fehler", ex.getMessage()); }
-						}
-					}.execute();
-				} else {
-					// Image → Image gallery: copy file
-					File dest = BaseSidebarPanel.copyFileWithUniqueName(src, src.getParentFile());
-					if (dest != null) {
-						c.tileGallery.addFileAtIndex(dest, insertIndex);
-						c.tileGallery.setActiveFile(dest);
-						ToastNotification.show(SelectiveAlphaEditor.this, "Kopie: " + dest.getName());
-					}
-				}
-			}
-		};
+	TileGalleryPanel.Callbacks buildGalleryCallbacks(int idx) {
+		return GalleryCallbacksFactory.build(this, idx);
 	}
 
-	/**
-	 * Creates a FilePreloadCallback for hover-based image preloading in the tile gallery.
-	 * When user hovers over a tile, the image is loaded asynchronously in the background
-	 * with zoom and viewport calculations cached for instant display.
-	 */
 	private TileGalleryPanel.FilePreloadCallback buildGalleryPreloadCallback(int idx) {
-		return (file) -> preloadFileAsync(file, idx);
+		return GalleryCallbacksFactory.buildPreloadCallback(this, idx);
 	}
 
 	// =========================================================================
@@ -4449,313 +1923,19 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// =========================================================================
 
 	private TileGalleryPanel.Callbacks buildScenesCallbacks(int idx) {
-		return new TileGalleryPanel.Callbacks() {
-			@Override
-			public void onTileOpened(File sceneFile) {
-				// GameII scene directory (no manifest) — load directly
-				if (sceneFile.isDirectory()) {
-					if (new File(sceneFile, "sprites").isDirectory()) {
-						ci(idx).tileGallery.clearActiveAndSelection();
-						loadGameIISceneDir(sceneFile, idx);
-					}
-					return;
-				}
-				if (!sceneFile.getName().endsWith(".txt") && !sceneFile.getName().endsWith(".json"))
-					return;
-				// Deselect the image gallery when a scene is opened
-				ci(idx).tileGallery.clearActiveAndSelection();
-				CanvasInstance c = ci(idx);
-				try {
-					File sceneDir = sceneFile.getParentFile();
-					String sceneName = sceneFile.getName().replaceAll("\\.(txt|json)$", "");
-
-					// GameII-Scene erkennen: hat sprites/-Unterordner
-					File spritesSubDir = new File(sceneDir, "sprites");
-					if (spritesSubDir.exists() && spritesSubDir.isDirectory()) {
-						// ── GameII-Scene ──────────────────────────────────
-						GameSceneReader.GameSceneData gameData =
-								GameSceneReader.readScene(sceneDir, sceneName);
-
-						// Leeres Hintergrundbild als Canvas-Grundlage
-						if (c.workingImage == null
-								|| c.workingImage.getWidth()  != gameData.canvasW
-								|| c.workingImage.getHeight() != gameData.canvasH) {
-							java.awt.image.BufferedImage blank = new java.awt.image.BufferedImage(
-									gameData.canvasW, gameData.canvasH,
-									java.awt.image.BufferedImage.TYPE_INT_ARGB);
-							java.awt.Graphics2D g2 = blank.createGraphics();
-							g2.setColor(new java.awt.Color(30, 30, 40));
-							g2.fillRect(0, 0, gameData.canvasW, gameData.canvasH);
-							g2.dispose();
-							c.workingImage  = blank;
-							c.originalImage = blank;
-						}
-
-						c.gameSceneRoot = sceneDir;
-						c.gameCanvasW   = gameData.canvasW;
-						c.gameCanvasH   = gameData.canvasH;
-						c.activeElements   = gameData.layers;
-						c.selectedElements.clear();
-						c.activeSceneFile  = sceneFile;
-						c.sourceFile       = sceneFile; // persistSceneIfActive braucht sourceFile != null
-						refreshElementPanel();
-						c.canvasPanel.repaint();
-
-					} else {
-						// ── Standard TT-Scene ─────────────────────────────
-						SceneFileReader.SceneData sceneData = SceneFileReader.readScene(sceneDir, sceneName);
-
-						if (sceneData.backgroundImage != null) {
-							loadSceneBackground(sceneData.backgroundImage, idx);
-						}
-
-						List<Layer> allLayers = new ArrayList<>();
-						int nextId = System.identityHashCode(new Object());
-						for (SceneFileReader.ImageLayerRef ref : sceneData.imageLayers) {
-							java.awt.image.BufferedImage img = ImageLoader.loadImage(ref.file);
-							if (img != null) {
-								int w = ref.w > 0 ? ref.w : img.getWidth();
-								int h = ref.h > 0 ? ref.h : img.getHeight();
-								ImageLayer il = new ImageLayer(nextId++, img, ref.x, ref.y, w, h, ref.rotation, ref.opacity);
-								allLayers.add(il);
-							}
-						}
-						allLayers.addAll(sceneData.textLayers);
-						allLayers.addAll(sceneData.pathLayers);
-
-						c.gameSceneRoot = null; // keine GameII-Scene
-						c.activeElements   = allLayers;
-						c.selectedElements.clear();
-						c.activeSceneFile  = sceneFile;
-						refreshElementPanel();
-						c.canvasPanel.repaint();
-					}
-
-				} catch (Exception e) {
-					System.err.println("[ERROR] loadScene failed: " + e.getMessage());
-					showErrorDialog("Fehler", "Scene konnte nicht geladen werden:\n" + e.getMessage());
-				}
-			}
-
-			@Override
-			public void onSelectionChanged(List<File> selectedFiles) {
-				if (!selectedFiles.isEmpty())
-					ci(idx).tileGallery.clearActiveAndSelection();
-			}
-
-			@Override
-			public void onDragStarted(File file) {
-				// Scene tiles dragged out — no drop zone needed, just hide any stale one
-			}
-
-			@Override
-			public void onDragEnded() {
-				rightDropZone.setVisible(false);
-				if (ci(0).layeredPane != null) ci(0).layeredPane.repaint();
-			}
-
-			// ── Right-drag from any panel onto scenes gallery ─────────────────
-			@Override
-			public void onFileElementDropped(File src, int insertIndex) {
-				boolean isScene = src.getName().endsWith(".txt") || src.getName().endsWith(".json");
-				if (isScene) {
-					// Scene → Scene gallery: copy whole scene directory
-					copySceneDirectory(src, idx);
-				} else {
-					// Image → Scene gallery: create scene from image + current canvas layers
-					createSceneFromDrop(java.util.Arrays.asList(src), idx);
-				}
-			}
-
-			// ── Layer dragged from ElementLayerPanel onto scenes gallery ──────
-			@Override
-			public void onLayerDropped(Layer layer) {
-				CanvasInstance c = ci(idx);
-				// Render layer to image to use as background
-				BufferedImage img = renderLayerToImage(layer);
-				if (img == null) return;
-				// Save temp image, then create scene
-				try {
-					File tmp = File.createTempFile("layer_scene_", ".png");
-					tmp.deleteOnExit();
-					javax.imageio.ImageIO.write(img, "PNG", tmp);
-					createSceneFromDrop(java.util.Arrays.asList(tmp), idx);
-				} catch (Exception ex) {
-					showErrorDialog("Fehler", "Layer → Scene fehlgeschlagen:\n" + ex.getMessage());
-				}
-			}
-		};
+		return scenesController.buildScenesCallbacks(idx);
 	}
 
-	/**
-	 * Called when image files are dropped from TileGalleryPanel onto the scenes panel.
-	 * Creates a new scene: dropped image = background, current canvas layers = scene layers.
-	 */
-	private void createSceneFromDrop(List<File> files, int idx) {
-		if (files == null || files.isEmpty()) return;
-		File imageFile = files.get(0);
-		String n = imageFile.getName().toLowerCase();
-		boolean isImage = n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg")
-				|| n.endsWith(".gif") || n.endsWith(".bmp") || n.endsWith(".webp");
-		if (!isImage) return;
-
-		CanvasInstance c = ci(idx);
-
-		String defaultName = "Scene_" + new java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss")
-				.format(new java.util.Date());
-		String sceneName = (String) javax.swing.JOptionPane.showInputDialog(
-				SelectiveAlphaEditor.this,
-				"Szenen-Name:",
-				"Neue Szene erstellen",
-				javax.swing.JOptionPane.PLAIN_MESSAGE,
-				null, null, defaultName);
-		if (sceneName == null || sceneName.isBlank()) return;
-		sceneName = sceneName.trim();
-
-		List<String> projects = SceneLocator.getToolProjects();
-		String projectName = projects.isEmpty() ? "Default" : projects.get(0);
-		File scenesRoot = SceneLocator.getToolScenesDir(projectName);
-		File sceneDir   = new File(scenesRoot, sceneName);
-
-		List<Layer> layers = new ArrayList<>(c.activeElements);
-		final String finalName = sceneName;
-		new javax.swing.SwingWorker<Void, Void>() {
-			@Override protected Void doInBackground() throws Exception {
-				SceneFileWriter.writeScene(sceneDir, finalName, imageFile, layers);
-				return null;
-			}
-			@Override protected void done() {
-				try { get(); } catch (Exception ex) {
-					System.err.println("[ERROR] Scene save failed: " + ex.getMessage());
-					showErrorDialog("Fehler", "Scene konnte nicht gespeichert werden:\n" + ex.getMessage());
-					return;
-				}
-				refreshSceneFiles(idx);
-				ToastNotification.show(SelectiveAlphaEditor.this, "Scene gespeichert: " + finalName);
-			}
-		}.execute();
-	}
-
-	/** Collects all scene .txt files from SceneLocator and populates the scenes panel. */
 	void refreshSceneFiles(int idx) {
-		CanvasInstance c = ci(idx);
-		List<File> allScenes = new ArrayList<>();
-		// TransparencyTool-Projekte (projects/)
-		for (String project : SceneLocator.getToolProjects()) {
-			allScenes.addAll(SceneLocator.getToolScenes(project));
-		}
-		// GameII-Spiele (Games/ im alten Games-Ordner – Legacy)
-		for (String game : SceneLocator.getAvailableGames()) {
-			allScenes.addAll(SceneLocator.getGameScenes(game));
-		}
-		// GameII-Spiele (AppData\TransparencyTool\Games\ – neuer Pfad)
-		for (String game : SceneLocator.getAppDataGames()) {
-			allScenes.addAll(SceneLocator.getAppDataGameScenes(game));
-		}
-		c.scenesPanel.setFiles(allScenes, null);
+		scenesController.refreshSceneFiles(idx);
 	}
 
-	/**
-	 * Loads a GameII scene from its directory (sprites/ subdir is the indicator).
-	 * No .txt manifest required — the directory name is used as the scene name.
-	 */
-	private void loadGameIISceneDir(File sceneDir, int idx) {
-		CanvasInstance c = ci(idx);
-		String sceneName = sceneDir.getName();
-		try {
-			GameSceneReader.GameSceneData gameData = GameSceneReader.readScene(sceneDir, sceneName);
-
-			if (c.workingImage == null
-					|| c.workingImage.getWidth()  != gameData.canvasW
-					|| c.workingImage.getHeight() != gameData.canvasH) {
-				java.awt.image.BufferedImage blank = new java.awt.image.BufferedImage(
-						gameData.canvasW, gameData.canvasH,
-						java.awt.image.BufferedImage.TYPE_INT_ARGB);
-				java.awt.Graphics2D g2 = blank.createGraphics();
-				g2.setColor(new java.awt.Color(30, 30, 40));
-				g2.fillRect(0, 0, gameData.canvasW, gameData.canvasH);
-				g2.dispose();
-				c.workingImage  = blank;
-				c.originalImage = blank;
-			}
-
-			// Use a synthetic .txt path for activeSceneFile (needed by persistSceneIfActive)
-			File syntheticManifest = new File(sceneDir, sceneName + ".txt");
-			c.gameSceneRoot   = sceneDir;
-			c.gameCanvasW     = gameData.canvasW;
-			c.gameCanvasH     = gameData.canvasH;
-			c.activeElements  = gameData.layers;
-			c.selectedElements.clear();
-			c.activeSceneFile = syntheticManifest;
-			c.sourceFile      = syntheticManifest;
-			ci(idx).tileGallery.clearActiveAndSelection();
-			activeCanvasIndex = idx;
-			updateCanvasFocusBorder();
-			swapToImageView(idx);
-			SwingUtilities.invokeLater(() -> fitToViewport(idx));
-			refreshElementPanel();
-			updateTitle();
-			updateStatus();
-			setBottomButtonsEnabled(true);
-
-			// Open scenes panel and populate it with scenes of this game only
-			File gameScenesDir = sceneDir.getParentFile(); // …/DefaultGame/scenes/
-			List<File> gameScenes = new ArrayList<>();
-			if (gameScenesDir != null && gameScenesDir.isDirectory()) {
-				File[] siblings = gameScenesDir.listFiles(File::isDirectory);
-				if (siblings != null) {
-					java.util.Arrays.sort(siblings,
-							(a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-					for (File s : siblings) {
-						if (new File(s, "sprites").isDirectory()) gameScenes.add(s);
-					}
-				}
-			}
-			if (idx == 0) scenesBtn.setSelected(true);
-			else if (idx == 1) secondScenesBtn.setSelected(true);
-			c.scenesPanel.setVisible(true);
-			c.scenesPanel.setFiles(gameScenes, sceneDir);
-			updateLayoutVisibility();
-			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> reloadCurrentImage(idx)));
-
-		} catch (Exception e) {
-			System.err.println("[ERROR] loadGameIISceneDir failed: " + e.getMessage());
-			showErrorDialog("Fehler", "GameII-Scene konnte nicht geladen werden:\n" + e.getMessage());
-		}
+	void createSceneFromDrop(java.util.List<java.io.File> files, int idx) {
+		scenesController.createSceneFromDrop(files, idx);
 	}
 
-	/**
-	 * Hilfsmethode: extrahiert ein JSON-Feld aus einem String. Wird für schnelles
-	 * Lesen von Szenen-Daten verwendet.
-	 */
-	private static String extractJsonField(String json, String fieldName) {
-		String pattern = "\"" + fieldName + "\":";
-		int idx = json.indexOf(pattern);
-		if (idx < 0)
-			return null;
-
-		int start = idx + pattern.length();
-		while (start < json.length() && Character.isWhitespace(json.charAt(start)))
-			start++;
-
-		if (start >= json.length() || json.charAt(start) != '[')
-			return null;
-
-		int depth = 0;
-		int end = start;
-		while (end < json.length()) {
-			if (json.charAt(end) == '[')
-				depth++;
-			if (json.charAt(end) == ']') {
-				depth--;
-				if (depth == 0) {
-					end++;
-					break;
-				}
-			}
-			end++;
-		}
-		return json.substring(start, end).trim();
+	void loadGameIISceneDir(java.io.File sceneDir, int idx) {
+		scenesController.loadGameIISceneDir(sceneDir, idx);
 	}
 
 	// =========================================================================
@@ -4766,170 +1946,29 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * CTRL+C — copy INSIDE selection → Element layer (or full image if no
 	 * selection).
 	 */
-	private void doCopy() {
-		CanvasInstance c = ci();
-		if (c.workingImage == null)
-			return;
-
-		// Copy selected layers (non-destructive, for pasting into other canvases)
-		if (!c.selectedElements.isEmpty()) {
-			clipboardLayers = new ArrayList<>(c.selectedElements);
-			// Still copy image for system clipboard compatibility
-			Layer first = c.selectedElements.get(0);
-			if (first instanceof ImageLayer il) {
-				clipboard = il.image();
-			} else if (first instanceof PathLayer pl) {
-				clipboard = PaintEngine.cropPolygon(c.workingImage, pl.absXPoints(), pl.absYPoints());
-			} else if (first instanceof TextLayer tl) {
-				clipboard = renderTextLayerToImage(tl);
-			}
-			if (clipboard != null)
-				copyToSystemClipboard(clipboard);
-			return;
-		}
-
-		// No selected layers: copy image region
-		Rectangle sel = getActiveSelection();
-		if (sel != null) {
-			clipboard = PaintEngine.cropRegion(c.workingImage, sel);
-			copyToSystemClipboard(clipboard);
-			addElementFromClipboard(clipboard, sel.x, sel.y);
-			clipboardLayers = new ArrayList<>(c.selectedElements); // carry layer to other canvas
-		} else {
-			clipboard = deepCopy(c.workingImage);
-			clipboardLayers = null;
-			copyToSystemClipboard(clipboard);
-		}
+	void doCopy() {
+		clipboardController.doCopy();
 	}
 
 	/**
 	 * CTRL+SHIFT+C — copy OUTSIDE selection → Element layer (full-size, inside
 	 * punched out).
 	 */
-	private void doCopyOutside() {
-		CanvasInstance c = ci();
-		if (c.workingImage == null)
-			return;
-
-		// NEW: PathLayer support
-		if (!c.selectedElements.isEmpty() && c.selectedElements.get(0) instanceof PathLayer pl) {
-			clipboard = PaintEngine.cropOutsidePolygon(c.workingImage, pl.absXPoints(), pl.absYPoints());
-			if (clipboard != null)
-				copyToSystemClipboard(clipboard);
-			return;
-		}
-
-		Rectangle sel = getActiveSelection();
-		if (sel != null) {
-			clipboard = PaintEngine.cropOutside(c.workingImage, sel);
-			copyToSystemClipboard(clipboard);
-			addElementFromClipboard(clipboard, 0, 0);
-			clipboardLayers = new ArrayList<>(c.selectedElements); // carry layer to other canvas
-		} else {
-			// No selection: same as normal copy
-			clipboard = deepCopy(c.workingImage);
-			clipboardLayers = null;
-			copyToSystemClipboard(clipboard);
-		}
+	void doCopyOutside() {
+		clipboardController.doCopyOutside();
 	}
 
 	/** CTRL+X — cut INSIDE selection → Element layer + clear canvas pixels. */
-	private void doCut() {
-		CanvasInstance c = ci();
-		if (c.workingImage == null)
-			return;
-
-		// Cut selected layers: copy them to clipboard and remove from canvas
-		if (!c.selectedElements.isEmpty() && !(c.selectedElements.get(0) instanceof PathLayer)) {
-			pushUndo();
-			clipboardLayers = new ArrayList<>(c.selectedElements);
-
-			// Copy image for system clipboard
-			Layer first = c.selectedElements.get(0);
-			if (first instanceof ImageLayer il) {
-				clipboard = il.image();
-			} else if (first instanceof TextLayer tl) {
-				clipboard = renderTextLayerToImage(tl);
-			}
-			if (clipboard != null)
-				copyToSystemClipboard(clipboard);
-
-			// Remove these layers from canvas
-			for (Layer el : c.selectedElements) {
-				c.activeElements.removeIf(e -> e.id() == el.id());
-			}
-			c.selectedElements.clear();
-			markDirty();
-			refreshElementPanel();
-			c.canvasPanel.repaint();
-			return;
-		}
-
-		// PathLayer support
-		if (!c.selectedElements.isEmpty() && c.selectedElements.get(0) instanceof PathLayer pl) {
-			pushUndo();
-			clipboard = PaintEngine.cropPolygon(c.workingImage, pl.absXPoints(), pl.absYPoints());
-			clipboardLayers = null; // PathLayer uses image clipboard
-			if (clipboard != null)
-				copyToSystemClipboard(clipboard);
-			PaintEngine.clearPolygon(c.workingImage, pl.absXPoints(), pl.absYPoints());
-			markDirty();
-			return;
-		}
-
-		Rectangle sel = getActiveSelection();
-		if (sel != null) {
-			pushUndo();
-			clipboard = PaintEngine.cropRegion(c.workingImage, sel);
-			copyToSystemClipboard(clipboard);
-			PaintEngine.clearRegion(c.workingImage, sel);
-			markDirty();
-			addElementFromClipboard(clipboard, sel.x, sel.y);
-			clipboardLayers = new ArrayList<>(c.selectedElements); // carry layer to other canvas
-		} else {
-			// No selection: cut entire image
-			pushUndo();
-			clipboard = deepCopy(c.workingImage);
-			clipboardLayers = null;
-			copyToSystemClipboard(clipboard);
-			PaintEngine.clearRegion(c.workingImage,
-					new Rectangle(0, 0, c.workingImage.getWidth(), c.workingImage.getHeight()));
-			markDirty();
-		}
+	void doCut() {
+		clipboardController.doCut();
 	}
 
 	/**
 	 * CTRL+SHIFT+X — cut OUTSIDE selection → Element layer (full-size) + clear
 	 * canvas outside.
 	 */
-	private void doCutOutside() {
-		CanvasInstance c = ci();
-		if (c.workingImage == null)
-			return;
-
-		// NEW: PathLayer support
-		if (!c.selectedElements.isEmpty() && c.selectedElements.get(0) instanceof PathLayer pl) {
-			pushUndo();
-			clipboard = PaintEngine.cropOutsidePolygon(c.workingImage, pl.absXPoints(), pl.absYPoints());
-			if (clipboard != null)
-				copyToSystemClipboard(clipboard);
-			PaintEngine.clearOutsidePolygon(c.workingImage, pl.absXPoints(), pl.absYPoints());
-			markDirty();
-			return;
-		}
-
-		Rectangle sel = getActiveSelection();
-		if (sel != null) {
-			pushUndo();
-			clipboard = PaintEngine.cropOutside(c.workingImage, sel);
-			copyToSystemClipboard(clipboard);
-			PaintEngine.clearOutside(c.workingImage, sel);
-			markDirty();
-			addElementFromClipboard(clipboard, 0, 0);
-		} else {
-			// No selection: same as normal cut
-			doCut();
-		}
+	void doCutOutside() {
+		clipboardController.doCutOutside();
 	}
 
 	/**
@@ -4937,79 +1976,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Called after any copy/cut so the content immediately appears as a
 	 * non-destructive layer.
 	 */
-	private void addElementFromClipboard(BufferedImage img, int x, int y) {
-		if (img == null || ci().appMode != AppMode.PAINT)
-			return;
-		CanvasInstance c = ci();
-		Layer el = new ImageLayer(c.nextElementId++, deepCopy(img), x, y, img.getWidth(), img.getHeight());
-		c.activeElements.add(el);
-		c.selectedElements.clear();
-		c.selectedElements.add(el);
-		markDirty(); // Update gallery thumbnail when element is added
-		refreshElementPanel();
-		if (c.canvasPanel != null)
-			c.canvasPanel.repaint();
-	}
 
-	private void doPaste() {
-		CanvasInstance c = ci();
-		BufferedImage fromClip = pasteFromSystemClipboard();
-		if (fromClip != null)
-			clipboard = fromClip;
-
-		// Try to paste layers first (if copied from another canvas)
-		if (clipboardLayers != null && !clipboardLayers.isEmpty() && c.workingImage != null) {
-			pushUndo();
-			c.selectedElements.clear();
-
-			for (Layer original : clipboardLayers) {
-				// Create a new layer with a fresh ID for this canvas
-				Layer newLayer;
-				if (original instanceof ImageLayer il) {
-					newLayer = new ImageLayer(c.nextElementId++, deepCopy(il.image()), original.x(), original.y(),
-							original.width(), original.height(), il.rotationAngle(), il.opacity(), il.isHidden());
-				} else if (original instanceof TextLayer tl) {
-					newLayer = TextLayer.of(c.nextElementId++, tl.text(), tl.fontName(), tl.fontSize(), tl.fontBold(),
-							tl.fontItalic(), tl.fontColor(), original.x(), original.y(), tl.isHidden());
-				} else if (original instanceof PathLayer pl) {
-					newLayer = PathLayer.of(c.nextElementId++, new ArrayList<>(pl.points()), null, // image will be
-																									// null, rendered
-																									// on-the-fly
-							pl.isClosed(), original.x(), original.y(), pl.isHidden());
-				} else {
-					continue; // Unknown layer type
-				}
-
-				c.activeElements.add(newLayer);
-				c.selectedElements.add(newLayer);
-			}
-
-			c.hasUnsavedChanges = true;
-			markDirty();
-			refreshElementPanel();
-			c.canvasPanel.repaint();
-			updateTitle();
-			return;
-		}
-
-		// No layers in clipboard: paste as floating image
-		if (clipboard != null && c.workingImage != null) {
-			pushUndo();
-			// Create floating selection immediately — handles appear right away.
-			// Content is merged to the canvas only when commitFloat() is called.
-			c.floatingImg = deepCopy(clipboard);
-			c.floatRect = new Rectangle(0, 0, Math.min(clipboard.getWidth(), c.workingImage.getWidth()),
-					Math.min(clipboard.getHeight(), c.workingImage.getHeight()));
-			c.isDraggingFloat = false;
-			c.floatDragAnchor = null;
-			c.activeHandle = -1;
-			c.scaleBaseRect = null;
-			c.scaleDragStart = null;
-			c.selectedAreas.clear();
-			c.hasUnsavedChanges = true;
-			updateTitle();
-			c.canvasPanel.repaint();
-		}
+	void doPaste() {
+		clipboardController.doPaste();
 	}
 
 	public Rectangle getActiveSelection() {
@@ -5026,767 +1995,43 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		return null;
 	}
 
-	private void copyToSystemClipboard(BufferedImage img) {
-		if (img == null)
-			return;
-		try {
-			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new TransferableImage(img), null);
-		} catch (Exception ignored) {
-		}
-	}
-
-	private BufferedImage pasteFromSystemClipboard() {
-		try {
-			Transferable t = Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null);
-			if (t != null && t.isDataFlavorSupported(DataFlavor.imageFlavor)) {
-				Image img = (Image) t.getTransferData(DataFlavor.imageFlavor);
-				BufferedImage bi = new BufferedImage(img.getWidth(null), img.getHeight(null),
-						BufferedImage.TYPE_INT_ARGB);
-				bi.createGraphics().drawImage(img, 0, 0, null);
-				return bi;
-			}
-		} catch (Exception ignored) {
-		}
-		return null;
-	}
-
-	private static class TransferableImage implements Transferable {
-		private final BufferedImage image;
-
-		TransferableImage(BufferedImage img) {
-			this.image = img;
-		}
-
-		@Override
-		public DataFlavor[] getTransferDataFlavors() {
-			return new DataFlavor[] { DataFlavor.imageFlavor };
-		}
-
-		@Override
-		public boolean isDataFlavorSupported(DataFlavor f) {
-			return DataFlavor.imageFlavor.equals(f);
-		}
-
-		@Override
-		public Object getTransferData(DataFlavor f) throws UnsupportedFlavorException {
-			if (!isDataFlavorSupported(f))
-				throw new UnsupportedFlavorException(f);
-			return image;
-		}
-	}
-
-	// =========================================================================
-	// Secondary Canvas Window – SecondaryPanel inner class
-	// =========================================================================
-	private class SecondaryPanel extends JPanel {
-		private static final int HANDLE_SIZE = 8;
-		private int dragStartX, dragStartY;
-		private int dragStartWinX, dragStartWinY, dragStartWinW, dragStartWinH;
-		private String resizeEdge = null; // "tl", "t", "tr", "l", "r", "bl", "b", "br", or null for drag
-
-		SecondaryPanel() {
-			addMouseListener(new MouseAdapter() {
-				@Override
-				public void mousePressed(MouseEvent e) {
-					dragStartX = e.getXOnScreen();
-					dragStartY = e.getYOnScreen();
-					dragStartWinX = secWin.getX();
-					dragStartWinY = secWin.getY();
-					dragStartWinW = secWin.getWidth();
-					dragStartWinH = secWin.getHeight();
-					resizeEdge = getResizeEdgeAt(e.getX(), e.getY());
-				}
-			});
-			addMouseMotionListener(new MouseAdapter() {
-				@Override
-				public void mouseMoved(MouseEvent e) {
-					String edge = getResizeEdgeAt(e.getX(), e.getY());
-					updateCursor(edge);
-				}
-
-				@Override
-				public void mouseDragged(MouseEvent e) {
-					if (secWin == null || secFullscreen)
-						return;
-					int dx = e.getXOnScreen() - dragStartX;
-					int dy = e.getYOnScreen() - dragStartY;
-
-					if (resizeEdge == null) {
-						// Window drag
-						secWin.setLocation(dragStartWinX + dx, dragStartWinY + dy);
-					} else {
-						// Window resize
-						int newX = dragStartWinX, newY = dragStartWinY;
-						int newW = dragStartWinW, newH = dragStartWinH;
-
-						if (resizeEdge.contains("l"))
-							newX += dx;
-						if (resizeEdge.contains("r"))
-							newW += dx;
-						if (resizeEdge.contains("t"))
-							newY += dy;
-						if (resizeEdge.contains("b"))
-							newH += dy;
-
-						newW = Math.max(200, newW);
-						newH = Math.max(150, newH);
-
-						secWin.setBounds(newX, newY, newW, newH);
-					}
-				}
-			});
-		}
-
-		private String getResizeEdgeAt(int x, int y) {
-			int w = getWidth(), h = getHeight();
-			boolean nearLeft = x < HANDLE_SIZE;
-			boolean nearRight = x >= w - HANDLE_SIZE;
-			boolean nearTop = y < HANDLE_SIZE;
-			boolean nearBottom = y >= h - HANDLE_SIZE;
-
-			if (nearTop && nearLeft)
-				return "tl";
-			if (nearTop && nearRight)
-				return "tr";
-			if (nearBottom && nearLeft)
-				return "bl";
-			if (nearBottom && nearRight)
-				return "br";
-			if (nearTop)
-				return "t";
-			if (nearBottom)
-				return "b";
-			if (nearLeft)
-				return "l";
-			if (nearRight)
-				return "r";
-			return null;
-		}
-
-		private void updateCursor(String edge) {
-			if (edge == null) {
-				setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
-			} else {
-				int cursorType = switch (edge) {
-				case "tl", "br" -> Cursor.NW_RESIZE_CURSOR;
-				case "tr", "bl" -> Cursor.NE_RESIZE_CURSOR;
-				case "t", "b" -> Cursor.N_RESIZE_CURSOR;
-				case "l", "r" -> Cursor.W_RESIZE_CURSOR;
-				default -> Cursor.DEFAULT_CURSOR;
-				};
-				setCursor(Cursor.getPredefinedCursor(cursorType));
-			}
-		}
-
-		@Override
-		protected void paintComponent(Graphics g) {
-			super.paintComponent(g);
-			Graphics2D g2 = (Graphics2D) g;
-			g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-
-			// Determine source canvas based on display mode
-			BufferedImage src;
-			List<Layer> elements;
-			int srcIdx = switch (SelectiveAlphaEditor.this.secCanvasMode) {
-			case SHOW_CANVAS_I_ONLY -> 0;
-			case SHOW_CANVAS_II_ONLY -> 1;
-			case SHOW_ACTIVE_CANVAS -> SelectiveAlphaEditor.this.activeCanvasIndex;
-			};
-			CanvasInstance ci = canvases[srcIdx];
-			if (ci.workingImage == null)
-				return;
-			src = ci.workingImage;
-
-			if (secMode == PreviewMode.SNAPSHOT) {
-				// In SNAPSHOT mode, render elements on top of snapshot base
-				elements = ci.activeElements;
-			} else {
-				// In LIVE modes, render all elements
-				elements = ci.activeElements;
-			}
-
-			// Scale-to-fit (maintain aspect ratio)
-			int pw = getWidth(), ph = getHeight();
-			int iw = src.getWidth(), ih = src.getHeight();
-			double scale = Math.min((double) pw / iw, (double) ph / ih);
-			int dw = (int) (iw * scale), dh = (int) (ih * scale);
-			int ox = (pw - dw) / 2, oy = (ph - dh) / 2;
-
-			// Checkerboard background - use same colors as main canvas
-			int cell = 16;
-			for (int cy = 0; cy < ph; cy += cell) {
-				for (int cx = 0; cx < pw; cx += cell) {
-					g2.setColor(((cx / cell + cy / cell) % 2 == 0) ? canvasBg1 : canvasBg2);
-					g2.fillRect(cx, cy, cell, cell);
-				}
-			}
-
-			// Draw main image
-			g2.drawImage(src, ox, oy, dw, dh, null);
-
-			// Draw elements (all modes with GameLoop rendering)
-			for (Layer el : elements) {
-				if (el instanceof ImageLayer il) {
-					int ex = ox + (int) Math.round(il.x() * scale);
-					int ey = oy + (int) Math.round(il.y() * scale);
-					int ew = (int) Math.round(il.width() * scale);
-					int eh = (int) Math.round(il.height() * scale);
-					// Draw with rotation if needed
-					if (Math.abs(il.rotationAngle()) > 0.001) {
-						java.awt.geom.AffineTransform orig = g2.getTransform();
-						double cx = ex + ew / 2.0;
-						double cy = ey + eh / 2.0;
-						g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
-						g2.drawImage(il.image(), ex, ey, ew, eh, null);
-						g2.setTransform(orig);
-					} else {
-						g2.drawImage(il.image(), ex, ey, ew, eh, null);
-					}
-				} else if (el instanceof TextLayer tl) {
-					// Render TextLayer with scaled font size
-					int tstyle = (tl.fontBold() ? java.awt.Font.BOLD : 0)
-							| (tl.fontItalic() ? java.awt.Font.ITALIC : 0);
-					int scaledFontSize = Math.max(1, (int) Math.round(tl.fontSize() * scale));
-					java.awt.Font tfont = new java.awt.Font(tl.fontName(), tstyle, scaledFontSize);
-					g2.setFont(tfont);
-					g2.setColor(tl.fontColor());
-					java.awt.FontMetrics tfm = g2.getFontMetrics();
-					String[] tLines = tl.text().split("\n", -1);
-					int tpx = ox + (int) Math.round((tl.x() + TextLayer.TEXT_PADDING) * scale);
-					int tpy = oy + (int) Math.round((tl.y() + TextLayer.TEXT_PADDING) * scale);
-					for (int li = 0; li < tLines.length; li++) {
-						g2.drawString(tLines[li], tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
-					}
-				} else if (el instanceof PathLayer pl && secMode == PreviewMode.LIVE_ALL_EDIT) {
-					// PathLayer only in LIVE_ALL_EDIT
-					renderPathLayerPreview(g2, pl, ox, oy, scale);
-				}
-			}
-
-			// Element borders only in LIVE_ALL_EDIT
-			if (secMode == PreviewMode.LIVE_ALL_EDIT) {
-				g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10,
-						new float[] { 4, 3 }, 0));
-				g2.setColor(new Color(0, 180, 255));
-				for (Layer el : elements) {
-					int ex = ox + (int) Math.round(el.x() * scale);
-					int ey = oy + (int) Math.round(el.y() * scale);
-					int ew = (int) Math.round(el.width() * scale);
-					int eh = (int) Math.round(el.height() * scale);
-					g2.drawRect(ex, ey, ew, eh);
-				}
-			}
-		}
-	}
-
-	private void renderPathLayerPreview(Graphics2D g2, PathLayer pl, int ox, int oy, double scale) {
-		List<Point3D> pts = pl.points();
-		if (pts.isEmpty())
-			return;
-		g2.setColor(new Color(0, 200, 255));
-		g2.setStroke(new BasicStroke(1.5f));
-		for (int i = 1; i < pts.size(); i++) {
-			int x1 = ox + (int) Math.round(pts.get(i - 1).x * scale);
-			int y1 = oy + (int) Math.round(pts.get(i - 1).y * scale);
-			int x2 = ox + (int) Math.round(pts.get(i).x * scale);
-			int y2 = oy + (int) Math.round(pts.get(i).y * scale);
-			g2.drawLine(x1, y1, x2, y2);
-		}
-		g2.setColor(Color.WHITE);
-		for (Point3D p : pts) {
-			int px = ox + (int) Math.round(p.x * scale) - 3;
-			int py = oy + (int) Math.round(p.y * scale) - 3;
-			g2.fillOval(px, py, 6, 6);
-		}
-	}
-
 	// =========================================================================
 	// Secondary Canvas Window – Control Methods
 	// =========================================================================
-	private void initSecondaryWindow() {
-		secPanel = new SecondaryPanel();
-		secPanel.setBackground(Color.BLACK);
-		secWin = new JFrame("TransparencyTool - Canvas Preview");
-		// Keep decorated so screen sharing / screen capture can detect the window
-		secWin.setUndecorated(false);
-		secWin.setResizable(true);
-		secWin.setSize(640, 480);
-		secWin.setLocationRelativeTo(this);
-		secWin.getContentPane().add(secPanel);
-		secWin.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
-		// GameLoop: 60 FPS (16ms per frame) for smooth rendering
-		secTimer = new javax.swing.Timer(16, e -> secPanel.repaint());
+
+	void toggleSecondaryWindow() {
+		secWinController.toggleSecondaryWindow();
 	}
 
-	private void toggleSecondaryWindow() {
-		if (secWin == null)
-			initSecondaryWindow();
-		if (secWin.isVisible()) {
-			secTimer.stop();
-			secWin.setVisible(false);
-		} else {
-			if (secMode != PreviewMode.SNAPSHOT)
-				secTimer.start();
-			secWin.setVisible(true);
-			secPanel.repaint();
-		}
+	void cyclePreviewMode() {
+		secWinController.cyclePreviewMode();
 	}
 
-	private void cyclePreviewMode() {
-		if (secWin == null)
-			initSecondaryWindow();
-		secMode = switch (secMode) {
-		case SNAPSHOT -> PreviewMode.LIVE_ALL;
-		case LIVE_ALL -> PreviewMode.LIVE_ALL_EDIT;
-		case LIVE_ALL_EDIT -> PreviewMode.SNAPSHOT;
-		};
-		if (secWin.isVisible()) {
-			if (secMode == PreviewMode.SNAPSHOT)
-				secTimer.stop();
-			else
-				secTimer.start();
-			secPanel.repaint();
-		}
-		ToastNotification.show(SelectiveAlphaEditor.this, "Preview: " + secMode.name());
+	void refreshSnapshot() {
+		secWinController.refreshSnapshot();
 	}
 
-	private void refreshSnapshot() {
-		if (secWin == null)
-			initSecondaryWindow();
-		// Composite: workingImage + all elements flattened
-		BufferedImage src = ci().workingImage;
-		if (src == null)
-			return;
-		secSnapshot = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-		Graphics2D g2 = secSnapshot.createGraphics();
-		g2.drawImage(src, 0, 0, null);
-		for (Layer el : ci().activeElements) {
-			if (el instanceof ImageLayer il)
-				g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
-		}
-		g2.dispose();
-		if (secWin != null && secWin.isVisible())
-			secPanel.repaint();
-		ToastNotification.show(SelectiveAlphaEditor.this, "Snapshot updated");
+	void toggleSecondaryFullscreen() {
+		secWinController.toggleSecondaryFullscreen();
 	}
 
-	private void toggleSecondaryFullscreen() {
-		if (secWin == null)
-			initSecondaryWindow();
-		if (!secWin.isVisible()) {
-			secWin.setVisible(true);
-		}
-
-		if (secFullscreen) {
-			// Exit fullscreen
-			secWin.setExtendedState(JFrame.NORMAL);
-			secWin.setBounds(secOldX, secOldY, secOldW, secOldH);
-			secFullscreen = false;
-			ToastNotification.show(SelectiveAlphaEditor.this, "Fullscreen: OFF");
-		} else {
-			// Enter fullscreen
-			secOldX = secWin.getX();
-			secOldY = secWin.getY();
-			secOldW = secWin.getWidth();
-			secOldH = secWin.getHeight();
-			secWin.setExtendedState(JFrame.MAXIMIZED_BOTH);
-			secFullscreen = true;
-			ToastNotification.show(SelectiveAlphaEditor.this, "Fullscreen: ON");
-		}
+	void cycleAlwaysOnTop() {
+		secWinController.cycleAlwaysOnTop();
 	}
 
-	private void cycleAlwaysOnTop() {
-		if (secWin == null)
-			initSecondaryWindow();
-		if (!secWin.isVisible()) {
-			secWin.setVisible(true);
-		}
-
-		secAlwaysOnTop = switch (secAlwaysOnTop) {
-		case TO_FRONT -> AlwaysOnTopMode.NORMAL;
-		case NORMAL -> AlwaysOnTopMode.TO_BACKGROUND;
-		case TO_BACKGROUND -> AlwaysOnTopMode.TO_FRONT;
-		};
-
-		switch (secAlwaysOnTop) {
-		case TO_FRONT:
-			secWin.setAlwaysOnTop(true);
-			ToastNotification.show(SelectiveAlphaEditor.this, "Window: Always on Top");
-			break;
-		case NORMAL:
-			secWin.setAlwaysOnTop(false);
-			ToastNotification.show(SelectiveAlphaEditor.this, "Window: Normal");
-			break;
-		case TO_BACKGROUND:
-			secWin.setAlwaysOnTop(false);
-			// Send to back by requesting focus for main window
-			SelectiveAlphaEditor.this.toFront();
-			SelectiveAlphaEditor.this.requestFocus();
-			ToastNotification.show(SelectiveAlphaEditor.this, "Window: Behind Main");
-			break;
-		}
+	void cycleCanvasDisplayMode() {
+		secWinController.cycleCanvasDisplayMode();
 	}
 
-	private void cycleCanvasDisplayMode() {
-		if (secWin == null)
-			initSecondaryWindow();
-		if (!secWin.isVisible()) {
-			secWin.setVisible(true);
-		}
-
-		secCanvasMode = switch (secCanvasMode) {
-		case SHOW_CANVAS_I_ONLY -> CanvasDisplayMode.SHOW_CANVAS_II_ONLY;
-		case SHOW_CANVAS_II_ONLY -> CanvasDisplayMode.SHOW_ACTIVE_CANVAS;
-		case SHOW_ACTIVE_CANVAS -> CanvasDisplayMode.SHOW_CANVAS_I_ONLY;
-		};
-
-		String msg = switch (secCanvasMode) {
-		case SHOW_CANVAS_I_ONLY -> "Display: Canvas I Only";
-		case SHOW_CANVAS_II_ONLY -> "Display: Canvas II Only";
-		case SHOW_ACTIVE_CANVAS -> "Display: Active Canvas";
-		};
-		ToastNotification.show(SelectiveAlphaEditor.this, msg);
-		if (secPanel != null)
-			secPanel.repaint();
-	}
-
-	private void applySecondaryWindowToCanvas() {
-		if (secWin == null || !secWin.isVisible()) {
-			ToastNotification.show(SelectiveAlphaEditor.this, "Secondary window not open");
-			return;
-		}
-
-		// Get the image to apply (from the currently shown canvas)
-		BufferedImage imageToApply = null;
-
-		if (secMode == PreviewMode.SNAPSHOT) {
-			if (secSnapshot == null) {
-				ToastNotification.show(SelectiveAlphaEditor.this, "No snapshot available");
-				return;
-			}
-			imageToApply = deepCopy(secSnapshot);
-		} else {
-			// LIVE_ALL or LIVE_ALL_EDIT: get the ACTIVE canvas's working image
-			CanvasInstance srcCi = ci(); // Active canvas
-			if (srcCi.workingImage == null) {
-				ToastNotification.show(SelectiveAlphaEditor.this, "Active canvas has no image");
-				return;
-			}
-			imageToApply = deepCopy(srcCi.workingImage);
-		}
-
-		// Apply to Canvas II (index 1)
-		CanvasInstance targetCi = ci(1);
-		targetCi.workingImage = normalizeImage(imageToApply);
-		targetCi.undoStack.clear();
-		targetCi.redoStack.clear();
-		targetCi.activeElements = new ArrayList<>();
-		targetCi.selectedElements.clear();
-		targetCi.zoom = 1.0;
-		targetCi.userHasManuallyZoomed = false;
-
-		// Update Canvas II display
-		if (targetCi.canvasPanel != null) {
-			targetCi.canvasPanel.repaint();
-		}
-		if (elementLayerPanel2 != null) {
-			refreshElementPanel();
-		}
-
-		// Switch to Canvas II to see the result
-		activeCanvasIndex = 1;
-		secondCanvasBtn.setSelected(true);
-		secondCanvasBtn.setEnabled(true);
-		updateLayoutVisibility();
-		centerCanvas(1);
-
-		ToastNotification.show(SelectiveAlphaEditor.this, "Image applied to Canvas II");
+	void applySecondaryWindowToCanvas() {
+		secWinController.applySecondaryWindowToCanvas();
 	}
 
 	// =========================================================================
 	// Keyboard shortcuts
 	// =========================================================================
 	private void setupKeyBindings() {
-		JPanel root = (JPanel) getContentPane();
-		InputMap im = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
-		ActionMap am = root.getActionMap();
-
-		int CTRL = InputEvent.CTRL_DOWN_MASK;
-		int CTRL_SHIFT = InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
-		int CTRL_ALT = InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK;
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, CTRL), "copy");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, CTRL_SHIFT), "copyOutside");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, CTRL), "cut");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, CTRL_SHIFT), "cutOutside");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, CTRL), "paste");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, CTRL), "selectAll");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK),
-				"selectAllElements");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, CTRL), "undo");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, CTRL), "redo");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL), "save");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT), "saveOriginal");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL | InputEvent.SHIFT_DOWN_MASK), "saveBurnedCopy");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, CTRL_ALT | InputEvent.SHIFT_DOWN_MASK), "saveBurnedOriginal");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, 0), "rotateCW");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.SHIFT_DOWN_MASK), "rotateCCW");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.SHIFT_DOWN_MASK), "toggleVis");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "escape");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "deleteInside");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "deleteOutside");
-		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "mergeElement");
-
-		am.put("copy", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				doCopy();
-			}
-		});
-		am.put("copyOutside", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				doCopyOutside();
-			}
-		});
-		am.put("cut", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				doCut();
-			}
-		});
-		am.put("cutOutside", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				doCutOutside();
-			}
-		});
-		am.put("paste", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				doPaste();
-			}
-		});
-		am.put("selectAll", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				if (ci().appMode == AppMode.PAINT) {
-					CanvasInstance c = ci();
-					c.selectedElements.clear();
-					c.selectedElements.addAll(c.activeElements);
-					if (c.canvasPanel != null)
-						c.canvasPanel.repaint();
-					refreshElementPanel();
-				}
-			}
-		});
-		am.put("selectAllElements", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				CanvasInstance c = ci();
-				c.selectedElements.clear();
-				c.selectedElements.addAll(c.activeElements);
-				if (c.canvasPanel != null)
-					c.canvasPanel.repaint();
-				refreshElementPanel();
-			}
-		});
-		am.put("undo", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				CanvasInstance c = ci();
-				if (c.floatingImg != null)
-					cancelFloat();
-				else
-					doUndo();
-			}
-		});
-		am.put("redo", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				doRedo();
-			}
-		});
-		am.put("save", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				saveImageSilent();
-			}
-		});
-		am.put("saveOriginal", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				saveImageToOriginal();
-			}
-		});
-		am.put("saveBurnedCopy", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				saveBurnedElementsCopy();
-			}
-		});
-		am.put("saveBurnedOriginal", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				saveBurnedElementsOriginal();
-			}
-		});
-		am.put("rotateCW", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				doRotate(90.0);
-			}
-		});
-		am.put("rotateCCW", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				doRotate(-90.0);
-			}
-		});
-		am.put("toggleVis", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				CanvasInstance c = ci();
-				if (c.workingImage == null)
-					return;
-				List<Layer> toToggle = c.selectedElements.isEmpty() ? java.util.List.of() : c.selectedElements;
-				for (Layer el : toToggle) {
-					pushUndo();
-					Layer updated = null;
-					if (el instanceof ImageLayer il) {
-						updated = il.withHidden(!il.isHidden());
-					} else if (el instanceof TextLayer tl) {
-						updated = tl.withHidden(!tl.isHidden());
-					} else if (el instanceof PathLayer pl) {
-						updated = pl.withHidden(!pl.isHidden());
-					}
-					if (updated != null) {
-						for (int i = 0; i < c.activeElements.size(); i++) {
-							if (c.activeElements.get(i).id() == updated.id()) {
-								c.activeElements.set(i, updated);
-								break;
-							}
-						}
-						for (int i = 0; i < c.selectedElements.size(); i++) {
-							if (c.selectedElements.get(i).id() == updated.id()) {
-								c.selectedElements.set(i, updated);
-								break;
-							}
-						}
-					}
-				}
-				if (!toToggle.isEmpty()) {
-					markDirty();
-					refreshElementPanel();
-					if (c.canvasPanel != null)
-						c.canvasPanel.repaint();
-				}
-			}
-		});
-		am.put("escape", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				// Hide drop zone when ESC is pressed
-				if (rightDropZone != null && rightDropZone.isVisible()) {
-					rightDropZone.setVisible(false);
-					ci(0).layeredPane.repaint();
-				}
-
-				CanvasInstance c = ci();
-				if (c.floatingImg != null) {
-					cancelFloat();
-				} else if (!c.selectedElements.isEmpty()) {
-					c.selectedElements.clear();
-					c.canvasPanel.repaint();
-				} else {
-					c.selectedAreas.clear();
-					c.isSelecting = false;
-					c.selectionStart = null;
-					c.selectionEnd = null;
-					c.canvasPanel.repaint();
-				}
-			}
-		});
-		am.put("deleteInside", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				CanvasInstance c = ci();
-				// NEW: PathLayer support
-				if (!c.selectedElements.isEmpty() && c.selectedElements.get(0) instanceof PathLayer pl) {
-					pushUndo();
-					PaintEngine.clearPolygon(c.workingImage, pl.absXPoints(), pl.absYPoints());
-					markDirty();
-				} else if (!c.selectedElements.isEmpty()) {
-					deleteSelectedElements();
-				} else if (!c.selectedAreas.isEmpty() && c.workingImage != null) {
-					pushUndo();
-					for (Rectangle r : c.selectedAreas)
-						PaintEngine.clearRegion(c.workingImage, r);
-					c.selectedAreas.clear();
-					c.isSelecting = false;
-					c.selectionStart = null;
-					c.selectionEnd = null;
-					markDirty();
-				}
-			}
-		});
-		am.put("deleteOutside", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				CanvasInstance c = ci();
-				if (c.workingImage == null)
-					return;
-				Rectangle sel = getActiveSelection();
-				if (sel != null) {
-					pushUndo();
-					PaintEngine.clearOutside(c.workingImage, sel);
-					markDirty();
-				}
-			}
-		});
-		am.put("mergeElement", new AbstractAction() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				if (!ci().selectedElements.isEmpty())
-					mergeSelectedElements();
-			}
-		});
-
-		// Global F1/F2/F3/F4/F5/F6 key dispatcher for secondary window control
-		KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
-			if (e.getID() != KeyEvent.KEY_PRESSED)
-				return false;
-			switch (e.getKeyCode()) {
-			case KeyEvent.VK_F1 -> {
-				toggleSecondaryWindow();
-				return true;
-			}
-			case KeyEvent.VK_F2 -> {
-				cyclePreviewMode();
-				return true;
-			}
-			case KeyEvent.VK_F3 -> {
-				refreshSnapshot();
-				return true;
-			}
-			case KeyEvent.VK_F4 -> {
-				toggleSecondaryFullscreen();
-				return true;
-			}
-			case KeyEvent.VK_F5 -> {
-				cycleAlwaysOnTop();
-				return true;
-			}
-			case KeyEvent.VK_F6 -> {
-				applySecondaryWindowToCanvas();
-				return true;
-			}
-			case KeyEvent.VK_F7 -> {
-				cycleCanvasDisplayMode();
-				return true;
-			}
-			}
-			return false;
-		});
+		new KeyboardShortcutManager(this).setup();
 	}
 
 	// =========================================================================
@@ -5804,7 +2049,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Centers the viewport horizontally only (X-axis) for indexed canvas. Called
 	 * when the user has a custom zoom and the toolbar or fullscreen state changes.
 	 */
-	private void centerCanvasX(int idx) {
+	void centerCanvasX(int idx) {
 		CanvasInstance c = ci(idx);
 		if (c.scrollPane == null || c.workingImage == null)
 			return;
@@ -5823,352 +2068,26 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	/**
 	 * Centers the viewport horizontally only (X-axis) for active canvas.
 	 */
-	private void centerCanvasX() {
+	void centerCanvasX() {
 		centerCanvasX(activeCanvasIndex);
 	}
 
-	/**
-	 * Opens a tiny popup where the user can type a zoom percentage directly.
-	 * Activated by double-clicking the zoom label.
-	 */
 	private void showZoomInput() {
-		JTextField tf = new JTextField(String.valueOf(Math.round(ci().zoom * 100)), 5);
-		tf.setBackground(AppColors.BTN_BG);
-		tf.setForeground(AppColors.TEXT);
-		tf.setCaretColor(AppColors.TEXT);
-		tf.setFont(new Font("SansSerif", Font.PLAIN, 12));
-		tf.setHorizontalAlignment(JTextField.CENTER);
-		tf.setBorder(BorderFactory.createLineBorder(AppColors.ACCENT));
-
-		JDialog popup = new JDialog(this, false);
-		popup.setUndecorated(true);
-		popup.setSize(80, 28);
-		popup.setLocationRelativeTo(zoomLabel);
-		popup.add(tf);
-
-		tf.selectAll();
-		tf.addActionListener(ev -> {
-			try {
-				double pct = Double.parseDouble(tf.getText().trim().replace("%", ""));
-				setZoom(pct / 100.0, null);
-			} catch (NumberFormatException ignored) {
-			}
-			popup.dispose();
-		});
-		tf.addKeyListener(new java.awt.event.KeyAdapter() {
-			@Override
-			public void keyPressed(java.awt.event.KeyEvent e) {
-				if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE)
-					popup.dispose();
-			}
-		});
-		popup.addWindowFocusListener(new java.awt.event.WindowFocusListener() {
-			@Override
-			public void windowGainedFocus(java.awt.event.WindowEvent e) {
-			}
-
-			@Override
-			public void windowLostFocus(java.awt.event.WindowEvent e) {
-				popup.dispose();
-			}
-		});
-		popup.setVisible(true);
-		tf.requestFocusInWindow();
+		editorDialogs.showZoomInput();
 	}
 
 	/** Creates a new blank ARGB bitmap after asking for dimensions. */
 	private void doNewBitmap() {
-		if (bookModeBtn.isSelected()) {
-			doNewBookSheet();
-			return;
-		}
-
-		JTextField wField = new JTextField("1024", 5);
-		JTextField hField = new JTextField("1024", 5);
-		for (JTextField f : new JTextField[] { wField, hField }) {
-			f.setBackground(AppColors.BTN_BG);
-			f.setForeground(AppColors.TEXT);
-			f.setCaretColor(AppColors.TEXT);
-		}
-		JPanel grid = new JPanel(new GridLayout(2, 2, 6, 4));
-		grid.setOpaque(false);
-		JLabel wl = new JLabel("Breite (px):");
-		wl.setForeground(AppColors.TEXT);
-		JLabel hl = new JLabel("Höhe  (px):");
-		hl.setForeground(AppColors.TEXT);
-		grid.add(wl);
-		grid.add(wField);
-		grid.add(hl);
-		grid.add(hField);
-
-		JDialog dialog = createBaseDialog("Neue Bitmap", 300, 200);
-		JPanel content = centeredColumnPanel(16, 20, 12);
-		content.add(grid);
-		content.add(Box.createVerticalStrut(14));
-		JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
-		row.setOpaque(false);
-		JButton ok = UIComponentFactory.buildButton("Erstellen", AppColors.ACCENT, AppColors.ACCENT_HOVER);
-		JButton can = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		ok.setForeground(Color.WHITE);
-		ok.addActionListener(e -> {
-			try {
-				int nw = Math.max(1, Integer.parseInt(wField.getText().trim()));
-				int nh = Math.max(1, Integer.parseInt(hField.getText().trim()));
-				CanvasInstance c = ci();
-				if (c.sourceFile != null)
-					saveCurrentState();
-				c.workingImage = new BufferedImage(nw, nh, BufferedImage.TYPE_INT_ARGB);
-				c.originalImage = deepCopy(c.workingImage);
-				c.activeElements = new ArrayList<>();
-				c.selectedElements.clear();
-				c.undoStack.clear();
-				c.redoStack.clear();
-				c.selectedAreas.clear();
-				c.floatingImg = null;
-				c.floatRect = null;
-
-				// Create and save new file
-				File saveDir = c.lastIndexedDir != null ? c.lastIndexedDir : new File(System.getProperty("user.home"));
-				int counter = 1;
-				File newFile;
-				do {
-					newFile = new File(saveDir, "Untitled_" + counter + ".png");
-					counter++;
-				} while (newFile.exists());
-
-				try {
-					ImageIO.write(c.workingImage, "PNG", newFile);
-					c.sourceFile = newFile;
-					c.hasUnsavedChanges = false;
-					dirtyFiles.remove(c.sourceFile);
-
-					// Update tile gallery
-					if (!c.directoryImages.contains(newFile)) {
-						c.directoryImages.add(newFile);
-						c.tileGallery.addFiles(Arrays.asList(newFile));
-					}
-					c.tileGallery.setActiveFile(newFile);
-					c.currentImageIndex = c.directoryImages.indexOf(newFile);
-				} catch (IOException ex) {
-					showErrorDialog("Speicherfehler",
-							"Neue Bitmap konnte nicht gespeichert werden:\n" + ex.getMessage());
-					return;
-				}
-
-				swapToImageView(activeCanvasIndex);
-				SwingUtilities.invokeLater(() -> fitToViewport(activeCanvasIndex));
-				updateTitle();
-				updateStatus();
-				updateDirtyUI();
-				setBottomButtonsEnabled(true);
-			} catch (NumberFormatException ex) {
-				showErrorDialog("Ungültige Eingabe", "Bitte ganzzahlige Pixelwerte eingeben.");
-			}
-			dialog.dispose();
-		});
-		can.addActionListener(e -> dialog.dispose());
-		row.add(ok);
-		row.add(can);
-		content.add(row);
-		dialog.add(content);
-		dialog.setVisible(true);
-	}
-
-	/** Creates a new sheet with paper format, orientation, and margin guides. */
-	private void doNewBookSheet() {
-		// Show paper format dialog
-		PaperFormat.Format[] formats = PaperFormat.Format.values();
-		String[] formatLabels = new String[formats.length];
-		for (int i = 0; i < formats.length; i++) {
-			formatLabels[i] = formats[i].toString();
-		}
-		JComboBox<String> formatCombo = new JComboBox<>(formatLabels);
-		formatCombo.setSelectedIndex(4); // A4 as default
-		formatCombo.setBackground(AppColors.BTN_BG);
-		formatCombo.setForeground(AppColors.TEXT);
-
-		// Create orientation combobox
-		String[] orientations = { "Hochformat", "Querformat" };
-		JComboBox<String> orientCombo = new JComboBox<>(orientations);
-		orientCombo.setSelectedIndex(0); // Portrait as default
-		orientCombo.setBackground(AppColors.BTN_BG);
-		orientCombo.setForeground(AppColors.TEXT);
-
-		// Create margins checkbox
-		JCheckBox marginsCheckBox = new JCheckBox("Mit Rändern", true);
-		marginsCheckBox.setOpaque(false);
-		marginsCheckBox.setForeground(AppColors.TEXT);
-
-		// Create form grid
-		JPanel grid = new JPanel(new GridLayout(3, 2, 6, 4));
-		grid.setOpaque(false);
-
-		JLabel formatLabel = new JLabel("Format:");
-		formatLabel.setForeground(AppColors.TEXT);
-		grid.add(formatLabel);
-		grid.add(formatCombo);
-
-		JLabel orientLabel = new JLabel("Ausrichtung:");
-		orientLabel.setForeground(AppColors.TEXT);
-		grid.add(orientLabel);
-		grid.add(orientCombo);
-
-		JLabel marginsLabel = new JLabel("");
-		marginsLabel.setForeground(AppColors.TEXT);
-		grid.add(marginsLabel);
-		grid.add(marginsCheckBox);
-
-		// Create dialog
-		JDialog dialog = createBaseDialog("Neues Blatt", 320, 240);
-		JPanel content = centeredColumnPanel(16, 20, 12);
-		content.add(grid);
-		content.add(Box.createVerticalStrut(12));
-
-		// Create buttons
-		JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
-		row.setOpaque(false);
-		JButton okBtn = UIComponentFactory.buildButton("Erstellen", AppColors.ACCENT, AppColors.ACCENT_HOVER);
-		JButton cancelBtn = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		okBtn.setForeground(Color.WHITE);
-
-		okBtn.addActionListener(e -> {
-			PaperFormat.Format selectedFormat = formats[formatCombo.getSelectedIndex()];
-			boolean landscape = orientCombo.getSelectedIndex() == 1;
-			boolean withMargins = marginsCheckBox.isSelected();
-
-			// Convert mm → pixels at 96 DPI (1 mm = 96/25.4 px ≈ 3.7795 px)
-			final double PX_PER_MM = 96.0 / 25.4;
-			int wPx = (int) Math.round(
-					(landscape ? selectedFormat.getWidthLandscape() : selectedFormat.getWidthPortrait()) * PX_PER_MM);
-			int hPx = (int) Math.round(
-					(landscape ? selectedFormat.getHeightLandscape() : selectedFormat.getHeightPortrait()) * PX_PER_MM);
-
-			// Build the Sheet image
-			BufferedImage img = new BufferedImage(wPx, hPx, BufferedImage.TYPE_INT_ARGB);
-			Graphics2D g2 = img.createGraphics();
-			g2.setColor(Color.WHITE);
-			g2.fillRect(0, 0, wPx, hPx);
-
-			if (withMargins) {
-				int mTop = (int) Math.round(selectedFormat.getMarginTop() * PX_PER_MM);
-				int mBottom = (int) Math.round(selectedFormat.getMarginBottom() * PX_PER_MM);
-				int mLeft = (int) Math.round(selectedFormat.getMarginInner() * PX_PER_MM);
-				int mRight = (int) Math.round(selectedFormat.getMarginOuter() * PX_PER_MM);
-				g2.setColor(new Color(0, 120, 220, 180)); // semi-transparent blue
-				float[] dash = { 6f, 4f };
-				g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
-				g2.drawRect(mLeft, mTop, wPx - mLeft - mRight, hPx - mTop - mBottom);
-			}
-			g2.dispose();
-
-			// Load into canvas (same pattern as doNewBitmap)
-			CanvasInstance c = ci();
-			c.workingImage = img;
-			c.originalImage = deepCopy(img);
-			c.activeElements = new ArrayList<>();
-			c.selectedElements.clear();
-			c.undoStack.clear();
-			c.redoStack.clear();
-			c.selectedAreas.clear();
-			c.floatingImg = null;
-			c.floatRect = null;
-
-			swapToImageView(activeCanvasIndex);
-			SwingUtilities.invokeLater(() -> fitToViewport(activeCanvasIndex));
-			updateTitle();
-			updateStatus();
-			setBottomButtonsEnabled(true);
-			dialog.dispose();
-		});
-
-		cancelBtn.addActionListener(e -> dialog.dispose());
-
-		row.add(okBtn);
-		row.add(cancelBtn);
-		content.add(row);
-		dialog.add(content);
-		dialog.setVisible(true);
+		newFileController.doNewBitmap();
 	}
 
 	/** Lets the user choose one or both checkerboard background colors. */
 	private void showCanvasBgDialog() {
-		JPanel preview = new JPanel() {
-			@Override
-			protected void paintComponent(Graphics g) {
-				int cell = 16;
-				for (int r = 0; r < getHeight(); r += cell)
-					for (int c = 0; c < getWidth(); c += cell) {
-						boolean even = ((r / cell) + (c / cell)) % 2 == 0;
-						g.setColor(even ? canvasBg1 : canvasBg2);
-						g.fillRect(c, r, Math.min(cell, getWidth() - c), Math.min(cell, getHeight() - r));
-					}
-			}
-		};
-		preview.setPreferredSize(new Dimension(120, 60));
-
-		JButton btn1 = UIComponentFactory.buildButton("Farbe 1", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		JButton btn2 = UIComponentFactory.buildButton("Farbe 2", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		JButton btnBoth = UIComponentFactory.buildButton("Beide", AppColors.BTN_BG, AppColors.BTN_HOVER);
-
-		btn1.addActionListener(e -> {
-			Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe 1", canvasBg1);
-			if (c != null) {
-				canvasBg1 = c;
-				preview.repaint();
-				ci().canvasPanel.repaint();
-			}
-		});
-		btn2.addActionListener(e -> {
-			Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe 2", canvasBg2);
-			if (c != null) {
-				canvasBg2 = c;
-				preview.repaint();
-				ci().canvasPanel.repaint();
-			}
-		});
-		btnBoth.addActionListener(e -> {
-			Color c = javax.swing.JColorChooser.showDialog(this, "Hintergrundfarbe", canvasBg1);
-			if (c != null) {
-				canvasBg1 = c;
-				canvasBg2 = c;
-				preview.repaint();
-				ci().canvasPanel.repaint();
-			}
-		});
-
-		JDialog dialog = createBaseDialog("Canvas-Hintergrund", 380, 240);
-		JPanel content = centeredColumnPanel(16, 20, 12);
-		content.add(preview);
-		content.add(Box.createVerticalStrut(12));
-		JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
-		row.setOpaque(false);
-		row.add(btn1);
-		row.add(btn2);
-		row.add(btnBoth);
-		content.add(row);
-		content.add(Box.createVerticalStrut(12));
-		JButton closeBtn = UIComponentFactory.buildButton("Schließen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		closeBtn.setAlignmentX(CENTER_ALIGNMENT);
-		closeBtn.addActionListener(e -> dialog.dispose());
-		content.add(closeBtn);
-		dialog.add(content);
-		dialog.setVisible(true);
+		newFileController.showCanvasBgDialog();
 	}
 
 	private void toggleQuickBG() {
-		if (canvasBg1Backup == null) {
-			// Hide BG Color 1 by setting it to match BG Color 2
-			canvasBg1Backup = canvasBg1;
-			canvasBg1 = canvasBg2;
-		} else {
-			// Restore BG Color 1
-			canvasBg1 = canvasBg1Backup;
-			canvasBg1Backup = null;
-		}
-		if (ci() != null && ci().canvasPanel != null)
-			ci().canvasPanel.repaint();
-		if (secPanel != null)
-			secPanel.repaint(); // Also repaint secondary window if visible
+		newFileController.toggleQuickBG();
 	}
 
 	// =========================================================================
@@ -6178,7 +2097,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 		swapToImageView(activeCanvasIndex);
 	}
 
-	private void updateNavigationButtons() {
+	void updateNavigationButtons() {
 		CanvasInstance c = ci();
 		c.prevNavButton.setEnabled(c.currentImageIndex > 0);
 		c.nextNavButton.setEnabled(c.currentImageIndex < c.directoryImages.size() - 1);
@@ -6220,394 +2139,78 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 				btn.setEnabled(enabled);
 	}
 
-	// =========================================================================
-	// Custom Dialogs
-	// =========================================================================
-	private int showUnsavedChangesDialog() {
-		if (!ci().hasUnsavedChanges)
-			return 1;
-		final int[] result = { 2 };
-		JDialog dialog = createBaseDialog("Ungespeicherte Änderungen", 420, 310);
-		JPanel content = centeredColumnPanel(20, 28, 16);
-		content.add(styledLabel("⚠", 30, AppColors.WARNING, Font.PLAIN));
-		content.add(Box.createVerticalStrut(10));
-		content.add(htmlLabel("Das Bild hat ungespeicherte Änderungen.<br>Was möchtest du tun?", AppColors.TEXT, 13));
-		content.add(Box.createVerticalStrut(18));
-		JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
-		row.setOpaque(false);
-		JButton sBtn = UIComponentFactory.buildButton("Speichern", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
-		JButton dBtn = UIComponentFactory.buildButton("Verwerfen", AppColors.DANGER, AppColors.DANGER_HOVER);
-		JButton cBtn = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		sBtn.setForeground(Color.WHITE);
-		dBtn.setForeground(Color.WHITE);
-		sBtn.addActionListener(e -> {
-			result[0] = 0;
-			dialog.dispose();
-		});
-		dBtn.addActionListener(e -> {
-			result[0] = 1;
-			dialog.dispose();
-		});
-		cBtn.addActionListener(e -> {
-			result[0] = 2;
-			dialog.dispose();
-		});
-		row.add(sBtn);
-		row.add(dBtn);
-		row.add(cBtn);
-		content.add(row);
-		dialog.add(content);
-		dialog.setVisible(true);
-		return result[0];
+	// ── Quick-open dialog → QuickOpenController ──────────────────────────────
+
+	void showQuickOpenDialog() {
+		quickOpenController.show();
 	}
 
-	/**
-	 * Show quick open dialog with recent projects and browse option (loads into
-	 * active canvas).
-	 */
-	private void showQuickOpenDialog() {
-		showQuickOpenDialog(activeCanvasIndex);
+	void showQuickOpenDialog(int canvasIdx) {
+		quickOpenController.show(canvasIdx);
 	}
 
-	/** Show quick open dialog with recent projects (uses StartupDialog). */
-	private void showQuickOpenDialog(int canvasIdx) {
-		showQuickOpenDialog(canvasIdx, LastProjectsManager.CAT_IMAGES);
+	void showQuickOpenDialog(int canvasIdx, String initialCategory) {
+		quickOpenController.show(canvasIdx, initialCategory);
 	}
 
-	private void showQuickOpenDialog(int canvasIdx, String initialCategory) {
-		try {
-			Map<String, List<String>> recent = LastProjectsManager.loadAll();
-			StartupDialog dlg = new StartupDialog(this, recent, StartupDialog.Mode.QUICK_OPEN, canvasIdx, initialCategory);
-			dlg.setVisible(true);
-			File chosen = dlg.getSelectedPath();
-			if (chosen == null) return;
-			String category = dlg.getSelectedCategory();
-			if (chosen.isDirectory()) {
-				// GameII game directory: has scenes/ subdir → open first scene
-				File scenesSubDir = new File(chosen, "scenes");
-				if (scenesSubDir.exists() && scenesSubDir.isDirectory()) {
-					File[] sceneDirs = scenesSubDir.listFiles(
-							f -> f.isDirectory() && new File(f, "sprites").isDirectory());
-					if (sceneDirs != null && sceneDirs.length > 0) {
-						Arrays.sort(sceneDirs, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-						loadGameIISceneDir(sceneDirs[0], canvasIdx);
-						return;
-					}
-				}
-				// GameII scene directory: directly has sprites/ subdir
-				if (new File(chosen, "sprites").isDirectory()) {
-					loadGameIISceneDir(chosen, canvasIdx);
-					return;
-				}
-				// Standard: image directory
-				File[] images = chosen.listFiles(f -> f.isFile() && isSupportedFile(f));
-				if (images != null && images.length > 0) {
-					Arrays.sort(images, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-					indexDirectory(images[0], canvasIdx, category);
-				}
-			} else {
-				loadFile(chosen, canvasIdx);
-				try { LastProjectsManager.addRecent(category, chosen.getParent()); } catch (IOException ignored) {}
-			}
-		} catch (IOException ex) {
-			showErrorDialog("Fehler", "Schnellauswahl konnte nicht geöffnet werden:\n" + ex.getMessage());
-		}
+	// ── Dialogs → EditorDialogs / UIComponentFactory ──────────────────────────
+
+	void showErrorDialog(String title, String message) {
+		editorDialogs.showErrorDialog(title, message);
 	}
 
-	private void showErrorDialog(String title, String message) {
-		JDialog dialog = createBaseDialog(title, 440, 215);
-		JPanel content = centeredColumnPanel(20, 28, 16);
-		JLabel msgLbl = htmlLabel(message.replace("\n", "<br>"), AppColors.TEXT, 12);
-		JButton ok = UIComponentFactory.buildButton("OK", AppColors.DANGER, AppColors.DANGER_HOVER);
-		ok.setForeground(Color.WHITE);
-		ok.setAlignmentX(CENTER_ALIGNMENT);
-		ok.addActionListener(e -> dialog.dispose());
-		content.add(styledLabel("✕", 26, AppColors.DANGER, Font.BOLD));
-		content.add(Box.createVerticalStrut(6));
-		content.add(styledLabel(title, 13, AppColors.DANGER, Font.BOLD));
-		content.add(Box.createVerticalStrut(8));
-		content.add(msgLbl);
-		content.add(Box.createVerticalStrut(16));
-		content.add(ok);
-		dialog.add(content);
-		dialog.setVisible(true);
+	void showInfoDialog(String title, String message) {
+		editorDialogs.showInfoDialog(title, message);
 	}
 
-	private void showInfoDialog(String title, String message) {
-		JDialog dialog = createBaseDialog(title, 400, 200);
-		JPanel content = centeredColumnPanel(20, 28, 16);
-		JLabel msgLbl = htmlLabel(message.replace("\n", "<br>"), AppColors.TEXT, 13);
-		JButton ok = UIComponentFactory.buildButton("OK", AppColors.ACCENT, AppColors.ACCENT_HOVER);
-		ok.setForeground(Color.WHITE);
-		ok.setAlignmentX(CENTER_ALIGNMENT);
-		ok.addActionListener(e -> dialog.dispose());
-		content.add(styledLabel("ℹ", 26, AppColors.ACCENT, Font.PLAIN));
-		content.add(Box.createVerticalStrut(8));
-		content.add(msgLbl);
-		content.add(Box.createVerticalStrut(16));
-		content.add(ok);
-		dialog.add(content);
-		dialog.setVisible(true);
+	JDialog createBaseDialog(String title, int w, int h) {
+		return UIComponentFactory.createBaseDialog(this, title, w, h);
 	}
 
-	private JDialog createBaseDialog(String title, int w, int h) {
-		JDialog d = new JDialog(this, title, true);
-		d.setSize(w, h);
-		d.setLocationRelativeTo(this);
-		d.setResizable(false);
-		d.getContentPane().setBackground(AppColors.BG_PANEL);
-		d.setLayout(new BorderLayout());
-		JPanel titleBar = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		titleBar.setBackground(new Color(35, 35, 35));
-		titleBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
-		JLabel tl = new JLabel(title);
-		tl.setForeground(AppColors.TEXT);
-		tl.setFont(new Font("SansSerif", Font.BOLD, 13));
-		titleBar.add(tl);
-		d.add(titleBar, BorderLayout.NORTH);
-		return d;
+	JPanel centeredColumnPanel(int vp, int hp, int bp) {
+		return UIComponentFactory.centeredColumnPanel(vp, hp, bp);
 	}
-
-	private JPanel centeredColumnPanel(int vp, int hp, int bp) {
-		JPanel p = new JPanel();
-		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
-		p.setBackground(AppColors.BG_PANEL);
-		p.setBorder(BorderFactory.createEmptyBorder(vp, hp, bp, hp));
-		return p;
-	}
-
-	private JLabel styledLabel(String text, int size, Color color, int style) {
-		JLabel l = new JLabel(text);
-		l.setFont(new Font("SansSerif", style, size));
-		l.setForeground(color);
-		l.setAlignmentX(CENTER_ALIGNMENT);
-		return l;
-	}
-
-	private JLabel htmlLabel(String html, Color color, int size) {
-		JLabel l = new JLabel("<html><center>" + html + "</center></html>");
-		l.setForeground(color);
-		l.setFont(new Font("SansSerif", Font.PLAIN, size));
-		l.setAlignmentX(CENTER_ALIGNMENT);
-		return l;
-	}
-
-	// Note: buildButton(), buildModeToggleBtn(), buildNavButton() are now in
-	// UIComponentFactory.java
 
 	// =========================================================================
 	// Element helpers
 	// =========================================================================
 
-	/**
-	 * Screen-space rectangle for a layer, accounting for current zoom (uses active
-	 * canvas zoom).
-	 */
 	public Rectangle elemRectScreen(Layer el) {
-		return elemRectScreen(el, ci().zoom);
+		return elementController.elemRectScreen(el);
 	}
 
-	/** Screen-space rectangle for a layer, with explicit zoom value. */
 	public Rectangle elemRectScreen(Layer el, double zoom) {
-		double z = zoom;
-		if (el instanceof PathLayer pl && !pl.points().isEmpty()) {
-			// PathLayer: compute padded visual bounding box from actual points
-			// (matches the frameRect drawn in CanvasPanel.paintComponent)
-			double fMinX = Double.MAX_VALUE, fMaxX = -Double.MAX_VALUE;
-			double fMinY = Double.MAX_VALUE, fMaxY = -Double.MAX_VALUE;
-			for (Point3D p : pl.points()) {
-				if (p.x < fMinX)
-					fMinX = p.x;
-				if (p.x > fMaxX)
-					fMaxX = p.x;
-				if (p.y < fMinY)
-					fMinY = p.y;
-				if (p.y > fMaxY)
-					fMaxY = p.y;
-			}
-			int fx = (int) Math.round((pl.x() + fMinX - 8) * z);
-			int fy = (int) Math.round((pl.y() + fMinY - 8) * z);
-			int fw = (int) Math.round((fMaxX - fMinX + 16) * z);
-			int fh = (int) Math.round((fMaxY - fMinY + 16) * z);
-			return new Rectangle(fx, fy, Math.max(1, fw), Math.max(1, fh));
-		}
-		return new Rectangle((int) Math.round(el.x() * z), (int) Math.round(el.y() * z),
-				(int) Math.round(el.width() * z), (int) Math.round(el.height() * z));
+		return elementController.elemRectScreen(el, zoom);
 	}
 
-	/**
-	 * Renders a TextLayer to a pixel image at its natural (image-space) font size.
-	 * Used when burning a text layer into the working image.
-	 */
-	private BufferedImage renderTextLayerToImage(TextLayer tl) {
-		int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
-		Font font = new Font(tl.fontName(), style, Math.max(6, tl.fontSize()));
-		BufferedImage dummy = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-		FontMetrics fm = dummy.createGraphics().getFontMetrics(font);
-		String[] lines = tl.text().split("\n", -1);
-		int w = 1;
-		for (String l : lines)
-			w = Math.max(w, fm.stringWidth(l));
-		int h = Math.max(1, fm.getHeight() * lines.length);
-		BufferedImage img = new BufferedImage(w + TextLayer.TEXT_PADDING * 2, h + TextLayer.TEXT_PADDING * 2,
-				BufferedImage.TYPE_INT_ARGB);
-		Graphics2D g2 = img.createGraphics();
-		// Set transparent background - preserve alpha channel
-		g2.setComposite(AlphaComposite.Clear);
-		g2.fillRect(0, 0, img.getWidth(), img.getHeight());
-		g2.setComposite(AlphaComposite.SrcOver);
-		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-		g2.setFont(font);
-		g2.setColor(tl.fontColor());
-		for (int i = 0; i < lines.length; i++) {
-			g2.drawString(lines[i], TextLayer.TEXT_PADDING,
-					TextLayer.TEXT_PADDING + fm.getHeight() * i + fm.getAscent());
-		}
-		g2.dispose();
-		return img;
+	BufferedImage renderTextLayerToImage(TextLayer tl) {
+		return elementController.renderTextLayerToImage(tl);
 	}
 
-	/**
-	 * Inserts the current clipboard / selection as a new Element (non-destructive
-	 * layer). The underlying canvas pixels are NOT modified until the element is
-	 * merged via mergeElementToCanvas().
-	 */
 	private void insertSelectionAsElement() {
-		BufferedImage src = null;
-		CanvasInstance c = ci();
-		Rectangle sel = getActiveSelection();
-		if (sel != null && c.workingImage != null) {
-			src = PaintEngine.cropRegion(c.workingImage, sel);
-		} else if (clipboard != null) {
-			src = deepCopy(clipboard);
-		}
-		if (src == null) {
-			showInfoDialog("Kein Inhalt", "Nichts zum Einfügen als Element.");
-			return;
-		}
-
-		int ex = sel != null ? sel.x : 0;
-		int ey = sel != null ? sel.y : 0;
-		Layer el = new ImageLayer(c.nextElementId++, src, ex, ey, src.getWidth(), src.getHeight());
-		c.activeElements.add(el);
-		c.selectedElements.clear();
-		c.selectedElements.add(el);
-		c.selectedAreas.clear();
-		markDirty();
-		refreshElementPanel();
+		elementController.insertSelectionAsElement();
 	}
 
-	/**
-	 * Merges all selected layers onto the canvas and removes them from the layer
-	 * list.
-	 */
-	private void mergeSelectedElements() {
-		CanvasInstance c = ci();
-		if (c.selectedElements.isEmpty() || c.workingImage == null)
-			return;
-		pushUndo();
-		for (Layer el : new ArrayList<>(c.selectedElements)) {
-			if (el instanceof ImageLayer il) {
-				BufferedImage scaled = PaintEngine.scale(il.image(), Math.max(1, el.width()), Math.max(1, el.height()));
-				PaintEngine.pasteRegion(c.workingImage, scaled, new Point(el.x(), el.y()));
-			} else if (el instanceof TextLayer tl) {
-				BufferedImage rendered = renderTextLayerToImage(tl);
-				PaintEngine.pasteRegion(c.workingImage, rendered, new Point(el.x(), el.y()));
-			}
-			c.activeElements.removeIf(e -> e.id() == el.id());
-		}
-		c.selectedElements.clear();
-		markDirty();
-		refreshElementPanel();
+	void mergeSelectedElements() {
+		elementController.mergeSelectedElements();
 	}
 
-	/** Deletes all selected layers without merging to canvas. */
-	private void deleteSelectedElements() {
-		CanvasInstance c = ci();
-		if (c.selectedElements.isEmpty())
-			return;
-		for (Layer el : c.selectedElements)
-			c.activeElements.removeIf(e -> e.id() == el.id());
-		c.selectedElements.clear();
-		markDirty();
-		refreshElementPanel();
-		persistSceneIfActive(activeCanvasIndex);
+	void deleteSelectedElements() {
+		elementController.deleteSelectedElements();
 	}
 
-	/**
-	 * If a scene is currently loaded, rewrite its .txt file with the current
-	 * activeElements so deletions (and other changes) are persisted to disk.
-	 */
-	private void persistSceneIfActive(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.activeSceneFile == null) return;
-
-		// ── GameII-Scene ──────────────────────────────────────────────────────
-		if (c.gameSceneRoot != null) {
-			List<Layer> layers = new ArrayList<>(c.activeElements);
-			int gw = c.gameCanvasW, gh = c.gameCanvasH;
-			new javax.swing.SwingWorker<Void, Void>() {
-				@Override protected Void doInBackground() throws Exception {
-					GameSceneWriter.writeScene(layers, gw, gh);
-					return null;
-				}
-				@Override protected void done() {
-					try { get(); }
-					catch (Exception ex) {
-						System.err.println("[ERROR] GameII scene persist failed: " + ex.getMessage());
-					}
-				}
-			}.execute();
-			return;
-		}
-
-		// ── Standard TT-Scene ────────────────────────────────────────────────
-		if (c.sourceFile == null) return;
-		File sceneDir     = c.activeSceneFile.getParentFile();
-		String sceneName  = c.activeSceneFile.getName().replaceAll("\\.(txt|json)$", "");
-		List<Layer> layers = new ArrayList<>(c.activeElements);
-		File bgFile        = c.sourceFile;
-		File sceneFileFinal = c.activeSceneFile;
-		new javax.swing.SwingWorker<BufferedImage, Void>() {
-			@Override protected BufferedImage doInBackground() throws Exception {
-				SceneFileWriter.writeScene(sceneDir, sceneName, bgFile, layers);
-				SceneImageAdapter.SceneAsImage updated = SceneImageAdapter.loadSceneAsImage(sceneFileFinal);
-				return updated != null ? updated.thumbnail : null;
-			}
-			@Override protected void done() {
-				try {
-					BufferedImage thumb = get();
-					if (thumb != null) {
-						ci(idx).scenesPanel.refreshThumbnailFor(sceneFileFinal, thumb);
-					}
-				} catch (Exception ex) {
-					System.err.println("[ERROR] Scene persist failed: " + ex.getMessage());
-				}
-			}
-		}.execute();
+	void persistSceneIfActive(int idx) {
+		elementController.persistSceneIfActive(idx);
 	}
 
-	/**
-	 * Toggles a layer in/out of the multi-selection. New primary is put at index 0.
-	 */
-	private void doToggleElementSelection(Layer el) {
-		CanvasInstance c = ci();
-		for (int i = 0; i < c.selectedElements.size(); i++) {
-			if (c.selectedElements.get(i).id() == el.id()) {
-				c.selectedElements.remove(i);
-				refreshElementPanel();
-				return;
-			}
-		}
-		c.selectedElements.add(0, el);
-		refreshElementPanel();
+	void doToggleElementSelection(Layer el) {
+		elementController.doToggleElementSelection(el);
 	}
 
 	// =========================================================================
 	// Utilities
 	// =========================================================================
-	private static boolean isSupportedFile(File f) {
+	static boolean isSupportedFile(File f) {
 		if (f == null || !f.isFile())
 			return false;
 		String n = f.getName().toLowerCase();
@@ -6668,7 +2271,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	 * Copies an entire scene directory (sceneFile's parent) to a new name in the
 	 * same scenes root, then refreshes the scene panel.
 	 */
-	private void copySceneDirectory(File sceneFile, int idx) {
+	void copySceneDirectory(File sceneFile, int idx) {
 		File srcDir = sceneFile.getParentFile();
 		File scenesRoot = srcDir.getParentFile();
 		String baseName = srcDir.getName();
@@ -6708,7 +2311,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// =========================================================================
 
 	/** Renders a layer to a BufferedImage. Returns null for PathLayer (not supported). */
-	private BufferedImage renderLayerToImage(Layer live) {
+	BufferedImage renderLayerToImage(Layer live) {
 		if (live instanceof TextLayer tl) {
 			return renderTextLayerToImage(tl);
 		} else if (live instanceof ImageLayer il) {
@@ -6718,7 +2321,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	/** Returns a unique File in sourceFile's directory for exporting a layer. */
-	private File uniqueLayerExportFile(File sourceFile, int layerId) {
+	File uniqueLayerExportFile(File sourceFile, int layerId) {
 		String sourceName = sourceFile.getName();
 		int dot = sourceName.lastIndexOf('.');
 		String base = dot > 0 ? sourceName.substring(0, dot) : sourceName;
@@ -6734,7 +2337,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	}
 
 	/** Writes img to file, adds file to the gallery of canvas idx, shows error on failure. */
-	private void saveLayerAsImageFile(BufferedImage img, File file, int idx) {
+	void saveLayerAsImageFile(BufferedImage img, File file, int idx) {
 		try {
 			javax.imageio.ImageIO.write(img, "PNG", file);
 			if (ci(idx).tileGallery != null)
@@ -6796,157 +2399,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// Preload Cache (for hover/browsing optimization)
 	// =========================================================================
 
-	/**
-	 * Asynchronously preload a file into the preload cache.
-	 * Loads image, calculates zoom (fitToViewport), and stores state.
-	 * Runs in background thread and does NOT update UI.
-	 */
-	private void preloadFileAsync(File file, int idx) {
-		CanvasInstance c = ci(idx);
-
-		// Skip if already preloaded or currently loading
-		if (c.preloadCache.containsKey(file))
-			return;
-
-		SwingWorker<CanvasInstance.PreloadedFileState, Void> worker =
-			new SwingWorker<CanvasInstance.PreloadedFileState, Void>() {
-				@Override
-				protected CanvasInstance.PreloadedFileState doInBackground() throws Exception {
-					// Load image from disk or file cache
-					BufferedImage img = null;
-					CanvasInstance.CanvasFileState cached = c.fileCache.get(file);
-					if (cached != null) {
-						img = cached.image;
-					} else {
-						img = javax.imageio.ImageIO.read(file);
-						if (img != null) {
-							img = normalizeImage(img);
-							// Cache it in file cache too
-							c.fileCache.put(file, new CanvasInstance.CanvasFileState(img));
-						}
-					}
-
-					if (img == null)
-						return null;
-
-					// Return preloaded state with normalized image
-					// Actual zoom/viewport calculation will happen in fitToViewport()
-					// when the user clicks on this image
-					return new CanvasInstance.PreloadedFileState(img);
-				}
-
-				@Override
-				protected void done() {
-					try {
-						CanvasInstance.PreloadedFileState state = get();
-						if (state != null && !isCancelled()) {
-							c.preloadCache.put(file, state);
-						}
-					} catch (Exception e) {
-						// Silently ignore preload failures
-					}
-				}
-			};
-
-		worker.execute();
+	void preloadFileAsync(File file, int idx) {
+		preloadController.preloadFileAsync(file, idx);
 	}
 
-	/**
-	 * Preload next/previous image in browsing order.
-	 * Call this after loading/navigating to ensure smooth browsing.
-	 */
-	private void preloadNextImages(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.directoryImages.isEmpty() || c.currentImageIndex < 0)
-			return;
-
-		// Preload next image
-		int nextIdx = c.currentImageIndex + 1;
-		if (nextIdx < c.directoryImages.size()) {
-			preloadFileAsync(c.directoryImages.get(nextIdx), idx);
-		}
-
-		// Preload previous image
-		int prevIdx = c.currentImageIndex - 1;
-		if (prevIdx >= 0) {
-			preloadFileAsync(c.directoryImages.get(prevIdx), idx);
-		}
-
-		// Clean up old cache entries that are no longer useful
-		cleanupPreloadCache(idx);
-	}
-
-	/**
-	 * Clean up the preload cache by:
-	 * 1. Removing entries older than 60 seconds
-	 * 2. Keeping current, next, and previous images
-	 * 3. Limiting total cache size to a reasonable number
-	 */
-	private void cleanupPreloadCache(int idx) {
-		CanvasInstance c = ci(idx);
-		if (c.preloadCache.isEmpty())
-			return;
-
-		long now = System.currentTimeMillis();
-		long CACHE_EXPIRY_MS = 60_000; // 60 seconds
-		int MAX_CACHE_SIZE = 5; // Keep max 5 images preloaded
-
-		// Identify files we want to keep
-		java.util.Set<File> keepFiles = new java.util.HashSet<>();
-		if (c.currentImageIndex >= 0 && c.currentImageIndex < c.directoryImages.size()) {
-			keepFiles.add(c.directoryImages.get(c.currentImageIndex)); // Current
-			if (c.currentImageIndex + 1 < c.directoryImages.size()) {
-				keepFiles.add(c.directoryImages.get(c.currentImageIndex + 1)); // Next
-			}
-			if (c.currentImageIndex - 1 >= 0) {
-				keepFiles.add(c.directoryImages.get(c.currentImageIndex - 1)); // Previous
-			}
-		}
-
-		// Remove stale or excessive entries
-		List<File> toRemove = new ArrayList<>();
-		for (java.util.Map.Entry<File, CanvasInstance.PreloadedFileState> entry : c.preloadCache.entrySet()) {
-			File file = entry.getKey();
-			CanvasInstance.PreloadedFileState state = entry.getValue();
-
-			// Keep current/next/previous files even if old
-			if (keepFiles.contains(file))
-				continue;
-
-			// Remove if expired
-			if (state.isStale(CACHE_EXPIRY_MS)) {
-				toRemove.add(file);
-			}
-		}
-
-		// If cache is still too large, remove oldest entries (except kept files)
-		if (c.preloadCache.size() > MAX_CACHE_SIZE) {
-			List<File> nonKeepFiles = new ArrayList<>();
-			long oldestTime = Long.MAX_VALUE;
-
-			for (java.util.Map.Entry<File, CanvasInstance.PreloadedFileState> entry : c.preloadCache.entrySet()) {
-				if (!keepFiles.contains(entry.getKey())) {
-					nonKeepFiles.add(entry.getKey());
-					oldestTime = Math.min(oldestTime, entry.getValue().timestamp);
-				}
-			}
-
-			// Sort by timestamp and remove oldest ones
-			nonKeepFiles.sort((f1, f2) -> {
-				long t1 = c.preloadCache.get(f1).timestamp;
-				long t2 = c.preloadCache.get(f2).timestamp;
-				return Long.compare(t1, t2);
-			});
-
-			int toRemoveCount = c.preloadCache.size() - MAX_CACHE_SIZE;
-			for (int i = 0; i < toRemoveCount && i < nonKeepFiles.size(); i++) {
-				toRemove.add(nonKeepFiles.get(i));
-			}
-		}
-
-		// Actually remove the entries
-		for (File f : toRemove) {
-			c.preloadCache.remove(f);
-		}
+	void preloadNextImages(int idx) {
+		preloadController.preloadNextImages(idx);
 	}
 }

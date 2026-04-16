@@ -1,0 +1,401 @@
+> Lies nur die SelectiveAlphaEditor.java in "C:\Users\pc\eclipse-workspace\TransparencyTool\src\paint" Die Datei ist
+  extrem groß. Wie können wir diese Modularisieren, ohne den Code zu brechen?
+
+  Searched for 5 patterns, read 1 file (ctrl+o to expand)
+  ⎿  Loaded eclipse-workspace\TransparencyTool\CLAUDE.md
+
+● Bash(python3 - <<'EOF'
+      import re…)
+  ⎿  Error: Exit code 1
+       237: main
+       239: public static void main(String[] args) {
+       244: Constructors
+       246: public SelectiveAlphaEditor() {
+       265: UI construction
+       267: private void initializeUI() {
+      1222: Drag & Drop
+      1224: private void setupDropTarget(java.awt.Component target, int idx) {
+      1366: Second Canvas / Split Screen
+     … +15 lines (ctrl+o to see all)
+
+● Bash(grep -n "^       // ========================================================================="
+      "C:\Users\pc\eclipse-workspace\TransparencyTool\src\paint\SelectiveAlph…)
+  ⎿     // main
+        public static void main(String[] args) {
+        // Constructors
+     … +42 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(# Read the section titles (line after each separator)…)
+  ⎿  237 ->     // main
+     244 ->     // Constructors
+     265 ->     // UI construction
+     … +28 lines (ctrl+o to expand)
+
+● Gut, ich habe jetzt einen klaren Überblick. Lass mich die Größe der wichtigsten Sektionen berechnen:
+
+● Bash(echo "Section sizes:"
+      echo "UI construction:       265 → 1222 = $((1222-265)) lines"…)
+  ⎿  Section sizes:
+     UI construction:       265 → 1222 = 957 lines                                                                           Mode toggles:         2652 → 3224 = 572 lines
+     … +14 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+● Jetzt habe ich ein vollständiges Bild. Hier ist meine Analyse:
+
+  ---
+  Struktur-Analyse: SelectiveAlphaEditor.java (6952 Zeilen)
+                                                                                                                          Die größten Blöcke
+                                                                                                                          ┌────────────────────────┬───────────┬───────┐
+  │        Sektion         │  Zeilen   │ Größe │
+  ├────────────────────────┼───────────┼───────┤
+  │ UI construction        │ 265–1222  │ 957   │
+  ├────────────────────────┼───────────┼───────┤
+  │ Mode toggles           │ 2652–3224 │ 572   │
+  ├────────────────────────┼───────────┼───────┤
+  │ Canvas callbacks       │ 3798–4344 │ 546   │
+  ├────────────────────────┼───────────┼───────┤
+  │ Element-edit mode      │ 2209–2652 │ 443   │
+  ├────────────────────────┼───────────┼───────┤
+  │ File loading           │ 1456–1877 │ 421   │
+  ├────────────────────────┼───────────┼───────┤
+  │ Keyboard shortcuts     │ 5506–5792 │ 286   │
+  ├────────────────────────┼───────────┼───────┤
+  │ Clipboard operations   │ 4761–5078 │ 317   │
+  ├────────────────────────┼───────────┼───────┤
+  │ Scenes Panel Callbacks │ 4447–4761 │ 314   │
+  ├────────────────────────┼───────────┼───────┤
+  │ Transformations        │ 3224–3505 │ 281   │
+  └────────────────────────┴───────────┴───────┘
+
+  Es gibt bereits erste Ansätze einer Modularisierung: ZoomState, FloatSelectionState, FileStateCache, CanvasInstance
+  wurden schon extrahiert. Das ist die richtige Richtung.
+
+  ---
+  Das Kernproblem
+
+  Fast jede Methode greift direkt auf private-Felder der äußeren Klasse zu (workingImage, canvases, secWin,
+  paintToolbar, etc.). Deshalb sind Inner-Class-Methoden so gefährlich zu verschieben — Java-Sichtbarkeitsregeln machen
+  das leichter als in anderen Sprachen, aber man muss private → package-private ändern.
+
+  ---
+  Empfohlene Strategie: Inkrementell, risikogeordnet
+
+  Schritt 1 – Kein Risiko: Static Inner Classes heraus (sofort machbar)
+
+  TransferableImage (Z. 5053) ist eine private static class ohne Zugriff auf äußere Felder → einfach als
+  TransferableImage.java in package paint auslagern.
+
+  // Vorher (in SelectiveAlphaEditor):
+  private static class TransferableImage implements Transferable { ... }
+
+  // Nachher: eigene Datei paint/TransferableImage.java
+  class TransferableImage implements Transferable { ... }
+
+  ---
+  Schritt 2 – Geringes Risiko: SecondaryPanel auslagern
+
+  SecondaryPanel (Z. 5078–5303) ist eine private class mit Outer-Referenz. Pattern:
+
+  // paint/SecondaryPanel.java
+  class SecondaryPanel extends JPanel {
+      private final SelectiveAlphaEditor editor; // statt implizitem outer-this
+
+      SecondaryPanel(SelectiveAlphaEditor editor) {
+          this.editor = editor;
+          // alle Zugriffe: editor.canvases statt canvases
+      }
+  }
+
+  Alle Zugriffe auf äußere Felder werden zu editor.fieldName. Die betroffenen Felder müssen von private auf
+  package-private (kein Modifier) gesetzt werden.
+
+  ---
+  Schritt 3 – Mittleres Risiko: Controller-Klassen mit Editor-Referenz
+
+  Das bewährteste Pattern für eng gekoppelte JFrame-Klassen: Controller-Objekte, die SelectiveAlphaEditor als
+  Konstruktorparameter bekommen.
+
+  Kandidaten:
+
+  KeyboardShortcutManager.java    ← setupKeyBindings() + alle AbstractAction-Definitionen
+  ClipboardController.java        ← doCopy/doPaste/doCut (nutzt floatSelectionState)
+  FileLoadController.java         ← loadFile(), loadImage(), saveFile() etc.
+  SecondaryWindowController.java  ← initSecondaryWindow(), openSecondaryWindow(), Timer-Setup
+
+  Beispiel-Pattern:
+
+  class KeyboardShortcutManager {
+      private final SelectiveAlphaEditor ed;
+
+      KeyboardShortcutManager(SelectiveAlphaEditor ed) {
+          this.ed = ed;
+      }
+
+      void setup() {
+          // bisheriger Inhalt von setupKeyBindings()
+          // ed.doUndo() statt doUndo()
+          // ed.ci() statt ci()
+      }
+  }
+
+  In SelectiveAlphaEditor:
+  private final KeyboardShortcutManager keyboardManager = new KeyboardShortcutManager(this);
+  // in initializeUI():
+  keyboardManager.setup();
+
+  ---
+  Schritt 4 – Hohes Risiko: UI-Builder extrahieren
+
+  UI construction (957 Zeilen) ist am komplexesten, weil sie alle UI-Felder (statusLabel, modeLabel, paintToolbar, etc.)
+   erzeugt und setzt. Hier braucht man Vorsicht:
+
+  class EditorUIBuilder {
+      private final SelectiveAlphaEditor ed;
+
+      EditorUIBuilder(SelectiveAlphaEditor ed) { this.ed = ed; }
+
+      JPanel buildTopBar() { ... }   // ed.filmstripBtn = ...; return panel;
+      JComponent buildCenter() { ... }
+      JPanel buildBottomBar() { ... }
+  }
+
+  Risiko: Alle UI-Felder (filmstripBtn, secondCanvasBtn, etc.) müssen package-private werden — das ist viel
+  Änderungsarbeit.
+
+  ---
+  Schritt 5 – Längerfristig: Callbacks-Klassen
+
+  Die Callback-Sektionen (Canvas/Gallery/Scenes) sind zusammen ~963 Zeilen. Diese als CanvasCallbacksFactory,
+  GalleryCallbacksFactory, ScenesCallbacksFactory auszulagern wäre der letzte große Schritt.
+
+  ---
+  Empfohlene Reihenfolge
+
+  1. TransferableImage      → sofort, 0 Risiko
+  2. SecondaryPanel         → gering, ~225 Zeilen raus
+  3. KeyboardShortcutManager → gering, ~286 Zeilen raus
+  4. ClipboardController    → mittel, ~317 Zeilen raus
+  5. FileLoadController     → mittel, ~421 Zeilen raus
+  6. SecondaryWindowController → mittel, ~203 Zeilen raus
+  7. EditorUIBuilder        → hoch, ~957 Zeilen raus (nach allem anderen)
+
+  Nach Schritt 6 wäre die Hauptklasse schon unter ~4000 Zeilen, nach Schritt 7 unter ~3000.
+
+  ---
+  Soll ich einen dieser Schritte konkret umsetzen? Ich würde empfehlen, mit TransferableImage oder
+  KeyboardShortcutManager zu beginnen — die sind am sichersten und zeigen das Pattern, bevor wir größere Blöcke
+  anfassen.
+
+
+
+  ---
+  Ergebnis
+
+  ┌───────────────────────────┬─────────────┬─────────────┐                                                               │                           │   Vorher    │   Nachher   │
+  ├───────────────────────────┼─────────────┼─────────────┤                                                               │ SelectiveAlphaEditor.java │ 6952 Zeilen │ 6413 Zeilen │
+  ├───────────────────────────┼─────────────┼─────────────┤
+  │ Reduziert um              │ —           │ −539 Zeilen │
+  └───────────────────────────┴─────────────┴─────────────┘
+
+  Neu erstellte Dateien:
+
+  ┌──────────────────────────────┬────────┬────────────────────────────────────────────────┐
+  │            Datei             │ Zeilen │                     Inhalt                     │
+  ├──────────────────────────────┼────────┼────────────────────────────────────────────────┤
+  │ SecondaryPanel.java          │ 232    │ Preview-Fenster Panel (drag/resize/render)     │
+  ├──────────────────────────────┼────────┼────────────────────────────────────────────────┤
+  │ KeyboardShortcutManager.java │ 309    │ Alle Tastenkürzel (InputMap/ActionMap + F1–F7) │
+  ├──────────────────────────────┼────────┼────────────────────────────────────────────────┤
+  │ PreviewMode.java             │ 6      │ Enum (SNAPSHOT / LIVE_ALL / LIVE_ALL_EDIT)     │
+  ├──────────────────────────────┼────────┼────────────────────────────────────────────────┤
+  │ AlwaysOnTopMode.java         │ 6      │ Enum (TO_FRONT / NORMAL / TO_BACKGROUND)       │
+  ├──────────────────────────────┼────────┼────────────────────────────────────────────────┤
+  │ CanvasDisplayMode.java       │ 6      │ Enum (SHOW_CANVAS_I/II/ACTIVE)                 │
+  └──────────────────────────────┴────────┴────────────────────────────────────────────────┘
+
+  Was geändert wurde:
+  - Doppelte TransferableImage inner class entfernt (stand parallel zur externen Datei)
+  - 3 private Enums aus SelectiveAlphaEditor in eigene Dateien verschoben
+  - Felder canvases, activeCanvasIndex, canvasBg1/2, alle sec*-Felder, rightDropZone und ~24 Methoden von private auf
+  package-private gesetzt
+  - setupKeyBindings() delegiert jetzt an new KeyboardShortcutManager(this).setup()
+
+
+  Ergebnis dieser Runde
+
+  ┌───────────────────────────┬────────────────────────┬─────────────────────┐
+  │                           │ Vorher (Session-Start) │        Jetzt        │
+  ├───────────────────────────┼────────────────────────┼─────────────────────┤
+  │ SelectiveAlphaEditor.java │ 6952                   │ 5691                │
+  ├───────────────────────────┼────────────────────────┼─────────────────────┤
+  │ Reduziert gesamt          │ —                      │ −1261 Zeilen (−18%) │                                            └───────────────────────────┴────────────────────────┴─────────────────────┘
+                                                                                                                          Neu extrahiert in dieser Runde:
+
+  ┌────────────────────────────────┬────────┬────────────────────────────────────────────────────────────────────────┐
+  │             Datei              │ Zeilen │                                 Inhalt                                 │
+  ├────────────────────────────────┼────────┼────────────────────────────────────────────────────────────────────────┤
+  │ FileLoadController.java        │ 397    │ loadFile, indexDirectory, navigateImage, swapToImageView,              │
+  │                                │        │ fitToViewport, centerCanvas, setZoomInstant                            │
+  ├────────────────────────────────┼────────┼────────────────────────────────────────────────────────────────────────┤
+  │ ClipboardController.java       │ 271    │ doCopy/Cut/Paste (alle 5 Varianten) + System-Clipboard I/O             │
+  ├────────────────────────────────┼────────┼────────────────────────────────────────────────────────────────────────┤
+  │ SecondaryWindowController.java │ 206    │ initSecondaryWindow, toggle, fullscreen, cycleMode, snapshot,          │
+  │                                │        │ applyToCanvas                                                          │
+  └────────────────────────────────┴────────┴────────────────────────────────────────────────────────────────────────┘
+
+  Alles kompiliert. Die nächsten größten Blöcke sind noch:
+
+  - UI construction ~960 Zeilen (größte Hürde)
+  - Mode toggles ~570 Zeilen
+  - Canvas callbacks ~550 Zeilen
+
+  Zwischenstand
+
+  ┌───────────────────────────┬───────────────┬─────────────────────┐
+  │                           │ Session-Start │        Jetzt        │
+  ├───────────────────────────┼───────────────┼─────────────────────┤
+  │ SelectiveAlphaEditor.java │ 6952          │ 5019                │
+  ├───────────────────────────┼───────────────┼─────────────────────┤
+  │ Reduziert gesamt          │ —             │ −1933 Zeilen (−28%) │                                                     └───────────────────────────┴───────────────┴─────────────────────┘
+                                                                                                                          Diese Runde neu extrahiert:
+
+  ┌─────────────────────────────┬────────┬───────────────────────────────────────────────────────────────────────────┐
+  │            Datei            │ Zeilen │                                  Inhalt                                   │
+  ├─────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────┤
+  │ ModeController.java         │ 155    │ 7 Toggle-Methoden (Alpha/Paint/Canvas/Book/Scene, setElementPanelVisible, │
+  │                             │        │  updateModeLabel)                                                         │
+  ├─────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────┤
+  │ CanvasCallbacksFactory.java │ 559    │ buildCanvasCallbacks — alle 40+ Callback-Methoden                         │
+  └─────────────────────────────┴────────┴───────────────────────────────────────────────────────────────────────────┘
+
+  Noch in SelectiveAlphaEditor (größte verbleibende Blöcke):
+
+  ┌────────────────────────────────┬────────┐
+  │            Sektion             │ Zeilen │
+  ├────────────────────────────────┼────────┤
+  │ UI construction                │ ~950   │
+  ├────────────────────────────────┼────────┤
+  │ Element-edit mode              │ ~440   │
+  ├────────────────────────────────┼────────┤
+  │ buildElementLayerCallbacks     │ ~270   │
+  ├────────────────────────────────┼────────┤
+  │ TileGallery + Scenes callbacks │ ~430   │
+  ├────────────────────────────────┼────────┤
+  │ Transformations                │ ~280   │
+  └────────────────────────────────┴────────┘
+
+
+Down from 5019 to 4010 lines (-20% more, -42% total from 6952). The five new files were created successfully and
+  compile cleanly:
+
+  - ElementLayerCallbacksFactory.java — element layer panel callbacks (~250 lines)
+  - TransformController.java — flip/rotate/scale operations (~275 lines)                                                  - PaintCallbacksFactory.java — paint toolbar callbacks (~100 lines)
+  - GalleryCallbacksFactory.java — tile gallery callbacks (~115 lines)                                                    - ScenesController.java — scenes panel, scene loading, GameII scenes (~290 lines)
+
+  Access changes made in SAE: selectedImages, mapsPanel, repositionRightDropZone, createBaseDialog, centeredColumnPanel,
+   copySceneDirectory, preloadFileAsync all made package-private. Two new delegation methods added:
+  createSceneFromDrop() and loadGameIISceneDir().
+
+
+Die größten verbleibenden Blöcke, sortiert nach Größe:
+
+  ┌────────┬─────────────────────────────────────────────────────────┬────────────────────────────────────┐
+  │ Zeilen │                        Abschnitt                        │               Risiko               │               ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 940    │ UI construction (279–1219)                              │ ⚠️ sehr hoch — komplettes UI-Setup │               ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 433    │ CanvasPanel inner class (1893–2326)                     │ ⚠️ hoch — Mouse/Paint-Handler      │
+  ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 243    │ saveAs / neue Datei erstellen (2988–3231)               │ mittel                             │
+  ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 192    │ Element-Helpers / PathLayer (3472–3664)                 │ niedrig                            │
+  ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 172    │ Floating selection (2536–2708)                          │ mittel                             │
+  ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 145    │ Preload-Cache (3865–4010)                               │ niedrig                            │
+  ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 129    │ Drag & Drop (1234–1363)                                 │ mittel                             │
+  ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 117    │ Zoom (1564–1681)                                        │ niedrig — delegiert bereits viel   │
+  ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 114    │ persistSceneIfActive + Szenen-Hilfsmethoden (1769–1883) │ niedrig                            │
+  ├────────┼─────────────────────────────────────────────────────────┼────────────────────────────────────┤
+  │ 111    │ Open-Directory-Dialog (3344–3455)                       │ niedrig                            │
+  └────────┴─────────────────────────────────────────────────────────┴────────────────────────────────────┘
+
+  Was sich noch gut extrahieren lässt (niedriges Risiko):
+
+  1. SaveController (~243 Zeilen): doSaveAs, saveFile, createNewFile, buildSaveDialog — alles rund ums Speichern
+  2. ElementHelpers (~192 Zeilen): renderLayerToImage, renderTextLayerToImage, renderCompositeForThumbnail,
+  PathLayer-Bounding-Box-Logik
+  3. PreloadController (~145 Zeilen): preloadFileAsync, preloadNextImages, Preload-Cache-Management
+  4. ScenePersistController (~114 Zeilen): persistSceneIfActive, activateElementEditMode
+
+  Was riskant/aufwändig wäre:
+
+  - UI construction (940 Zeilen) — alles initializeUI(), Button-Callbacks, Layout-Aufbau. Sehr viele Querabhängigkeiten,
+   sehr hohes Bruchrisiko.
+  - CanvasPanel (433 Zeilen) — innere Klasse mit Mouse- und Paint-Logik. Funktioniert gut als innere Klasse, Extraktion
+  bringt wenig Mehrwert.
+
+  Soll ich mit den vier risikoarmen Blöcken weitermachen?
+
+● Von 6952 auf 3413 Zeilen — minus 51%. Neue Dateien dieser Runde:
+
+  - NewFileController.java — doNewBitmap, doNewBookSheet, showCanvasBgDialog, toggleQuickBG
+  - ElementController.java — renderTextLayerToImage, elemRectScreen, insertSelectionAsElement, mergeSelectedElements, deleteSelectedElements, persistSceneIfActive, doToggleElementSelection
+  - PreloadController.java — preloadFileAsync, preloadNextImages, cleanupPreloadCache                                                                                                                                             
+  Was jetzt noch bleibt (~3413 Zeilen):                                                                                                                                                                                           
+  ┌────────┬────────────────────────────────────────────────────────┐
+  │ Zeilen │                       Abschnitt                        │
+  ├────────┼────────────────────────────────────────────────────────┤
+  │ ~940   │ UI construction (initializeUI + alle Button-Callbacks) │
+  ├────────┼────────────────────────────────────────────────────────┤
+  │ ~433   │ CanvasPanel inner class                                │
+  ├────────┼────────────────────────────────────────────────────────┤
+  │ ~130   │ Drag & Drop                                            │
+  ├────────┼────────────────────────────────────────────────────────┤
+  │ ~85    │ Second Canvas / Split Screen                           │
+  ├────────┼────────────────────────────────────────────────────────┤
+  │ ~rest  │ Kleinere Helper-Methoden                               │
+  └────────┴────────────────────────────────────────────────────────┘
+
+  Der UI-Bau und CanvasPanel sind die letzten großen Brocken — beide haben viele interne Querabhängigkeiten. Soll ich weitermachen?
+
+
+  Diese Runde neu erstellt:
+
+  - DropController.java — setupDropTarget, insertLayerCopyToCanvas, insertFileAsElement, buildRightDropZone, repositionRightDropZone                                                                                                - SaveController.java — saveImage, saveImageToOriginal, doUndo, doRedo, afterUndoRedo, applySelectionsToAlpha, clearSelections, resetImage
+                                                                                                                                                                                                                                    Was noch verbleibt (größte Blöcke):
+
+  ┌────────┬────────────────────────────────────────────────────────────────────┐
+  │ Zeilen │                             Abschnitt                              │
+  ├────────┼────────────────────────────────────────────────────────────────────┤
+  │ ~910   │ initializeUI() + Button-Callbacks                                  │
+  ├────────┼────────────────────────────────────────────────────────────────────┤
+  │ ~433   │ CanvasPanel inner class                                            │
+  ├────────┼────────────────────────────────────────────────────────────────────┤
+  │ ~114   │ saveImageSilent, saveBurnedElementsCopy, Element-Edit-Bar-Methoden │
+  ├────────┼────────────────────────────────────────────────────────────────────┤
+  │ ~111   │ Quick-Open-Dialog                                                  │
+  ├────────┼────────────────────────────────────────────────────────────────────┤
+  │ ~85    │ Second-Canvas-Layout                                               │
+  └────────┴────────────────────────────────────────────────────────────────────┘
+
+  Weitermachen mit den letzten mittleren Blöcken (saveImageSilent/saveBurnedElementsCopy, Element-Edit-Bar, Quick-Open-Dialog)?
+
+● SAE is down from 3113 → 2684 lines (-429 lines this round).
+
+  Summary of what was done:
+  - ElementEditController.java (253 lines) — element-edit mode state fields + all 11 related methods. SAE now delegates via elementEditController.*.
+  - QuickOpenController.java (76 lines) — all 3 showQuickOpenDialog overloads. SAE keeps thin delegation wrappers.                                                                                                                  - SaveController.java expanded (+178 lines) — saveImageSilent, saveBurnedElementsCopy, saveBurnedElementsOriginal, burnVisibleElements moved here. SAE has one-liner delegations.
+                                                                                                                                                                                                                                    SAE is now at 2684 lines. Weitermachen mit den verbleibenden Blöcken?
+
+● SAE is now at 2412 lines (down from 2684, -272 lines this round).
+
+  Summary of this round:
+  - ZoomController.java (139 lines) — setZoom, startZoomAnimation, applyZoomFrame, updateZoomLabel, screenToImage
+  - EditorDialogs expanded (+30 lines for showUnsavedChangesDialog) and wired in — SAE's showErrorDialog/showInfoDialog now delegate to editorDialogs; createBaseDialog/centeredColumnPanel delegate to UIComponentFactory; dead    showUnsavedChangesDialog removed; showZoomInput reduced to 1-liner
+  - Dead state manager fields (zoomState, floatSelectionState, fileCacheManager) removed                                                                                                                                          
+  SAE: 6952 → 2412 lines (–65%). Weitermachen?

@@ -33,6 +33,36 @@ public class EditorDialogs {
     }
 
     // Simple dialogs
+    public int showUnsavedChangesDialog() {
+        if (!editor.ci().hasUnsavedChanges)
+            return 1;
+        final int[] result = { 2 };
+        JDialog dialog = UIComponentFactory.createBaseDialog(editor, "Ungespeicherte Änderungen", 420, 310);
+        JPanel content = UIComponentFactory.centeredColumnPanel(20, 28, 16);
+        content.add(UIComponentFactory.styledLabel("⚠", 30, AppColors.WARNING, Font.PLAIN));
+        content.add(Box.createVerticalStrut(10));
+        content.add(UIComponentFactory.htmlLabel(
+                "Das Bild hat ungespeicherte Änderungen.<br>Was möchtest du tun?", AppColors.TEXT, 13));
+        content.add(Box.createVerticalStrut(18));
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        row.setOpaque(false);
+        JButton sBtn = UIComponentFactory.buildButton("Speichern", AppColors.SUCCESS, AppColors.SUCCESS_HOVER);
+        JButton dBtn = UIComponentFactory.buildButton("Verwerfen", AppColors.DANGER, AppColors.DANGER_HOVER);
+        JButton cBtn = UIComponentFactory.buildButton("Abbrechen", AppColors.BTN_BG, AppColors.BTN_HOVER);
+        sBtn.setForeground(Color.WHITE);
+        dBtn.setForeground(Color.WHITE);
+        sBtn.addActionListener(e -> { result[0] = 0; dialog.dispose(); });
+        dBtn.addActionListener(e -> { result[0] = 1; dialog.dispose(); });
+        cBtn.addActionListener(e -> { result[0] = 2; dialog.dispose(); });
+        row.add(sBtn);
+        row.add(dBtn);
+        row.add(cBtn);
+        content.add(row);
+        dialog.add(content);
+        dialog.setVisible(true);
+        return result[0];
+    }
+
     public void showErrorDialog(String title, String message) {
         JDialog dialog = UIComponentFactory.createBaseDialog(editor, title, 440, 215);
         JPanel content = UIComponentFactory.centeredColumnPanel(20, 28, 16);

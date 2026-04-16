@@ -56,13 +56,25 @@ public class GameSceneReader {
 
         // ── Sprites ──────────────────────────────────────────────────────────
         File spritesDir = new File(sceneRoot, "sprites");
-        File imagesDir  = new File(spritesDir, "images");
+        // Images are stored alongside the .txt files in sprites/ directly.
+        // Skip "sprites.txt" – it is a container/index file, not a sprite entity.
         if (spritesDir.exists()) {
-            File[] txts = spritesDir.listFiles(f -> f.isFile() && f.getName().endsWith(".txt"));
+            File[] txts = spritesDir.listFiles(f ->
+                    f.isFile() && f.getName().endsWith(".txt")
+                    && !f.getName().equalsIgnoreCase("sprites.txt"));
             if (txts != null) {
+                java.util.Arrays.sort(txts);
+                System.out.println("[GameSceneReader] Verarbeite " + txts.length + " Sprite-Dateien in: " + spritesDir);
                 for (File f : txts) {
-                    SpriteLayer sl = readSprite(f, imagesDir, nextId++, data.canvasW, data.canvasH);
-                    if (sl != null) data.layers.add(sl);
+                    SpriteLayer sl = readSprite(f, spritesDir, nextId++, data.canvasW, data.canvasH);
+                    if (sl != null) {
+                        data.layers.add(sl);
+                        System.out.println("[GameSceneReader]   + " + f.getName()
+                                + " → x=" + sl.x() + " y=" + sl.y()
+                                + " w=" + sl.width() + " h=" + sl.height());
+                    } else {
+                        System.err.println("[GameSceneReader]   ! " + f.getName() + " → null (übersprungen)");
+                    }
                 }
             }
         }
@@ -191,7 +203,11 @@ public class GameSceneReader {
                                    file.getAbsolutePath(), rawLines, z);
 
         } catch (IOException e) {
-            System.err.println("[GameSceneReader] Sprite nicht lesbar: " + file.getName() + " – " + e.getMessage());
+            System.err.println("[GameSceneReader] Sprite IOException: " + file.getName() + " – " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            System.err.println("[GameSceneReader] Sprite Fehler: " + file.getName() + " – " + e);
+            e.printStackTrace();
             return null;
         }
     }
