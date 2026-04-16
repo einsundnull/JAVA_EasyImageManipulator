@@ -245,6 +245,20 @@ class ClipboardController {
 			c.canvasPanel.repaint();
 	}
 
+	public Rectangle getActiveSelection() {
+		CanvasInstance c = ed.ci();
+		if (!c.selectedAreas.isEmpty())
+			return c.selectedAreas.get(c.selectedAreas.size() - 1);
+		if (c.isSelecting && c.selectionStart != null && c.selectionEnd != null) {
+			int x = Math.min(c.selectionStart.x, c.selectionEnd.x);
+			int y = Math.min(c.selectionStart.y, c.selectionEnd.y);
+			int w = Math.abs(c.selectionEnd.x - c.selectionStart.x);
+			int h = Math.abs(c.selectionEnd.y - c.selectionStart.y);
+			return (w > 0 && h > 0) ? new Rectangle(x, y, w, h) : null;
+		}
+		return null;
+	}
+
 	private void copyToSystemClipboard(BufferedImage img) {
 		if (img == null)
 			return;

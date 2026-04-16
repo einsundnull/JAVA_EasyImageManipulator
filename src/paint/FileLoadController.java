@@ -27,6 +27,29 @@ class FileLoadController {
 		this.ed = ed;
 	}
 
+	private static final String[] SUPPORTED_EXTENSIONS = { "png", "jpg", "jpeg", "bmp", "gif" };
+
+	static boolean isSupportedFile(File f) {
+		if (f == null || !f.isFile())
+			return false;
+		String n = f.getName().toLowerCase();
+		for (String e : SUPPORTED_EXTENSIONS)
+			if (n.endsWith("." + e))
+				return true;
+		return false;
+	}
+
+	/** Converts image to TYPE_INT_ARGB (clean ARGB copy). */
+	BufferedImage normalizeImage(BufferedImage src) {
+		if (src.getType() == BufferedImage.TYPE_INT_ARGB)
+			return ed.deepCopy(src);
+		BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+		java.awt.Graphics2D g2 = out.createGraphics();
+		g2.drawImage(src, 0, 0, null);
+		g2.dispose();
+		return out;
+	}
+
 	/** Convenience: loads into active canvas. */
 	void loadFile(File file) {
 		loadFile(file, ed.activeCanvasIndex);
@@ -373,6 +396,23 @@ class FileLoadController {
 			int ch = (int) Math.ceil(c.workingImage.getHeight() * c.zoom);
 			int viewX = Math.max(0, (cw - vpSz.width) / 2);
 			int viewY = Math.max(0, (ch - vpSz.height) / 2);
+			vp.setViewPosition(new Point(viewX, viewY));
+		});
+	}
+
+	/** Centers the viewport horizontally only (keeps vertical position). */
+	void centerCanvasX(int idx) {
+		CanvasInstance c = ed.ci(idx);
+		if (c.scrollPane == null || c.workingImage == null)
+			return;
+		SwingUtilities.invokeLater(() -> {
+			c.canvasWrapper.revalidate();
+			c.canvasWrapper.validate();
+			JViewport vp = c.scrollPane.getViewport();
+			Dimension vpSz = vp.getSize();
+			int cw = (int) Math.ceil(c.workingImage.getWidth() * c.zoom);
+			int viewX = Math.max(0, (cw - vpSz.width) / 2);
+			int viewY = vp.getViewPosition().y;
 			vp.setViewPosition(new Point(viewX, viewY));
 		});
 	}

@@ -34,6 +34,35 @@ class SaveController {
 
 	// ── Undo / Redo ────────────────────────────────────────────────────────────
 
+	static final int MAX_UNDO = 50;
+
+	void clearUndoRedo() {
+		ed.ci().undoStack.clear();
+		ed.ci().redoStack.clear();
+	}
+
+	public void performFloodfill(java.awt.Point screenPt) {
+		CanvasInstance c = ed.ci();
+		java.awt.Point ip = ed.screenToImage(screenPt);
+		int tc = c.workingImage.getRGB(ip.x, ip.y);
+		if (((tc >> 24) & 0xFF) == 0) {
+			ed.showInfoDialog("Bereits transparent", "Klicke auf eine sichtbare Farbe.");
+			return;
+		}
+		PaintEngine.floodFill(c.workingImage, ip.x, ip.y, new Color(0, 0, 0, 0), 30);
+		ed.markDirty();
+	}
+
+	void pushUndo(int idx) {
+		CanvasInstance c = ed.ci(idx);
+		if (c.workingImage == null)
+			return;
+		c.undoStack.push(ed.deepCopy(c.workingImage));
+		if (c.undoStack.size() > MAX_UNDO)
+			c.undoStack.pollLast();
+		c.redoStack.clear();
+	}
+
 	void doUndo(int idx) {
 		CanvasInstance c = ed.ci(idx);
 		if (c.undoStack.isEmpty())

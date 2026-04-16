@@ -399,3 +399,79 @@ Die größten verbleibenden Blöcke, sortiert nach Größe:
   - EditorDialogs expanded (+30 lines for showUnsavedChangesDialog) and wired in — SAE's showErrorDialog/showInfoDialog now delegate to editorDialogs; createBaseDialog/centeredColumnPanel delegate to UIComponentFactory; dead    showUnsavedChangesDialog removed; showZoomInput reduced to 1-liner
   - Dead state manager fields (zoomState, floatSelectionState, fileCacheManager) removed                                                                                                                                          
   SAE: 6952 → 2412 lines (–65%). Weitermachen?
+
+● SAE is now at 1734 lines (down from 2412, −678 lines this round; total: 6952 → 1734, −75%).
+
+  This round:
+  - UIBuilder.java (646 lines) wired up — initializeUI() now delegates buildTopBar/Center/BottomBar to it
+  - Duplicate buildTopBar, buildCenter, buildCanvasArea, buildBottomBar, buildDropHintPanel removed from SAE (~755 lines)                                                                                                           - buildRulerLayout, repositionNavButtons, updateCanvasFocusBorder, updateLayoutVisibility moved to a tidy "Layout utilities" section in SAE (they're called by UIBuilder and other controllers)
+  - Made saveController, newFileController, buildGalleryPreloadCallback, buildScenesCallbacks, and button-size constants package-private for UIBuilder access                                                                     
+  ---
+  Remaining big blocks in SAE (~1734 lines):
+
+  ┌───────┬────────────────────────────────────────────────────────────┐
+  │ Lines │                          Section                           │
+  ├───────┼────────────────────────────────────────────────────────────┤
+  │ ~433  │ CanvasPanel inner class (Mouse/Paint handler)              │
+  ├───────┼────────────────────────────────────────────────────────────┤
+  │ ~172  │ Floating selection (commitFloat, cancelFloat, handle math) │
+  ├───────┼────────────────────────────────────────────────────────────┤
+  │ ~120  │ Various small delegation wrappers                          │
+
+
+
+
+ Summary of this session's work:
+                                                                                                                                                                                                                                    ┌─────────────────────────────┬─────────────────────────────────────────────────────────────────┐
+  │            File             │                              Lines                              │                                                                                                                                 ├─────────────────────────────┼─────────────────────────────────────────────────────────────────┤
+  │ AppLifecycleController.java │ new — settings load/save on startup/close                       │
+  ├─────────────────────────────┼─────────────────────────────────────────────────────────────────┤
+  │ LayoutController.java       │ new — ruler, nav buttons, focus borders, visibility, status bar │
+  ├─────────────────────────────┼─────────────────────────────────────────────────────────────────┤
+  │ SelectiveAlphaEditor.java   │ 659 (was 1066 at session start, 6952 originally)                │
+  └─────────────────────────────┴─────────────────────────────────────────────────────────────────┘
+
+  Extractions this session:
+  - AppLifecycleController: loadSettings() (62 lines) + saveOnClose() (65 lines)
+  - LayoutController: buildRulerLayout, repositionNavButtons, updateCanvasFocusBorder, updateLayoutVisibility, updateNavigationButtons, updateTitle, updateStatus, setBottomButtonsEnabled
+  - FileLoadController: added centerCanvasX(int idx)
+  - SaveController: added pushUndo(int idx)
+  - Deleted dead copyInto() and removed MAX_UNDO constant
+  - Removed 17 unused imports
+
+
+  Progress summary for this session:
+                                                                                                                                                                                                                                    ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┬───────┐
+  │                                                                         Round                                                                          │ Lines │                                                                ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼───────┤
+  │ Session start                                                                                                                                          │ 1 066 │
+  ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼───────┤
+  │ After AppLifecycleController + LayoutController                                                                                                        │ 866   │
+  ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼───────┤
+  │ After nav/status to LayoutController, centerCanvasX to FileLoadController                                                                              │ 780   │
+  ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼───────┤
+  │ After compacting delegators + dead code                                                                                                                │ 677   │
+  ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼───────┤
+  │ After markDirty/refreshElementPanel/updateDirtyUI → LayoutController, performFloodfill/clearUndoRedo → SaveController, layer utils → ElementController │ 564   │
+  ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┼───────┤
+  │ After startup/window listener → AppLifecycleController, initializeUI shrunk                                                                            │ 491   │
+  └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┴───────┘
+
+  From the original 6,952 lines → 491 — 93% reduction.
+
+  Final tally across this session:
+                                                                                                                                                                                                                                    ┌────────────────────────────────────────────────────────────────────────┬───────┐
+  │                                  Step                                  │ Lines │                                                                                                                                                ├────────────────────────────────────────────────────────────────────────┼───────┤
+  │ Session start                                                          │ 659   │
+  ├────────────────────────────────────────────────────────────────────────┼───────┤
+  │ Removed dead constants, moved getActiveSelection → ClipboardController │ —     │
+  ├────────────────────────────────────────────────────────────────────────┼───────┤
+  │ Moved isSupportedFile + normalizeImage → FileLoadController            │ —     │
+  ├────────────────────────────────────────────────────────────────────────┼───────┤
+  │ Compacted remaining expanded stubs                                     │ 443   │
+  └────────────────────────────────────────────────────────────────────────┴───────┘
+
+  Total journey: 6,952 → 443 lines (−94%). The file now contains only:
+  - Shared mutable state fields (~100 lines)
+  - Controller instantiations (~20 lines)
+  - The two fundamental accessors ci() / ci(int) and deepCopy()
+  - Thin delegator wrappers for SAE's public API (~260 lines)

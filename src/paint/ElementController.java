@@ -3,6 +3,7 @@ package paint;
 import java.awt.AlphaComposite;
 import java.awt.Font;
 import java.awt.FontMetrics;
+import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
@@ -11,6 +12,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.imageio.ImageIO;
 import javax.swing.SwingWorker;
 
 /**
@@ -86,6 +88,37 @@ class ElementController {
 		}
 		return new Rectangle((int) Math.round(el.x() * z), (int) Math.round(el.y() * z),
 				(int) Math.round(el.width() * z), (int) Math.round(el.height() * z));
+	}
+
+	// ── Layer utilities ───────────────────────────────────────────────────────
+
+	private static final float MAX_ELEM_RATIO = 0.40f;
+
+	/** Creates a copy of {@code src} with a new ID. Returns null for unsupported types. */
+	Layer copyLayerWithNewId(Layer src, int newId) {
+		if (src instanceof ImageLayer il) {
+			BufferedImage normalized = ed.normalizeImage(il.image());
+			return new ImageLayer(newId, normalized, il.x(), il.y(), normalized.getWidth(), normalized.getHeight());
+		} else if (src instanceof TextLayer tl) {
+			return TextLayer.of(newId, tl.text(), tl.fontName(), tl.fontSize(), tl.fontBold(), tl.fontItalic(),
+					tl.fontColor(), tl.x(), tl.y());
+		} else if (src instanceof PathLayer pl) {
+			return PathLayer.of(newId, pl.points(), pl.image(), pl.isClosed(), pl.x(), pl.y());
+		}
+		return null;
+	}
+
+	/** Returns {renderW, renderH} scaled to MAX_ELEM_RATIO of canvas size. Never upscales. */
+	static int[] fitElementSize(int imgW, int imgH, int canvasW, int canvasH) {
+		float maxW = canvasW * MAX_ELEM_RATIO;
+		float maxH = canvasH * MAX_ELEM_RATIO;
+		float scale = Math.min(1.0f, Math.min(maxW / imgW, maxH / imgH));
+		return new int[] { Math.max(1, Math.round(imgW * scale)), Math.max(1, Math.round(imgH * scale)) };
+	}
+
+	/** Converts a visual drop index (0 = top) to a list insert index. */
+	static int visualToInsertIndex(int visualIdx, int listSize) {
+		return Math.max(0, Math.min(listSize, listSize - visualIdx));
 	}
 
 	// ── Element operations ─────────────────────────────────────────────────────
@@ -168,6 +201,128 @@ class ElementController {
 	 * If a scene is currently loaded, rewrite its file with the current
 	 * activeElements so changes are persisted to disk.
 	 */
+	// ── Composite thumbnail ────────────────────────────────────────────────────
+
+	/** Renders canvas + all active elements as a composite thumbnail image. */
+	BufferedImage renderCompositeForThumbnail(CanvasInstance c) {
+		if (c.workingImage == null)
+			return null;
+		int w = c.workingImage.getWidth(), h = c.workingImage.getHeight();
+		BufferedImage comp = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g2 = comp.createGraphics();
+		g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		g2.drawImage(c.workingImage, 0, 0, null);
+		for (Layer el : c.activeElements) {
+			if (el instanceof ImageLayer il) {
+				if (Math.abs(il.rotationAngle()) > 0.001) {
+					double cx = il.x() + il.width() / 2.0;
+					double cy = il.y() + il.height() / 2.0;
+					g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
+					g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+					g2.rotate(-Math.toRadians(il.rotationAngle()), cx, cy);
+				} else {
+					g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+				}
+			}
+		}
+		g2.dispose();
+		return comp;
+	}
+
+	void refreshGalleryThumbnail() { refreshGalleryThumbnail(ed.activeCanvasIndex); }
+
+	void refreshGalleryThumbnail(int idx) {
+		CanvasInstance c = ed.ci(idx);
+		if (c.sourceFile == null || c.workingImage == null)
+			return;
+		BufferedImage thumb = renderCompositeForThumbnail(c);
+		if (thumb == null)
+			return;
+		c.tileGallery.refreshThumbnailFor(c.sourceFile, thumb);
+		if (c.activeSceneFile != null)
+			c.scenesPanel.refreshThumbnailFor(c.activeSceneFile, thumb);
+	}
+
+	// ── List helpers ───────────────────────────────────────────────────────────
+
+	/** Update a layer in both activeElements and selectedElements by ID. */
+	void replaceInLists(CanvasInstance c, Layer updated) {
+		for (int i = 0; i < c.activeElements.size(); i++) {
+			if (c.activeElements.get(i).id() == updated.id()) { c.activeElements.set(i, updated); break; }
+		}
+		for (int i = 0; i < c.selectedElements.size(); i++) {
+			if (c.selectedElements.get(i).id() == updated.id()) { c.selectedElements.set(i, updated); break; }
+		}
+	}
+
+	// ── Open layer in other canvas ─────────────────────────────────────────────
+
+	/** Opens an ImageLayer (or any renderable layer) in the other canvas for pixel editing. */
+	void doOpenImageLayerInOtherCanvas(int sourceIdx, Layer el) {
+		BufferedImage img = null;
+		if (el instanceof ImageLayer il) {
+			img = il.image();
+		} else if (el instanceof TextLayer tl) {
+			img = renderTextLayerToImage(tl);
+		}
+		if (img == null)
+			return;
+		try {
+			java.io.File tmp = java.io.File.createTempFile("element_" + el.id() + "_", ".png");
+			tmp.deleteOnExit();
+			ImageIO.write(img, "PNG", tmp);
+			int targetIdx = 1 - sourceIdx;
+			ed.activeCanvasIndex = targetIdx;
+			if (targetIdx == 1) {
+				ed.secondCanvasBtn.setEnabled(true);
+				ed.secondCanvasBtn.setSelected(true);
+				ed.updateLayoutVisibility();
+				if (ed.galleryWrapper != null) {
+					ed.galleryWrapper.revalidate();
+					ed.galleryWrapper.repaint();
+				}
+			}
+			ed.loadFile(tmp, targetIdx);
+			ed.elementEditController.activateElementEditMode(targetIdx, el, sourceIdx);
+		} catch (java.io.IOException ex) {
+			ed.showErrorDialog("Fehler", "Element konnte nicht geöffnet werden:\n" + ex.getMessage());
+		}
+	}
+
+	// ── Layer export helpers ───────────────────────────────────────────────────
+
+	/** Renders a layer to a BufferedImage. Returns null for PathLayer (not supported). */
+	BufferedImage renderLayerToImage(Layer live) {
+		if (live instanceof TextLayer tl) return renderTextLayerToImage(tl);
+		if (live instanceof ImageLayer il) return PaintEngine.scale(il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
+		return null;
+	}
+
+	/** Returns a unique File in sourceFile's directory for exporting a layer. */
+	File uniqueLayerExportFile(File sourceFile, int layerId) {
+		String name = sourceFile.getName();
+		int dot = name.lastIndexOf('.');
+		String base = dot > 0 ? name.substring(0, dot) : name;
+		String ext  = dot > 0 ? name.substring(dot)    : ".png";
+		File dir    = sourceFile.getParentFile();
+		File target = new File(dir, base + "_layer_" + layerId + ext);
+		int counter = 1;
+		while (target.exists()) target = new File(dir, base + "_layer_" + layerId + "_" + counter++ + ext);
+		return target;
+	}
+
+	/** Writes img to file, adds file to the gallery of canvas idx, shows error on failure. */
+	void saveLayerAsImageFile(BufferedImage img, File file, int idx) {
+		try {
+			javax.imageio.ImageIO.write(img, "PNG", file);
+			if (ed.ci(idx).tileGallery != null)
+				ed.ci(idx).tileGallery.addFiles(java.util.Arrays.asList(file));
+		} catch (Exception ex) {
+			System.err.println("[ERROR] Failed to export layer: " + ex.getMessage());
+			ed.showErrorDialog("Fehler", "Speichern fehlgeschlagen:\n" + ex.getMessage());
+		}
+	}
+
 	void persistSceneIfActive(int idx) {
 		CanvasInstance c = ed.ci(idx);
 		if (c.activeSceneFile == null)

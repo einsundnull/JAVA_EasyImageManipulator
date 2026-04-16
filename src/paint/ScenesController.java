@@ -315,4 +315,44 @@ class ScenesController {
 		}
 		return json.substring(start, end).trim();
 	}
+
+	// ── Directory copy (for scene duplication) ────────────────────────────────
+
+	/**
+	 * Copies an entire scene directory to a new name in the same scenes root,
+	 * then refreshes the scene panel.
+	 */
+	void copySceneDirectory(File sceneFile, int idx) {
+		File srcDir = sceneFile.getParentFile();
+		File scenesRoot = srcDir.getParentFile();
+		String baseName = srcDir.getName();
+		File destDir = new File(scenesRoot, baseName + "_copy");
+		int n = 2;
+		while (destDir.exists()) destDir = new File(scenesRoot, baseName + "_copy" + n++);
+		File finalDest = destDir;
+		new javax.swing.SwingWorker<Void, Void>() {
+			@Override protected Void doInBackground() throws Exception {
+				copyDirRecursive(srcDir, finalDest);
+				File oldTxt = new File(finalDest, baseName + ".txt");
+				File newTxt = new File(finalDest, finalDest.getName() + ".txt");
+				if (oldTxt.exists()) oldTxt.renameTo(newTxt);
+				return null;
+			}
+			@Override protected void done() {
+				try { get(); } catch (Exception ex) { ed.showErrorDialog("Fehler", ex.getMessage()); return; }
+				ed.refreshSceneFiles(idx);
+				ToastNotification.show(ed, "Scene kopiert: " + finalDest.getName());
+			}
+		}.execute();
+	}
+
+	private static void copyDirRecursive(File src, File dest) throws java.io.IOException {
+		dest.mkdirs();
+		for (File f : src.listFiles()) {
+			File d = new File(dest, f.getName());
+			if (f.isDirectory()) copyDirRecursive(f, d);
+			else java.nio.file.Files.copy(f.toPath(), d.toPath(),
+					java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+		}
+	}
 }
