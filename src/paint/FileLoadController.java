@@ -142,7 +142,9 @@ class FileLoadController {
 		ed.activeCanvasIndex = idx;
 		ed.updateCanvasFocusBorder();
 
-		if (!file.getParentFile().equals(new File(System.getProperty("java.io.tmpdir"))))
+		// Book pages are navigated via BookPagesPanel — never touch the TileGallery
+		boolean isPage = PageLayoutManifest.isBookPage(file);
+		if (!isPage && !file.getParentFile().equals(new File(System.getProperty("java.io.tmpdir"))))
 			indexDirectory(file, idx);
 		swapToImageView(idx);
 
@@ -153,11 +155,13 @@ class FileLoadController {
 		SwingUtilities.invokeLater(() -> fitToViewport(idx));
 
 		ed.refreshElementPanel();
-		ed.updateNavigationButtons();
 		ed.updateTitle();
 		ed.updateStatus();
 		ed.setBottomButtonsEnabled(true);
-		ed.preloadNextImages(idx);
+		if (!isPage) {
+			ed.updateNavigationButtons();
+			ed.preloadNextImages(idx);
+		}
 
 		// Notify page-layout toolbar so it can load the page's .layout manifest
 		if (ed.pageLayoutToolbar != null)

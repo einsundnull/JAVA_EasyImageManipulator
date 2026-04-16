@@ -28,9 +28,9 @@ import javax.swing.text.JTextComponent;
  */
 class PageLayoutToolbar extends JPanel {
 
-    static final int TOOLBAR_H = 58;
-    private static final int BTN_W  = 42;
-    private static final int BTN_H  = 22;
+    static final int TOOLBAR_H = 96;   // label(14) + strut(2) + 2×spinner(24)+gap(2) + strip-pad(12) + hScrollBar(15) = 93 → 96
+    private static final int BTN_W  = 44;
+    private static final int BTN_H  = 24;
     private static final int GAP    = 4;
 
     private final SelectiveAlphaEditor ed;
@@ -113,12 +113,13 @@ class PageLayoutToolbar extends JPanel {
         JPanel strip = new JPanel();
         strip.setLayout(new BoxLayout(strip, BoxLayout.X_AXIS));
         strip.setBackground(AppColors.BG_TOOLBAR);
-        strip.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        strip.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
 
         // Page name indicator
         pageNameLabel = new JLabel("Keine Buchseite");
         pageNameLabel.setForeground(AppColors.TEXT_MUTED);
         pageNameLabel.setFont(new Font("SansSerif", Font.ITALIC, 11));
+        pageNameLabel.setAlignmentY(Component.CENTER_ALIGNMENT);
         pageNameLabel.setPreferredSize(new Dimension(130, BTN_H));
         pageNameLabel.setMaximumSize(new Dimension(130, BTN_H));
         strip.add(pageNameLabel);
@@ -354,6 +355,7 @@ class PageLayoutToolbar extends JPanel {
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         p.setOpaque(false);
+        p.setAlignmentY(Component.CENTER_ALIGNMENT);
         JLabel lbl = new JLabel(title);
         lbl.setForeground(AppColors.TEXT_MUTED);
         lbl.setFont(new Font("SansSerif", Font.PLAIN, 9));
@@ -421,10 +423,11 @@ class PageLayoutToolbar extends JPanel {
 
     /** Vertical separator between toolbar sections. */
     private Component hSep() {
+        int sepH = TOOLBAR_H - 24; // leave 12px top + bottom breathing room
         JPanel sep = new JPanel();
         sep.setBackground(AppColors.BORDER);
-        sep.setPreferredSize(new Dimension(1, TOOLBAR_H - 16));
-        sep.setMaximumSize(new Dimension(1, TOOLBAR_H - 16));
+        sep.setPreferredSize(new Dimension(1, sepH));
+        sep.setMaximumSize(new Dimension(1, sepH));
         JPanel w = new JPanel();
         w.setOpaque(false);
         w.setLayout(new BoxLayout(w, BoxLayout.X_AXIS));
