@@ -1,5 +1,6 @@
 package paint;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.List;
 
@@ -105,6 +106,14 @@ class GalleryCallbacksFactory {
 					}
 				}
 			}
+
+			@Override
+			public BufferedImage getCompositeForFile(File f) {
+				CanvasInstance c = ed.canvases[idx];
+				if (f.equals(c.sourceFile) && c.workingImage != null)
+					return ed.elementController.renderCompositeForThumbnail(c);
+				return null;
+			}
 		};
 	}
 
@@ -195,6 +204,14 @@ class GalleryCallbacksFactory {
 						ToastNotification.show(ed, "Kopie: " + dest.getName());
 					}
 				}
+			}
+
+			@Override
+			public BufferedImage getCompositeForFile(File f) {
+				CanvasInstance c = ed.canvases[idx];
+				if (f.equals(c.sourceFile) && c.workingImage != null)
+					return ed.elementController.renderCompositeForThumbnail(c);
+				return null;
 			}
 		};
 	}

@@ -92,6 +92,13 @@ public class TileGalleryPanel extends BaseSidebarPanel {
          * image = PNG/JPG/etc.) and the destination panel type (image vs. scene gallery).
          */
         default void onFileElementDropped(File sourceFile, int insertIndex) {}
+        /**
+         * Returns a full-resolution composite (workingImage + elements) for the given
+         * file if it is currently loaded in a canvas, or null to fall back to a raw
+         * file copy. Used by the gallery DropTarget to ensure drag-copies look exactly
+         * like what is visible on screen.
+         */
+        default java.awt.image.BufferedImage getCompositeForFile(File f) { return null; }
     }
 
     // ── Callback for preloading ───────────────────────────────────────────────
@@ -251,8 +258,15 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                                             dtde.dropComplete(false);
                                             return;
                                         }
-                                        // Copy file to destination directory using BaseSidebarPanel utility
-                                        File destFile = BaseSidebarPanel.copyFileWithUniqueName(sourceFile, destDir);
+                                        // If the file is currently loaded, write the rendered composite
+                                        // (workingImage + elements) instead of copying the raw disk file.
+                                        java.awt.image.BufferedImage composite = callbacks.getCompositeForFile(sourceFile);
+                                        File destFile;
+                                        if (composite != null) {
+                                            destFile = writeCompositeWithUniqueName(composite, sourceFile, destDir);
+                                        } else {
+                                            destFile = BaseSidebarPanel.copyFileWithUniqueName(sourceFile, destDir);
+                                        }
                                         if (destFile != null) {
                                             callbacks.onFileElementDropped(destFile, insertIndex);
                                         }
@@ -898,6 +912,21 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             }
 
             g2.dispose();
+        }
+    }
+
+    private static File writeCompositeWithUniqueName(java.awt.image.BufferedImage img, File original, File targetDir) {
+        String name = original.getName();
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        File dest = new File(targetDir, base + "_copy.png");
+        for (int i = 1; dest.exists(); i++) dest = new File(targetDir, base + "_copy_" + i + ".png");
+        try {
+            javax.imageio.ImageIO.write(img, "PNG", dest);
+            return dest;
+        } catch (Exception ex) {
+            System.err.println("[TileGalleryPanel] writeCompositeWithUniqueName failed: " + ex.getMessage());
+            return null;
         }
     }
 
