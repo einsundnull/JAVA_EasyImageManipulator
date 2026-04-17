@@ -81,6 +81,7 @@ public class UIComponentFactory {
     }
 
     // ── Button factories ───────────────────────────────────────────────────────
+    // Buttons in the top Button Row
     public static JButton buildButton(String text, Color bg, Color hover) {
         JButton btn = new JButton(text) {
             @Override
@@ -124,13 +125,15 @@ public class UIComponentFactory {
                 super.paintComponent(g);
             }
         };
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        btn.setFont(new Font("Dialog", Font.PLAIN, 16));
         btn.setForeground(AppColors.TEXT);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setOpaque(false);
+        btn.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
         btn.setPreferredSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
+        btn.setMinimumSize(new Dimension(BUTTON_WIDTH, BUTTON_HEIGHT));
         btn.setToolTipText(tooltip);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;

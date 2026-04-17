@@ -29,7 +29,7 @@ import javax.swing.text.JTextComponent;
 class PageLayoutToolbar extends JPanel {
 
     static final int TOOLBAR_H = 96;   // label(14) + strut(2) + 2×spinner(24)+gap(2) + strip-pad(12) + hScrollBar(15) = 93 → 96
-    private static final int BTN_W  = 44;
+    private static final int BTN_W  = 52;
     private static final int BTN_H  = 24;
     private static final int GAP    = 4;
 
@@ -390,7 +390,7 @@ class PageLayoutToolbar extends JPanel {
 
     private JToggleButton barToggle(String text, String tooltip) {
         JToggleButton btn = new JToggleButton(text);
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 8));
         btn.setForeground(AppColors.TEXT);
         btn.setBackground(AppColors.BTN_BG);
         btn.setOpaque(true); btn.setContentAreaFilled(true);

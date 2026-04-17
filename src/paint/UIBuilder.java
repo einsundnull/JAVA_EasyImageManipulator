@@ -127,7 +127,7 @@ class UIBuilder {
 		});
 
 		// M – Maps
-		ed.mapsBtn = UIComponentFactory.buildModeToggleBtn("M", "Maps ein-/ausblenden");
+		ed.mapsBtn = UIComponentFactory.buildModeToggleBtn("📝", "Maps ein-/ausblenden");
 		ed.mapsBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		ed.mapsBtn.setSelected(false);
 		ed.mapsBtn.addActionListener(e -> {
@@ -138,7 +138,7 @@ class UIBuilder {
 		});
 
 		// Drop zone toggle
-		ed.toggleDropZoneBtn = UIComponentFactory.buildModeToggleBtn("\u2193", "Drop-Feld");
+		ed.toggleDropZoneBtn = UIComponentFactory.buildModeToggleBtn("🧲", "Drop-Feld");
 		ed.toggleDropZoneBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		ed.toggleDropZoneBtn.setSelected(false);
 		ed.toggleDropZoneBtn.addActionListener(
@@ -189,12 +189,13 @@ class UIBuilder {
 		ed.canvasModeBtn.addActionListener(e -> ed.toggleCanvasMode());
 
 		// PT – Paint toolbar
-		ed.paintModeBtn = UIComponentFactory.buildModeToggleBtn("PT", "Paint-Leiste ein-/ausblenden");
+		ed.paintModeBtn = UIComponentFactory.buildModeToggleBtn("🎨", "Paint-Leiste ein-/ausblenden");
 		ed.paintModeBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		ed.paintModeBtn.addActionListener(e -> ed.togglePaintMode());
 
 		// BK – Book mode
-		ed.bookModeBtn = UIComponentFactory.buildModeToggleBtn("BK", "Buch-Modus");
+		ed.bookModeBtn = UIComponentFactory.buildModeToggleBtn("📘", "Buch-Modus");
+//		ed.bookModeBtn = UIComponentFactory.buildModeToggleBtn("B", "Buch-Modus");
 		ed.bookModeBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		ed.bookModeBtn.addActionListener(e -> ed.toggleBookMode());
 
@@ -214,7 +215,7 @@ class UIBuilder {
 
 		// Zoom controls
 		JButton zoomInBtn   = UIComponentFactory.buildButton("+",      AppColors.BTN_BG, AppColors.BTN_HOVER);
-		JButton zoomOutBtn  = UIComponentFactory.buildButton("\u2212", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		JButton zoomOutBtn  = UIComponentFactory.buildButton("-", AppColors.BTN_BG, AppColors.BTN_HOVER);
 		JButton zoomFitBtn  = UIComponentFactory.buildButton("Fit",    AppColors.BTN_BG, AppColors.BTN_HOVER);
 		JButton zoomResetBtn = UIComponentFactory.buildButton("1:1",   AppColors.BTN_BG, AppColors.BTN_HOVER);
 
