@@ -107,6 +107,14 @@ public class CanvasPanel extends JPanel {
 	private record TLine(int start, int end, String text) {}
 
 
+	// ── Free-path drawing state ──────────────────────────────────────────────────
+	/** Raw image-space points collected during FREE_PATH drag. null = not drawing. */
+	private java.util.List<java.awt.Point> freePathPoints = null;
+	/** Screen-space points for live preview during FREE_PATH drag. */
+	private java.util.List<java.awt.Point> freePathScreenPoints = null;
+	/** Snap threshold in image pixels: connect to existing path endpoint within this distance. */
+	private static final int FREE_PATH_SNAP = 12;
+
 	// ── Path editor state ────────────────────────────────────────────────────────
 	/** Index of the currently hovered path point (for PathLayer), or -1. */
 	private int hoveredPathPointIndex = -1;
@@ -590,6 +598,18 @@ public class CanvasPanel extends JPanel {
 						}
 						repaint();
 					}
+					case FREE_PATH, WAND_IV -> {
+						// Begin freehand path drawing; first point may snap to existing path endpoint
+						freePathPoints = new java.util.ArrayList<>();
+						freePathScreenPoints = new java.util.ArrayList<>();
+						Point snapped = snapToPathEndpoint(imgPt);
+						freePathPoints.add(snapped);
+						freePathScreenPoints.add(e.getPoint());
+						repaint();
+					}
+					case WAND_I -> handleWandI(imgPt);
+					case WAND_II -> handleWandII(imgPt);
+					case WAND_III -> handleWandIII(imgPt);
 					}
 				} else {
 					if (callbacks.isFloodfillMode()) {
@@ -848,6 +868,15 @@ public class CanvasPanel extends JPanel {
 						int bh = Math.max(2, Math.abs(imgPt.y - textDragStart.y));
 						textBoundingBox = new Rectangle(bx, by, bw, bh);
 						repaint();
+					} else if ((tool == PaintEngine.Tool.FREE_PATH || tool == PaintEngine.Tool.WAND_IV)
+							&& freePathPoints != null) {
+						// Collect raw image-space and screen-space points for live preview
+						Point last = freePathPoints.get(freePathPoints.size() - 1);
+						if (Math.abs(imgPt.x - last.x) > 1 || Math.abs(imgPt.y - last.y) > 1) {
+							freePathPoints.add(imgPt);
+							freePathScreenPoints.add(e.getPoint());
+							repaint();
+						}
 					}
 				} else if (callbacks.isAlphaPaintMode()) {
 					// Alpha Paint mode: draw transparent strokes with eraser-like tool
@@ -995,6 +1024,10 @@ public class CanvasPanel extends JPanel {
 								}
 							}
 						}
+					} else if (tool == PaintEngine.Tool.FREE_PATH && freePathPoints != null) {
+						commitFreePath(e.getPoint());
+					} else if (tool == PaintEngine.Tool.WAND_IV && freePathPoints != null) {
+						commitWandIV();
 					}
 				} else {
 					if (callbacks.isSelecting()) {
@@ -1912,6 +1945,182 @@ public class CanvasPanel extends JPanel {
 	}
 
 	/** Returns the topmost layer at screen point, or null. */
+	// ── Free-path helpers ─────────────────────────────────────────────────────
+
+	/**
+	 * Snaps an image-space point to the nearest endpoint of any existing PathLayer,
+	 * if within FREE_PATH_SNAP pixels. Returns snapped point or original.
+	 */
+	private Point snapToPathEndpoint(Point imgPt) {
+		for (Layer el : callbacks.getActiveElements()) {
+			if (!(el instanceof PathLayer pl)) continue;
+			java.util.List<Point3D> pts = pl.points();
+			if (pts.isEmpty()) continue;
+			// Check first and last point (endpoints)
+			for (int idx : new int[]{0, pts.size() - 1}) {
+				Point3D ep = pts.get(idx);
+				int ax = (int) Math.round(pl.x() + ep.x);
+				int ay = (int) Math.round(pl.y() + ep.y);
+				if (Math.abs(ax - imgPt.x) <= FREE_PATH_SNAP && Math.abs(ay - imgPt.y) <= FREE_PATH_SNAP)
+					return new Point(ax, ay);
+			}
+		}
+		return imgPt;
+	}
+
+	/**
+	 * Finalises a FREE_PATH drag: simplifies collected points, optionally snaps the
+	 * last point to an existing path endpoint, creates a PathLayer, and switches to
+	 * SELECT so the user can edit it immediately.
+	 */
+	private void commitFreePath(Point screenRelease) {
+		java.util.List<java.awt.Point> raw = freePathPoints;
+		freePathPoints       = null;
+		freePathScreenPoints = null;
+		if (raw == null || raw.size() < 2) { repaint(); return; }
+
+		// Snap last point to nearby endpoint
+		Point lastImg = raw.get(raw.size() - 1);
+		Point snappedLast = snapToPathEndpoint(lastImg);
+		if (!snappedLast.equals(lastImg))
+			raw.set(raw.size() - 1, snappedLast);
+
+		// Douglas-Peucker simplification (epsilon=2 image px)
+		java.util.List<java.awt.Point> simplified = PaintEngine.simplifyPath(raw, 2.0);
+		if (simplified.size() < 2) { repaint(); return; }
+
+		// Find bounding box of all points
+		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+		int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+		for (java.awt.Point p : simplified) {
+			minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+			maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+		}
+
+		// Convert to relative PathLayer coords (origin = minX, minY)
+		java.util.List<Point3D> pts = new java.util.ArrayList<>();
+		for (java.awt.Point p : simplified)
+			pts.add(new Point3D(p.x - minX, p.y - minY));
+
+		// Closed = first and last snap to same point
+		boolean closed = simplified.get(0).equals(simplified.get(simplified.size() - 1));
+
+		PathLayer newPath = PathLayer.of(callbacks.getNextElementId(), pts, null, closed, minX, minY);
+		callbacks.addElement(newPath);
+		callbacks.setSelectedElement(newPath);
+		callbacks.getPaintToolbar().setActiveTool(PaintEngine.Tool.SELECT);
+		callbacks.markDirty();
+		repaint();
+	}
+
+	/**
+	 * Wand IV – inwards collapse: simplify the drawn path, close it, then collapse
+	 * each vertex inward until it hits a pixel that is neither transparent nor the
+	 * secondary color (within the toolbar's wand-tolerance setting).
+	 */
+	private void commitWandIV() {
+		java.util.List<java.awt.Point> raw = freePathPoints;
+		freePathPoints       = null;
+		freePathScreenPoints = null;
+		if (raw == null || raw.size() < 3) { repaint(); return; }
+
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) { repaint(); return; }
+
+		// Densify the drawn outline so every edge contributes collapse candidates.
+		// This ensures the collapsed path has enough points to trace fine details,
+		// regardless of how fast or slow the user drew the initial boundary.
+		java.util.List<java.awt.Point> dense = PaintEngine.densifyPath(raw, 3);
+		if (dense.size() < 3) { repaint(); return; }
+
+		// Collapse each densified vertex inward toward content
+		java.awt.Color secColor = callbacks.getPaintToolbar().getSecondaryColor();
+		int            tolPct   = callbacks.getPaintToolbar().getWandTolerance();
+		java.util.List<java.awt.Point> collapsed =
+				PaintEngine.collapsePathInward(dense, img, secColor, tolPct);
+
+		// Light post-simplification to remove redundant collinear points while
+		// keeping the fine-grained shape discovered by the collapse
+		java.util.List<java.awt.Point> simplified = PaintEngine.simplifyPath(collapsed, 0.8);
+		if (simplified.size() < 3) { repaint(); return; }
+
+		// Build PathLayer
+		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+		for (java.awt.Point p : simplified) {
+			minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+		}
+		java.util.List<Point3D> pts = new java.util.ArrayList<>();
+		for (java.awt.Point p : simplified) pts.add(new Point3D(p.x - minX, p.y - minY));
+
+		PathLayer newPath = PathLayer.of(callbacks.getNextElementId(), pts, null, true, minX, minY);
+		callbacks.addElement(newPath);
+		callbacks.setSelectedElement(newPath);
+		callbacks.getPaintToolbar().setActiveTool(PaintEngine.Tool.SELECT);
+		callbacks.markDirty();
+		repaint();
+	}
+
+	// ── Magic Wand helpers ─────────────────────────────────────────────────────
+
+	private static final int WAND_TOLERANCE = 30;
+
+	/**
+	 * Wand I: flood-fill from click stopping at color boundaries, creates PathLayer outline.
+	 */
+	private void handleWandI(Point imgPt) {
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		boolean[][] region = PaintEngine.floodFillRegion(img, imgPt.x, imgPt.y, WAND_TOLERANCE);
+		createPathFromRegion(region, img.getWidth(), img.getHeight());
+	}
+
+	/**
+	 * Wand II: flood-fill from click stopping when hitting secondary color, creates PathLayer outline.
+	 */
+	private void handleWandII(Point imgPt) {
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		java.awt.Color stopColor = callbacks.getPaintToolbar().getSecondaryColor();
+		boolean[][] region = PaintEngine.floodFillRegionUntilColor(img, imgPt.x, imgPt.y, stopColor, WAND_TOLERANCE);
+		createPathFromRegion(region, img.getWidth(), img.getHeight());
+	}
+
+	/**
+	 * Wand III: flood-fill from click (same boundary logic as Wand I), directly clears region pixels.
+	 */
+	private void handleWandIII(Point imgPt) {
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		callbacks.pushUndo();
+		boolean[][] region = PaintEngine.floodFillRegion(img, imgPt.x, imgPt.y, WAND_TOLERANCE);
+		PaintEngine.clearRegionMask(img, region);
+		callbacks.markDirty();
+		repaint();
+	}
+
+	/** Shared: trace contour of region mask and create a PathLayer element. */
+	private void createPathFromRegion(boolean[][] region, int imgW, int imgH) {
+		int[][] contour = PaintEngine.traceContour(region, imgW, imgH);
+		if (contour == null || contour.length < 2) {
+			ToastNotification.show(null, "Kein Bereich gefunden");
+			return;
+		}
+
+		// Find bounding box
+		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+		for (int[] p : contour) { minX = Math.min(minX, p[0]); minY = Math.min(minY, p[1]); }
+
+		java.util.List<Point3D> pts = new java.util.ArrayList<>();
+		for (int[] p : contour) pts.add(new Point3D(p[0] - minX, p[1] - minY));
+
+		PathLayer newPath = PathLayer.of(callbacks.getNextElementId(), pts, null, true, minX, minY);
+		callbacks.addElement(newPath);
+		callbacks.setSelectedElement(newPath);
+		callbacks.getPaintToolbar().setActiveTool(PaintEngine.Tool.SELECT);
+		callbacks.markDirty();
+		repaint();
+	}
+
 	/**
 	 * Checks if a screen-space point is inside the polygon of the given PathLayer.
 	 * Used to detect click/drag inside the path area (not just on control points).
@@ -2046,6 +2255,25 @@ public class CanvasPanel extends JPanel {
 		// ── Canvas sub-mode draw overlay (in-progress stroke preview) ────────
 		if (canvasDrawOverlay != null) {
 			g2.drawImage(canvasDrawOverlay, 0, 0, cw, ch, null);
+		}
+
+		// ── Free-path live preview ────────────────────────────────────────────
+		if (freePathScreenPoints != null && freePathScreenPoints.size() >= 2) {
+			java.awt.Stroke savedStroke = g2.getStroke();
+			java.awt.Color savedColor   = g2.getColor();
+			g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+					java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+			g2.setStroke(new BasicStroke(2f));
+			g2.setColor(new java.awt.Color(80, 160, 255, 200));
+			java.util.List<java.awt.Point> sp = freePathScreenPoints;
+			for (int i = 1; i < sp.size(); i++)
+				g2.drawLine(sp.get(i-1).x, sp.get(i-1).y, sp.get(i).x, sp.get(i).y);
+			// Draw first point marker
+			java.awt.Point fp = sp.get(0);
+			g2.setColor(new java.awt.Color(255, 200, 60));
+			g2.fillOval(fp.x - 4, fp.y - 4, 8, 8);
+			g2.setStroke(savedStroke);
+			g2.setColor(savedColor);
 		}
 
 		// ── Element layers (non-destructive, rendered above base canvas) ──────

@@ -12,6 +12,7 @@ import java.awt.RenderingHints;
 import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
+import java.util.Arrays;
 import java.util.Stack;
 
 /**
@@ -24,7 +25,8 @@ public class PaintEngine {
 
     // ── Tool enum ─────────────────────────────────────────────────────────────
     public enum Tool {
-        PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT, TEXT, PATH
+        PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT, TEXT, PATH,
+        FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV
     }
 
     // ── Fill mode enum ────────────────────────────────────────────────────────
@@ -394,6 +396,279 @@ public class PaintEngine {
         g2.fillPolygon(xs, ys, xs.length);
         g2.dispose();
         return out;
+    }
+
+    // ── Magic Wand helpers ────────────────────────────────────────────────────
+
+    /**
+     * Flood-fill region gathering (Wand I): collects all pixels reachable from
+     * (x,y) whose color matches the start pixel within tolerance.
+     * Returns a boolean[width][height] mask of the filled region.
+     */
+    public static boolean[][] floodFillRegion(BufferedImage img, int x, int y, int tolerance) {
+        int w = img.getWidth(), h = img.getHeight();
+        if (x < 0 || x >= w || y < 0 || y >= h) return new boolean[w][h];
+        int targetARGB = img.getRGB(x, y);
+        boolean[][] region = new boolean[w][h];
+        Stack<Point> stack = new Stack<>();
+        stack.push(new Point(x, y));
+        while (!stack.isEmpty()) {
+            Point p = stack.pop();
+            if (p.x < 0 || p.x >= w || p.y < 0 || p.y >= h || region[p.x][p.y]) continue;
+            if (!colorsMatch(img.getRGB(p.x, p.y), targetARGB, tolerance)) continue;
+            region[p.x][p.y] = true;
+            stack.push(new Point(p.x + 1, p.y));
+            stack.push(new Point(p.x - 1, p.y));
+            stack.push(new Point(p.x, p.y + 1));
+            stack.push(new Point(p.x, p.y - 1));
+        }
+        return region;
+    }
+
+    /**
+     * Flood-fill region gathering (Wand II): collects all pixels reachable from
+     * (x,y), stopping when a pixel matches stopColor within stopTolerance.
+     * Returns a boolean[width][height] mask of the filled region.
+     */
+    public static boolean[][] floodFillRegionUntilColor(BufferedImage img, int x, int y,
+            Color stopColor, int stopTolerance) {
+        int w = img.getWidth(), h = img.getHeight();
+        if (x < 0 || x >= w || y < 0 || y >= h) return new boolean[w][h];
+        int stopARGB = stopColor.getRGB();
+        int startARGB = img.getRGB(x, y);
+        // If the starting pixel itself is the stop color, return empty region
+        if (colorsMatch(startARGB, stopARGB, stopTolerance)) return new boolean[w][h];
+        boolean[][] region = new boolean[w][h];
+        Stack<Point> stack = new Stack<>();
+        stack.push(new Point(x, y));
+        while (!stack.isEmpty()) {
+            Point p = stack.pop();
+            if (p.x < 0 || p.x >= w || p.y < 0 || p.y >= h || region[p.x][p.y]) continue;
+            int rgb = img.getRGB(p.x, p.y);
+            if (colorsMatch(rgb, stopARGB, stopTolerance)) continue;  // boundary
+            region[p.x][p.y] = true;
+            stack.push(new Point(p.x + 1, p.y));
+            stack.push(new Point(p.x - 1, p.y));
+            stack.push(new Point(p.x, p.y + 1));
+            stack.push(new Point(p.x, p.y - 1));
+        }
+        return region;
+    }
+
+    /**
+     * Clears (alpha=0) all pixels where region[x][y] == true (Wand III).
+     */
+    public static void clearRegionMask(BufferedImage img, boolean[][] region) {
+        int w = Math.min(img.getWidth(), region.length);
+        for (int x = 0; x < w; x++) {
+            int h = Math.min(img.getHeight(), region[x].length);
+            for (int y = 0; y < h; y++) {
+                if (region[x][y]) img.setRGB(x, y, 0x00000000);
+            }
+        }
+    }
+
+    /**
+     * Traces the outer boundary of a region mask using Moore-neighborhood tracing,
+     * then simplifies with Douglas-Peucker.
+     * Returns an array of [x, y] pairs as int[n][2], or null if region is empty.
+     */
+    public static int[][] traceContour(boolean[][] region, int imgW, int imgH) {
+        // Find any boundary pixel (leftmost of topmost row)
+        int startX = -1, startY = -1;
+        outer:
+        for (int y = 0; y < imgH; y++) {
+            for (int x = 0; x < imgW; x++) {
+                if (x < region.length && y < region[x].length && region[x][y]) {
+                    startX = x; startY = y;
+                    break outer;
+                }
+            }
+        }
+        if (startX < 0) return null;
+
+        // Simple boundary trace: walk around using 8-connectivity
+        java.util.List<int[]> boundary = new java.util.ArrayList<>();
+        int[] dx = {1, 1, 0, -1, -1, -1, 0, 1};
+        int[] dy = {0, 1, 1, 1, 0, -1, -1, -1};
+        // For each boundary pixel, emit centroid of that pixel
+        // Use a simple scan-based contour instead of Moore tracing to avoid complexity
+        for (int y = 0; y < imgH; y++) {
+            for (int x = 0; x < imgW; x++) {
+                if (!inRegion(region, x, y, imgW, imgH)) continue;
+                // Boundary pixel = has at least one 4-neighbor outside region
+                if (!inRegion(region, x-1, y, imgW, imgH) || !inRegion(region, x+1, y, imgW, imgH)
+                 || !inRegion(region, x, y-1, imgW, imgH) || !inRegion(region, x, y+1, imgW, imgH)) {
+                    boundary.add(new int[]{x, y});
+                }
+            }
+        }
+        if (boundary.isEmpty()) return null;
+
+        // Sort boundary pixels into a connected chain using nearest-neighbor
+        java.util.List<int[]> ordered = orderBoundary(boundary);
+
+        // Douglas-Peucker simplification
+        return douglasPeucker(ordered, 1.5);
+    }
+
+    private static boolean inRegion(boolean[][] region, int x, int y, int w, int h) {
+        if (x < 0 || y < 0 || x >= w || y >= h) return false;
+        if (x >= region.length || y >= region[x].length) return false;
+        return region[x][y];
+    }
+
+    private static java.util.List<int[]> orderBoundary(java.util.List<int[]> pts) {
+        if (pts.size() <= 2) return pts;
+        java.util.List<int[]> ordered = new java.util.ArrayList<>();
+        boolean[] used = new boolean[pts.size()];
+        int cur = 0;
+        used[0] = true;
+        ordered.add(pts.get(0));
+        for (int i = 1; i < pts.size(); i++) {
+            int bestIdx = -1;
+            double bestDist = Double.MAX_VALUE;
+            int[] c = ordered.get(ordered.size() - 1);
+            for (int j = 0; j < pts.size(); j++) {
+                if (used[j]) continue;
+                int[] p = pts.get(j);
+                double d = Math.hypot(c[0] - p[0], c[1] - p[1]);
+                if (d < bestDist) { bestDist = d; bestIdx = j; }
+            }
+            if (bestIdx < 0) break;
+            used[bestIdx] = true;
+            ordered.add(pts.get(bestIdx));
+        }
+        return ordered;
+    }
+
+    private static int[][] douglasPeucker(java.util.List<int[]> pts, double epsilon) {
+        if (pts.size() <= 2) return pts.stream().toArray(int[][]::new);
+        // Find point with max distance from line start-end
+        int[] start = pts.get(0), end = pts.get(pts.size() - 1);
+        double maxDist = 0;
+        int maxIdx = 0;
+        for (int i = 1; i < pts.size() - 1; i++) {
+            double d = pointToLineDist(pts.get(i), start, end);
+            if (d > maxDist) { maxDist = d; maxIdx = i; }
+        }
+        if (maxDist > epsilon) {
+            int[][] left  = douglasPeucker(pts.subList(0, maxIdx + 1), epsilon);
+            int[][] right = douglasPeucker(pts.subList(maxIdx, pts.size()), epsilon);
+            int[][] result = new int[left.length + right.length - 1][];
+            System.arraycopy(left,  0, result, 0,              left.length);
+            System.arraycopy(right, 1, result, left.length,    right.length - 1);
+            return result;
+        } else {
+            return new int[][]{start, end};
+        }
+    }
+
+    private static double pointToLineDist(int[] p, int[] a, int[] b) {
+        double dx = b[0] - a[0], dy = b[1] - a[1];
+        double len2 = dx * dx + dy * dy;
+        if (len2 == 0) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+        double t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+    }
+
+    /**
+     * Wand IV – inwards collapse.
+     * Takes a closed freehand polygon and collapses each vertex inward (toward
+     * centroid, 1 px per step) until the pixel under the vertex is neither
+     * transparent nor matches {@code secondaryColor} within the given tolerance.
+     *
+     * @param pts          polygon vertices in image-space
+     * @param img          the canvas image
+     * @param secondaryColor the "pass-through" color (treated like transparency)
+     * @param tolerancePct tolerance 0-100 % (how closely a pixel must match
+     *                     secondaryColor to be treated as "pass-through")
+     * @return new list of collapsed image-space vertices
+     */
+    public static java.util.List<java.awt.Point> collapsePathInward(
+            java.util.List<java.awt.Point> pts, java.awt.image.BufferedImage img,
+            java.awt.Color secondaryColor, int tolerancePct) {
+
+        if (pts == null || pts.size() < 3) return pts;
+        int w = img.getWidth(), h = img.getHeight();
+        int secRGB   = secondaryColor.getRGB();
+        int tolAbs   = tolerancePct * 255 / 100;
+
+        // Centroid used as "inward" direction reference
+        double cx = 0, cy = 0;
+        for (java.awt.Point p : pts) { cx += p.x; cy += p.y; }
+        cx /= pts.size(); cy /= pts.size();
+
+        java.util.List<java.awt.Point> result = new java.util.ArrayList<>();
+        for (java.awt.Point p : pts) {
+            double dx = cx - p.x, dy = cy - p.y;
+            double len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 0.5) { result.add(p); continue; }
+            dx /= len; dy /= len;  // unit vector toward centroid
+
+            double nx = p.x, ny = p.y;
+            java.awt.Point best = p;   // last "pass-through" position
+            while (true) {
+                nx += dx; ny += dy;
+                int ix = (int) Math.round(nx), iy = (int) Math.round(ny);
+                // Stop at image boundary or centroid overshoot
+                if (ix < 0 || ix >= w || iy < 0 || iy >= h) break;
+                if (Math.hypot(ix - cx, iy - cy) < 1.0) break; // reached centroid
+                int rgb   = img.getRGB(ix, iy);
+                int alpha = (rgb >>> 24) & 0xFF;
+                boolean isTransparent   = alpha == 0;
+                boolean isSecondaryLike = alpha > 0 && colorsMatch(rgb, secRGB, tolAbs);
+                if (isTransparent || isSecondaryLike) {
+                    best = new java.awt.Point(ix, iy);  // still pass-through, keep moving
+                } else {
+                    best = new java.awt.Point(ix, iy);  // stop at the first blocking pixel
+                    break;
+                }
+            }
+            result.add(best);
+        }
+        return result;
+    }
+
+    /**
+     * Densifies a path by inserting interpolated points so no consecutive gap
+     * exceeds {@code maxGapPx} image pixels.  Used before inward collapse so the
+     * result has enough vertices to trace fine content edges.
+     */
+    public static java.util.List<java.awt.Point> densifyPath(
+            java.util.List<java.awt.Point> pts, int maxGapPx) {
+        if (pts == null || pts.size() < 2) return pts;
+        java.util.List<java.awt.Point> out = new java.util.ArrayList<>();
+        for (int i = 0; i < pts.size(); i++) {
+            java.awt.Point a = pts.get(i);
+            java.awt.Point b = pts.get((i + 1) % pts.size());
+            out.add(a);
+            double dist = Math.hypot(b.x - a.x, b.y - a.y);
+            int steps = (int) Math.ceil(dist / maxGapPx);
+            for (int s = 1; s < steps; s++) {
+                double t = (double) s / steps;
+                out.add(new java.awt.Point(
+                        (int) Math.round(a.x + t * (b.x - a.x)),
+                        (int) Math.round(a.y + t * (b.y - a.y))));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Simplifies a list of image-space points using Douglas-Peucker.
+     * Used for freehand path simplification.
+     */
+    public static java.util.List<java.awt.Point> simplifyPath(
+            java.util.List<java.awt.Point> pts, double epsilon) {
+        if (pts.size() <= 2) return new java.util.ArrayList<>(pts);
+        int[][] arr = pts.stream().map(p -> new int[]{p.x, p.y}).toArray(int[][]::new);
+        java.util.List<int[]> list = new java.util.ArrayList<>(java.util.Arrays.asList(arr));
+        int[][] simplified = douglasPeucker(list, epsilon);
+        java.util.List<java.awt.Point> result = new java.util.ArrayList<>();
+        for (int[] pt : simplified) result.add(new java.awt.Point(pt[0], pt[1]));
+        return result;
     }
 
     // Helpers

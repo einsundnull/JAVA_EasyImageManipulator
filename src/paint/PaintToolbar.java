@@ -102,6 +102,7 @@ public class PaintToolbar extends JPanel {
     private PaintEngine.FillMode      fillMode       = PaintEngine.FillMode.SOLID;
     private PaintEngine.BrushShape    brushShape     = PaintEngine.BrushShape.ROUND;
     private boolean                   antialias      = true;
+    private int                       wandTolerance  = 20;  // 0-100 %
 
     // ── UI refs ───────────────────────────────────────────────────────────────
     private JLabel              colorPrimaryPreview;
@@ -116,6 +117,8 @@ public class PaintToolbar extends JPanel {
     private boolean             pickingSecondary = false;
     private java.util.Map<PaintEngine.Tool, javax.swing.JToggleButton> toolButtons = new java.util.HashMap<>();
     private JToggleButton rulerBtn;
+    private JSlider       wandTolSlider;
+    private JLabel        wandTolLabel;
 
     // =========================================================================
     // Constructor
@@ -175,6 +178,7 @@ public class PaintToolbar extends JPanel {
     public PaintEngine.FillMode   getFillMode()       { return fillMode; }
     public PaintEngine.BrushShape getBrushShape()     { return brushShape; }
     public boolean                isAntialiasing()    { return antialias; }
+    public int                    getWandTolerance()  { return wandTolerance; }
 
     public void setSelectedColor(Color c) {
         primaryColor = c;
@@ -264,6 +268,8 @@ public class PaintToolbar extends JPanel {
         strip.add(buildFillBrush());
         strip.add(vSep());
         strip.add(buildAntialias());
+        strip.add(vSep());
+        strip.add(buildWandTolerance());
         strip.add(vSep());
         strip.add(buildTransforms());
         strip.add(vSep());
@@ -453,6 +459,29 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
+    // ── Wand tolerance slider (0-100 %) ──────────────────────────────────────
+    private JPanel buildWandTolerance() {
+        JPanel p = new JPanel(new java.awt.GridLayout(2, 3, 4, 2));
+        p.setOpaque(false);
+        p.setPreferredSize(new Dimension(130, BTN_SIZE));
+        p.setMaximumSize(new Dimension(130, BTN_SIZE));
+        p.setMinimumSize(new Dimension(130, BTN_SIZE));
+
+        wandTolSlider = styledSlider(0, 100, wandTolerance, 80);
+        wandTolLabel  = miniLabel(wandTolerance + "%");
+        wandTolSlider.addChangeListener(e -> {
+            wandTolerance = wandTolSlider.getValue();
+            wandTolLabel.setText(wandTolerance + "%");
+        });
+
+        p.add(miniLabel("% Abw."));
+        p.add(wandTolSlider);
+        p.add(wandTolLabel);
+        // empty second row – keeps grid balanced
+        p.add(new JLabel()); p.add(new JLabel()); p.add(new JLabel());
+        return p;
+    }
+
     // ── Transform buttons ─────────────────────────────────────────────────────
     private JPanel buildTransforms() {
         JPanel p = hBox();
@@ -546,6 +575,11 @@ public class PaintToolbar extends JPanel {
             case SELECT     -> new String[]{ "⬚", "Auswahl (S)"    };
             case TEXT       -> new String[]{ "A", "Text (T)"       };
             case PATH       -> new String[]{ "≈", "Pfad (K)"       };
+            case FREE_PATH  -> new String[]{ "✏", "Freihand-Pfad (J)"  };
+            case WAND_I     -> new String[]{ "⚡", "Zauberstab I – andere Farbe (1)" };
+            case WAND_II    -> new String[]{ "⚡", "Zauberstab II – Zielfarbe (2)"   };
+            case WAND_III   -> new String[]{ "⚡", "Zauberstab III – Transparent (3)" };
+            case WAND_IV    -> new String[]{ "⚡", "Zauberstab IV – Inwards Collapse (4)" };
         };
     }
 
