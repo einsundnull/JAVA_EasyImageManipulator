@@ -127,6 +127,12 @@ public abstract class BaseSidebarPanel extends JPanel {
     protected JPanel buildSidebarHeader(String title, Runnable onRefresh,
                                         java.util.function.Consumer<Boolean> onAllOnlyToggle,
                                         Runnable onClose) {
+        return buildSidebarHeader(title, onRefresh, onAllOnlyToggle, onClose, null);
+    }
+
+    protected JPanel buildSidebarHeader(String title, Runnable onRefresh,
+                                        java.util.function.Consumer<Boolean> onAllOnlyToggle,
+                                        Runnable onClose, Runnable onTitleClick) {
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(new Color(42, 42, 42));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
@@ -136,6 +142,14 @@ public abstract class BaseSidebarPanel extends JPanel {
         titleLbl.setForeground(AppColors.TEXT_MUTED);
         titleLbl.setFont(new Font("SansSerif", Font.BOLD, 11));
         titleLbl.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 4));
+        if (onTitleClick != null) {
+            titleLbl.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            titleLbl.addMouseListener(new MouseAdapter() {
+                @Override public void mouseClicked(MouseEvent e) { onTitleClick.run(); }
+                @Override public void mouseEntered(MouseEvent e) { titleLbl.setForeground(AppColors.TEXT); }
+                @Override public void mouseExited (MouseEvent e) { titleLbl.setForeground(AppColors.TEXT_MUTED); }
+            });
+        }
         header.add(titleLbl, BorderLayout.CENTER);
 
         // ── East side: all/only toggle (optional) + refresh button (optional) + close button (optional) ─

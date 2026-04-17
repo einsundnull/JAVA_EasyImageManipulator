@@ -392,6 +392,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	void doNewBitmap()                     { newFileController.doNewBitmap(); }
 	void doNewBitmapForCanvas(int idx)     { newFileController.doNewBitmapForCanvas(idx); }
 	void openSecondGalleryDir(int idx)     { fileLoader.openSecondGalleryDir(idx); }
+	void loadFileIntoGallery2(File f, int idx) { fileLoader.loadFileIntoGallery2(f, idx); }
 	TileGalleryPanel.Callbacks buildGallery2Callbacks(int idx) { return GalleryCallbacksFactory.buildGallery2(this, idx); }
 	private void showCanvasBgDialog()      { newFileController.showCanvasBgDialog(); }
 	private void toggleQuickBG()           { newFileController.toggleQuickBG(); }

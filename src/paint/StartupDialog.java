@@ -45,10 +45,16 @@ public class StartupDialog extends JDialog {
 
     private File selectedPath = null;
     private String selectedCategory = LastProjectsManager.CAT_IMAGES;
+    /** 0 = primary gallery, 1 = first extra gallery (tileGallery2), etc. */
+    private int selectedGallerySlot = 0;
     private final Map<String, List<String>> recentByCategory;
     private final Mode mode;
     private final int canvasIdx;
     private final String initialCategory;
+
+    private static final int NUM_BASE_TABS = 6;
+    private int extraTabCount = 0;
+    private boolean addingTab = false;
 
     // Alt-Konstruktor (Startup-Modus, rückwärtskompatibel)
     public StartupDialog(JFrame owner, Map<String, List<String>> recentByCategory) {
@@ -105,7 +111,6 @@ public class StartupDialog extends JDialog {
             String cat = categories[i];
             List<String> paths = new ArrayList<>(recentByCategory.getOrDefault(cat, new ArrayList<>()));
 
-            // Augment CAT_GAMES with live-scanned game directories from AppData\Games\
             if (cat.equals(LastProjectsManager.CAT_GAMES)) {
                 File gamesDir = SceneLocator.getAppDataGamesDir();
                 if (gamesDir.exists()) {
@@ -113,25 +118,44 @@ public class StartupDialog extends JDialog {
                     if (gameDirs != null) {
                         for (File gameDir : gameDirs) {
                             String absPath = gameDir.getAbsolutePath();
-                            if (!paths.contains(absPath)) {
-                                paths.add(absPath);
-                            }
+                            if (!paths.contains(absPath)) paths.add(absPath);
                         }
                     }
                 }
             }
 
             JPanel tabPanel = (cat.equals(LastProjectsManager.CAT_IMAGES))
-                    ? createImagesPanel(paths)
+                    ? createImagesPanel(paths, 0)
                     : createCategoryTab(paths, cat);
             tabPane.addTab(capitalize(cat), tabPanel);
             if (cat.equals(initialCategory)) initialTabIndex = i;
         }
+
+        // "+" pseudo-tab — always the last tab
+        tabPane.addTab("+", new JPanel());
+
         tabPane.setSelectedIndex(initialTabIndex);
         tabPane.addChangeListener(e -> {
+            if (addingTab) return;
             int sel = tabPane.getSelectedIndex();
-            if (sel >= 0 && sel < categories.length)
+            int plusIdx = tabPane.getTabCount() - 1;
+            if (sel == plusIdx) {
+                addingTab = true;
+                try {
+                    addExtraGalleryTab(tabPane);
+                } finally {
+                    addingTab = false;
+                }
+                return;
+            }
+            if (sel >= NUM_BASE_TABS) {
+                // Extra gallery tab: slot = 1-based index among extras
+                selectedGallerySlot = sel - NUM_BASE_TABS + 1;
+                selectedCategory = LastProjectsManager.CAT_IMAGES;
+            } else if (sel >= 0 && sel < categories.length) {
+                selectedGallerySlot = 0;
                 selectedCategory = categories[sel];
+            }
         });
 
         JPanel centerPanel = new JPanel(new BorderLayout());
@@ -189,6 +213,20 @@ public class StartupDialog extends JDialog {
 
         setContentPane(mainPanel);
         setUndecorated(false);
+    }
+
+    private void addExtraGalleryTab(JTabbedPane tabPane) {
+        extraTabCount++;
+        int slot = extraTabCount; // slot 1, 2, 3…
+        String tabTitle = "Bilder " + (slot + 1);
+        List<String> paths = new ArrayList<>(recentByCategory.getOrDefault(
+                LastProjectsManager.CAT_IMAGES, new ArrayList<>()));
+        JPanel panel = createImagesPanel(paths, slot);
+        int insertIdx = tabPane.getTabCount() - 1; // before "+"
+        tabPane.insertTab(tabTitle, null, panel, "Liste " + (slot + 1) + " – lädt in zweite Gallery", insertIdx);
+        tabPane.setSelectedIndex(insertIdx);
+        selectedGallerySlot = slot;
+        selectedCategory = LastProjectsManager.CAT_IMAGES;
     }
 
     private JTabbedPane createStyledTabbedPane() {
@@ -251,8 +289,9 @@ public class StartupDialog extends JDialog {
 
     /**
      * Special panel for Images with delete buttons per item.
+     * @param gallerySlot 0 = primary gallery, 1+ = extra gallery slots
      */
-    private JPanel createImagesPanel(List<String> paths) {
+    private JPanel createImagesPanel(List<String> paths, int gallerySlot) {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(AppColors.BG_DARK);
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -293,6 +332,7 @@ public class StartupDialog extends JDialog {
                     System.err.println("[ERROR] Konnte Eintrag nicht löschen: " + e.getMessage());
                 }
             }, () -> {
+                selectedGallerySlot = gallerySlot;
                 selectedPath = new File(path);
                 dispose();
             });
@@ -534,6 +574,8 @@ public class StartupDialog extends JDialog {
 
     public File getSelectedPath() { return selectedPath; }
     public String getSelectedCategory() { return selectedCategory; }
+    /** 0 = primary gallery, 1 = tileGallery2, 2 = tileGallery3 (future), … */
+    public int getSelectedGallerySlot() { return selectedGallerySlot; }
     public int getCanvasIdx() { return canvasIdx; }
 
     public Mode getMode() {

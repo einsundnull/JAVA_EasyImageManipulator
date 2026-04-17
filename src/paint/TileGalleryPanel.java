@@ -101,15 +101,21 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
+    private static final java.awt.Color HEADER_BG_NORMAL      = new java.awt.Color(42, 42, 42);
+    private static final java.awt.Color HEADER_BG_HIGHLIGHTED  = new java.awt.Color(38, 58, 80);
+
     private final Callbacks       callbacks;
     private final FilePreloadCallback filePreloadCallback;
     private final List<TilePanel> tiles          = new ArrayList<>();
     private final List<File>      selectedImages = new ArrayList<>();
     private       boolean         multiSelectMode = false;
     private       File            activeFile      = null;
+    private final Runnable[]      onHeaderClickRef = {null};
     private       java.util.Set<File> dirtyFiles = new java.util.HashSet<>();
     private       boolean         showAll = false;  // Toggle: false = Only, true = All
     private       File            linkedScene = null;  // Scene to filter by when in "Only" mode
+    private       boolean         highlighted = false;
+    private final Runnable[]      onActivatedRef = {null};
     /** When set, replaces the default copy-to-directory behavior on javaFileListFlavor drops. */
     private java.util.function.Consumer<List<File>> fileDropOverride = null;
 
@@ -117,6 +123,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     private final JPanel      tilesContainer;
     private final JScrollPane galleryScroll;
     private final JPanel      actionRow;
+    private       JPanel      sidebarHeader;
 
     // =========================================================================
     // Constructor
@@ -143,6 +150,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         setLayout(new BorderLayout());
         setBackground(new Color(36, 36, 36));
         setPreferredSize(new Dimension(GALLERY_W, 0));
+        setMaximumSize(new Dimension(GALLERY_W, Integer.MAX_VALUE));
         setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 0, 1, AppColors.BORDER),
                 BorderFactory.createEmptyBorder(0, 0, 16, 0)));
@@ -150,14 +158,13 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         Runnable refreshAction = onRefresh != null ? onRefresh : this::refreshGallery;
 
         // ── Header mit All/Only Toggle, Refresh-Button ──────────────────────
-        JPanel header = buildSidebarHeader(title, refreshAction, isAll -> {
-            // Toggle between All Images vs Only Images of the Scene
+        sidebarHeader = buildSidebarHeader(title, refreshAction, isAll -> {
             showAll = isAll;
-            // Redraw all tiles to reflect linked/unlinked status
-            for (TilePanel t : tiles) {
-                t.repaint();
-            }
-        }, onClose);
+            for (TilePanel t : tiles) t.repaint();
+        }, onClose, () -> {
+            if (onActivatedRef[0] != null) onActivatedRef[0].run();
+            if (onHeaderClickRef[0] != null && activeFile != null) onHeaderClickRef[0].run();
+        });
 
         // ── Select-All / Deselect-All (initially hidden) ──────────────────────
         actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
@@ -175,7 +182,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         JPanel north = new JPanel();
         north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
         north.setBackground(new Color(42, 42, 42));
-        north.add(header);
+        north.add(sidebarHeader);
         north.add(actionRow);
         add(north, BorderLayout.NORTH);
 
@@ -289,6 +296,23 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     }
 
     /** Full refresh – called when a new directory is loaded. */
+    /** Returns the currently active (highlighted) file, or null if none. */
+    public File getActiveFile() { return activeFile; }
+
+    /** Called when the user clicks the gallery header title — typically re-shows the active file. */
+    public void setOnHeaderClick(Runnable r) { onHeaderClickRef[0] = r; }
+
+    public void setHighlighted(boolean h) {
+        if (highlighted == h) return;
+        highlighted = h;
+        if (sidebarHeader != null) {
+            sidebarHeader.setBackground(h ? HEADER_BG_HIGHLIGHTED : HEADER_BG_NORMAL);
+            sidebarHeader.repaint();
+        }
+    }
+
+    public void setOnActivated(Runnable r) { onActivatedRef[0] = r; }
+
     public void setFiles(List<File> files, File active) {
         activeFile = active;
         tiles.clear();
@@ -513,6 +537,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             callbacks.onSelectionChanged(getSelectedImages());
         } else {
             // Single click → open image
+            if (onActivatedRef[0] != null) onActivatedRef[0].run();
             setActiveFile(tile.imageFile);
             callbacks.onTileOpened(tile.imageFile);
         }
@@ -797,6 +822,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
+            g2.clipRect(0, 0, getWidth(), getHeight());
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             int w = getWidth();
 

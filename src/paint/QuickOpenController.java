@@ -39,6 +39,14 @@ class QuickOpenController {
 			if (chosen == null)
 				return;
 			String category = dlg.getSelectedCategory();
+			int gallerySlot = dlg.getSelectedGallerySlot();
+
+			// Extra gallery slot: load into secondary gallery panel
+			if (gallerySlot >= 1) {
+				ed.fileLoader.indexDirectory2(chosen, canvasIdx);
+				return;
+			}
+
 			if (chosen.isDirectory()) {
 				// GameII game directory: has scenes/ subdir → open first scene
 				File scenesSubDir = new File(chosen, "scenes");

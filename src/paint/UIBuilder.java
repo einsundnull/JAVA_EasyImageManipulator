@@ -303,22 +303,7 @@ class UIBuilder {
 		left.add(ed.filmstripBtn2);
 		left.add(ed.firstElementsBtn);
 		left.add(ed.firstCanvasBtn);
-		// Folder I: small "+" above the main folder button
-		JPanel folderIStack = new JPanel();
-		folderIStack.setLayout(new BoxLayout(folderIStack, BoxLayout.Y_AXIS));
-		folderIStack.setOpaque(false);
-		JButton addDirIBtn = UIComponentFactory.buildButton("+", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		addDirIBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
-		addDirIBtn.setToolTipText("Zweiten Bilderbrowser für Canvas I öffnen");
-		addDirIBtn.setForeground(AppColors.TEXT);
-		addDirIBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, 13));
-		addDirIBtn.setMaximumSize(new Dimension(ed.TOPBAR_BTN_W, 13));
-		addDirIBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-		addDirIBtn.addActionListener(e -> ed.openSecondGalleryDir(0));
-		ed.quickOpenBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-		folderIStack.add(addDirIBtn);
-		folderIStack.add(ed.quickOpenBtn);
-		left.add(folderIStack);
+		left.add(ed.quickOpenBtn);
 		JButton newIBtn = UIComponentFactory.buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
 		newIBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		newIBtn.setToolTipText("Neue Datei für Canvas I");
@@ -374,22 +359,7 @@ class UIBuilder {
 		newIIBtn.setForeground(AppColors.TEXT);
 		newIIBtn.addActionListener(e -> ed.doNewBitmapForCanvas(1));
 		right.add(newIIBtn);
-		// Folder II: small "+" above the main folder button
-		JPanel folderIIStack = new JPanel();
-		folderIIStack.setLayout(new BoxLayout(folderIIStack, BoxLayout.Y_AXIS));
-		folderIIStack.setOpaque(false);
-		JButton addDirIIBtn = UIComponentFactory.buildButton("+", AppColors.BTN_BG, AppColors.BTN_HOVER);
-		addDirIIBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
-		addDirIIBtn.setToolTipText("Zweiten Bilderbrowser für Canvas II öffnen");
-		addDirIIBtn.setForeground(AppColors.TEXT);
-		addDirIIBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, 13));
-		addDirIIBtn.setMaximumSize(new Dimension(ed.TOPBAR_BTN_W, 13));
-		addDirIIBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-		addDirIIBtn.addActionListener(e -> ed.openSecondGalleryDir(1));
-		openFolderII.setAlignmentX(Component.CENTER_ALIGNMENT);
-		folderIIStack.add(addDirIIBtn);
-		folderIIStack.add(openFolderII);
-		right.add(folderIIStack);
+		right.add(openFolderII);
 		right.add(ed.secondCanvasBtn);
 		right.add(ed.secondElementsBtn);
 		right.add(ed.secondGalleryBtn);
@@ -661,6 +631,10 @@ class UIBuilder {
 		});
 
 		c.tileGallery = new TileGalleryPanel(ed.buildGalleryCallbacks(idx), ed.buildGalleryPreloadCallback(idx));
+		c.tileGallery.setOnHeaderClick(() -> {
+			java.io.File f = c.tileGallery.getActiveFile();
+			if (f != null) ed.loadFile(f, idx);
+		});
 		c.tileGallery.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
@@ -695,9 +669,13 @@ class UIBuilder {
 				"Bilder 2", () -> {
 					c.tileGallery2.setVisible(false);
 					javax.swing.JToggleButton btn = idx == 0 ? ed.filmstripBtn2 : ed.secondGalleryBtn2;
-					if (btn != null) btn.setSelected(false);
+					if (btn != null) { btn.setSelected(false); btn.setVisible(false); }
 					ed.updateLayoutVisibility();
 				});
+		c.tileGallery2.setOnHeaderClick(() -> {
+			java.io.File f = c.tileGallery2.getActiveFile();
+			if (f != null) ed.loadFileIntoGallery2(f, idx);
+		});
 		c.tileGallery2.addMouseListener(new MouseAdapter() {
 			@Override public void mousePressed(MouseEvent e) {
 				if (ed.activeCanvasIndex != idx)
@@ -728,6 +706,16 @@ class UIBuilder {
 				}
 			}
 		}
+
+		// Mutual highlight: whichever gallery is activated gets the header highlight
+		c.tileGallery.setOnActivated(() -> {
+			c.tileGallery.setHighlighted(true);
+			if (c.tileGallery2 != null) c.tileGallery2.setHighlighted(false);
+		});
+		c.tileGallery2.setOnActivated(() -> {
+			c.tileGallery2.setHighlighted(true);
+			c.tileGallery.setHighlighted(false);
+		});
 
 		c.scenesPanel = new TileGalleryPanel(ed.buildScenesCallbacks(idx), null, "Szenen",
 				() -> ed.setScenesPanelVisible(idx, false),

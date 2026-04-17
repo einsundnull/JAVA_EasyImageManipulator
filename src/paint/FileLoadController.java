@@ -22,9 +22,21 @@ import javax.swing.SwingUtilities;
 class FileLoadController {
 
 	private final SelectiveAlphaEditor ed;
+	/** When true, loadFile() updates tileGallery2 instead of tileGallery. */
+	private boolean gallery2Mode = false;
 
 	FileLoadController(SelectiveAlphaEditor ed) {
 		this.ed = ed;
+	}
+
+	/** Load a file and reflect it in the secondary gallery (tileGallery2) only. */
+	void loadFileIntoGallery2(File file, int idx) {
+		gallery2Mode = true;
+		try {
+			loadFile(file, idx);
+		} finally {
+			gallery2Mode = false;
+		}
 	}
 
 	private static final String[] SUPPORTED_EXTENSIONS = { "png", "jpg", "jpeg", "bmp", "gif" };
@@ -144,8 +156,12 @@ class FileLoadController {
 
 		// Book pages are navigated via BookPagesPanel — never touch the TileGallery
 		boolean isPage = PageLayoutManifest.isBookPage(file);
-		if (!isPage && !file.getParentFile().equals(new File(System.getProperty("java.io.tmpdir"))))
-			indexDirectory(file, idx);
+		if (!isPage && !file.getParentFile().equals(new File(System.getProperty("java.io.tmpdir")))) {
+			if (gallery2Mode)
+				indexDirectory2(file, idx);
+			else
+				indexDirectory(file, idx);
+		}
 		swapToImageView(idx);
 
 		CanvasInstance.PreloadedFileState preloaded = c.preloadCache.get(file);
@@ -305,19 +321,30 @@ class FileLoadController {
 		indexDirectory2(chooser.getSelectedFile(), idx);
 	}
 
-	/** Indexes a directory into canvas {@code idx}'s second gallery panel. */
-	void indexDirectory2(File dir, int idx) {
+	/** Indexes a directory (or a file's parent directory) into canvas {@code idx}'s second gallery. */
+	void indexDirectory2(File fileOrDir, int idx) {
+		File dir = (fileOrDir != null && fileOrDir.isFile()) ? fileOrDir.getParentFile() : fileOrDir;
 		if (dir == null || !dir.isDirectory()) return;
 		CanvasInstance c = ed.ci(idx);
+		if (dir.equals(c.lastIndexedDir2)) {
+			// Same directory — just highlight the clicked file
+			if (fileOrDir != null && fileOrDir.isFile() && c.tileGallery2 != null)
+				c.tileGallery2.setActiveFile(fileOrDir);
+			c.currentImageIndex2 = c.directoryImages2.indexOf(fileOrDir);
+			return;
+		}
 		File[] files = dir.listFiles(f -> f.isFile() && SelectiveAlphaEditor.isSupportedFile(f));
 		if (files == null) files = new File[0];
 		Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
 		c.directoryImages2 = new ArrayList<>(Arrays.asList(files));
 		c.lastIndexedDir2 = dir;
+		File activeFile = (fileOrDir != null && fileOrDir.isFile()) ? fileOrDir
+				: (files.length > 0 ? files[0] : null);
 		if (c.tileGallery2 != null) {
-			c.tileGallery2.setFiles(c.directoryImages2, files.length > 0 ? files[0] : null);
+			c.tileGallery2.setFiles(c.directoryImages2, activeFile);
 			c.tileGallery2.setVisible(true);
 		}
+		c.currentImageIndex2 = c.directoryImages2.indexOf(activeFile);
 		javax.swing.JToggleButton btn = idx == 0 ? ed.filmstripBtn2 : ed.secondGalleryBtn2;
 		if (btn != null) { btn.setVisible(true); btn.setSelected(true); }
 

@@ -115,7 +115,7 @@ class GalleryCallbacksFactory {
 			public void onTileOpened(File f) {
 				if (ed.ci(idx).scenesPanel != null)
 					ed.ci(idx).scenesPanel.clearActiveAndSelection();
-				ed.loadFile(f, idx);
+				ed.loadFileIntoGallery2(f, idx);
 			}
 
 			@Override
