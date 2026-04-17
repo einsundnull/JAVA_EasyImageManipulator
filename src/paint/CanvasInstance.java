@@ -106,6 +106,10 @@ public class CanvasInstance {
     public JLayeredPane     layeredPane;
     public JPanel           dropHintPanel;
     public TileGalleryPanel tileGallery;
+    public TileGalleryPanel tileGallery2;    // Second image browser (optional second directory)
+    public List<File>       directoryImages2  = new ArrayList<>();
+    public int              currentImageIndex2 = -1;
+    public File             lastIndexedDir2;
     public TileGalleryPanel scenesPanel;     // Scene browser for Tool/Game scenes
     public JButton          prevNavButton;
     public JButton          nextNavButton;

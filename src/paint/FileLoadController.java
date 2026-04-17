@@ -166,6 +166,26 @@ class FileLoadController {
 		// Notify page-layout toolbar so it can load the page's .layout manifest
 		if (ed.pageLayoutToolbar != null)
 			ed.pageLayoutToolbar.loadFromPage(file);
+
+		// Ensure book pages always have a wrapping TextLayer
+		if (isPage && c.workingImage != null && ed.pageLayoutToolbar != null) {
+			boolean hasWrapping = false;
+			for (Layer l : c.activeElements)
+				if (l instanceof TextLayer tl && tl.isWrapping()) { hasWrapping = true; break; }
+			if (!hasWrapping) {
+				PageLayout pl = ed.pageLayoutToolbar.getPageLayout();
+				if (pl != null) {
+					int w = c.workingImage.getWidth(), h = c.workingImage.getHeight();
+					int mL = pl.marginLeftPx(), mT = pl.marginTopPx();
+					int mR = pl.marginRightPx(), mB = pl.marginBottomPx();
+					int cw = Math.max(1, w - mL - mR), ch = Math.max(1, h - mT - mB);
+					c.activeElements.add(TextLayer.wrappingOf(
+							c.nextElementId++, "", "SansSerif", 12,
+							false, false, java.awt.Color.BLACK, mL, mT, cw, ch));
+					ed.refreshElementPanel();
+				}
+			}
+		}
 	}
 
 	/**
@@ -271,6 +291,41 @@ class FileLoadController {
 		}
 		c.currentImageIndex = c.directoryImages.indexOf(file);
 		c.tileGallery.setVisible(true);
+	}
+
+	/** Opens a directory chooser and loads the chosen folder into canvas {@code idx}'s second gallery. */
+	void openSecondGalleryDir(int idx) {
+		javax.swing.JFileChooser chooser = new javax.swing.JFileChooser();
+		chooser.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
+		chooser.setDialogTitle("Ordner für zweiten Bilderbrowser wählen (Canvas " + (idx + 1) + ")");
+		CanvasInstance c = ed.ci(idx);
+		if (c.lastIndexedDir2 != null)      chooser.setCurrentDirectory(c.lastIndexedDir2);
+		else if (c.lastIndexedDir != null)  chooser.setCurrentDirectory(c.lastIndexedDir);
+		if (chooser.showOpenDialog(ed) != javax.swing.JFileChooser.APPROVE_OPTION) return;
+		indexDirectory2(chooser.getSelectedFile(), idx);
+	}
+
+	/** Indexes a directory into canvas {@code idx}'s second gallery panel. */
+	void indexDirectory2(File dir, int idx) {
+		if (dir == null || !dir.isDirectory()) return;
+		CanvasInstance c = ed.ci(idx);
+		File[] files = dir.listFiles(f -> f.isFile() && SelectiveAlphaEditor.isSupportedFile(f));
+		if (files == null) files = new File[0];
+		Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+		c.directoryImages2 = new ArrayList<>(Arrays.asList(files));
+		c.lastIndexedDir2 = dir;
+		if (c.tileGallery2 != null) {
+			c.tileGallery2.setFiles(c.directoryImages2, files.length > 0 ? files[0] : null);
+			c.tileGallery2.setVisible(true);
+		}
+		javax.swing.JToggleButton btn = idx == 0 ? ed.filmstripBtn2 : ed.secondGalleryBtn2;
+		if (btn != null) { btn.setVisible(true); btn.setSelected(true); }
+
+		AppSettings settings = AppSettings.getInstance();
+		if (idx == 0) settings.setGallery2Dir0(dir.getAbsolutePath());
+		else          settings.setGallery2Dir1(dir.getAbsolutePath());
+		try { settings.save(); } catch (IOException ex) { /* non-fatal */ }
+		ed.updateLayoutVisibility();
 	}
 
 	void navigateImage(int dir) {

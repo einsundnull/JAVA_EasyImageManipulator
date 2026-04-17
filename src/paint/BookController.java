@@ -360,17 +360,25 @@ class BookController {
 				c.sourceFile         = pageFile;
 				c.hasUnsavedChanges  = false;
 
+				// Auto-create book wrapping TextLayer covering the content area
+				int contentX = withMargins ? mL : 0;
+				int contentY = withMargins ? mT : 0;
+				int contentW = withMargins ? (wPx - mL - mR) : wPx;
+				int contentH = withMargins ? (hPx - mT  - mB) : hPx;
+				c.activeElements.add(TextLayer.wrappingOf(
+						c.nextElementId++, "", "SansSerif", 12,
+						false, false, java.awt.Color.BLACK,
+						contentX, contentY, contentW, contentH));
+
 				// Add dropped image as centered ImageLayer (scaled to fit content area)
 				if (droppedImage != null) {
-					int contentW = wPx - mL - mR;
-					int contentH = hPx - mT  - mB;
 					double scale = Math.min(1.0,
 							Math.min((double) contentW / droppedImage.getWidth(),
 									 (double) contentH / droppedImage.getHeight()));
 					int iw = (int) Math.round(droppedImage.getWidth()  * scale);
 					int ih = (int) Math.round(droppedImage.getHeight() * scale);
-					int ix = mL + (contentW - iw) / 2;
-					int iy = mT + (contentH - ih) / 2;
+					int ix = contentX + (contentW - iw) / 2;
+					int iy = contentY + (contentH - ih) / 2;
 					c.activeElements.add(new ImageLayer(
 							c.nextElementId++, ed.deepCopy(droppedImage), ix, iy, iw, ih));
 				}

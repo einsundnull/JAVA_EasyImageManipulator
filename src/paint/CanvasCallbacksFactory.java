@@ -362,8 +362,16 @@ class CanvasCallbacksFactory {
 			public void commitTextLayer(int id, String text, String font, int size, boolean bold,
 					boolean italic, Color col, int x, int y) {
 				CanvasInstance ci = c();
-				TextLayer updated = (id >= 0) ? TextLayer.of(id, text, font, size, bold, italic, col, x, y)
-						: TextLayer.of(ci.nextElementId++, text, font, size, bold, italic, col, x, y);
+				// If the target layer is a wrapping TextLayer, preserve wrapping mode and bounds
+				Layer existing = null;
+				if (id >= 0) for (Layer el : ci.activeElements) if (el.id() == id) { existing = el; break; }
+				TextLayer updated;
+				if (existing instanceof TextLayer etl && etl.isWrapping()) {
+					updated = etl.withText(text, font, size, bold, italic, col);
+				} else {
+					updated = (id >= 0) ? TextLayer.of(id, text, font, size, bold, italic, col, x, y)
+							: TextLayer.of(ci.nextElementId++, text, font, size, bold, italic, col, x, y);
+				}
 				boolean found = false;
 				for (int i = 0; i < ci.activeElements.size(); i++) {
 					if (ci.activeElements.get(i).id() == updated.id()) {
@@ -553,6 +561,39 @@ class CanvasCallbacksFactory {
 			@Override
 			public Color getCanvasBg2() {
 				return ed.canvasBg2;
+			}
+
+			// ── Book / page layout ──
+			@Override
+			public PageLayout getPageLayout() {
+				return ed.pageLayoutToolbar != null ? ed.pageLayoutToolbar.getPageLayout() : null;
+			}
+
+			@Override
+			public boolean isBookMode() {
+				return ed.bookModeBtn != null && ed.bookModeBtn.isSelected();
+			}
+
+			@Override
+			public void showTextToolbar(String font, int size, boolean bold, boolean italic, java.awt.Color color) {
+				if (ed.textToolbar != null) {
+					ed.textToolbar.showToolbar(font, size, bold, italic, color);
+					ed.revalidate();
+				}
+			}
+
+			@Override
+			public void hideTextToolbar() {
+				if (ed.textToolbar != null) {
+					ed.textToolbar.hideToolbar();
+					ed.revalidate();
+				}
+			}
+
+			@Override
+			public void syncTextToolbar(String font, int size, boolean bold, boolean italic, java.awt.Color color) {
+				if (ed.textToolbar != null && ed.textToolbar.isVisible())
+					ed.textToolbar.setProps(font, size, bold, italic, color);
 			}
 		};
 	}

@@ -3,6 +3,7 @@ package paint;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.List;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
 
@@ -47,6 +48,7 @@ class PageLayoutToolbar extends JPanel {
 
     // ── Snap-mode toggles ─────────────────────────────────────────────────────
     private JToggleButton btnSnapNone, btnSnapLayer, btnSnapMargin;
+
 
     // ── Info label ────────────────────────────────────────────────────────────
     private JLabel pageNameLabel;
@@ -302,32 +304,91 @@ class PageLayoutToolbar extends JPanel {
     // Internal helpers
     // =========================================================================
 
-    /** Called on every control-value change: updates the layout field and saves the manifest. */
+    /** Called on every control-value change: saves manifest, live-repaints canvas, updates book TextLayer. */
     private void onChange(Runnable update) {
         update.run();
         if (currentPage != null)
             PageLayoutManifest.write(currentPage, layout);
+        // Live canvas repaint for margin overlay
+        CanvasInstance c = ed.ci();
+        if (c.canvasPanel != null) c.canvasPanel.repaint();
+        if (ed.showRuler) { if (ed.hRuler != null) ed.hRuler.repaint(); if (ed.vRuler != null) ed.vRuler.repaint(); }
+        updateBookTextLayerBounds();
+    }
+
+    /**
+     * Called from ruler drag handles to update a single margin value and propagate changes.
+     *
+     * @param isHorizontal true = L/R margins (H ruler), false = T/B (V ruler)
+     * @param isFirst      true = left/top, false = right/bottom
+     * @param newMm        new margin in mm (clamped to [0, 150])
+     */
+    void setMarginFromRuler(boolean isHorizontal, boolean isFirst, int newMm) {
+        int clamped = Math.max(0, Math.min(150, newMm));
+        if (isHorizontal) {
+            if (isFirst) { layout.marginLeft   = clamped; if (spLeft   != null) spLeft  .setValue(clamped); }
+            else         { layout.marginRight  = clamped; if (spRight  != null) spRight .setValue(clamped); }
+        } else {
+            if (isFirst) { layout.marginTop    = clamped; if (spTop    != null) spTop   .setValue(clamped); }
+            else         { layout.marginBottom = clamped; if (spBottom != null) spBottom.setValue(clamped); }
+        }
+        if (currentPage != null) PageLayoutManifest.write(currentPage, layout);
+        CanvasInstance c = ed.ci();
+        if (c.canvasPanel != null) c.canvasPanel.repaint();
+        if (ed.showRuler) { if (ed.hRuler != null) ed.hRuler.repaint(); if (ed.vRuler != null) ed.vRuler.repaint(); }
+        updateBookTextLayerBounds();
+    }
+
+    /** Repositions the book wrapping TextLayer to match current content area. */
+    private void updateBookTextLayerBounds() {
+        CanvasInstance c = ed.ci();
+        if (c.workingImage == null) return;
+        int imgW = c.workingImage.getWidth(), imgH = c.workingImage.getHeight();
+        int mL = layout.marginLeftPx(), mR = layout.marginRightPx();
+        int mT = layout.marginTopPx(),  mB = layout.marginBottomPx();
+        int cx = mL, cy = mT;
+        int cw = Math.max(1, imgW - mL - mR), ch = Math.max(1, imgH - mT - mB);
+        for (int i = 0; i < c.activeElements.size(); i++) {
+            Layer el = c.activeElements.get(i);
+            if (el instanceof TextLayer tl && tl.isWrapping()) {
+                c.activeElements.set(i, tl.withBounds(cx, cy, cw, ch));
+                if (c.canvasPanel != null) c.canvasPanel.repaint();
+                break;
+            }
+        }
     }
 
     /** Pushes all current layout values back into the UI controls (called on loadFromPage). */
     private void populateControls() {
-        // Spinners — suppress change-events while setting
         spLeft  .setValue(layout.marginLeft);
         spRight .setValue(layout.marginRight);
         spTop   .setValue(layout.marginTop);
         spBottom.setValue(layout.marginBottom);
 
-        // Decoration toggles
         btnHeader.setSelected(layout.headerVisible);
         btnFooter.setSelected(layout.footerVisible);
         btnPageNr.setSelected(layout.pageNumberVisible);
         syncDecorButtons();
 
-        // Snap radio group
         btnSnapNone  .setSelected(layout.snapMode == PageLayout.SnapMode.NONE);
         btnSnapLayer .setSelected(layout.snapMode == PageLayout.SnapMode.SNAP_TO_LAYER);
         btnSnapMargin.setSelected(layout.snapMode == PageLayout.SnapMode.SNAP_TO_MARGIN);
         syncSnapButtons();
+
+        // Sync TextToolbar from the wrapping TextLayer (if present on this page)
+        if (ed.textToolbar != null) {
+            CanvasInstance c = ed.ci();
+            boolean found = false;
+            for (Layer el : c.activeElements) {
+                if (el instanceof TextLayer tl && tl.isWrapping()) {
+                    ed.textToolbar.showToolbar(tl.fontName(), tl.fontSize(),
+                            tl.fontBold(), tl.fontItalic(), tl.fontColor());
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) ed.textToolbar.hideToolbar();
+        }
     }
 
     private void syncDecorButtons() {

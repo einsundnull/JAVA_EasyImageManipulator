@@ -32,18 +32,30 @@ class ElementController {
 
 	/**
 	 * Renders a TextLayer to a pixel image at its natural (image-space) font size.
+	 * Wrapping layers render word-wrapped within their stored bounds.
 	 */
 	BufferedImage renderTextLayerToImage(TextLayer tl) {
 		int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
 		Font font = new Font(tl.fontName(), style, Math.max(6, tl.fontSize()));
 		BufferedImage dummy = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
 		FontMetrics fm = dummy.createGraphics().getFontMetrics(font);
-		String[] lines = tl.text().split("\n", -1);
-		int w = 1;
-		for (String l : lines)
-			w = Math.max(w, fm.stringWidth(l));
-		int h = Math.max(1, fm.getHeight() * lines.length);
-		BufferedImage img = new BufferedImage(w + TextLayer.TEXT_PADDING * 2, h + TextLayer.TEXT_PADDING * 2,
+
+		java.util.List<String> lines;
+		int imgW, imgH;
+		if (tl.isWrapping()) {
+			int maxW = Math.max(1, tl.width() - TextLayer.TEXT_PADDING * 2);
+			lines = CanvasPanel.wrapText(tl.text(), fm, maxW);
+			imgW = tl.width();
+			imgH = tl.height();
+		} else {
+			lines = java.util.Arrays.asList(tl.text().split("\n", -1));
+			int w = 1;
+			for (String l : lines) w = Math.max(w, fm.stringWidth(l));
+			imgW = w + TextLayer.TEXT_PADDING * 2;
+			imgH = Math.max(1, fm.getHeight() * lines.size()) + TextLayer.TEXT_PADDING * 2;
+		}
+
+		BufferedImage img = new BufferedImage(Math.max(1, imgW), Math.max(1, imgH),
 				BufferedImage.TYPE_INT_ARGB);
 		java.awt.Graphics2D g2 = img.createGraphics();
 		g2.setComposite(AlphaComposite.Clear);
@@ -53,8 +65,8 @@ class ElementController {
 		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		g2.setFont(font);
 		g2.setColor(tl.fontColor());
-		for (int i = 0; i < lines.length; i++) {
-			g2.drawString(lines[i], TextLayer.TEXT_PADDING,
+		for (int i = 0; i < lines.size(); i++) {
+			g2.drawString(lines.get(i), TextLayer.TEXT_PADDING,
 					TextLayer.TEXT_PADDING + fm.getHeight() * i + fm.getAscent());
 		}
 		g2.dispose();

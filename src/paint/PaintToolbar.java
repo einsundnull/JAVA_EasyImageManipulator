@@ -115,6 +115,7 @@ public class PaintToolbar extends JPanel {
     private ColorPickerPopup    colorPicker;
     private boolean             pickingSecondary = false;
     private java.util.Map<PaintEngine.Tool, javax.swing.JToggleButton> toolButtons = new java.util.HashMap<>();
+    private JToggleButton rulerBtn;
 
     // =========================================================================
     // Constructor
@@ -235,6 +236,9 @@ public class PaintToolbar extends JPanel {
         }
     }
 
+    public void setRulerSelected(boolean selected) { if (rulerBtn != null) rulerBtn.setSelected(selected); }
+    public boolean isRulerSelected() { return rulerBtn != null && rulerBtn.isSelected(); }
+
     public void showToolbar() { setVisible(true); revalidate(); repaint(); }
     public void hideToolbar() { setVisible(false); revalidate(); }
 
@@ -292,12 +296,10 @@ public class PaintToolbar extends JPanel {
             JToggleButton btn = toolBtn(st[0], st[1]);
             btn.addActionListener(e -> {
                 if (activeTool == tool) {
-                    // Toggle off — deselect current tool
                     activeTool = null;
                     btn.setSelected(false);
                     cb.onToolChanged(null);
                 } else {
-                    // Deselect all other tool buttons
                     toolButtons.forEach((t, b) -> { if (t != tool) b.setSelected(false); });
                     activeTool = tool;
                     btn.setSelected(true);
@@ -492,7 +494,8 @@ public class PaintToolbar extends JPanel {
         JPanel p = hBox();
 
         JToggleButton grid  = toggleBtn("⊞", "Raster ein-/ausblenden");
-        JToggleButton ruler = toggleBtn("⌇", "Lineal ein-/ausblenden");
+        rulerBtn = toggleBtn("⌇", "Lineal ein-/ausblenden");
+        JToggleButton ruler = rulerBtn;
         grid .addActionListener(e -> cb.onToggleGrid(grid.isSelected()));
         ruler.addActionListener(e -> cb.onToggleRuler(ruler.isSelected()));
 

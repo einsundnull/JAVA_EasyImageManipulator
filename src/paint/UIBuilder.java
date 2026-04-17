@@ -64,6 +64,17 @@ class UIBuilder {
 			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> ed.reloadCurrentImage(0)));
 		});
 
+		// II+ – Images I second gallery toggle (hidden until a second dir is loaded)
+		ed.filmstripBtn2 = UIComponentFactory.buildModeToggleBtn("II+", "Bilder I (2) ein-/ausblenden");
+		ed.filmstripBtn2.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		ed.filmstripBtn2.setSelected(true);
+		ed.filmstripBtn2.setVisible(false);
+		ed.filmstripBtn2.addActionListener(e -> {
+			if (ed.ci(0).tileGallery2 != null)
+				ed.ci(0).tileGallery2.setVisible(ed.filmstripBtn2.isSelected());
+			ed.updateLayoutVisibility();
+		});
+
 		// EI – Elements I
 		ed.firstElementsBtn = UIComponentFactory.buildModeToggleBtn("EI", "Ebenen I ein-/ausblenden");
 		ed.firstElementsBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
@@ -105,6 +116,17 @@ class UIBuilder {
 			if (ed.ci(1).tileGallery != null) ed.ci(1).tileGallery.setVisible(ed.secondGalleryBtn.isSelected());
 			ed.updateLayoutVisibility();
 			SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> ed.reloadCurrentImage(1)));
+		});
+
+		// III+ – Images II second gallery toggle (hidden until a second dir is loaded)
+		ed.secondGalleryBtn2 = UIComponentFactory.buildModeToggleBtn("III+", "Bilder II (2) ein-/ausblenden");
+		ed.secondGalleryBtn2.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		ed.secondGalleryBtn2.setSelected(true);
+		ed.secondGalleryBtn2.setVisible(false);
+		ed.secondGalleryBtn2.addActionListener(e -> {
+			if (ed.ci(1).tileGallery2 != null)
+				ed.ci(1).tileGallery2.setVisible(ed.secondGalleryBtn2.isSelected());
+			ed.updateLayoutVisibility();
 		});
 
 		// SII – Scenes II
@@ -278,9 +300,31 @@ class UIBuilder {
 		left.add(ed.bookPagesIBtn);  // ganz links – nur sichtbar in Book-Modus
 		left.add(ed.scenesBtn);
 		left.add(ed.filmstripBtn);
+		left.add(ed.filmstripBtn2);
 		left.add(ed.firstElementsBtn);
 		left.add(ed.firstCanvasBtn);
-		left.add(ed.quickOpenBtn);
+		// Folder I: small "+" above the main folder button
+		JPanel folderIStack = new JPanel();
+		folderIStack.setLayout(new BoxLayout(folderIStack, BoxLayout.Y_AXIS));
+		folderIStack.setOpaque(false);
+		JButton addDirIBtn = UIComponentFactory.buildButton("+", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		addDirIBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+		addDirIBtn.setToolTipText("Zweiten Bilderbrowser für Canvas I öffnen");
+		addDirIBtn.setForeground(AppColors.TEXT);
+		addDirIBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, 13));
+		addDirIBtn.setMaximumSize(new Dimension(ed.TOPBAR_BTN_W, 13));
+		addDirIBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		addDirIBtn.addActionListener(e -> ed.openSecondGalleryDir(0));
+		ed.quickOpenBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		folderIStack.add(addDirIBtn);
+		folderIStack.add(ed.quickOpenBtn);
+		left.add(folderIStack);
+		JButton newIBtn = UIComponentFactory.buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		newIBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		newIBtn.setToolTipText("Neue Datei für Canvas I");
+		newIBtn.setForeground(AppColors.TEXT);
+		newIBtn.addActionListener(e -> ed.doNewBitmapForCanvas(0));
+		left.add(newIBtn);
 		left.add(Box.createHorizontalStrut(12));
 		ed.topBarLeft = left;
 		bar.add(left, BorderLayout.WEST);
@@ -309,7 +353,7 @@ class UIBuilder {
 		center.add(ed.bookModeBtn);
 		center.add(ed.sceneModeBtn);
 		center.add(Box.createHorizontalStrut(4));
-		ed.pageLayoutBtn = UIComponentFactory.buildModeToggleBtn("SL", "SeitenLayout ein/ausblenden");
+		ed.pageLayoutBtn = UIComponentFactory.buildModeToggleBtn("📑", "SeitenLayout ein/ausblenden");
 		ed.pageLayoutBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		ed.pageLayoutBtn.addActionListener(e -> {
 			if (ed.pageLayoutToolbar != null)
@@ -324,10 +368,32 @@ class UIBuilder {
 		JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 5));
 		right.setOpaque(false);
 		right.add(Box.createHorizontalStrut(12));
-		right.add(openFolderII);
+		JButton newIIBtn = UIComponentFactory.buildButton("Neu", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		newIIBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
+		newIIBtn.setToolTipText("Neue Datei für Canvas II");
+		newIIBtn.setForeground(AppColors.TEXT);
+		newIIBtn.addActionListener(e -> ed.doNewBitmapForCanvas(1));
+		right.add(newIIBtn);
+		// Folder II: small "+" above the main folder button
+		JPanel folderIIStack = new JPanel();
+		folderIIStack.setLayout(new BoxLayout(folderIIStack, BoxLayout.Y_AXIS));
+		folderIIStack.setOpaque(false);
+		JButton addDirIIBtn = UIComponentFactory.buildButton("+", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		addDirIIBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+		addDirIIBtn.setToolTipText("Zweiten Bilderbrowser für Canvas II öffnen");
+		addDirIIBtn.setForeground(AppColors.TEXT);
+		addDirIIBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, 13));
+		addDirIIBtn.setMaximumSize(new Dimension(ed.TOPBAR_BTN_W, 13));
+		addDirIIBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+		addDirIIBtn.addActionListener(e -> ed.openSecondGalleryDir(1));
+		openFolderII.setAlignmentX(Component.CENTER_ALIGNMENT);
+		folderIIStack.add(addDirIIBtn);
+		folderIIStack.add(openFolderII);
+		right.add(folderIIStack);
 		right.add(ed.secondCanvasBtn);
 		right.add(ed.secondElementsBtn);
 		right.add(ed.secondGalleryBtn);
+		right.add(ed.secondGalleryBtn2);
 		right.add(ed.secondScenesBtn);
 		right.add(ed.bookPagesIIBtn); // ganz rechts – nur sichtbar in Book-Modus
 		right.add(ed.bookListIIBtn);  // ganz rechts – nur sichtbar in Book-Modus
@@ -434,11 +500,13 @@ class UIBuilder {
 		ed.galleryWrapper.add(ed.bookPagesPanel);   // PI  – links
 		ed.galleryWrapper.add(ed.ci(0).scenesPanel);
 		ed.galleryWrapper.add(ed.ci(0).tileGallery);
+		ed.galleryWrapper.add(ed.ci(0).tileGallery2);   // Canvas I – second gallery (right of first)
 		ed.galleryWrapper.add(ed.elementLayerPanel);
 		ed.galleryWrapper.add(ed.ci(0).layeredPane);
 		ed.galleryWrapper.add(ed.mainDividerPanel);
 		ed.galleryWrapper.add(ed.ci(1).layeredPane);
 		ed.galleryWrapper.add(ed.elementLayerPanel2);
+		ed.galleryWrapper.add(ed.ci(1).tileGallery2);   // Canvas II – second gallery (left of first)
 		ed.galleryWrapper.add(ed.ci(1).tileGallery);
 		ed.galleryWrapper.add(ed.ci(1).scenesPanel);
 		ed.galleryWrapper.add(ed.mapsPanel);
@@ -622,6 +690,45 @@ class UIBuilder {
 			System.out.println("[INFO] Keine letzten Bilder gefunden: " + ex.getMessage());
 		}
 
+		// Second gallery – build panel
+		c.tileGallery2 = new TileGalleryPanel(ed.buildGallery2Callbacks(idx), ed.buildGalleryPreloadCallback(idx),
+				"Bilder 2", () -> {
+					c.tileGallery2.setVisible(false);
+					javax.swing.JToggleButton btn = idx == 0 ? ed.filmstripBtn2 : ed.secondGalleryBtn2;
+					if (btn != null) btn.setSelected(false);
+					ed.updateLayoutVisibility();
+				});
+		c.tileGallery2.addMouseListener(new MouseAdapter() {
+			@Override public void mousePressed(MouseEvent e) {
+				if (ed.activeCanvasIndex != idx)
+					ed.elementEditController.resetElementDragState(ed.activeCanvasIndex);
+				ed.activeCanvasIndex = idx;
+				ed.updateCanvasFocusBorder();
+			}
+		});
+		c.tileGallery2.setVisible(false);
+
+		// Restore second gallery directory from AppSettings
+		String savedDir2 = idx == 0
+				? AppSettings.getInstance().getGallery2Dir0()
+				: AppSettings.getInstance().getGallery2Dir1();
+		if (savedDir2 != null && !savedDir2.isEmpty()) {
+			File dir2 = new File(savedDir2);
+			if (dir2.exists() && dir2.isDirectory()) {
+				File[] files2 = dir2.listFiles(f -> f.isFile() && SelectiveAlphaEditor.isSupportedFile(f));
+				if (files2 != null && files2.length > 0) {
+					java.util.Arrays.sort(files2, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+					c.directoryImages2 = new java.util.ArrayList<>(java.util.Arrays.asList(files2));
+					c.lastIndexedDir2 = dir2;
+					c.tileGallery2.setFiles(c.directoryImages2, files2[0]);
+					c.tileGallery2.setVisible(true);
+					// Show/select the toggle button – buttons exist because buildTopBar() ran first
+					javax.swing.JToggleButton btn = idx == 0 ? ed.filmstripBtn2 : ed.secondGalleryBtn2;
+					if (btn != null) { btn.setVisible(true); btn.setSelected(true); }
+				}
+			}
+		}
+
 		c.scenesPanel = new TileGalleryPanel(ed.buildScenesCallbacks(idx), null, "Szenen",
 				() -> ed.setScenesPanelVisible(idx, false),
 				() -> ed.refreshSceneFiles(idx));
@@ -642,14 +749,19 @@ class UIBuilder {
 	// ── Bottom bar ────────────────────────────────────────────────────────────
 
 	JPanel buildBottomBar() {
-		ed.paintToolbar     = new PaintToolbar(ed, ed.buildPaintCallbacks());
+		ed.paintToolbar      = new PaintToolbar(ed, ed.buildPaintCallbacks());
 		ed.pageLayoutToolbar = new PageLayoutToolbar(ed);
+		ed.textToolbar       = new TextToolbar(ed, ed.buildTextToolbarCallbacks());
 
-		// Stack: pageLayoutToolbar (top) + paintToolbar (below)
+		// Stack from top: pageLayoutToolbar → textToolbar → paintToolbar
 		JPanel toolbarStack = new JPanel(new BorderLayout());
 		toolbarStack.setOpaque(false);
-		toolbarStack.add(ed.pageLayoutToolbar, BorderLayout.NORTH);
-		toolbarStack.add(ed.paintToolbar,      BorderLayout.SOUTH);
+		JPanel upper = new JPanel(new BorderLayout());
+		upper.setOpaque(false);
+		upper.add(ed.pageLayoutToolbar, BorderLayout.NORTH);
+		upper.add(ed.textToolbar,       BorderLayout.SOUTH);
+		toolbarStack.add(upper,              BorderLayout.NORTH);
+		toolbarStack.add(ed.paintToolbar,    BorderLayout.SOUTH);
 
 		JPanel wrapper = new JPanel(new BorderLayout());
 		wrapper.setBackground(AppColors.BG_DARK);

@@ -84,7 +84,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	boolean floodfillMode = false;
 	boolean alphaPaintMode = false; // true = Pinsel-basiertes Alpha-Malen
 	// showGrid is now per-canvas: ci(idx).showGrid
-	boolean showRuler = false;
+	boolean showRuler = true;
 	RulerUnit rulerUnit = RulerUnit.PX;
 
 	// ── File cache (images stay alive while navigating, dirty until saved) ────
@@ -144,9 +144,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// ── Filmstrip sidebar + toggles ────────────────────────────────────────────
 	JPanel galleryWrapper;
 	JToggleButton filmstripBtn;
+	JToggleButton filmstripBtn2;       // Toggle for Canvas I second gallery
 	JToggleButton scenesBtn;
 	JToggleButton secondCanvasBtn;
 	JToggleButton secondGalleryBtn;
+	JToggleButton secondGalleryBtn2;   // Toggle for Canvas II second gallery
 	JToggleButton secondScenesBtn;
 
 	// ── Element layer panels (shown in Canvas mode) ──────────────────────────
@@ -202,6 +204,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	JToggleButton     pageLayoutBtn;   // "SL" toggle in top bar
 
 	PaintToolbar paintToolbar;
+	TextToolbar  textToolbar;
 
 	// =========================================================================
 	// main
@@ -352,6 +355,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 	// ── Callback factories ────────────────────────────────────────────────────
 	PaintToolbar.Callbacks buildPaintCallbacks()                    { return PaintCallbacksFactory.build(this); }
+	TextToolbar.Callbacks  buildTextToolbarCallbacks()              { return TextToolbarCallbacksFactory.build(this); }
 	CanvasCallbacks buildCanvasCallbacks(int idx)                   { return CanvasCallbacksFactory.build(this, idx); }
 	TileGalleryPanel.Callbacks buildGalleryCallbacks(int idx)       { return GalleryCallbacksFactory.build(this, idx); }
 	TileGalleryPanel.FilePreloadCallback buildGalleryPreloadCallback(int idx) { return GalleryCallbacksFactory.buildPreloadCallback(this, idx); }
@@ -386,6 +390,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	public void swapToImageView()          { swapToImageView(activeCanvasIndex); }
 	private void showZoomInput()           { editorDialogs.showZoomInput(); }
 	void doNewBitmap()                     { newFileController.doNewBitmap(); }
+	void doNewBitmapForCanvas(int idx)     { newFileController.doNewBitmapForCanvas(idx); }
+	void openSecondGalleryDir(int idx)     { fileLoader.openSecondGalleryDir(idx); }
+	TileGalleryPanel.Callbacks buildGallery2Callbacks(int idx) { return GalleryCallbacksFactory.buildGallery2(this, idx); }
 	private void showCanvasBgDialog()      { newFileController.showCanvasBgDialog(); }
 	private void toggleQuickBG()           { newFileController.toggleQuickBG(); }
 
@@ -434,6 +441,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	@Override public JPanel getCanvasPanel()         { return ci().canvasPanel; }
 	@Override public double getZoom()                { return ci().zoom; }
 	@Override public RulerUnit getRulerUnit()        { return rulerUnit; }
+	@Override public PageLayout getPageLayout()      { return pageLayoutToolbar != null ? pageLayoutToolbar.getPageLayout() : null; }
+	@Override public boolean isBookMode()            { return bookModeBtn != null && bookModeBtn.isSelected(); }
+	@Override public void onMarginDragged(boolean isHorizontal, boolean isFirst, int newMm) {
+		if (pageLayoutToolbar == null) return;
+		pageLayoutToolbar.setMarginFromRuler(isHorizontal, isFirst, newMm);
+	}
 
 	// ── Scene helpers → ScenesController ─────────────────────────────────────
 	void copySceneDirectory(File sceneFile, int idx) { scenesController.copySceneDirectory(sceneFile, idx); }

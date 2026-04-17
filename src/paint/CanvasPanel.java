@@ -86,17 +86,26 @@ public class CanvasPanel extends JPanel {
 	 * removed from activeElements and stored here; it is restored if the user cancels.
 	 */
 	private Layer editingOriginalElement = null;
+	/** True when the element being edited is a wrapping TextLayer (book page text frame). */
+	private boolean editingWrappingLayer = false;
 
-	// ── Modeless text-options dialog ──────────────────────────────────────────
-	private javax.swing.JDialog           textChooserDlg    = null;
-	private javax.swing.JTextArea         dlgTextArea       = null;
-	private javax.swing.JComboBox<String> dlgFontBox        = null;
-	private javax.swing.JSpinner          dlgSizeSpinner    = null;
-	private javax.swing.JCheckBox         dlgBoldCb         = null;
-	private javax.swing.JCheckBox         dlgItalicCb       = null;
-	private javax.swing.JButton           dlgColorBtn       = null;
-	/** True while syncing controls from an element (suppresses the listener → element update loop). */
-	private boolean suppressChooserSync = false;
+	// ── Text caret + selection ─────────────────────────────────────────────────
+	/** Character index of the insertion caret (0 = before first char). */
+	private int textCaretPos       = 0;
+	/** Anchor for Shift-extend selection. -1 = no active selection. */
+	private int textSelAnchor      = -1;
+	/** Blink timer for the caret. */
+	private javax.swing.Timer textCaretTimer  = null;
+	private boolean            textCaretVisible = true;
+	/** True while user is drag-selecting text with the mouse. */
+	private boolean textMouseDragSel = false;
+	/** Cached visual line layout from last paint (used for mouse hit-testing). */
+	private java.util.List<TLine> lastTextLines = null;
+	private int lastTextSx = 0, lastTextSy = 0, lastTextLineH = 0;
+
+	/** One visual line in the wrapped/unwrapped text layout. */
+	private record TLine(int start, int end, String text) {}
+
 
 	// ── Path editor state ────────────────────────────────────────────────────────
 	/** Index of the currently hovered path point (for PathLayer), or -1. */
@@ -166,8 +175,9 @@ public class CanvasPanel extends JPanel {
 			// restore original — but activeElements belongs to the other image now, so just discard
 		}
 		textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
-		textBuffer.setLength(0);
-		editingTextElementId = -1; editingOriginalElement = null;
+		textBuffer.setLength(0); textCaretPos = 0; clearTextSel(); lastTextLines = null;
+		editingTextElementId = -1; editingOriginalElement = null; editingWrappingLayer = false;
+		stopCaretBlink(); callbacks.hideTextToolbar();
 		// Reset path editor state
 		hoveredPathPointIndex = -1; selectedPathPointIndex = -1;
 		// Cancel canvas draw overlay
@@ -212,6 +222,35 @@ public class CanvasPanel extends JPanel {
 						callbacks.pushUndo();
 					}
 					return;
+				}
+
+				// ── In-canvas caret positioning (click/double-click/drag inside active text box) ─
+				if (textBoundingBox != null && !textDrawingBox && lastTextLines != null) {
+					double z = callbacks.getZoom();
+					int tbSx = (int)(textBoundingBox.x * z);
+					int tbSy = (int)(textBoundingBox.y * z);
+					int tbW  = editingWrappingLayer ? (int)(textBoundingBox.width  * z) : 99999;
+					int tbH  = editingWrappingLayer ? (int)(textBoundingBox.height * z) : 99999;
+					Rectangle tbRect = new Rectangle(tbSx - 2, tbSy - 2, tbW + 4, tbH + 4);
+					if (tbRect.contains(e.getPoint())) {
+						int style = (textBold ? Font.BOLD : 0) | (textItalic ? Font.ITALIC : 0);
+						int scSz  = Math.max(1, (int) Math.round(Math.max(6, textFontSize) * z));
+						java.awt.FontMetrics fm = getFontMetrics(new Font(textFontName, style, scSz));
+						int clickedPos = screenToCaretPos(e.getPoint(), lastTextLines, fm, lastTextSx, lastTextSy, lastTextLineH);
+						if (e.getClickCount() == 1) {
+							if (!e.isShiftDown()) { textCaretPos = clickedPos; clearTextSel(); }
+							else { if (textSelAnchor < 0) textSelAnchor = textCaretPos; textCaretPos = clickedPos; }
+							textMouseDragSel = true;
+						} else if (e.getClickCount() == 2) {
+							int ws = wordStart(clickedPos), we = wordEnd(clickedPos);
+							textSelAnchor = ws; textCaretPos = we;
+						} else if (e.getClickCount() >= 3) {
+							int li = findLineForCaret(clickedPos, lastTextLines);
+							textSelAnchor = lastTextLines.get(li).start();
+							textCaretPos  = lastTextLines.get(li).end();
+						}
+						textCaretVisible = true; repaint(); return;
+					}
 				}
 
 				// Commit any open text session when clicking elsewhere
@@ -318,6 +357,15 @@ public class CanvasPanel extends JPanel {
 						}
 						// PathLayer: ignore double-click here (handled via path editor dialog in panel)
 						return;
+					}
+					// In book mode, double-click anywhere (even in margins) opens the wrapping TextLayer
+					if (e.getClickCount() == 2 && hit == null && callbacks.isBookMode()) {
+						for (Layer el : callbacks.getActiveElements()) {
+							if (el instanceof TextLayer tl && tl.isWrapping()) {
+								enterTextEditMode(el);
+								return;
+							}
+						}
 					}
 
 					// Check resize handles on the primary selected element
@@ -569,6 +617,18 @@ public class CanvasPanel extends JPanel {
 					return;
 				}
 
+				// ── Text drag-selection ────────────────────────────────────────────
+				if (textMouseDragSel && textBoundingBox != null && !textDrawingBox && lastTextLines != null) {
+					double z = callbacks.getZoom();
+					int style = (textBold ? Font.BOLD : 0) | (textItalic ? Font.ITALIC : 0);
+					int scSz  = Math.max(1, (int) Math.round(Math.max(6, textFontSize) * z));
+					java.awt.FontMetrics fm = getFontMetrics(new Font(textFontName, style, scSz));
+					int dragPos = screenToCaretPos(e.getPoint(), lastTextLines, fm, lastTextSx, lastTextSy, lastTextLineH);
+					if (textSelAnchor < 0) textSelAnchor = textCaretPos;
+					textCaretPos = dragPos;
+					textCaretVisible = true; repaint(); return;
+				}
+
 				// ── Rotation drag ──────────────────────────────────────────────────
 				if (isDraggingRotation) {
 					Layer el = callbacks.getSelectedElement();
@@ -599,8 +659,8 @@ public class CanvasPanel extends JPanel {
 							elemLastImgPt = imgPt;
 							// Get the primary element and apply snap
 							Layer primary = callbacks.getSelectedElement();
-							if (primary instanceof ImageLayer il) {
-								applySnapToElement(il);
+							if (primary != null) {
+								applySnapToElement(primary);
 							}
 						}
 					}
@@ -810,6 +870,7 @@ public class CanvasPanel extends JPanel {
 				panStart = null;
 				panViewPos = null;
 				elemLastImgPt = null;
+				textMouseDragSel = false;
 
 				// Finalize rotation drag
 				if (isDraggingRotation) {
@@ -835,7 +896,6 @@ public class CanvasPanel extends JPanel {
 						// Real drag → enter text-input mode
 						textDrawingBox = false;
 						textMinBox = new Rectangle(textBoundingBox);
-						ensureTextChooserVisible();
 						requestFocusInWindow();
 						repaint();
 					} else {
@@ -986,7 +1046,7 @@ public class CanvasPanel extends JPanel {
 						callbacks.updateSelectedElement(updated);
 						// Keep chooser spinner in sync
 						textFontSize = newSize;
-						if (dlgSizeSpinner != null) dlgSizeSpinner.setValue(newSize);
+						callbacks.syncTextToolbar(textFontName, textFontSize, textBold, textItalic, textColor);
 						repaint();
 						return;
 					}
@@ -1164,26 +1224,73 @@ public class CanvasPanel extends JPanel {
 				// ── Text tool editing ──────────────────────────────────────────
 				if (textBoundingBox == null || textDrawingBox) return;
 				int code = ke.getKeyCode();
+				boolean ctrl  = ke.isControlDown();
+				boolean shift = ke.isShiftDown();
+
+				if (code == KeyEvent.VK_ESCAPE) {
+					stopCaretBlink(); callbacks.hideTextToolbar();
+					textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
+					textBuffer.setLength(0); textCaretPos = 0; clearTextSel(); lastTextLines = null;
+					editingTextElementId = -1; editingOriginalElement = null; editingWrappingLayer = false;
+					ke.consume(); repaint(); return;
+				}
 				if (code == KeyEvent.VK_ENTER) {
-					// Shift+Enter = newline inside text; plain Enter = commit
-					if (ke.isShiftDown()) {
-						textBuffer.append('\n');
+					if (editingWrappingLayer || shift) {
+						insertAtCaret("\n");
 					} else {
 						commitText();
 					}
-					ke.consume(); repaint(); return;
-				}
-				if (code == KeyEvent.VK_ESCAPE) {
-					// Cancel edit: element stays in activeElements unchanged (was never removed)
-					textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
-					textBuffer.setLength(0);
-					editingTextElementId = -1; editingOriginalElement = null;
-					ke.consume(); repaint(); return;
+					textCaretVisible = true; syncDialogText();
+					ke.consume(); repaintIfEditing(); return;
 				}
 				if (code == KeyEvent.VK_BACK_SPACE) {
-					if (textBuffer.length() > 0)
-						textBuffer.deleteCharAt(textBuffer.length() - 1);
-					ke.consume(); repaint(); return;
+					if (ctrl && !hasTextSel()) { int ws = wordStart(textCaretPos); textBuffer.delete(ws, textCaretPos); textCaretPos = ws; }
+					else deleteBeforeCaret();
+					textCaretVisible = true; syncDialogText();
+					ke.consume(); repaintIfEditing(); return;
+				}
+				if (code == KeyEvent.VK_DELETE) {
+					if (ctrl && !hasTextSel()) { int we = wordEnd(textCaretPos); textBuffer.delete(textCaretPos, we); }
+					else deleteAfterCaret();
+					textCaretVisible = true; syncDialogText();
+					ke.consume(); repaintIfEditing(); return;
+				}
+				// Clipboard
+				if (ctrl && code == KeyEvent.VK_A) { textSelAnchor = 0; textCaretPos = textBuffer.length(); ke.consume(); repaintIfEditing(); return; }
+				if (ctrl && code == KeyEvent.VK_C) { copyToClipboard(); ke.consume(); return; }
+				if (ctrl && code == KeyEvent.VK_X) { copyToClipboard(); deleteSel(); textCaretVisible = true; syncDialogText(); ke.consume(); repaintIfEditing(); return; }
+				if (ctrl && code == KeyEvent.VK_V) { pasteFromClipboard(); textCaretVisible = true; syncDialogText(); ke.consume(); repaintIfEditing(); return; }
+				// Arrow navigation
+				if (code == KeyEvent.VK_LEFT || code == KeyEvent.VK_RIGHT ||
+					code == KeyEvent.VK_UP   || code == KeyEvent.VK_DOWN  ||
+					code == KeyEvent.VK_HOME || code == KeyEvent.VK_END) {
+					int oldCaret = textCaretPos;
+					java.util.List<TLine> ll = getCurrentTextLines();
+					if (code == KeyEvent.VK_LEFT) {
+						if (hasTextSel() && !shift) textCaretPos = selMin();
+						else if (ctrl) textCaretPos = wordStart(textCaretPos);
+						else textCaretPos = Math.max(0, textCaretPos - 1);
+					} else if (code == KeyEvent.VK_RIGHT) {
+						if (hasTextSel() && !shift) textCaretPos = selMax();
+						else if (ctrl) textCaretPos = wordEnd(textCaretPos);
+						else textCaretPos = Math.min(textBuffer.length(), textCaretPos + 1);
+					} else if (code == KeyEvent.VK_HOME) {
+						textCaretPos = ctrl ? 0 : lineStartPos(textCaretPos, ll);
+					} else if (code == KeyEvent.VK_END) {
+						textCaretPos = ctrl ? textBuffer.length() : lineEndPos(textCaretPos, ll);
+					} else if (code == KeyEvent.VK_UP) {
+						int li = findLineForCaret(textCaretPos, ll);
+						if (li > 0) { int off = textCaretPos - ll.get(li).start(); TLine prev = ll.get(li - 1); textCaretPos = Math.min(prev.start() + off, prev.end()); }
+						else textCaretPos = 0;
+					} else if (code == KeyEvent.VK_DOWN) {
+						int li = findLineForCaret(textCaretPos, ll);
+						if (li < ll.size() - 1) { int off = textCaretPos - ll.get(li).start(); TLine next = ll.get(li + 1); textCaretPos = Math.min(next.start() + off, next.end()); }
+						else textCaretPos = textBuffer.length();
+					}
+					if (shift) { if (textSelAnchor < 0) textSelAnchor = oldCaret; }
+					else clearTextSel();
+					textCaretVisible = true;
+					ke.consume(); repaintIfEditing(); return;
 				}
 			}
 			@Override
@@ -1191,8 +1298,11 @@ public class CanvasPanel extends JPanel {
 				if (textBoundingBox == null || textDrawingBox) return;
 				char c = ke.getKeyChar();
 				if (c == KeyEvent.CHAR_UNDEFINED) return;
-				if (c == '\r' || c == '\n' || c == '\u001b' || c == '\b') return; // handled in keyPressed
-				textBuffer.append(c);
+				if (c == '\r' || c == '\n' || c == '\u001b' || c == '\b') return;
+				if (ke.isControlDown()) return; // handled in keyPressed
+				insertAtCaret(String.valueOf(c));
+				textCaretVisible = true;
+				syncDialogText();
 				ke.consume(); repaint();
 			}
 
@@ -1211,10 +1321,10 @@ public class CanvasPanel extends JPanel {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				if (textBoundingBox != null) {
-					// Element stays in activeElements unchanged (was never removed)
+					stopCaretBlink(); callbacks.hideTextToolbar();
 					textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
-					textBuffer.setLength(0);
-					editingTextElementId = -1; editingOriginalElement = null;
+					textBuffer.setLength(0); textCaretPos = 0; clearTextSel(); lastTextLines = null;
+					editingTextElementId = -1; editingOriginalElement = null; editingWrappingLayer = false;
 					repaint(); return;
 				}
 				if (callbacks.getFloatingImage() != null) {
@@ -1324,186 +1434,10 @@ public class CanvasPanel extends JPanel {
 	 * synchronise the controls to the current text* field values.
 	 * Returns immediately — does NOT block the canvas.
 	 */
-	private void ensureTextChooserVisible() {
-		if (textChooserDlg == null) buildTextChooserDialog();
-		syncTextChooserFromFields();
-		if (!textChooserDlg.isShowing()) textChooserDlg.setVisible(true);
-		// Request focus IMMEDIATELY for canvas so key events (text typing) are received
-		// Do NOT use invokeLater or toFront() as they interfere with keyboard focus
-		requestFocusInWindow();
-	}
 
 	/** Builds the one-time modeless dialog and wires live-update listeners. */
-	private void buildTextChooserDialog() {
-		javax.swing.JFrame topFrame = (javax.swing.JFrame)
-				javax.swing.SwingUtilities.getWindowAncestor(this);
-
-		textChooserDlg = new javax.swing.JDialog(topFrame, "Textoptionen", false); // MODELESS
-		textChooserDlg.setLayout(new java.awt.BorderLayout(8, 8));
-		textChooserDlg.getContentPane().setBackground(new Color(36, 36, 36));
-		textChooserDlg.setAlwaysOnTop(true);
-
-		javax.swing.JPanel form = new javax.swing.JPanel(new java.awt.GridBagLayout());
-		form.setBackground(new Color(36, 36, 36));
-		form.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 14, 6, 14));
-		java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
-		gbc.insets = new java.awt.Insets(3, 4, 3, 4);
-		gbc.anchor = java.awt.GridBagConstraints.WEST;
-
-		// Helper to add label + control row
-		int[] rowIdx = {0};
-		java.util.function.BiConsumer<String, java.awt.Component> addRow = (lbl, comp) -> {
-			gbc.gridx = 0; gbc.gridy = rowIdx[0]; gbc.weightx = 0; gbc.fill = java.awt.GridBagConstraints.NONE;
-			javax.swing.JLabel l = new javax.swing.JLabel(lbl);
-			l.setForeground(AppColors.TEXT); l.setFont(new Font("SansSerif", Font.PLAIN, 11));
-			form.add(l, gbc);
-			gbc.gridx = 1; gbc.weightx = 1; gbc.fill = java.awt.GridBagConstraints.HORIZONTAL;
-			form.add(comp, gbc);
-			rowIdx[0]++;
-			gbc.fill = java.awt.GridBagConstraints.NONE;
-		};
-
-		// Text input field (for editing selected TextLayer content)
-		dlgTextArea = new javax.swing.JTextArea(4, 30);
-		dlgTextArea.setBackground(new Color(50, 50, 50));
-		dlgTextArea.setForeground(AppColors.TEXT);
-		dlgTextArea.setLineWrap(true);
-		dlgTextArea.setWrapStyleWord(true);
-		dlgTextArea.setFont(new Font("Monospace", Font.PLAIN, 10));
-		dlgTextArea.addKeyListener(new java.awt.event.KeyAdapter() {
-			@Override
-			public void keyPressed(java.awt.event.KeyEvent e) {
-				if ((e.getModifiersEx() & java.awt.event.InputEvent.CTRL_DOWN_MASK) != 0
-						&& e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
-					// CTRL+Enter: apply and close dialog
-					textBuffer = new StringBuilder(dlgTextArea.getText());
-					applyTextChooserToSelected();
-					commitText();
-					textChooserDlg.setVisible(false);
-					requestFocusInWindow();
-				}
-			}
-		});
-		dlgTextArea.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-			@Override
-			public void insertUpdate(javax.swing.event.DocumentEvent e) { updateTextFromField(); }
-			@Override
-			public void removeUpdate(javax.swing.event.DocumentEvent e) { updateTextFromField(); }
-			@Override
-			public void changedUpdate(javax.swing.event.DocumentEvent e) { updateTextFromField(); }
-
-			private void updateTextFromField() {
-				textBuffer = new StringBuilder(dlgTextArea.getText());
-				applyTextChooserToSelected();
-			}
-		});
-		javax.swing.JScrollPane textScrollPane = new javax.swing.JScrollPane(dlgTextArea,
-				javax.swing.JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-				javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		textScrollPane.setBackground(new Color(36, 36, 36));
-		addRow.accept("Text:", textScrollPane);
-
-		// Font family
-		String[] sysfonts = java.awt.GraphicsEnvironment
-				.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
-		dlgFontBox = new javax.swing.JComboBox<>(sysfonts);
-		dlgFontBox.setBackground(new Color(50, 50, 50));
-		dlgFontBox.setForeground(AppColors.TEXT);
-		dlgFontBox.addActionListener(ev -> {
-			if (suppressChooserSync) return;
-			textFontName = (String) dlgFontBox.getSelectedItem();
-			applyTextChooserToSelected();
-		});
-		addRow.accept("Schriftart:", dlgFontBox);
-
-		// Size
-		dlgSizeSpinner = new javax.swing.JSpinner(
-				new javax.swing.SpinnerNumberModel(textFontSize, 6, 800, 1));
-		((javax.swing.JSpinner.DefaultEditor) dlgSizeSpinner.getEditor())
-				.getTextField().setForeground(AppColors.TEXT);
-		((javax.swing.JSpinner.DefaultEditor) dlgSizeSpinner.getEditor())
-				.getTextField().setBackground(new Color(50, 50, 50));
-		dlgSizeSpinner.addChangeListener(ev -> {
-			if (suppressChooserSync) return;
-			textFontSize = (int) dlgSizeSpinner.getValue();
-			applyTextChooserToSelected();
-		});
-		addRow.accept("Größe (px):", dlgSizeSpinner);
-
-		// Bold + Italic
-		dlgBoldCb   = new javax.swing.JCheckBox("Fett");
-		dlgItalicCb = new javax.swing.JCheckBox("Kursiv");
-		dlgBoldCb.setForeground(AppColors.TEXT);   dlgBoldCb.setBackground(new Color(36, 36, 36));
-		dlgItalicCb.setForeground(AppColors.TEXT); dlgItalicCb.setBackground(new Color(36, 36, 36));
-		dlgBoldCb.addActionListener(ev -> {
-			if (suppressChooserSync) return;
-			textBold = dlgBoldCb.isSelected(); applyTextChooserToSelected();
-		});
-		dlgItalicCb.addActionListener(ev -> {
-			if (suppressChooserSync) return;
-			textItalic = dlgItalicCb.isSelected(); applyTextChooserToSelected();
-		});
-		javax.swing.JPanel styleRow = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 4, 0));
-		styleRow.setBackground(new Color(36, 36, 36));
-		styleRow.add(dlgBoldCb); styleRow.add(dlgItalicCb);
-		addRow.accept("Stil:", styleRow);
-
-		// Color
-		dlgColorBtn = new javax.swing.JButton("   ");
-		dlgColorBtn.setBackground(textColor);
-		dlgColorBtn.setOpaque(true);
-		dlgColorBtn.setBorder(javax.swing.BorderFactory.createLineBorder(new Color(80, 80, 80)));
-		dlgColorBtn.setToolTipText("Textfarbe wählen");
-		dlgColorBtn.addActionListener(ev -> {
-			Color c = javax.swing.JColorChooser.showDialog(textChooserDlg, "Textfarbe", textColor);
-			if (c != null) { textColor = c; dlgColorBtn.setBackground(c); applyTextChooserToSelected(); }
-			// Bring focus back to canvas after color chooser
-			javax.swing.SwingUtilities.invokeLater(CanvasPanel.this::requestFocusInWindow);
-		});
-		addRow.accept("Farbe:", dlgColorBtn);
-
-		textChooserDlg.add(form, java.awt.BorderLayout.CENTER);
-
-		// Close button
-		javax.swing.JPanel south = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 8, 6));
-		south.setBackground(new Color(36, 36, 36));
-		javax.swing.JButton closeBtn = new javax.swing.JButton("Schließen");
-		closeBtn.setBackground(new Color(55, 55, 55));
-		closeBtn.setForeground(AppColors.TEXT);
-		closeBtn.addActionListener(ev -> {
-			textChooserDlg.setVisible(false);
-			javax.swing.SwingUtilities.invokeLater(CanvasPanel.this::requestFocusInWindow);
-		});
-		south.add(closeBtn);
-		textChooserDlg.add(south, java.awt.BorderLayout.SOUTH);
-
-		textChooserDlg.pack();
-		// Position dialog at top-right of main frame (don't overlap canvas)
-		if (topFrame != null) {
-			int dialogX = topFrame.getX() + topFrame.getWidth() - textChooserDlg.getWidth() - 10;
-			int dialogY = topFrame.getY() + 30;
-			textChooserDlg.setLocation(Math.max(0, dialogX), Math.max(0, dialogY));
-		}
-	}
-
-	/** Pushes current text* field values into the dialog controls without firing listeners. */
-	private void syncTextChooserFromFields() {
-		if (textChooserDlg == null) return;
-		suppressChooserSync = true;
-		try {
-			dlgTextArea.setText(textBuffer.toString());
-			dlgFontBox.setSelectedItem(textFontName);
-			dlgSizeSpinner.setValue(textFontSize);
-			dlgBoldCb.setSelected(textBold);
-			dlgItalicCb.setSelected(textItalic);
-			dlgColorBtn.setBackground(textColor);
-		} finally {
-			suppressChooserSync = false;
-		}
-	}
-
 	/**
-	 * Loads a TEXT_LAYER element's settings into the text* fields and syncs the dialog.
+	 * Loads a TEXT_LAYER element's settings into the text* fields.
 	 * Called when the user single-clicks a TEXT_LAYER to select it.
 	 */
 	public void syncTextChooserFromElement(Layer el) {
@@ -1514,7 +1448,7 @@ public class CanvasPanel extends JPanel {
 		textBold     = tl.fontBold();
 		textItalic   = tl.fontItalic();
 		textColor    = tl.fontColor();
-		syncTextChooserFromFields();
+		callbacks.syncTextToolbar(textFontName, textFontSize, textBold, textItalic, textColor);
 	}
 
 	/**
@@ -1562,86 +1496,332 @@ public class CanvasPanel extends JPanel {
 		textItalic   = tl.fontItalic();
 		textColor    = tl.fontColor();
 		textBuffer   = new StringBuilder(tl.text());
-		textBoundingBox = new Rectangle(el.x(), el.y(), el.width(), el.height());
-		textMinBox      = new Rectangle(el.x(), el.y(), el.width(), el.height());
-		textDrawingBox  = false;
+		textBoundingBox    = new Rectangle(el.x(), el.y(), el.width(), el.height());
+		textMinBox         = new Rectangle(el.x(), el.y(), el.width(), el.height());
+		textDrawingBox     = false;
 		editingTextElementId   = el.id();
 		editingOriginalElement = el;
-		// Element stays in activeElements — paintComponent skips it while editingTextElementId matches,
-		// so the live preview (textBoundingBox) is shown instead without duplication.
+		editingWrappingLayer   = tl.isWrapping();
+		textCaretPos   = textBuffer.length();
+		textSelAnchor  = -1;
+		lastTextLines  = null;
 		callbacks.setSelectedElement(null);
-		syncTextChooserFromFields();
-		ensureTextChooserVisible();
-		// Set focus to text area so cursor is visible and user can type immediately
-		if (dlgTextArea != null) {
-			dlgTextArea.requestFocus();
-			// Position caret at end of text (don't select all, to avoid accidental deletion)
-			dlgTextArea.setCaretPosition(dlgTextArea.getText().length());
-		}
+		callbacks.showTextToolbar(textFontName, textFontSize, textBold, textItalic, textColor);
+		requestFocusInWindow();
+		startCaretBlink();
 		repaint();
 	}
 
 	/**
-	 * Applies snap-to-element logic: aligns edges/corners of the dragged element
-	 * to nearby edges/corners of other elements within SNAP_DIST pixels.
-	 * Checks 5 edge pairs per axis: left/right/center + 4 corners.
+	 * Applies snap logic based on the active snap mode:
+	 * <ul>
+	 *   <li>SNAP_TO_LAYER  – aligns to edges/corners of other elements.</li>
+	 *   <li>SNAP_TO_MARGIN – aligns to page margin edges.</li>
+	 * </ul>
 	 */
-	private void applySnapToElement(ImageLayer dragged) {
+	private void applySnapToElement(Layer dragged) {
 		if (dragged == null) return;
+		PageLayout pl = callbacks.getPageLayout();
 
-		java.util.List<Layer> others = callbacks.getActiveElements();
+		// Determine snap mode (default SNAP_TO_LAYER when no page layout)
+		PageLayout.SnapMode mode = (pl != null) ? pl.snapMode : PageLayout.SnapMode.SNAP_TO_LAYER;
+
 		Rectangle dr = new Rectangle(dragged.x(), dragged.y(), dragged.width(), dragged.height());
-
 		int snapX = Integer.MAX_VALUE, snapDx = 0;
 		int snapY = Integer.MAX_VALUE, snapDy = 0;
 
-		for (Layer other : others) {
-			if (other.id() == dragged.id()) continue;
-			Rectangle or = new Rectangle(other.x(), other.y(), other.width(), other.height());
+		if (mode == PageLayout.SnapMode.SNAP_TO_MARGIN && pl != null
+				&& callbacks.getWorkingImage() != null) {
+			// Snap to the four margin lines (image-space pixels)
+			int imgW = callbacks.getWorkingImage().getWidth();
+			int imgH = callbacks.getWorkingImage().getHeight();
+			int mL = pl.marginLeftPx(), mR = imgW - pl.marginRightPx();
+			int mT = pl.marginTopPx(),  mB = imgH - pl.marginBottomPx();
 
-			// X-axis snap pairs: dragged element edges to other element edges
 			int[][] xPairs = {
-				{ dr.x,               or.x              },  // left → left
-				{ dr.x,               or.x + or.width   },  // left → right
-				{ dr.x + dr.width,    or.x              },  // right → left
-				{ dr.x + dr.width,    or.x + or.width   },  // right → right
-				{ dr.x + dr.width/2,  or.x + or.width/2 }   // center → center
+				{ dr.x,            mL }, { dr.x,            mR },
+				{ dr.x + dr.width, mL }, { dr.x + dr.width, mR },
 			};
 			int[][] yPairs = {
-				{ dr.y,               or.y              },
-				{ dr.y,               or.y + or.height  },
-				{ dr.y + dr.height,   or.y              },
-				{ dr.y + dr.height,   or.y + or.height  },
-				{ dr.y + dr.height/2, or.y + or.height/2 }
+				{ dr.y,             mT }, { dr.y,             mB },
+				{ dr.y + dr.height, mT }, { dr.y + dr.height, mB },
 			};
-
-			// Find closest X snap
-			for (int[] pair : xPairs) {
-				int dist = Math.abs(pair[0] - pair[1]);
-				if (dist < SNAP_DIST && dist < snapX) {
-					snapX = dist;
-					snapDx = pair[1] - pair[0];
+			for (int[] p : xPairs) {
+				int d = Math.abs(p[0] - p[1]);
+				if (d < SNAP_DIST && d < snapX) { snapX = d; snapDx = p[1] - p[0]; }
+			}
+			for (int[] p : yPairs) {
+				int d = Math.abs(p[0] - p[1]);
+				if (d < SNAP_DIST && d < snapY) { snapY = d; snapDy = p[1] - p[0]; }
+			}
+		} else if (mode != PageLayout.SnapMode.NONE) {
+			// SNAP_TO_LAYER (default)
+			for (Layer other : callbacks.getActiveElements()) {
+				if (other.id() == dragged.id()) continue;
+				Rectangle or = new Rectangle(other.x(), other.y(), other.width(), other.height());
+				int[][] xPairs = {
+					{ dr.x,               or.x              },
+					{ dr.x,               or.x + or.width   },
+					{ dr.x + dr.width,    or.x              },
+					{ dr.x + dr.width,    or.x + or.width   },
+					{ dr.x + dr.width/2,  or.x + or.width/2 }
+				};
+				int[][] yPairs = {
+					{ dr.y,               or.y              },
+					{ dr.y,               or.y + or.height  },
+					{ dr.y + dr.height,   or.y              },
+					{ dr.y + dr.height,   or.y + or.height  },
+					{ dr.y + dr.height/2, or.y + or.height/2 }
+				};
+				for (int[] p : xPairs) {
+					int d = Math.abs(p[0] - p[1]);
+					if (d < SNAP_DIST && d < snapX) { snapX = d; snapDx = p[1] - p[0]; }
+				}
+				for (int[] p : yPairs) {
+					int d = Math.abs(p[0] - p[1]);
+					if (d < SNAP_DIST && d < snapY) { snapY = d; snapDy = p[1] - p[0]; }
 				}
 			}
-
-			// Find closest Y snap
-			for (int[] pair : yPairs) {
-				int dist = Math.abs(pair[0] - pair[1]);
-				if (dist < SNAP_DIST && dist < snapY) {
-					snapY = dist;
-					snapDy = pair[1] - pair[0];
-				}
-			}
 		}
 
-		// Apply snap if within threshold
-		if (snapX < SNAP_DIST && snapDx != 0) {
-			callbacks.moveSelectedElements(snapDx, 0);
-		}
-		if (snapY < SNAP_DIST && snapDy != 0) {
-			callbacks.moveSelectedElements(0, snapDy);
-		}
+		if (snapX < SNAP_DIST && snapDx != 0) callbacks.moveSelectedElements(snapDx, 0);
+		if (snapY < SNAP_DIST && snapDy != 0) callbacks.moveSelectedElements(0, snapDy);
 	}
+
+	/**
+	 * Word-wraps {@code text} (which may contain {@code \n}) into lines that fit
+	 * within {@code maxWidth} screen pixels using {@code fm}.
+	 * Explicit newlines always start a new line.
+	 */
+	// =========================================================================
+	// Text layout helpers
+	// =========================================================================
+
+	/**
+	 * Builds visual line layout tracking char offsets in the original string.
+	 * For wordWrap=true, lines are broken at word boundaries to fit maxWidth.
+	 * For wordWrap=false, lines are split only on '\n'.
+	 */
+	static java.util.List<TLine> buildTextLines(String text, java.awt.FontMetrics fm, int maxW, boolean wordWrap) {
+		java.util.List<TLine> lines = new java.util.ArrayList<>();
+		if (text == null) text = "";
+		int n = text.length();
+		int i = 0;
+		while (i <= n) {
+			int pEnd = text.indexOf('\n', i);
+			if (pEnd < 0) pEnd = n;
+			// No wrap needed if: wrapping disabled, empty para, or whole para fits
+			if (!wordWrap || pEnd == i || fm.stringWidth(text.substring(i, pEnd)) <= maxW) {
+				lines.add(new TLine(i, pEnd, text.substring(i, pEnd)));
+				i = pEnd + 1;
+				continue;
+			}
+			// Word-wrap this paragraph
+			int lStart = i, lEnd = i;
+			int wStart = i;
+			while (wStart <= pEnd) {
+				// Find end of current word
+				int wEnd = wStart;
+				while (wEnd < pEnd && text.charAt(wEnd) != ' ') wEnd++;
+				String candidate = text.substring(lStart, wEnd);
+				if (fm.stringWidth(candidate) <= maxW || lStart == wStart) {
+					// Fits (or first word on line — emit even if too long)
+					lEnd = wEnd;
+					wStart = wEnd + 1;
+					if (wStart > pEnd) {
+						lines.add(new TLine(lStart, lEnd, text.substring(lStart, lEnd)));
+						break;
+					}
+				} else {
+					// Emit current line, start new one
+					int nextStart = lEnd;
+					if (nextStart < pEnd && text.charAt(nextStart) == ' ') nextStart++;
+					lines.add(new TLine(lStart, lEnd, text.substring(lStart, lEnd)));
+					lStart = nextStart; lEnd = nextStart;
+				}
+			}
+			// Catch leftover (handles edge case where loop exited without emitting)
+			if (lines.isEmpty() || lines.get(lines.size() - 1).end() < lStart)
+				lines.add(new TLine(lStart, Math.max(lStart, pEnd), text.substring(lStart, Math.max(lStart, pEnd))));
+			i = pEnd + 1;
+		}
+		if (lines.isEmpty()) lines.add(new TLine(0, 0, ""));
+		return lines;
+	}
+
+	/** Backward-compat wrapper used by ElementController. */
+	static java.util.List<String> wrapText(String text, java.awt.FontMetrics fm, int maxWidth) {
+		java.util.List<String> out = new java.util.ArrayList<>();
+		for (TLine l : buildTextLines(text, fm, maxWidth, true)) out.add(l.text());
+		return out;
+	}
+
+	// Find last TLine whose start <= caretPos
+	private static int findLineForCaret(int caretPos, java.util.List<TLine> lines) {
+		int best = 0;
+		for (int i = 0; i < lines.size(); i++) {
+			if (lines.get(i).start() <= caretPos) best = i;
+			else break;
+		}
+		return best;
+	}
+
+	// Screen X of the caret within the text box
+	private static int caretScreenX(int caretPos, java.util.List<TLine> lines, java.awt.FontMetrics fm, int sx) {
+		if (lines.isEmpty()) return sx + TEXT_PADDING;
+		int li = findLineForCaret(caretPos, lines);
+		TLine l = lines.get(li);
+		int offset = Math.min(caretPos - l.start(), l.text().length());
+		return sx + TEXT_PADDING + fm.stringWidth(l.text().substring(0, offset));
+	}
+
+	// Convert screen point to nearest caret position
+	private static int screenToCaretPos(java.awt.Point screenPt, java.util.List<TLine> lines,
+			java.awt.FontMetrics fm, int sx, int sy, int lineH) {
+		if (lines.isEmpty()) return 0;
+		int relY = screenPt.y - sy - TEXT_PADDING;
+		int li = Math.max(0, Math.min(lines.size() - 1, lineH > 0 ? relY / lineH : 0));
+		TLine line = lines.get(li);
+		int relX = screenPt.x - sx - TEXT_PADDING;
+		if (relX <= 0) return line.start();
+		String t = line.text();
+		for (int i = 0; i <= t.length(); i++) {
+			int cx   = fm.stringWidth(t.substring(0, i));
+			int next = i < t.length() ? fm.stringWidth(t.substring(0, i + 1)) : cx + 9999;
+			if (relX < (cx + next) / 2) return line.start() + i;
+		}
+		return line.end();
+	}
+
+	// ── Caret / selection state helpers ────────────────────────────────────────
+
+	private int  selMin()     { return textSelAnchor < 0 ? textCaretPos : Math.min(textCaretPos, textSelAnchor); }
+	private int  selMax()     { return textSelAnchor < 0 ? textCaretPos : Math.max(textCaretPos, textSelAnchor); }
+	private boolean hasTextSel() { return textSelAnchor >= 0 && textSelAnchor != textCaretPos; }
+	private void clearTextSel()  { textSelAnchor = -1; }
+
+	private void deleteSel() {
+		if (!hasTextSel()) return;
+		int a = selMin(), b = selMax();
+		textBuffer.delete(a, b);
+		textCaretPos = a;
+		clearTextSel();
+	}
+
+	private void insertAtCaret(String s) {
+		if (hasTextSel()) deleteSel();
+		textBuffer.insert(textCaretPos, s);
+		textCaretPos += s.length();
+	}
+
+	private void deleteBeforeCaret() {
+		if (hasTextSel()) { deleteSel(); return; }
+		if (textCaretPos > 0) { textBuffer.deleteCharAt(textCaretPos - 1); textCaretPos--; }
+	}
+
+	private void deleteAfterCaret() {
+		if (hasTextSel()) { deleteSel(); return; }
+		if (textCaretPos < textBuffer.length()) textBuffer.deleteCharAt(textCaretPos);
+	}
+
+	private int wordStart(int pos) {
+		String s = textBuffer.toString(); int i = pos;
+		while (i > 0 && !Character.isWhitespace(s.charAt(i - 1))) i--;
+		return i;
+	}
+	private int wordEnd(int pos) {
+		String s = textBuffer.toString(); int n = s.length(); int i = pos;
+		while (i < n && !Character.isWhitespace(s.charAt(i))) i++;
+		return i;
+	}
+	private int lineStartPos(int pos, java.util.List<TLine> lines) {
+		if (lines.isEmpty()) return 0;
+		return lines.get(findLineForCaret(pos, lines)).start();
+	}
+	private int lineEndPos(int pos, java.util.List<TLine> lines) {
+		if (lines.isEmpty()) return textBuffer.length();
+		return lines.get(findLineForCaret(pos, lines)).end();
+	}
+
+	private void copyToClipboard() {
+		if (!hasTextSel()) return;
+		java.awt.datatransfer.StringSelection ss =
+				new java.awt.datatransfer.StringSelection(textBuffer.substring(selMin(), selMax()));
+		java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(ss, null);
+	}
+
+	private void pasteFromClipboard() {
+		try {
+			java.awt.datatransfer.Transferable t =
+					java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null);
+			if (t != null && t.isDataFlavorSupported(java.awt.datatransfer.DataFlavor.stringFlavor)) {
+				String s = (String) t.getTransferData(java.awt.datatransfer.DataFlavor.stringFlavor);
+				insertAtCaret(s.replace("\r\n", "\n").replace("\r", "\n"));
+			}
+		} catch (Exception ex) { System.err.println("[WARN] Paste: " + ex.getMessage()); }
+	}
+
+	private void startCaretBlink() {
+		stopCaretBlink();
+		textCaretVisible = true;
+		textCaretTimer = new javax.swing.Timer(530, ev -> {
+			if (textBoundingBox != null) { textCaretVisible = !textCaretVisible; repaint(); }
+			else stopCaretBlink();
+		});
+		textCaretTimer.start();
+	}
+
+	private void stopCaretBlink() {
+		if (textCaretTimer != null) { textCaretTimer.stop(); textCaretTimer = null; }
+		textCaretVisible = true;
+	}
+
+	/** Rebuilds line layout for the current text state (uses zoom-scaled font). */
+	private java.util.List<TLine> getCurrentTextLines() {
+		if (textBoundingBox == null) return java.util.Collections.emptyList();
+		double z = callbacks.getZoom();
+		int style = (textBold ? Font.BOLD : 0) | (textItalic ? Font.ITALIC : 0);
+		int screenSz = Math.max(1, (int) Math.round(Math.max(6, textFontSize) * z));
+		java.awt.FontMetrics fm = getFontMetrics(new Font(textFontName, style, screenSz));
+		int maxW = editingWrappingLayer ? (int)(textBoundingBox.width * z) - TEXT_PADDING * 2 : Integer.MAX_VALUE;
+		return buildTextLines(textBuffer.toString(), fm, Math.max(1, maxW), editingWrappingLayer);
+	}
+
+	/** Keeps the dialog's text area in sync after canvas edits (no-op: dialog removed). */
+	private void syncDialogText() {}
+
+	/**
+	 * Called by PaintCallbacksFactory when the user changes text properties in
+	 * the PaintToolbar text section. Updates internal fields and live-previews
+	 * the selected/editing TextLayer.
+	 */
+	public void applyTextPropsFromToolbar(String font, int size, boolean bold, boolean italic, Color color) {
+		textFontName = font;
+		textFontSize = size;
+		textBold     = bold;
+		textItalic   = italic;
+		textColor    = color;
+		if (textBoundingBox != null) {
+			// In text-edit mode: live-preview updates automatically via repaint
+			repaint();
+		} else {
+			// Outside text-edit mode: directly update the wrapping TextLayer or selected TextLayer
+			applyTextChooserToSelected();
+			// Also update wrapping TextLayer if in book mode and none is selected
+			if (callbacks.isBookMode()) {
+				java.util.List<Layer> els = callbacks.getActiveElements();
+				for (int i = 0; i < els.size(); i++) {
+					if (els.get(i) instanceof TextLayer tl && tl.isWrapping()) {
+						callbacks.updateSelectedElement(tl.withText(tl.text(), font, size, bold, italic, color));
+						break;
+					}
+				}
+			}
+		}
+		// Restore focus to canvas so keyboard input keeps working
+		javax.swing.SwingUtilities.invokeLater(this::requestFocusInWindow);
+	}
+
 
 	/**
 	 * Creates a transparent overlay image (same size as workingImage) used for
@@ -1694,23 +1874,41 @@ public class CanvasPanel extends JPanel {
 	 */
 	private void commitText() {
 		if (textBoundingBox == null) return;
+		stopCaretBlink();
+		callbacks.hideTextToolbar();
 		if (textBuffer.length() == 0) {
-			// Nothing typed: element stays in activeElements unchanged (was never removed)
 			textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
-			textBuffer.setLength(0);
-			editingTextElementId = -1; editingOriginalElement = null;
+			textBuffer.setLength(0); textCaretPos = 0; clearTextSel(); lastTextLines = null;
+			editingTextElementId = -1; editingOriginalElement = null; editingWrappingLayer = false;
 			repaint();
 			return;
 		}
+		boolean wasWrapping = editingWrappingLayer;
 		callbacks.commitTextLayer(
 				editingTextElementId,
 				textBuffer.toString(),
 				textFontName, textFontSize, textBold, textItalic, textColor,
 				textBoundingBox.x, textBoundingBox.y);
 		textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
-		textBuffer.setLength(0);
-		editingTextElementId = -1; editingOriginalElement = null;
+		textBuffer.setLength(0); textCaretPos = 0; clearTextSel(); lastTextLines = null;
+		editingTextElementId = -1; editingOriginalElement = null; editingWrappingLayer = false;
+		// Wrapping layer stays on page → keep TextToolbar visible with current props
+		if (wasWrapping) callbacks.showTextToolbar(textFontName, textFontSize, textBold, textItalic, textColor);
 		repaint();
+	}
+
+	/** Called by TextToolbarCallbacksFactory commit button. */
+	public void commitTextFromToolbar() { commitText(); requestFocusInWindow(); }
+
+	/** Called by TextToolbarCallbacksFactory cancel button. */
+	public void cancelTextFromToolbar() {
+		stopCaretBlink();
+		callbacks.hideTextToolbar();
+		textBoundingBox = null; textDrawingBox = false; textDragStart = null; textMinBox = null;
+		textBuffer.setLength(0); textCaretPos = 0; clearTextSel(); lastTextLines = null;
+		editingTextElementId = -1; editingOriginalElement = null; editingWrappingLayer = false;
+		repaint();
+		requestFocusInWindow();
 	}
 
 	/** Returns the topmost layer at screen point, or null. */
@@ -1923,18 +2121,27 @@ public class CanvasPanel extends JPanel {
 						g2.setComposite(origComposite);
 					}
 				} else if (el instanceof TextLayer tl) {
-					// TextLayer: render glyphs live — integer pt size for metric consistency with TextLayer.of()
+					// TextLayer: render glyphs live
 					int tstyle = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
 					int screenFontSz = Math.max(1, (int) Math.round(tl.fontSize() * callbacks.getZoom()));
 					Font  tfont  = new Font(tl.fontName(), tstyle, screenFontSz);
 					g2.setFont(tfont);
 					g2.setColor(tl.fontColor());
 					java.awt.FontMetrics tfm = g2.getFontMetrics();
-					String[] tLines = tl.text().split("\n", -1);
 					int tpx = sr.x + (int)(TEXT_PADDING * callbacks.getZoom());
 					int tpy = sr.y + (int)(TEXT_PADDING * callbacks.getZoom());
-					for (int li = 0; li < tLines.length; li++) {
-						g2.drawString(tLines[li], tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
+					if (tl.isWrapping()) {
+						int maxW = sr.width - (int)(TEXT_PADDING * 2 * callbacks.getZoom());
+						if (maxW < 1) maxW = 1;
+						java.util.List<String> wrapped = wrapText(tl.text(), tfm, maxW);
+						for (int li = 0; li < wrapped.size(); li++) {
+							g2.drawString(wrapped.get(li), tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
+						}
+					} else {
+						String[] tLines = tl.text().split("\n", -1);
+						for (int li = 0; li < tLines.length; li++) {
+							g2.drawString(tLines[li], tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
+						}
 					}
 				} else if (el instanceof PathLayer pl) {
 					// PathLayer: render path lines and control points
@@ -1983,55 +2190,152 @@ public class CanvasPanel extends JPanel {
 		// ── Text tool bounding-box preview (rubber-band draw phase + typing phase) ─
 		if (textBoundingBox != null) {
 			double z = callbacks.getZoom();
-			int    tstyle = (textBold ? Font.BOLD : 0) | (textItalic ? Font.ITALIC : 0);
+			int    tstyle   = (textBold ? Font.BOLD : 0) | (textItalic ? Font.ITALIC : 0);
 			int    screenSz = Math.max(1, (int) Math.round(Math.max(6, textFontSize) * z));
-			Font   tfont  = new Font(textFontName, tstyle, screenSz);
+			Font   tfont    = new Font(textFontName, tstyle, screenSz);
 			g2.setFont(tfont);
 			java.awt.FontMetrics fm = g2.getFontMetrics();
 			int lineH = fm.getHeight();
-
-			// Compute natural text size (in screen pixels)
-			String[] tLines = textDrawingBox ? new String[]{""}
-			                                 : (textBuffer.toString() + "|").split("\n", -1);
-			int textW = TEXT_PADDING * 2;
-			int textH = TEXT_PADDING * 2 + lineH * Math.max(1, tLines.length);
-			for (String l : tLines) textW = Math.max(textW, fm.stringWidth(l) + TEXT_PADDING * 2);
-
-			// Minimum frame is what the user drew (in screen pixels)
-			int minW = textMinBox != null ? (int)(textMinBox.width  * z) : (int)(textBoundingBox.width  * z);
-			int minH = textMinBox != null ? (int)(textMinBox.height * z) : (int)(textBoundingBox.height * z);
-
-			// Box expands to fit text, never smaller than user-drawn frame
-			int boxW = Math.max(minW, textW);
-			int boxH = Math.max(minH, textH);
-
 			int sx = (int)(textBoundingBox.x * z);
 			int sy = (int)(textBoundingBox.y * z);
-
-			// Update textBoundingBox image-space size so commitText() uses correct dimensions
-			if (!textDrawingBox) {
-				textBoundingBox.width  = (int)Math.ceil(boxW / z);
-				textBoundingBox.height = (int)Math.ceil(boxH / z);
-			}
-
-			// Background
-			g2.setColor(new Color(255, 255, 255, 20));
-			g2.fillRect(sx, sy, boxW, boxH);
-			// Dashed border (accent if typing, white if drawing the box)
+			int boxW, boxH;
 			float[] boxDash = { 5f, 3f };
-			g2.setColor(textDrawingBox ? new Color(180, 180, 255) : AppColors.ACCENT);
-			g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, boxDash, 0f));
-			g2.drawRect(sx, sy, boxW, boxH);
-			g2.setStroke(new BasicStroke(1f));
 
-			// Draw text (skip during rubber-band draw phase)
-			if (!textDrawingBox) {
-				g2.setColor(textColor);
-				for (int i = 0; i < tLines.length; i++) {
-					g2.drawString(tLines[i],
-					              sx + TEXT_PADDING,
-					              sy + TEXT_PADDING + lineH * i + fm.getAscent());
+			if (editingWrappingLayer) {
+				// ── Wrapping mode: fixed bounds, word-wrap ──────────────────────────
+				boxW = (int)(textBoundingBox.width  * z);
+				boxH = (int)(textBoundingBox.height * z);
+				g2.setColor(new Color(255, 255, 255, 15));
+				g2.fillRect(sx, sy, boxW, boxH);
+				g2.setColor(AppColors.ACCENT);
+				g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, boxDash, 0f));
+				g2.drawRect(sx, sy, boxW, boxH);
+				g2.setStroke(new BasicStroke(1f));
+
+				if (!textDrawingBox) {
+					int maxW = Math.max(1, boxW - TEXT_PADDING * 2);
+					java.util.List<TLine> lines = buildTextLines(textBuffer.toString(), fm, maxW, true);
+					lastTextLines = lines; lastTextSx = sx; lastTextSy = sy; lastTextLineH = lineH;
+					String text = textBuffer.toString();
+					// Selection highlight
+					if (hasTextSel()) {
+						int sMin = selMin(), sMax = selMax();
+						g2.setColor(new Color(66, 135, 245, 120));
+						for (int li = 0; li < lines.size(); li++) {
+							TLine ln = lines.get(li);
+							int lSS = Math.max(sMin, ln.start()), lSE = Math.min(sMax, ln.end());
+							if (lSS < lSE) {
+								int x1 = sx + TEXT_PADDING + fm.stringWidth(text.substring(ln.start(), lSS));
+								int x2 = sx + TEXT_PADDING + fm.stringWidth(text.substring(ln.start(), lSE));
+								g2.fillRect(x1, sy + TEXT_PADDING + li * lineH, x2 - x1, lineH);
+							}
+						}
+					}
+					// Text
+					g2.setColor(textColor);
+					for (int li = 0; li < lines.size(); li++) {
+						int drawY = sy + TEXT_PADDING + li * lineH + fm.getAscent();
+						if (drawY > sy + boxH + fm.getDescent()) break;
+						g2.drawString(lines.get(li).text(), sx + TEXT_PADDING, drawY);
+					}
+					// Caret
+					if (textCaretVisible) {
+						int li = findLineForCaret(textCaretPos, lines);
+						TLine ln = lines.get(li);
+						int off = Math.min(textCaretPos - ln.start(), ln.text().length());
+						int cx = sx + TEXT_PADDING + fm.stringWidth(ln.text().substring(0, off));
+						int cy = sy + TEXT_PADDING + li * lineH;
+						g2.setColor(textColor);
+						g2.setStroke(new BasicStroke(1.5f));
+						g2.drawLine(cx, cy, cx, cy + lineH - 1);
+						g2.setStroke(new BasicStroke(1f));
+					}
 				}
+			} else {
+				// ── Normal mode: auto-expand, no word-wrap ──────────────────────────
+				java.util.List<TLine> lines = textDrawingBox
+						? java.util.List.of(new TLine(0, 0, ""))
+						: buildTextLines(textBuffer.toString(), fm, Integer.MAX_VALUE, false);
+				int textW = TEXT_PADDING * 2;
+				int textH = TEXT_PADDING * 2 + lineH * Math.max(1, lines.size());
+				for (TLine l : lines) textW = Math.max(textW, fm.stringWidth(l.text()) + TEXT_PADDING * 2);
+				int minW = textMinBox != null ? (int)(textMinBox.width  * z) : (int)(textBoundingBox.width  * z);
+				int minH = textMinBox != null ? (int)(textMinBox.height * z) : (int)(textBoundingBox.height * z);
+				boxW = Math.max(minW, textW);
+				boxH = Math.max(minH, textH);
+				if (!textDrawingBox) {
+					textBoundingBox.width  = (int)Math.ceil(boxW / z);
+					textBoundingBox.height = (int)Math.ceil(boxH / z);
+				}
+				g2.setColor(new Color(255, 255, 255, 20));
+				g2.fillRect(sx, sy, boxW, boxH);
+				g2.setColor(textDrawingBox ? new Color(180, 180, 255) : AppColors.ACCENT);
+				g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, boxDash, 0f));
+				g2.drawRect(sx, sy, boxW, boxH);
+				g2.setStroke(new BasicStroke(1f));
+
+				if (!textDrawingBox) {
+					lastTextLines = lines; lastTextSx = sx; lastTextSy = sy; lastTextLineH = lineH;
+					String text = textBuffer.toString();
+					// Selection highlight
+					if (hasTextSel()) {
+						int sMin = selMin(), sMax = selMax();
+						g2.setColor(new Color(66, 135, 245, 120));
+						for (int li = 0; li < lines.size(); li++) {
+							TLine ln = lines.get(li);
+							int lSS = Math.max(sMin, ln.start()), lSE = Math.min(sMax, ln.end());
+							if (lSS < lSE) {
+								int x1 = sx + TEXT_PADDING + fm.stringWidth(text.substring(ln.start(), lSS));
+								int x2 = sx + TEXT_PADDING + fm.stringWidth(text.substring(ln.start(), lSE));
+								g2.fillRect(x1, sy + TEXT_PADDING + li * lineH, x2 - x1, lineH);
+							}
+						}
+					}
+					// Text
+					g2.setColor(textColor);
+					for (int li = 0; li < lines.size(); li++) {
+						g2.drawString(lines.get(li).text(), sx + TEXT_PADDING,
+								sy + TEXT_PADDING + li * lineH + fm.getAscent());
+					}
+					// Caret
+					if (textCaretVisible) {
+						int li = findLineForCaret(textCaretPos, lines);
+						TLine ln = lines.get(li);
+						int off = Math.min(textCaretPos - ln.start(), ln.text().length());
+						int cx = sx + TEXT_PADDING + fm.stringWidth(ln.text().substring(0, off));
+						int cy = sy + TEXT_PADDING + li * lineH;
+						g2.setColor(textColor);
+						g2.setStroke(new BasicStroke(1.5f));
+						g2.drawLine(cx, cy, cx, cy + lineH - 1);
+						g2.setStroke(new BasicStroke(1f));
+					}
+				}
+			}
+		}
+
+		// ── Book mode: live margin overlay (non-destructive) ─────────────────────
+		if (callbacks.isBookMode()) {
+			PageLayout pl = callbacks.getPageLayout();
+			if (pl != null && callbacks.getWorkingImage() != null) {
+				int imgW = callbacks.getWorkingImage().getWidth();
+				int imgH = callbacks.getWorkingImage().getHeight();
+				int mL = pl.marginLeftPx(), mR = pl.marginRightPx();
+				int mT = pl.marginTopPx(),  mB = pl.marginBottomPx();
+				int sL = (int) Math.round(mL * zoom);
+				int sT = (int) Math.round(mT * zoom);
+				int sR = (int) Math.round((imgW - mR) * zoom);
+				int sB = (int) Math.round((imgH - mB) * zoom);
+				float[] dash = { 6f, 4f };
+				g2.setColor(new Color(0, 120, 220, 200));
+				g2.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
+				g2.drawRect(sL, sT, Math.max(0, sR - sL), Math.max(0, sB - sT));
+				g2.setStroke(new BasicStroke(1f));
+				// Semi-transparent margin bands
+				g2.setColor(new Color(0, 120, 220, 18));
+				g2.fillRect(0,   0,   cw, sT);           // top band
+				g2.fillRect(0,   sB,  cw, ch - sB);      // bottom band
+				g2.fillRect(0,   sT,  sL, sB - sT);      // left band
+				g2.fillRect(sR,  sT,  cw - sR, sB - sT); // right band
 			}
 		}
 

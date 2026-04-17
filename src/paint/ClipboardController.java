@@ -184,6 +184,8 @@ class ClipboardController {
 		if (fromClip != null)
 			ed.clipboard = fromClip;
 
+		java.awt.Point vp = viewportOriginImageSpace(c);
+
 		if (ed.clipboardLayers != null && !ed.clipboardLayers.isEmpty() && c.workingImage != null) {
 			ed.pushUndo();
 			c.selectedElements.clear();
@@ -191,14 +193,14 @@ class ClipboardController {
 			for (Layer original : ed.clipboardLayers) {
 				Layer newLayer;
 				if (original instanceof ImageLayer il) {
-					newLayer = new ImageLayer(c.nextElementId++, ed.deepCopy(il.image()), original.x(), original.y(),
+					newLayer = new ImageLayer(c.nextElementId++, ed.deepCopy(il.image()), vp.x, vp.y,
 							original.width(), original.height(), il.rotationAngle(), il.opacity(), il.isHidden());
 				} else if (original instanceof TextLayer tl) {
 					newLayer = TextLayer.of(c.nextElementId++, tl.text(), tl.fontName(), tl.fontSize(), tl.fontBold(),
-							tl.fontItalic(), tl.fontColor(), original.x(), original.y(), tl.isHidden());
+							tl.fontItalic(), tl.fontColor(), vp.x, vp.y, tl.isHidden());
 				} else if (original instanceof PathLayer pl) {
 					newLayer = PathLayer.of(c.nextElementId++, new ArrayList<>(pl.points()), null,
-							pl.isClosed(), original.x(), original.y(), pl.isHidden());
+							pl.isClosed(), vp.x, vp.y, pl.isHidden());
 				} else {
 					continue;
 				}
@@ -214,21 +216,35 @@ class ClipboardController {
 			return;
 		}
 
-		if (ed.clipboard != null && c.workingImage != null) {
+		if (ed.clipboard != null) {
 			ed.pushUndo();
-			c.floatingImg = ed.deepCopy(ed.clipboard);
-			c.floatRect = new Rectangle(0, 0, Math.min(ed.clipboard.getWidth(), c.workingImage.getWidth()),
-					Math.min(ed.clipboard.getHeight(), c.workingImage.getHeight()));
-			c.isDraggingFloat = false;
-			c.floatDragAnchor = null;
-			c.activeHandle = -1;
-			c.scaleBaseRect = null;
-			c.scaleDragStart = null;
+			BufferedImage img = ed.deepCopy(ed.clipboard);
+			Layer el = new ImageLayer(c.nextElementId++, img, vp.x, vp.y, img.getWidth(), img.getHeight());
+			c.activeElements.add(el);
+			c.selectedElements.clear();
+			c.selectedElements.add(el);
 			c.selectedAreas.clear();
 			c.hasUnsavedChanges = true;
+			ed.markDirty();
+			ed.refreshElementPanel();
+			if (c.canvasPanel != null) c.canvasPanel.repaint();
 			ed.updateTitle();
-			c.canvasPanel.repaint();
 		}
+	}
+
+	/** Returns the top-left corner of the visible viewport in image-space coordinates. */
+	private static java.awt.Point viewportOriginImageSpace(CanvasInstance c) {
+		if (c.scrollPane != null && c.zoom > 0) {
+			java.awt.Point pos = c.scrollPane.getViewport().getViewPosition();
+			int ix = (int) Math.floor(pos.x / c.zoom);
+			int iy = (int) Math.floor(pos.y / c.zoom);
+			if (c.workingImage != null) {
+				ix = Math.max(0, Math.min(c.workingImage.getWidth()  - 1, ix));
+				iy = Math.max(0, Math.min(c.workingImage.getHeight() - 1, iy));
+			}
+			return new java.awt.Point(ix, iy);
+		}
+		return new java.awt.Point(0, 0);
 	}
 
 	private void addElementFromClipboard(BufferedImage img, int x, int y) {

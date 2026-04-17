@@ -168,11 +168,15 @@ class LayoutController {
 			ed.firstCanvasBtn.setSelected(ed.ci(0).layeredPane.isVisible());
 		if (ed.ci(1).layeredPane != null)
 			ed.secondCanvasBtn.setSelected(ed.ci(1).layeredPane.isVisible());
-		// Gallery I / II
+		// Gallery I / II (primary + secondary)
 		if (ed.ci(0).tileGallery != null)
 			ed.filmstripBtn.setSelected(ed.ci(0).tileGallery.isVisible());
+		if (ed.ci(0).tileGallery2 != null && ed.filmstripBtn2 != null)
+			ed.filmstripBtn2.setSelected(ed.ci(0).tileGallery2.isVisible());
 		if (ed.ci(1).tileGallery != null)
 			ed.secondGalleryBtn.setSelected(ed.ci(1).tileGallery.isVisible());
+		if (ed.ci(1).tileGallery2 != null && ed.secondGalleryBtn2 != null)
+			ed.secondGalleryBtn2.setSelected(ed.ci(1).tileGallery2.isVisible());
 		// Scenes I / II
 		if (ed.ci(0).scenesPanel != null)
 			ed.scenesBtn.setSelected(ed.ci(0).scenesPanel.isVisible());
@@ -209,9 +213,9 @@ class LayoutController {
 
 	/** Rebuilds the element layer panel tiles from the current activeElements. */
 	void refreshElementPanel() {
-		if (ed.elementLayerPanel != null && ed.elementLayerPanel.isShowing())
+		if (ed.elementLayerPanel != null)
 			ed.elementLayerPanel.refresh(ed.ci(0).activeElements);
-		if (ed.elementLayerPanel2 != null && ed.elementLayerPanel2.isShowing())
+		if (ed.elementLayerPanel2 != null)
 			ed.elementLayerPanel2.refresh(ed.ci(1).activeElements);
 	}
 

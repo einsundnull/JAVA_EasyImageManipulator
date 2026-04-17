@@ -15,4 +15,18 @@ public interface RulerCallbacks {
     JPanel getCanvasPanel();
     RulerUnit getRulerUnit();
     double getZoom();
+
+    /** Returns the current page layout (margins etc.) or null if not in book mode. */
+    PageLayout getPageLayout();
+
+    /** Returns true when book mode is active. */
+    boolean isBookMode();
+
+    /**
+     * Called when the user drags a margin handle in the ruler.
+     * @param isHorizontal true = left/right margins (H ruler), false = top/bottom (V ruler)
+     * @param isFirst      true = left/top margin, false = right/bottom margin
+     * @param newMm        new margin value in mm
+     */
+    void onMarginDragged(boolean isHorizontal, boolean isFirst, int newMm);
 }

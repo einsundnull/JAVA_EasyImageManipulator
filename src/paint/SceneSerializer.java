@@ -74,11 +74,12 @@ public class SceneSerializer {
         if (layer instanceof TextLayer tl) {
             return String.format(
                 "{\"type\":\"TextLayer\",\"id\":%d,\"x\":%d,\"y\":%d,\"width\":%d,\"height\":%d," +
-                "\"text\":\"%s\",\"fontName\":\"%s\",\"fontSize\":%d,\"bold\":%s,\"italic\":%s,\"color\":%d,\"hidden\":%s}",
+                "\"text\":\"%s\",\"fontName\":\"%s\",\"fontSize\":%d,\"bold\":%s,\"italic\":%s,\"color\":%d,\"hidden\":%s,\"wrapping\":%s}",
                 tl.id(), tl.x(), tl.y(), tl.width(), tl.height(),
                 escapeJson(tl.text()), tl.fontName(), tl.fontSize(),
                 tl.fontBold() ? "true" : "false", tl.fontItalic() ? "true" : "false",
-                tl.fontColor().getRGB(), tl.isHidden() ? "true" : "false"
+                tl.fontColor().getRGB(), tl.isHidden() ? "true" : "false",
+                tl.isWrapping() ? "true" : "false"
             );
         } else if (layer instanceof ImageLayer il) {
             String imageData = "";
@@ -137,7 +138,11 @@ public class SceneSerializer {
                 int colorInt = Integer.parseInt(extractField(json, "color"));
                 Color color = new Color(colorInt, true);
                 boolean hidden = "true".equals(extractField(json, "hidden"));
+                boolean wrapping = "true".equals(extractField(json, "wrapping"));
 
+                if (wrapping) {
+                    return TextLayer.wrappingOf(id, text, fontName, fontSize, bold, italic, color, x, y, w, h);
+                }
                 return TextLayer.of(id, text, fontName, fontSize, bold, italic, color, x, y, hidden);
             } else if ("ImageLayer".equals(type)) {
                 String imageData = extractField(json, "imageData");

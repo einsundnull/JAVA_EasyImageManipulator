@@ -134,4 +134,19 @@ public interface CanvasCallbacks {
     // Canvas background colors
     Color getCanvasBg1();
     Color getCanvasBg2();
+
+    /** Returns the current page layout (for margin overlay and snap), or null. */
+    PageLayout getPageLayout();
+
+    /** Returns true when book mode is active. */
+    boolean isBookMode();
+
+    /** Shows the TextToolbar with the given text properties. */
+    void showTextToolbar(String font, int size, boolean bold, boolean italic, java.awt.Color color);
+
+    /** Hides the TextToolbar. */
+    void hideTextToolbar();
+
+    /** Syncs text props to the TextToolbar without showing/hiding it. */
+    void syncTextToolbar(String font, int size, boolean bold, boolean italic, java.awt.Color color);
 }

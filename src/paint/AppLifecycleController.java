@@ -94,6 +94,8 @@ class AppLifecycleController {
 			ed.ci(1).showGrid = settings.isShowGrid();
 			ed.showRuler = settings.isShowRuler();
 			ed.rulerUnit = RulerUnit.valueOf(settings.getRulerUnit());
+			if (ed.paintToolbar != null) ed.paintToolbar.setRulerSelected(ed.showRuler);
+			if (ed.showRuler) SwingUtilities.invokeLater(() -> ed.buildRulerLayout());
 
 			// Zoom-Einstellungen
 			ed.ZOOM_MIN    = settings.getZoomMin();

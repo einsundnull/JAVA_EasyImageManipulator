@@ -29,21 +29,23 @@ public final class TextLayer extends Layer {
     private final boolean fontBold;
     private final boolean fontItalic;
     private final Color   fontColor;
-    private final boolean hidden;  // true = invisible (doesn't render)
+    private final boolean hidden;   // true = invisible (doesn't render)
+    private final boolean wrapping; // true = word-wrap within bounds, font size fixed
 
     // ── Private constructor – callers use the factory method ─────────────────
 
     private TextLayer(int id, String text, String fontName, int fontSize,
                       boolean fontBold, boolean fontItalic, Color fontColor,
-                      int x, int y, int w, int h, boolean hidden) {
+                      int x, int y, int w, int h, boolean hidden, boolean wrapping) {
         super(id, x, y, w, h);
-        this.text      = text;
-        this.fontName  = fontName;
-        this.fontSize  = fontSize;
-        this.fontBold  = fontBold;
+        this.text       = text;
+        this.fontName   = fontName;
+        this.fontSize   = fontSize;
+        this.fontBold   = fontBold;
         this.fontItalic = fontItalic;
-        this.fontColor = fontColor;
-        this.hidden    = hidden;
+        this.fontColor  = fontColor;
+        this.hidden     = hidden;
+        this.wrapping   = wrapping;
     }
 
     // ── Factory method ────────────────────────────────────────────────────────
@@ -81,34 +83,61 @@ public final class TextLayer extends Layer {
         int w = 1;
         for (String line : lines) w = Math.max(w, fm.stringWidth(line));
         int h = Math.max(1, fm.getHeight() * lines.length);
-        // Add TEXT_PADDING on each side
-        return new TextLayer(id, txt, fn, fs, bold, italic, col, x, y, w + TEXT_PADDING * 2, h + TEXT_PADDING * 2, hidden);
+        return new TextLayer(id, txt, fn, fs, bold, italic, col, x, y, w + TEXT_PADDING * 2, h + TEXT_PADDING * 2, hidden, false);
+    }
+
+    /**
+     * Creates a wrapping TextLayer with explicit bounds (content area).
+     * Font size is fixed — text word-wraps within the given width.
+     * {@link #withBounds} on a wrapping layer resizes the frame WITHOUT scaling the font.
+     */
+    public static TextLayer wrappingOf(int id, String text, String fontName, int fontSize,
+                                       boolean bold, boolean italic, Color color,
+                                       int x, int y, int w, int h) {
+        String fn  = fontName != null ? fontName : "SansSerif";
+        int    fs  = Math.max(6, fontSize);
+        Color  col = color != null ? color : Color.BLACK;
+        String txt = text  != null ? text  : "";
+        return new TextLayer(id, txt, fn, fs, bold, italic, col, x, y,
+                Math.max(TEXT_PADDING * 2 + 1, w),
+                Math.max(TEXT_PADDING * 2 + 1, h),
+                false, true);
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────
 
-    public String  text()      { return text;      }
-    public String  fontName()  { return fontName;  }
-    public int     fontSize()  { return fontSize;  }
-    public boolean fontBold()  { return fontBold;  }
-    public boolean fontItalic(){ return fontItalic; }
-    public Color   fontColor() { return fontColor; }
-    public boolean isHidden()  { return hidden;    }
+    public String  text()       { return text;      }
+    public String  fontName()   { return fontName;  }
+    public int     fontSize()   { return fontSize;  }
+    public boolean fontBold()   { return fontBold;  }
+    public boolean fontItalic() { return fontItalic; }
+    public Color   fontColor()  { return fontColor; }
+    public boolean isHidden()   { return hidden;    }
+    public boolean isWrapping() { return wrapping;  }
 
     // ── Mutations (return new instances) ──────────────────────────────────────
 
     @Override
     public TextLayer withPosition(int nx, int ny) {
-        return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, nx, ny, width, height, hidden);
+        return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, nx, ny, width, height, hidden, wrapping);
     }
 
     /**
      * Returns a copy with updated bounds.
-     * The font size is scaled proportionally to the larger of the two scale factors,
-     * then the bounding box is recomputed from the new font metrics.
+     * <ul>
+     *   <li>Normal layers: font size scales proportionally, bounding box recomputed.</li>
+     *   <li>Wrapping layers: bounds resize, font size stays fixed (text reflows).</li>
+     * </ul>
      */
     @Override
     public TextLayer withBounds(int nx, int ny, int nw, int nh) {
+        if (wrapping) {
+            return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor,
+                    nx, ny,
+                    Math.max(TEXT_PADDING * 2 + 1, nw),
+                    Math.max(TEXT_PADDING * 2 + 1, nh),
+                    hidden, true);
+        }
         double scaleX = (double) nw / Math.max(1, width);
         double scaleY = (double) nh / Math.max(1, height);
         double scale  = Math.max(scaleX, scaleY);
@@ -118,22 +147,37 @@ public final class TextLayer extends Layer {
 
     /**
      * Returns a copy with updated text content and/or font settings.
-     * The bounding box is recomputed from the new font metrics.
+     * For wrapping layers the bounding box is preserved; for normal layers it is recomputed.
      */
     public TextLayer withText(String newText, String newFontName, int newFontSize,
                               boolean newBold, boolean newItalic, Color newColor) {
+        if (wrapping) {
+            Color col = newColor != null ? newColor : Color.BLACK;
+            String fn = newFontName != null ? newFontName : "SansSerif";
+            return new TextLayer(id, newText != null ? newText : "", fn,
+                    Math.max(6, newFontSize), newBold, newItalic, col,
+                    x, y, width, height, hidden, true);
+        }
         return of(id, newText, newFontName, newFontSize, newBold, newItalic, newColor, x, y, hidden);
     }
 
     /**
      * Returns a copy with only the font size changed.
-     * The bounding box is recomputed from the new font metrics.
+     * For wrapping layers the bounding box is preserved; for normal layers it is recomputed.
      */
     public TextLayer withFontSize(int newFontSize) {
+        if (wrapping) {
+            return new TextLayer(id, text, fontName, Math.max(6, newFontSize),
+                    fontBold, fontItalic, fontColor, x, y, width, height, hidden, true);
+        }
         return of(id, text, fontName, newFontSize, fontBold, fontItalic, fontColor, x, y, hidden);
     }
 
     public TextLayer withHidden(boolean newHidden) {
+        if (wrapping) {
+            return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor,
+                    x, y, width, height, newHidden, true);
+        }
         return of(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, x, y, newHidden);
     }
 

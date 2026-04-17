@@ -43,7 +43,7 @@ public class AppSettings {
 
     // View
     private boolean showGrid = false;
-    private boolean showRuler = false;
+    private boolean showRuler = true;
     private String rulerUnit = "PX";
     private boolean filmstripVisible = true;
     private String appMode = "ALPHA_EDITOR";
@@ -63,6 +63,10 @@ public class AppSettings {
 
     // Mouse
     private int mouseWheelSensitivity = 16;
+
+    // Second gallery directories (per canvas)
+    private String gallery2Dir0 = "";
+    private String gallery2Dir1 = "";
 
     // Recent Files/Projects
     private List<String> recentProjects = new ArrayList<>();
@@ -159,6 +163,9 @@ public class AppSettings {
 
         if (data.containsKey("mouseWheelSensitivity")) mouseWheelSensitivity = parseInt(data.get("mouseWheelSensitivity"));
 
+        if (data.containsKey("gallery2Dir0")) gallery2Dir0 = data.get("gallery2Dir0");
+        if (data.containsKey("gallery2Dir1")) gallery2Dir1 = data.get("gallery2Dir1");
+
         // Parse recentProjects array
         if (data.containsKey("recentProjects")) {
             String arrStr = data.get("recentProjects");
@@ -249,6 +256,9 @@ public class AppSettings {
             writeField(writer, "maximized", windowMaximized, true);
 
             writeField(writer, "mouseWheelSensitivity", mouseWheelSensitivity, true);
+
+            writeField(writer, "gallery2Dir0", gallery2Dir0, true);
+            writeField(writer, "gallery2Dir1", gallery2Dir1, true);
 
             // recentProjects as JSON array
             writer.write("  \"recentProjects\": [");
@@ -401,6 +411,12 @@ public class AppSettings {
         recentProjects.add(0, path);
         while (recentProjects.size() > 10) recentProjects.remove(recentProjects.size() - 1);
     }
+
+    public String getGallery2Dir0() { return gallery2Dir0; }
+    public void setGallery2Dir0(String d) { gallery2Dir0 = d != null ? d : ""; }
+
+    public String getGallery2Dir1() { return gallery2Dir1; }
+    public void setGallery2Dir1(String d) { gallery2Dir1 = d != null ? d : ""; }
 
     public List<String> getRecentFiles() { return new ArrayList<>(recentFiles); }
     public void setRecentFiles(List<String> l) { recentFiles = new ArrayList<>(l); }

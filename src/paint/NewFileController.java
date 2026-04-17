@@ -37,6 +37,78 @@ class NewFileController {
 		this.ed = ed;
 	}
 
+	/**
+	 * Opens the unified new-image dialog targeted at the given canvas index.
+	 * The created file is assigned to that canvas; the view switches to it.
+	 */
+	void doNewBitmapForCanvas(int idx) {
+		NewImageDialog dlg = new NewImageDialog(ed);
+		NewImageDialog.Result res = dlg.showAndGet();
+		if (res == null) return;
+
+		CanvasInstance c = ed.ci(idx);
+
+		BufferedImage img = new BufferedImage(res.widthPx(), res.heightPx(), BufferedImage.TYPE_INT_ARGB);
+		java.awt.Graphics2D g2 = img.createGraphics();
+		g2.setColor(Color.WHITE);
+		g2.fillRect(0, 0, res.widthPx(), res.heightPx());
+		if (res.withMargins()) {
+			final double PPM = 96.0 / 25.4;
+			int mT = (int) Math.round(res.mTopMm()    * PPM);
+			int mB = (int) Math.round(res.mBottomMm() * PPM);
+			int mL = (int) Math.round(res.mLeftMm()   * PPM);
+			int mR = (int) Math.round(res.mRightMm()  * PPM);
+			g2.setColor(new Color(0, 120, 220, 180));
+			float[] dash = {6f, 4f};
+			g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT,
+					BasicStroke.JOIN_MITER, 10f, dash, 0f));
+			g2.drawRect(mL, mT, res.widthPx() - mL - mR, res.heightPx() - mT - mB);
+		}
+		g2.dispose();
+
+		c.workingImage   = img;
+		c.originalImage  = ed.deepCopy(img);
+		c.activeElements = new ArrayList<>();
+		c.selectedElements.clear();
+		c.undoStack.clear();
+		c.redoStack.clear();
+		c.selectedAreas.clear();
+		c.floatingImg = null;
+		c.floatRect   = null;
+
+		File saveDir = c.lastIndexedDir != null ? c.lastIndexedDir
+				: new File(System.getProperty("user.home"));
+		int counter = 1;
+		File newFile;
+		do {
+			newFile = new File(saveDir, "Untitled_" + counter + ".png");
+			counter++;
+		} while (newFile.exists());
+		try {
+			ImageIO.write(c.workingImage, "PNG", newFile);
+			c.sourceFile = newFile;
+			c.hasUnsavedChanges = false;
+			ed.dirtyFiles.remove(c.sourceFile);
+			if (!c.directoryImages.contains(newFile)) {
+				c.directoryImages.add(newFile);
+				c.tileGallery.addFiles(Arrays.asList(newFile));
+			}
+			c.tileGallery.setActiveFile(newFile);
+			c.currentImageIndex = c.directoryImages.indexOf(newFile);
+		} catch (IOException ex) {
+			ed.showErrorDialog("Speicherfehler",
+					"Neue Datei konnte nicht gespeichert werden:\n" + ex.getMessage());
+			return;
+		}
+
+		ed.swapToImageView(idx);
+		SwingUtilities.invokeLater(() -> ed.fitToViewport(idx));
+		ed.updateTitle();
+		ed.updateStatus();
+		ed.updateDirtyUI();
+		ed.setBottomButtonsEnabled(true);
+	}
+
 	/** Creates a new blank ARGB bitmap after asking for dimensions. */
 	void doNewBitmap() {
 		if (ed.bookModeBtn.isSelected()) {
