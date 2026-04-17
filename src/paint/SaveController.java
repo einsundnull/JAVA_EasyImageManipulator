@@ -130,6 +130,7 @@ class SaveController {
 			ed.dirtyFiles.remove(c.sourceFile);
 			ed.updateTitle();
 			ed.updateDirtyUI();
+			ed.refreshGalleryThumbnail();
 			ed.showInfoDialog("Gespeichert", "Gespeichert als:\n" + outFile.getName());
 		} catch (IOException e) {
 			ed.showErrorDialog("Speicherfehler", e.getMessage());
@@ -265,6 +266,7 @@ class SaveController {
 				ed.dirtyFiles.remove(c.sourceFile);
 				ed.updateTitle();
 				ed.updateDirtyUI();
+				ed.refreshGalleryThumbnail();
 				ToastNotification.show(ed, "Mit Elementen gespeichert: " + c.sourceFile.getName());
 			} catch (IOException e) {
 				ed.showErrorDialog("Speicherfehler", e.getMessage());
@@ -290,25 +292,9 @@ class SaveController {
 
 			for (Layer el : c.activeElements) {
 				if (el instanceof ImageLayer il) {
-					float alpha = il.opacity() / 100.0f;
-					Composite origComposite = g2.getComposite();
-					if (alpha < 1.0f) {
-						g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-					}
-					if (Math.abs(il.rotationAngle()) > 0.001) {
-						AffineTransform orig = g2.getTransform();
-						double cx = il.x() + il.width() / 2.0;
-						double cy = il.y() + il.height() / 2.0;
-						g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
-						g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
-						g2.setTransform(orig);
-					} else {
-						g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
-					}
-					if (alpha < 1.0f) {
-						g2.setComposite(origComposite);
-					}
+					ElementController.drawImageLayer(g2, il);
 				} else if (el instanceof TextLayer tl) {
+					if (tl.isHidden()) continue;
 					int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
 					Font font = new Font(tl.fontName(), style, tl.fontSize());
 					g2.setFont(font);
@@ -319,14 +305,11 @@ class SaveController {
 						g2.drawString(lines[i], tl.x() + 4, tl.y() + fm.getAscent() + i * fm.getHeight() + 4);
 					}
 				} else if (el instanceof PathLayer pl) {
+					if (pl.isHidden()) continue;
 					List<Point3D> points = pl.points();
 					if (!points.isEmpty()) {
-						int[] xs = new int[points.size()];
-						int[] ys = new int[points.size()];
-						for (int i = 0; i < points.size(); i++) {
-							xs[i] = (int) points.get(i).x;
-							ys[i] = (int) points.get(i).y;
-						}
+						int[] xs = pl.absXPoints();
+						int[] ys = pl.absYPoints();
 						g2.setColor(new Color(100, 150, 200));
 						g2.setStroke(new BasicStroke(2));
 						if (pl.isClosed()) {

@@ -1,12 +1,14 @@
 package paint;
 
 import java.awt.AlphaComposite;
+import java.awt.Composite;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
@@ -167,8 +169,10 @@ class ElementController {
 		ed.pushUndo();
 		for (Layer el : new ArrayList<>(c.selectedElements)) {
 			if (el instanceof ImageLayer il) {
-				BufferedImage scaled = PaintEngine.scale(il.image(), Math.max(1, el.width()), Math.max(1, el.height()));
-				PaintEngine.pasteRegion(c.workingImage, scaled, new Point(el.x(), el.y()));
+				Graphics2D mg = c.workingImage.createGraphics();
+				mg.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+				drawImageLayer(mg, il);
+				mg.dispose();
 			} else if (el instanceof TextLayer tl) {
 				BufferedImage rendered = renderTextLayerToImage(tl);
 				PaintEngine.pasteRegion(c.workingImage, rendered, new Point(el.x(), el.y()));
@@ -226,19 +230,34 @@ class ElementController {
 		g2.drawImage(c.workingImage, 0, 0, null);
 		for (Layer el : c.activeElements) {
 			if (el instanceof ImageLayer il) {
-				if (Math.abs(il.rotationAngle()) > 0.001) {
-					double cx = il.x() + il.width() / 2.0;
-					double cy = il.y() + il.height() / 2.0;
-					g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
-					g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
-					g2.rotate(-Math.toRadians(il.rotationAngle()), cx, cy);
-				} else {
-					g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
-				}
+				drawImageLayer(g2, il);
 			}
 		}
 		g2.dispose();
 		return comp;
+	}
+
+	/**
+	 * Draws an ImageLayer onto g2 at its canvas position, applying rotation,
+	 * opacity, and scaling. Skips hidden layers. Used by thumbnail rendering,
+	 * merge-to-canvas, and burn operations.
+	 */
+	static void drawImageLayer(Graphics2D g2, ImageLayer il) {
+		if (il.isHidden()) return;
+		float alpha = il.opacity() / 100.0f;
+		Composite origComp = g2.getComposite();
+		if (alpha < 1.0f) g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+		if (Math.abs(il.rotationAngle()) > 0.001) {
+			AffineTransform savedTx = g2.getTransform();
+			double cx = il.x() + il.width() / 2.0;
+			double cy = il.y() + il.height() / 2.0;
+			g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
+			g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+			g2.setTransform(savedTx);
+		} else {
+			g2.drawImage(il.image(), il.x(), il.y(), il.width(), il.height(), null);
+		}
+		g2.setComposite(origComp);
 	}
 
 	void refreshGalleryThumbnail() { refreshGalleryThumbnail(ed.activeCanvasIndex); }
@@ -306,7 +325,21 @@ class ElementController {
 	/** Renders a layer to a BufferedImage. Returns null for PathLayer (not supported). */
 	BufferedImage renderLayerToImage(Layer live) {
 		if (live instanceof TextLayer tl) return renderTextLayerToImage(tl);
-		if (live instanceof ImageLayer il) return PaintEngine.scale(il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
+		if (live instanceof ImageLayer il) {
+			BufferedImage scaled = PaintEngine.scale(il.image(), Math.max(1, il.width()), Math.max(1, il.height()));
+			if (Math.abs(il.rotationAngle()) < 0.001) return scaled;
+			double rad  = Math.toRadians(il.rotationAngle());
+			double cosA = Math.abs(Math.cos(rad)), sinA = Math.abs(Math.sin(rad));
+			int nw = (int) Math.ceil(scaled.getWidth() * cosA + scaled.getHeight() * sinA);
+			int nh = (int) Math.ceil(scaled.getWidth() * sinA + scaled.getHeight() * cosA);
+			BufferedImage rot = new BufferedImage(Math.max(1, nw), Math.max(1, nh), BufferedImage.TYPE_INT_ARGB);
+			Graphics2D g2 = rot.createGraphics();
+			g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			g2.rotate(rad, nw / 2.0, nh / 2.0);
+			g2.drawImage(scaled, (nw - scaled.getWidth()) / 2, (nh - scaled.getHeight()) / 2, null);
+			g2.dispose();
+			return rot;
+		}
 		return null;
 	}
 

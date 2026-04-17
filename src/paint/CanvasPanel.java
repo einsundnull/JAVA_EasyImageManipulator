@@ -2514,29 +2514,28 @@ public class CanvasPanel extends JPanel {
 			boolean isHovered = isPrimary && (i == hoveredPathPointIndex);
 			boolean isSelected = isPrimary && (i == selectedPathPointIndex);
 
-			// Point size varies based on state
+			// Point size varies based on state (hover keeps same size so line intersection stays visible)
 			int drawRadius = pointRadius;
 			if (isSelected) drawRadius = pointRadius + 4;
-			else if (isHovered) drawRadius = pointRadius + 2;
 
-			// Point fill color
-			Color fillColor;
-			if (isSelected) fillColor = new Color(255, 200, 0);      // Yellow = selected
-			else if (isHovered) fillColor = new Color(255, 100, 200);// Pink = hovered
-			else fillColor = Color.WHITE;                             // White = normal
+			if (isHovered && !isSelected) {
+				// Hover: only a thin dashed outline, no fill
+				g2.setColor(new Color(255, 255, 255, 200));
+				g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+						10f, new float[]{3f, 3f}, 0f));
+				g2.drawOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
+			} else {
+				// Normal / selected: filled circle with border
+				Color fillColor  = isSelected ? new Color(255, 200, 0) : Color.WHITE;
+				Color borderColor = isSelected ? new Color(255, 140, 0) : new Color(0, 150, 200);
 
-			g2.setColor(fillColor);
-			g2.fillOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
+				g2.setColor(fillColor);
+				g2.fillOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
 
-			// Point border
-			Color borderColor;
-			if (isSelected) borderColor = new Color(255, 140, 0);    // Orange border = selected
-			else if (isHovered) borderColor = new Color(255, 80, 150);// Darker pink = hovered
-			else borderColor = new Color(0, 150, 200);               // Cyan border = normal
-
-			g2.setColor(borderColor);
-			g2.setStroke(isSelected || isHovered ? new BasicStroke(2f) : new BasicStroke(1.5f));
-			g2.drawOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
+				g2.setColor(borderColor);
+				g2.setStroke(isSelected ? new BasicStroke(2f) : new BasicStroke(1.5f));
+				g2.drawOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
+			}
 
 			// Point index label
 			g2.setColor(Color.BLACK);

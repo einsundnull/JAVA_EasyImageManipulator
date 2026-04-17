@@ -684,7 +684,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             int tx = 5, ty = 4, tw = w - 10, th = THUMB_H;
             paintCheckerboard(g2, tx, ty, tw, th);
 
-            // Layer thumbnail (aspect-fit)
+            // Layer thumbnail (aspect-fit, with rotation + opacity)
             if (layer instanceof ImageLayer il) {
                 BufferedImage img = il.image();
                 if (img != null) {
@@ -695,7 +695,20 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                     int iy = ty + (th - ih) / 2;
                     g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                             RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    g2.drawImage(img, ix, iy, iw, ih, null);
+                    g2.setClip(tx, ty, tw, th);
+                    float alpha = il.opacity() / 100.0f;
+                    java.awt.Composite origComp = g2.getComposite();
+                    if (alpha < 1.0f) g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+                    if (Math.abs(il.rotationAngle()) > 0.001) {
+                        java.awt.geom.AffineTransform savedTx = g2.getTransform();
+                        g2.rotate(Math.toRadians(il.rotationAngle()), ix + iw / 2.0, iy + ih / 2.0);
+                        g2.drawImage(img, ix, iy, iw, ih, null);
+                        g2.setTransform(savedTx);
+                    } else {
+                        g2.drawImage(img, ix, iy, iw, ih, null);
+                    }
+                    g2.setComposite(origComp);
+                    g2.setClip(null);
                 }
             } else if (layer instanceof TextLayer tl) {
                 // TEXT_LAYER: render a small text preview in the tile

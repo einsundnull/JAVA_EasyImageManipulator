@@ -206,9 +206,11 @@ class LayoutController {
 	// ── Dirty / refresh ───────────────────────────────────────────────────────
 
 	void updateDirtyUI() {
-		ed.ci(0).tileGallery.setDirtyFiles(ed.dirtyFiles);
-		if (ed.ci(1).tileGallery != null)
-			ed.ci(1).tileGallery.setDirtyFiles(ed.dirtyFiles);
+		for (int i = 0; i < 2; i++) {
+			CanvasInstance c = ed.ci(i);
+			if (c.tileGallery  != null) c.tileGallery .setDirtyFiles(ed.dirtyFiles);
+			if (c.tileGallery2 != null) c.tileGallery2.setDirtyFiles(ed.dirtyFiles);
+		}
 	}
 
 	/** Rebuilds the element layer panel tiles from the current activeElements. */

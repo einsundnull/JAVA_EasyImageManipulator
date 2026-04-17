@@ -164,9 +164,15 @@ class FileLoadController {
 		}
 		swapToImageView(idx);
 
-		CanvasInstance.PreloadedFileState preloaded = c.preloadCache.get(file);
-		if (preloaded != null && preloaded.image != null)
-			c.workingImage = preloaded.image;
+		// Only use preload for first-time loads (no prior fileCache entry).
+		// For revisited files the fileCache entry (kept correct by saveCurrentState)
+		// must take precedence — the preloadCache may hold a stale in-place-modified
+		// reference from a previous session with that file.
+		if (cached == null) {
+			CanvasInstance.PreloadedFileState preloaded = c.preloadCache.get(file);
+			if (preloaded != null && preloaded.image != null)
+				c.workingImage = preloaded.image;
+		}
 
 		SwingUtilities.invokeLater(() -> fitToViewport(idx));
 

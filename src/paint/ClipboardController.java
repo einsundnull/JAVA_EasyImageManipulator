@@ -31,17 +31,23 @@ class ClipboardController {
 			return;
 
 		if (!c.selectedElements.isEmpty()) {
-			ed.clipboardLayers = new ArrayList<>(c.selectedElements);
 			Layer first = c.selectedElements.get(0);
-			if (first instanceof ImageLayer il) {
-				ed.clipboard = il.image();
-			} else if (first instanceof PathLayer pl) {
+			if (first instanceof PathLayer pl) {
+				// PathLayer: copy image content INSIDE the polygon, not the path structure
+				ed.clipboardLayers = null;
 				ed.clipboard = PaintEngine.cropPolygon(c.workingImage, pl.absXPoints(), pl.absYPoints());
-			} else if (first instanceof TextLayer tl) {
-				ed.clipboard = ed.renderTextLayerToImage(tl);
+				if (ed.clipboard != null)
+					copyToSystemClipboard(ed.clipboard);
+			} else {
+				ed.clipboardLayers = new ArrayList<>(c.selectedElements);
+				if (first instanceof ImageLayer il) {
+					ed.clipboard = il.image();
+				} else if (first instanceof TextLayer tl) {
+					ed.clipboard = ed.renderTextLayerToImage(tl);
+				}
+				if (ed.clipboard != null)
+					copyToSystemClipboard(ed.clipboard);
 			}
-			if (ed.clipboard != null)
-				copyToSystemClipboard(ed.clipboard);
 			return;
 		}
 
