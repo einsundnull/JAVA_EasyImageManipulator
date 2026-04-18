@@ -43,7 +43,8 @@ public class TextWriter {
 
             // Sichtbarkeit
             w.write("#Properties:\n");
-            w.write("-hidden: " + text.isHidden() + "\n\n");
+            w.write("-hidden: " + text.isHidden() + "\n");
+            w.write("-isWrapping: " + text.isWrapping() + "\n\n");
 
             // Text-Inhalt
             w.write("#Text:\n");

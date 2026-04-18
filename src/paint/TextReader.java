@@ -21,6 +21,7 @@ public class TextReader {
         int x = 0, y = 0;
         int width = 100, height = 20;
         boolean hidden = false;
+        boolean isWrapping = false;
         String content = "";
         String fontName = "SansSerif";
         int fontSize = 12;
@@ -50,21 +51,23 @@ public class TextReader {
                     trimmed = trimmed.substring(1).trim();
                 }
 
-                if (!trimmed.contains(":")) continue;
+                if (!trimmed.contains(":")) {
+                    // Name-Zeile hat kein Colon (z.B. "text_42") — ID hier extrahieren
+                    if ("Name:".equals(section) && trimmed.startsWith("text_")) {
+                        try {
+                            id = Integer.parseInt(trimmed.substring(5));
+                        } catch (NumberFormatException e) {
+                            id = Math.abs(trimmed.hashCode());
+                        }
+                    }
+                    continue;
+                }
 
                 String key = trimmed.substring(0, trimmed.indexOf(':')).trim();
                 String val = trimmed.substring(trimmed.indexOf(':') + 1).trim();
 
                 switch (section) {
                     case "Name:":
-                        // Versuche ID aus Name zu extrahieren (z.B. "text_42" -> 42)
-                        if (trimmed.startsWith("text_")) {
-                            try {
-                                id = Integer.parseInt(trimmed.substring(5));
-                            } catch (NumberFormatException e) {
-                                id = Math.abs(trimmed.hashCode());
-                            }
-                        }
                         break;
 
                     case "Position:":
@@ -81,8 +84,9 @@ public class TextReader {
                         break;
 
                     case "Properties:":
-                        if (key.equals("hidden")) {
-                            hidden = Boolean.parseBoolean(val);
+                        switch (key) {
+                            case "hidden"     -> hidden     = Boolean.parseBoolean(val);
+                            case "isWrapping" -> isWrapping = Boolean.parseBoolean(val);
                         }
                         break;
 
@@ -117,6 +121,8 @@ public class TextReader {
         }
 
         // TextLayer erstellen
+        if (isWrapping)
+            return TextLayer.wrappingOf(id, content, fontName, fontSize, fontBold, fontItalic, fontColor, x, y, width, height, hidden);
         return TextLayer.of(id, content, fontName, fontSize, fontBold, fontItalic, fontColor, x, y, hidden);
     }
 

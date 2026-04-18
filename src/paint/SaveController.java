@@ -194,6 +194,21 @@ class SaveController {
 		if (c.sourceFile == null)
 			return;
 		try {
+			// Book pages: save in-place and persist layers
+			if (PageLayoutManifest.isBookPage(c.sourceFile)) {
+				ImageIO.write(c.workingImage, "PNG", c.sourceFile);
+				if (c.activeSceneFile == null)
+					c.activeSceneFile = BookController.getPageManifest(c.sourceFile);
+				ed.persistSceneIfActive(ed.activeCanvasIndex);
+				c.hasUnsavedChanges = false;
+				ed.dirtyFiles.remove(c.sourceFile);
+				ed.updateTitle();
+				ed.updateDirtyUI();
+				ed.refreshGalleryThumbnail();
+				ToastNotification.show(ed, "Gespeichert: " + c.sourceFile.getName());
+				return;
+			}
+
 			String suffix = getSaveSuffix();
 			String outPath = WhiteToAlphaConverter.getOutputPath(c.sourceFile, suffix);
 			ImageIO.write(c.workingImage, "PNG", new File(outPath));
