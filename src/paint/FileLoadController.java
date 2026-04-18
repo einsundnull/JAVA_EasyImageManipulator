@@ -134,6 +134,31 @@ class FileLoadController {
 		// defaultAppMode only when there is genuinely no prior state (first load).
 		AppMode modeBeforeLoad = c.appMode;
 
+		// Book pages: load layers from scene directory (always, independent of project)
+		boolean isPageEarly = PageLayoutManifest.isBookPage(file);
+		if (isPageEarly) {
+			SceneFileReader.SceneData pageScene = BookController.loadPageScene(file);
+			if (pageScene != null) {
+				List<Layer> allLayers = new ArrayList<>();
+				int nextId = 1;
+				for (SceneFileReader.ImageLayerRef ref : pageScene.imageLayers) {
+					java.awt.image.BufferedImage img = ImageLoader.loadImage(ref.file);
+					if (img != null) {
+						int w = ref.w > 0 ? ref.w : img.getWidth();
+						int h = ref.h > 0 ? ref.h : img.getHeight();
+						allLayers.add(new ImageLayer(nextId++, img, ref.x, ref.y, w, h, ref.rotation, ref.opacity));
+					}
+				}
+				allLayers.addAll(pageScene.textLayers);
+				allLayers.addAll(pageScene.pathLayers);
+				if (!allLayers.isEmpty()) {
+					c.activeElements = allLayers;
+					c.selectedElements.clear();
+				}
+				c.activeSceneFile = BookController.getPageManifest(file);
+			}
+		}
+
 		try {
 			if (ed.projectManager.getProjectName() != null) {
 				List<Layer> savedLayers = ed.projectManager.loadScene(file);

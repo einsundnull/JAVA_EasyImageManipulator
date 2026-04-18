@@ -14,8 +14,6 @@ import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.util.ArrayDeque;
-import java.util.Arrays;
-import java.util.Stack;
 
 /**
  * Stateless drawing engine.

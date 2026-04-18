@@ -153,7 +153,35 @@ class ScenesController {
 					ed.showErrorDialog("Fehler", "Layer → Scene fehlgeschlagen:\n" + ex.getMessage());
 				}
 			}
+
+			@Override
+			public void onRenameRequested(File sceneFile) {
+				renameSceneFile(sceneFile, idx);
+			}
 		};
+	}
+
+	private void renameSceneFile(File sceneFile, int idx) {
+		if (sceneFile == null || !sceneFile.exists()) return;
+		String oldName = sceneFile.getName().replaceAll("\\.(txt|json)$", "");
+		String newName = (String) javax.swing.JOptionPane.showInputDialog(
+				ed, "Neuer Szenenname:", "Szene umbenennen",
+				javax.swing.JOptionPane.PLAIN_MESSAGE, null, null, oldName);
+		if (newName == null || newName.isBlank() || newName.equals(oldName)) return;
+		newName = newName.trim();
+		String ext = sceneFile.getName().endsWith(".json") ? ".json" : ".txt";
+		File newFile = new File(sceneFile.getParentFile(), newName + ext);
+		if (newFile.exists()) {
+			javax.swing.JOptionPane.showMessageDialog(ed, "Name bereits vorhanden.", "Fehler",
+					javax.swing.JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		if (!sceneFile.renameTo(newFile)) {
+			javax.swing.JOptionPane.showMessageDialog(ed, "Umbenennen fehlgeschlagen.", "Fehler",
+					javax.swing.JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		refreshSceneFiles(idx);
 	}
 
 	void createSceneFromDrop(List<File> files, int idx) {

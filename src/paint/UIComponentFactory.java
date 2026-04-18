@@ -1,6 +1,5 @@
 package paint;
 
-import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
@@ -108,23 +107,7 @@ public class UIComponentFactory {
     }
 
     public static JToggleButton buildModeToggleBtn(String symbol, String tooltip) {
-        JToggleButton btn = new JToggleButton(symbol) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                Color bg = isSelected() ? AppColors.ACCENT_ACTIVE
-                        : (getModel().isRollover() ? AppColors.BTN_HOVER : AppColors.BTN_BG);
-                g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                if (isSelected()) {
-                    g2.setColor(AppColors.ACCENT);
-                    g2.setStroke(new BasicStroke(2f));
-                    g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 8, 8);
-                }
-                super.paintComponent(g);
-            }
-        };
+        PanelToggleButton btn = new PanelToggleButton(symbol, PanelToggleButton.Style.MODE);
         btn.setFont(new Font("Dialog", Font.PLAIN, 16));
         btn.setForeground(AppColors.TEXT);
         btn.setFocusPainted(false);
@@ -144,25 +127,7 @@ public class UIComponentFactory {
      * to visually distinguish book-context buttons from regular mode buttons.
      */
     public static JToggleButton buildBookToggleBtn(String symbol, String tooltip) {
-        Color bookBg      = new Color(45, 52, 72);
-        Color bookHover   = new Color(58, 66, 90);
-        JToggleButton btn = new JToggleButton(symbol) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                Color bg = isSelected() ? AppColors.ACCENT_ACTIVE
-                        : (getModel().isRollover() ? bookHover : bookBg);
-                g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                if (isSelected()) {
-                    g2.setColor(AppColors.ACCENT);
-                    g2.setStroke(new BasicStroke(2f));
-                    g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 8, 8);
-                }
-                super.paintComponent(g);
-            }
-        };
+        PanelToggleButton btn = new PanelToggleButton(symbol, PanelToggleButton.Style.BOOK);
         btn.setFont(new Font("SansSerif", Font.PLAIN, 16));
         btn.setForeground(AppColors.TEXT);
         btn.setFocusPainted(false);

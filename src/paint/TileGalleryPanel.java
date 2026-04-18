@@ -99,6 +99,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
          * like what is visible on screen.
          */
         default java.awt.image.BufferedImage getCompositeForFile(File f) { return null; }
+        /** Called when the user requests a rename (right-click → Umbenennen). No-op by default. */
+        default void onRenameRequested(File file) {}
     }
 
     // ── Callback for preloading ───────────────────────────────────────────────
@@ -332,6 +334,9 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
     public void setOnActivated(Runnable r) { onActivatedRef[0] = r; }
 
+    /** Adds a "+" button to the gallery header that calls {@code r} when clicked. */
+    public void setOnAdd(Runnable r) { addAddButton(sidebarHeader, r); }
+
     public void setFiles(List<File> files, File active) {
         activeFile = active;
         tiles.clear();
@@ -494,20 +499,15 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         tp.setActive(f.equals(activeFile));
         tiles.add(tp);
         tilesContainer.add(tp);
-        tilesContainer.add(Box.createVerticalStrut(5));
     }
 
     /** Insert a tile at a specific index (for drop positioning). */
     private void addTileAtIndex(File f, int tileIndex) {
         TilePanel tp = new TilePanel(f);
         tp.setActive(f.equals(activeFile));
-        // Clamp index to valid range
         int idx = Math.max(0, Math.min(tileIndex, tiles.size()));
         tiles.add(idx, tp);
-        // Each tile has: TilePanel + 5px gap, so position in tilesContainer is 2*idx
-        int containerIdx = 2 * idx;
-        tilesContainer.add(tp, containerIdx);
-        tilesContainer.add(Box.createVerticalStrut(5), containerIdx + 1);
+        tilesContainer.add(tp, idx);
     }
 
     // =========================================================================
@@ -672,6 +672,14 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                     callbacks.onDragEnded();
                 }
                 @Override public void mouseClicked(MouseEvent e) {
+                    if (SwingUtilities.isRightMouseButton(e)) {
+                        javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
+                        javax.swing.JMenuItem renameItem = new javax.swing.JMenuItem("Umbenennen");
+                        renameItem.addActionListener(ae -> callbacks.onRenameRequested(imageFile));
+                        popup.add(renameItem);
+                        popup.show(TilePanel.this, e.getX(), e.getY());
+                        return;
+                    }
                     // Clear clicked state from other tiles and set this one
                     for (TilePanel t : tiles) {
                         if (t != TilePanel.this) {
@@ -785,13 +793,22 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                             img = sceneImg.thumbnail;
                         }
                     } else if (imageFile.isDirectory()) {
-                        // GameII scene directory — use first sprite image as thumbnail
-                        File imagesDir = new File(new File(imageFile, "sprites"), "images");
-                        if (imagesDir.exists()) {
-                            File[] imgs = imagesDir.listFiles(f ->
-                                    f.isFile() && f.getName().toLowerCase().endsWith(".png"));
-                            if (imgs != null && imgs.length > 0) {
-                                img = ImageIO.read(imgs[0]);
+                        // Book directory — use first page as cover thumbnail
+                        File pagesDir = new File(imageFile, "pages");
+                        if (pagesDir.isDirectory()) {
+                            for (String name : BookController.readManifestPages(imageFile)) {
+                                File cover = new File(pagesDir, name);
+                                if (cover.exists()) { img = ImageIO.read(cover); break; }
+                            }
+                        } else {
+                            // GameII scene directory — use first sprite image as thumbnail
+                            File imagesDir = new File(new File(imageFile, "sprites"), "images");
+                            if (imagesDir.exists()) {
+                                File[] imgs = imagesDir.listFiles(f ->
+                                        f.isFile() && f.getName().toLowerCase().endsWith(".png"));
+                                if (imgs != null && imgs.length > 0) {
+                                    img = ImageIO.read(imgs[0]);
+                                }
                             }
                         }
                     } else {

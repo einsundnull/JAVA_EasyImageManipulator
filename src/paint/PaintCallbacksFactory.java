@@ -89,6 +89,11 @@ class PaintCallbacksFactory {
 			}
 
 			@Override
+			public void onRotateDeg(double deg) {
+				ed.doRotate(deg);
+			}
+
+			@Override
 			public void onScale() {
 				ed.doScale();
 			}

@@ -12,22 +12,22 @@ import javax.swing.*;
 
 /**
  * Sidebar panel listing all books in the books root directory.
- * Clicking a book tile loads its pages into the linked {@link BookPagesPanel}.
+ * Clicking a book tile loads its pages into the linked {@link BookPagesPanelLegacy}.
  *
  * <p>Drop target: an image dropped onto the list (empty or not) triggers
  * {@link BookController#pickOrCreateBook()} so the user can choose or create
  * a book, then immediately opens the "Neue Seite" dialog.
  */
-class BookListPanel extends BaseSidebarPanel {
+class BookListPanelLegacy extends BaseSidebarPanel {
 
 	static final int PANEL_W  = BaseSidebarPanel.DEFAULT_PANEL_W;
 	static final int TILE_H   = 28;
 
 	private final SelectiveAlphaEditor ed;
-	private final BookPagesPanel       linkedPages;
+	private final BookPagesPanelLegacy       linkedPages;
 	private JPanel                     tilesContainer;
 
-	BookListPanel(SelectiveAlphaEditor ed, BookPagesPanel linkedPages) {
+	BookListPanelLegacy(SelectiveAlphaEditor ed, BookPagesPanelLegacy linkedPages) {
 		this.ed          = ed;
 		this.linkedPages = linkedPages;
 		setPreferredSize(new Dimension(PANEL_W, 0));

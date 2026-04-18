@@ -141,10 +141,24 @@ class ModeController {
 
 	void toggleSceneMode() {
 		boolean entering = ed.sceneModeBtn.isSelected();
-		if (entering && ed.bookModeBtn.isSelected()) {
+		if (entering && ed.bookModeBtn.isSelected())
 			ed.bookModeBtn.setSelected(false);
+
+		// Show/hide scene context buttons like book mode does for its buttons
+		if (ed.scenesBtn    != null) ed.scenesBtn   .setVisible(entering);
+		if (ed.secondScenesBtn != null) ed.secondScenesBtn.setVisible(entering);
+		if (ed.topBarLeft  != null) { ed.topBarLeft .revalidate(); ed.topBarLeft .repaint(); }
+		if (ed.topBarRight != null) { ed.topBarRight.revalidate(); ed.topBarRight.repaint(); }
+
+		// Hide scene panels when leaving scene mode
+		if (!entering) {
+			ed.setScenesPanelVisible(0, false);
+			ed.setScenesPanelVisible(1, false);
 		}
+
 		updateModeLabel();
+		ed.galleryWrapper.revalidate();
+		ed.galleryWrapper.repaint();
 		ed.ci().canvasPanel.repaint();
 	}
 

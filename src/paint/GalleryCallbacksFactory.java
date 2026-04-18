@@ -230,4 +230,132 @@ class GalleryCallbacksFactory {
 	static TileGalleryPanel.FilePreloadCallback buildPreloadCallback(SelectiveAlphaEditor ed, int idx) {
 		return (file) -> ed.preloadFileAsync(file, idx);
 	}
+
+	// ── Book panel pair ───────────────────────────────────────────────────────
+
+	/**
+	 * Creates a linked (listPanel, pagesPanel) pair for book navigation.
+	 * Clicking a book in the list fills the pages panel; clicking a page loads it.
+	 * Returns { listPanel, pagesPanel }.
+	 */
+	static TileGalleryPanel[] buildBookPanelPair(SelectiveAlphaEditor ed, int idx) {
+		File[]             currentBook  = { null };
+		TileGalleryPanel[] pagesPanelRef = { null };
+		TileGalleryPanel[] listPanelRef  = { null };
+
+		// ── Pages panel ───────────────────────────────────────────────────────
+		pagesPanelRef[0] = new TileGalleryPanel(
+			new TileGalleryPanel.Callbacks() {
+				@Override public void onTileOpened(File pageFile) {
+					ed.loadFile(pageFile, idx);
+				}
+				@Override public void onSelectionChanged(List<File> sel) {}
+				@Override public void onRenameRequested(File pageFile) {
+					if (currentBook[0] == null) return;
+					String cur = pageFile.getName().replaceAll("\\.png$", "");
+					String newName = (String) javax.swing.JOptionPane.showInputDialog(
+							ed, "Neuer Seitenname:", "Seite umbenennen",
+							javax.swing.JOptionPane.PLAIN_MESSAGE, null, null, cur);
+					if (newName == null || newName.isBlank() || newName.equals(cur)) return;
+					try {
+						BookController.renamePage(pageFile, newName.trim(), currentBook[0]);
+						pagesPanelRef[0].setFiles(BookController.listPages(currentBook[0]), null);
+					} catch (java.io.IOException ex) {
+						ed.showErrorDialog("Fehler", "Umbenennen fehlgeschlagen:\n" + ex.getMessage());
+					}
+				}
+				@Override public void onFileElementDropped(File src, int insertIndex) {
+					if (currentBook[0] == null) return;
+					boolean isPage = src.getParent() != null
+							&& new java.io.File(src.getParent()).getName().equals("pages");
+					if (isPage) {
+						try {
+							BookController.copyPage(src, currentBook[0]);
+							pagesPanelRef[0].setFiles(BookController.listPages(currentBook[0]), null);
+						} catch (java.io.IOException ex) {
+							ed.showErrorDialog("Fehler", ex.getMessage());
+						}
+					} else {
+						BufferedImage img = ImageLoader.loadImage(src);
+						ed.bookController.showNewPageDialog(img, currentBook[0],
+								() -> javax.swing.SwingUtilities.invokeLater(
+										() -> pagesPanelRef[0].setFiles(BookController.listPages(currentBook[0]), null)));
+					}
+				}
+				@Override public void onLayerDropped(Layer layer) {
+					if (currentBook[0] == null) return;
+					BufferedImage img = ed.renderLayerToImage(layer);
+					if (img == null) return;
+					ed.bookController.showNewPageDialog(img, currentBook[0],
+							() -> javax.swing.SwingUtilities.invokeLater(
+									() -> pagesPanelRef[0].setFiles(BookController.listPages(currentBook[0]), null)));
+				}
+			},
+			null, "Seiten", null,
+			() -> { if (currentBook[0] != null) pagesPanelRef[0].setFiles(BookController.listPages(currentBook[0]), null); }
+		);
+		TileGalleryPanel pagesPanel = pagesPanelRef[0];
+		pagesPanel.setFileDropOverride(files -> {
+			if (currentBook[0] == null || files.isEmpty()) return;
+			File src = files.get(0);
+			BufferedImage img = ImageLoader.loadImage(src);
+			if (img == null) return;
+			ed.bookController.showNewPageDialog(img, currentBook[0],
+					() -> javax.swing.SwingUtilities.invokeLater(
+							() -> pagesPanel.setFiles(BookController.listPages(currentBook[0]), null)));
+		});
+		pagesPanel.setOnAdd(() -> ed.bookController.showNewPageDialog(null, currentBook[0],
+				() -> javax.swing.SwingUtilities.invokeLater(
+						() -> pagesPanel.setFiles(BookController.listPages(currentBook[0]), null))));
+		pagesPanel.setVisible(false);
+
+		// ── List panel ────────────────────────────────────────────────────────
+		listPanelRef[0] = new TileGalleryPanel(
+			new TileGalleryPanel.Callbacks() {
+				@Override public void onTileOpened(File bookDir) {
+					currentBook[0] = bookDir;
+					pagesPanel.setFiles(BookController.listPages(bookDir), null);
+					if (!pagesPanel.isVisible()) {
+						pagesPanel.setVisible(true);
+						ed.galleryWrapper.revalidate();
+						ed.galleryWrapper.repaint();
+					}
+				}
+				@Override public void onSelectionChanged(List<File> sel) {}
+				@Override public void onRenameRequested(File bookDir) {
+					String cur = bookDir.getName();
+					String newName = (String) javax.swing.JOptionPane.showInputDialog(
+							ed, "Neuer Buchname:", "Buch umbenennen",
+							javax.swing.JOptionPane.PLAIN_MESSAGE, null, null, cur);
+					if (newName == null || newName.isBlank() || newName.equals(cur)) return;
+					java.io.File parent = bookDir.getParentFile();
+					java.io.File newDir = new java.io.File(parent, newName.trim());
+					if (newDir.exists()) { ed.showErrorDialog("Fehler", "Name bereits vorhanden."); return; }
+					if (!bookDir.renameTo(newDir)) { ed.showErrorDialog("Fehler", "Umbenennen fehlgeschlagen."); return; }
+					if (currentBook[0] != null && currentBook[0].equals(bookDir)) currentBook[0] = newDir;
+					listPanelRef[0].setFiles(BookController.listBooks(), currentBook[0]);
+				}
+			},
+			null, "Bücher", null,
+			() -> listPanelRef[0].setFiles(BookController.listBooks(), currentBook[0])
+		);
+		TileGalleryPanel listPanel = listPanelRef[0];
+		listPanel.setOnAdd(() -> {
+			String name = (String) javax.swing.JOptionPane.showInputDialog(
+					ed, "Buchname:", "Neues Buch", javax.swing.JOptionPane.PLAIN_MESSAGE);
+			if (name == null || name.isBlank()) return;
+			try {
+				java.io.File book = BookController.createBook(name.trim());
+				currentBook[0] = book;
+				listPanel.setFiles(BookController.listBooks(), book);
+				pagesPanel.setFiles(BookController.listPages(book), null);
+			} catch (java.io.IOException ex) {
+				ed.showErrorDialog("Fehler", ex.getMessage());
+			}
+		});
+		listPanel.setFiles(BookController.listBooks(), null);
+		listPanel.setVisible(false);
+
+		return new TileGalleryPanel[]{ listPanel, pagesPanel };
+	}
 }

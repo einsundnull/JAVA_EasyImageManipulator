@@ -194,10 +194,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	JPanel        topBarRight;    // right panel of the top bar (for revalidation)
 
 	// Book panels
-	BookListPanel  bookListPanel;
-	BookPagesPanel bookPagesPanel;
-	BookListPanel  bookListPanel2;
-	BookPagesPanel bookPagesPanel2;
+	TileGalleryPanel bookListPanel;
+	TileGalleryPanel bookPagesPanel;
+	TileGalleryPanel bookListPanel2;
+	TileGalleryPanel bookPagesPanel2;
 
 	// Page-layout toolbar (horizontal, above PaintToolbar)
 	PageLayoutToolbar pageLayoutToolbar;

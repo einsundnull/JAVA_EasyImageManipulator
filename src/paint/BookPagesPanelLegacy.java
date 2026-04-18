@@ -20,7 +20,7 @@ import javax.swing.TransferHandler;
  * Drop target: accepts images and internal TilePanel drags.
  * On drop → shows "Neue Seite" dialog → creates page PNG → opens in canvas.
  */
-class BookPagesPanel extends BaseSidebarPanel {
+class BookPagesPanelLegacy extends BaseSidebarPanel {
 
 	static final int PANEL_W = BaseSidebarPanel.DEFAULT_PANEL_W;
 	static final int THUMB_W = PANEL_W - 16;
@@ -34,7 +34,7 @@ class BookPagesPanel extends BaseSidebarPanel {
 	private File   currentBookDir  = null;
 	private JPanel tilesContainer;
 
-	BookPagesPanel(SelectiveAlphaEditor ed) {
+	BookPagesPanelLegacy(SelectiveAlphaEditor ed) {
 		this.ed = ed;
 		setPreferredSize(new Dimension(PANEL_W, 0));
 		setMaximumSize(new Dimension(PANEL_W, Integer.MAX_VALUE));

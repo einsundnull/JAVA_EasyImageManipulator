@@ -1,14 +1,11 @@
 package paint;
 
-import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.Composite;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
-import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -143,6 +140,13 @@ class SaveController {
 			return;
 		try {
 			ImageIO.write(c.workingImage, "PNG", c.sourceFile);
+
+			// Book pages: persist layers via scene mechanism (writes .txt + images/ + texts/)
+			if (PageLayoutManifest.isBookPage(c.sourceFile)) {
+				if (c.activeSceneFile == null)
+					c.activeSceneFile = BookController.getPageManifest(c.sourceFile);
+				ed.persistSceneIfActive(ed.activeCanvasIndex);
+			}
 
 			if (ed.projectManager.getProjectName() != null) {
 				ed.projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode,

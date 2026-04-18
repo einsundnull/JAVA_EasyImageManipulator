@@ -264,14 +264,18 @@ class ElementController {
 
 	void refreshGalleryThumbnail(int idx) {
 		CanvasInstance c = ed.ci(idx);
-		if (c.sourceFile == null || c.workingImage == null)
+		if (c.workingImage == null)
 			return;
 		BufferedImage thumb = renderCompositeForThumbnail(c);
 		if (thumb == null)
 			return;
-		c.tileGallery.refreshThumbnailFor(c.sourceFile, thumb);
+		if (c.sourceFile != null)
+			c.tileGallery.refreshThumbnailFor(c.sourceFile, thumb);
 		if (c.activeSceneFile != null)
 			c.scenesPanel.refreshThumbnailFor(c.activeSceneFile, thumb);
+		// Live-update book page panels when the canvas shows a page
+		if (ed.bookPagesPanel  != null && c.sourceFile != null) ed.bookPagesPanel .refreshThumbnailFor(c.sourceFile, thumb);
+		if (ed.bookPagesPanel2 != null && c.sourceFile != null) ed.bookPagesPanel2.refreshThumbnailFor(c.sourceFile, thumb);
 	}
 
 	// ── List helpers ───────────────────────────────────────────────────────────

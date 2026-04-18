@@ -209,8 +209,40 @@ public abstract class BaseSidebarPanel extends JPanel {
             }
 
             header.add(eastPanel, BorderLayout.EAST);
+            header.putClientProperty("eastPanel", eastPanel);
+        } else {
+            // Always provide an east panel so addAddButton() can insert into it later
+            JPanel eastPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+            eastPanel.setBackground(new Color(42, 42, 42));
+            eastPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
+            header.add(eastPanel, BorderLayout.EAST);
+            header.putClientProperty("eastPanel", eastPanel);
         }
         return header;
+    }
+
+    /**
+     * Adds a "+" icon button to the east panel of an existing header JPanel.
+     * Must be called after buildSidebarHeader() — relies on the "eastPanel" client property.
+     */
+    protected static void addAddButton(JPanel header, Runnable onAdd) {
+        Object prop = header.getClientProperty("eastPanel");
+        if (!(prop instanceof JPanel)) return;
+        JPanel east = (JPanel) prop;
+        JLabel addBtn = new JLabel("+");
+        addBtn.setForeground(AppColors.TEXT_MUTED);
+        addBtn.setFont(new Font("SansSerif", Font.BOLD, 14));
+        addBtn.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
+        addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        addBtn.setToolTipText("Neu erstellen");
+        addBtn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { onAdd.run(); }
+            @Override public void mouseEntered(MouseEvent e) { addBtn.setForeground(java.awt.Color.WHITE); }
+            @Override public void mouseExited (MouseEvent e) { addBtn.setForeground(AppColors.TEXT_MUTED); }
+        });
+        east.add(addBtn, 0);
+        east.revalidate();
+        east.repaint();
     }
 
     // ── ScrollPane-Builder ─────────────────────────────────────────────────────

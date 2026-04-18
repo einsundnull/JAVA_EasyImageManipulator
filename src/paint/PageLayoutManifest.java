@@ -1,9 +1,10 @@
 package paint;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.util.List;
 
 /**
  * Reads and writes per-page layout manifests.

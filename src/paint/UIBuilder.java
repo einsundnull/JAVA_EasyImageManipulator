@@ -52,6 +52,7 @@ class UIBuilder {
 		ed.scenesBtn = UIComponentFactory.buildModeToggleBtn("SI", "Szenen I ein-/ausblenden");
 		ed.scenesBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		ed.scenesBtn.setSelected(false);
+		ed.scenesBtn.setVisible(false); // hidden until scene mode is active
 		ed.scenesBtn.addActionListener(e -> ed.setScenesPanelVisible(0, ed.scenesBtn.isSelected()));
 
 		// II – Images I (filmstrip)
@@ -134,6 +135,7 @@ class UIBuilder {
 		ed.secondScenesBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
 		ed.secondScenesBtn.setSelected(false);
 		ed.secondScenesBtn.setEnabled(true);
+		ed.secondScenesBtn.setVisible(false); // hidden until scene mode is active
 		ed.secondScenesBtn.addActionListener(e -> ed.setScenesPanelVisible(1, ed.secondScenesBtn.isSelected()));
 
 		// EII – Elements II
@@ -456,11 +458,13 @@ class UIBuilder {
 		ed.ci(0).layeredPane.add(ed.rightDropZone, JLayeredPane.PALETTE_LAYER);
 		ed.rightDropZone.setVisible(false);
 
-		// Book panels (hidden by default, shown via BI/PI buttons)
-		ed.bookPagesPanel  = new BookPagesPanel(ed);
-		ed.bookListPanel   = new BookListPanel(ed, ed.bookPagesPanel);
-		ed.bookPagesPanel2 = new BookPagesPanel(ed);
-		ed.bookListPanel2  = new BookListPanel(ed, ed.bookPagesPanel2);
+		// Book panels — built as linked TileGalleryPanel pairs
+		TileGalleryPanel[] bookPair0 = GalleryCallbacksFactory.buildBookPanelPair(ed, 0);
+		ed.bookListPanel  = bookPair0[0];
+		ed.bookPagesPanel = bookPair0[1];
+		TileGalleryPanel[] bookPair1 = GalleryCallbacksFactory.buildBookPanelPair(ed, 1);
+		ed.bookListPanel2  = bookPair1[0];
+		ed.bookPagesPanel2 = bookPair1[1];
 
 		ed.galleryWrapper = new JPanel();
 		ed.galleryWrapper.setLayout(new BoxLayout(ed.galleryWrapper, BoxLayout.X_AXIS));
@@ -484,6 +488,7 @@ class UIBuilder {
 		ed.galleryWrapper.add(ed.bookListPanel2);   // BII – ganz rechts
 
 		ed.updateLayoutVisibility();
+		bindPanelButtons();
 
 		ed.galleryWrapper.addComponentListener(new ComponentAdapter() {
 			@Override
@@ -497,6 +502,33 @@ class UIBuilder {
 		});
 
 		return ed.galleryWrapper;
+	}
+
+	// ── Panel ↔ button binding ────────────────────────────────────────────────
+
+	/**
+	 * Binds each panel-toggling button to its panel via PanelToggleButton.bind().
+	 * After this call, hiding a panel from any code path automatically deselects
+	 * the corresponding button — no manual syncToggleButtons() call needed.
+	 */
+	private void bindPanelButtons() {
+		bind(ed.ci(0).tileGallery,   ed.filmstripBtn);
+		bind(ed.ci(0).scenesPanel,   ed.scenesBtn);
+		bind(ed.ci(1).tileGallery,   ed.secondGalleryBtn);
+		bind(ed.ci(1).scenesPanel,   ed.secondScenesBtn);
+		bind(ed.elementLayerPanel,   ed.firstElementsBtn);
+		bind(ed.elementLayerPanel2,  ed.secondElementsBtn);
+		bind(ed.mapsPanel,           ed.mapsBtn);
+		bind(ed.bookListPanel,       ed.bookListIBtn);
+		bind(ed.bookPagesPanel,      ed.bookPagesIBtn);
+		bind(ed.bookListPanel2,      ed.bookListIIBtn);
+		bind(ed.bookPagesPanel2,     ed.bookPagesIIBtn);
+		if (ed.ci(0).layeredPane != null) bind(ed.ci(0).layeredPane, ed.firstCanvasBtn);
+		if (ed.ci(1).layeredPane != null) bind(ed.ci(1).layeredPane, ed.secondCanvasBtn);
+	}
+
+	private static void bind(java.awt.Component panel, javax.swing.JToggleButton btn) {
+		if (btn instanceof PanelToggleButton ptb) ptb.bind(panel);
 	}
 
 	// ── Canvas area ───────────────────────────────────────────────────────────
@@ -631,6 +663,10 @@ class UIBuilder {
 		});
 
 		c.tileGallery = new TileGalleryPanel(ed.buildGalleryCallbacks(idx), ed.buildGalleryPreloadCallback(idx));
+		c.tileGallery.setOnAdd(() -> NewFolderDialog.show(ed,
+				NewFolderDialog.FolderType.IMAGE_FOLDER,
+				c.tileGallery.getTileGalleryDirectory(),
+				() -> { /* user opens the new folder manually */ }));
 		c.tileGallery.setOnHeaderClick(() -> {
 			java.io.File f = c.tileGallery.getActiveFile();
 			if (f != null) ed.loadFile(f, idx);
@@ -720,6 +756,8 @@ class UIBuilder {
 		c.scenesPanel = new TileGalleryPanel(ed.buildScenesCallbacks(idx), null, "Szenen",
 				() -> ed.setScenesPanelVisible(idx, false),
 				() -> ed.refreshSceneFiles(idx));
+		c.scenesPanel.setOnAdd(() -> NewFolderDialog.show(ed,
+				NewFolderDialog.FolderType.GAME, null, () -> ed.refreshSceneFiles(idx)));
 		c.scenesPanel.setFileDropOverride(files -> ed.createSceneFromDrop(files, idx));
 		c.scenesPanel.addMouseListener(new MouseAdapter() {
 			@Override

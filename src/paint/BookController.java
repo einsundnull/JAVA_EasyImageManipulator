@@ -1,18 +1,41 @@
 package paint;
 
-import book.PaperFormat;
-
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import javax.imageio.ImageIO;
-import javax.swing.*;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.DefaultListModel;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
+
+import book.PaperFormat;
 
 /**
  * Business logic for the book/page system.
@@ -383,6 +406,10 @@ class BookController {
 							c.nextElementId++, ed.deepCopy(droppedImage), ix, iy, iw, ih));
 				}
 
+				// Persist initial layers immediately so reload always works
+				savePageScene(pageFile, c.activeElements);
+				c.activeSceneFile = getPageManifest(pageFile);
+
 				ed.swapToImageView(ed.activeCanvasIndex);
 				SwingUtilities.invokeLater(() -> ed.fitToViewport(ed.activeCanvasIndex));
 				ed.refreshElementPanel();
@@ -427,6 +454,83 @@ class BookController {
 		writeManifest(bookDir, bookDir.getName(), pages);
 		System.out.println("[BookController] Seite kopiert: " + dest.getAbsolutePath());
 		return dest;
+	}
+
+	// ── Page rename ──────────────────────────────────────────────────────────
+
+	static void renamePage(File pageFile, String newBaseName, File bookDir) throws IOException {
+		String newFileName = newBaseName.endsWith(".png") ? newBaseName : newBaseName + ".png";
+		File newFile = new File(pageFile.getParentFile(), newFileName);
+		if (newFile.equals(pageFile)) return;
+		if (newFile.exists()) throw new IOException("Datei existiert bereits: " + newFileName);
+		java.nio.file.Files.move(pageFile.toPath(), newFile.toPath());
+		// Also rename scene directory if present
+		File oldSceneDir = getPageSceneDir(pageFile);
+		if (oldSceneDir.exists())
+			oldSceneDir.renameTo(getPageSceneDir(newFile));
+		List<String> pages = readManifestPages(bookDir);
+		int idx = pages.indexOf(pageFile.getName());
+		if (idx >= 0) {
+			pages.set(idx, newFileName);
+			writeManifest(bookDir, bookDir.getName(), pages);
+		}
+	}
+
+	// ── Page scene save / load ───────────────────────────────────────────────
+
+	/**
+	 * Returns the scene directory for a page PNG.
+	 * e.g. books/MyBook/pages/page_001.png → books/MyBook/pages/page_001/
+	 */
+	static File getPageSceneDir(File pageFile) {
+		String name = pageFile.getName();
+		int dot = name.lastIndexOf('.');
+		String base = dot > 0 ? name.substring(0, dot) : name;
+		return new File(pageFile.getParentFile(), base);
+	}
+
+	/**
+	 * Returns the .txt manifest file for a page.
+	 * e.g. books/MyBook/pages/page_001.png → books/MyBook/pages/page_001/page_001.txt
+	 */
+	static File getPageManifest(File pageFile) {
+		File sceneDir = getPageSceneDir(pageFile);
+		String name = pageFile.getName();
+		int dot = name.lastIndexOf('.');
+		String base = dot > 0 ? name.substring(0, dot) : name;
+		return new File(sceneDir, base + ".txt");
+	}
+
+	/** Saves all layers for a page using the standard SceneFileWriter (.txt) format. */
+	static void savePageScene(File pageFile, List<Layer> layers) {
+		try {
+			File sceneDir = getPageSceneDir(pageFile);
+			String name = pageFile.getName();
+			int dot = name.lastIndexOf('.');
+			String base = dot > 0 ? name.substring(0, dot) : name;
+			SceneFileWriter.writeScene(sceneDir, base, pageFile, layers);
+		} catch (IOException ex) {
+			System.err.println("[BookController] Page-Scene speichern fehlgeschlagen: " + ex.getMessage());
+		}
+	}
+
+	/**
+	 * Loads layers from the scene directory next to the page PNG.
+	 * Returns null if no scene exists yet.
+	 */
+	static SceneFileReader.SceneData loadPageScene(File pageFile) {
+		File sceneDir = getPageSceneDir(pageFile);
+		File manifest = getPageManifest(pageFile);
+		if (!manifest.exists()) return null;
+		try {
+			String name = pageFile.getName();
+			int dot = name.lastIndexOf('.');
+			String base = dot > 0 ? name.substring(0, dot) : name;
+			return SceneFileReader.readScene(sceneDir, base);
+		} catch (IOException ex) {
+			System.err.println("[BookController] Page-Scene laden fehlgeschlagen: " + ex.getMessage());
+			return null;
+		}
 	}
 
 	// ── Helpers ───────────────────────────────────────────────────────────────

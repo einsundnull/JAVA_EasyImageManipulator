@@ -87,6 +87,7 @@ public class PaintToolbar extends JPanel {
         void onFlipHorizontal();
         void onFlipVertical();
         void onRotate();
+        void onRotateDeg(double deg);
         void onScale();
         void onUndo();
         void onRedo();
@@ -496,19 +497,31 @@ public class PaintToolbar extends JPanel {
     private JPanel buildTransforms() {
         JPanel p = hBox();
 
-        JButton flipH  = iconBtn("↔",  "Horizontal spiegeln");
-        JButton flipV  = iconBtn("↕",  "Vertikal spiegeln");
-        JButton rotate = iconBtn("↺",  "Drehen …");
-        JButton scale  = iconBtn("⤡",  "Skalieren …");
+        JButton flipH   = iconBtn("↔",   "Horizontal spiegeln");
+        JButton flipV   = iconBtn("↕",   "Vertikal spiegeln");
+        JButton rot90cw = iconBtn("↻",   "90° im Uhrzeigersinn");
+        JButton rot90cc = iconBtn("↺",   "90° gegen Uhrzeigersinn");
+        JButton rot45cw = iconBtn("↷",   "45° im Uhrzeigersinn");
+        JButton rot45cc = iconBtn("↶",   "45° gegen Uhrzeigersinn");
+        JButton rotFree = iconBtn("⟳°",  "Drehen (freier Winkel) …");
+        JButton scale   = iconBtn("⤡",   "Skalieren …");
 
-        flipH .addActionListener(e -> cb.onFlipHorizontal());
-        flipV .addActionListener(e -> cb.onFlipVertical());
-        rotate.addActionListener(e -> cb.onRotate());
-        scale .addActionListener(e -> cb.onScale());
+        flipH  .addActionListener(e -> cb.onFlipHorizontal());
+        flipV  .addActionListener(e -> cb.onFlipVertical());
+        rot90cw.addActionListener(e -> cb.onRotateDeg(90));
+        rot90cc.addActionListener(e -> cb.onRotateDeg(-90));
+        rot45cw.addActionListener(e -> cb.onRotateDeg(45));
+        rot45cc.addActionListener(e -> cb.onRotateDeg(-45));
+        rotFree.addActionListener(e -> cb.onRotate());
+        scale  .addActionListener(e -> cb.onScale());
 
-        p.add(flipH);  p.add(Box.createHorizontalStrut(GAP));
-        p.add(flipV);  p.add(Box.createHorizontalStrut(GAP));
-        p.add(rotate); p.add(Box.createHorizontalStrut(GAP));
+        p.add(flipH);   p.add(Box.createHorizontalStrut(GAP));
+        p.add(flipV);   p.add(Box.createHorizontalStrut(GAP));
+        p.add(rot90cw); p.add(Box.createHorizontalStrut(GAP));
+        p.add(rot90cc); p.add(Box.createHorizontalStrut(GAP));
+        p.add(rot45cw); p.add(Box.createHorizontalStrut(GAP));
+        p.add(rot45cc); p.add(Box.createHorizontalStrut(GAP));
+        p.add(rotFree); p.add(Box.createHorizontalStrut(GAP));
         p.add(scale);
         return p;
     }
