@@ -490,6 +490,18 @@ class UIBuilder {
 		ed.updateLayoutVisibility();
 		bindPanelButtons();
 
+		// Mutual header highlight — one group per canvas side
+		wireMutualHighlight(
+				ed.bookListPanel, ed.bookPagesPanel,
+				ed.ci(0).scenesPanel, ed.ci(0).tileGallery, ed.ci(0).tileGallery2);
+		wireMutualHighlight(
+				ed.ci(1).tileGallery, ed.ci(1).tileGallery2,
+				ed.ci(1).scenesPanel, ed.bookPagesPanel2, ed.bookListPanel2);
+
+		// Header click reloads the active file for panels whose tiles load into canvas
+		ed.bookPagesPanel .setOnHeaderClick(() -> { File f = ed.bookPagesPanel .getActiveFile(); if (f != null) ed.loadFile(f, 0); });
+		ed.bookPagesPanel2.setOnHeaderClick(() -> { File f = ed.bookPagesPanel2.getActiveFile(); if (f != null) ed.loadFile(f, 1); });
+
 		ed.galleryWrapper.addComponentListener(new ComponentAdapter() {
 			@Override
 			public void componentResized(ComponentEvent e) {
@@ -743,19 +755,15 @@ class UIBuilder {
 			}
 		}
 
-		// Mutual highlight: whichever gallery is activated gets the header highlight
-		c.tileGallery.setOnActivated(() -> {
-			c.tileGallery.setHighlighted(true);
-			if (c.tileGallery2 != null) c.tileGallery2.setHighlighted(false);
-		});
-		c.tileGallery2.setOnActivated(() -> {
-			c.tileGallery2.setHighlighted(true);
-			c.tileGallery.setHighlighted(false);
-		});
 
-		c.scenesPanel = new TileGalleryPanel(ed.buildScenesCallbacks(idx), null, "Szenen",
+		TileGalleryPanel.Callbacks scenesCallbacks = ed.buildScenesCallbacks(idx);
+		c.scenesPanel = new TileGalleryPanel(scenesCallbacks, null, "Szenen",
 				() -> ed.setScenesPanelVisible(idx, false),
 				() -> ed.refreshSceneFiles(idx));
+		c.scenesPanel.setOnHeaderClick(() -> {
+			File f = c.scenesPanel.getActiveFile();
+			if (f != null) scenesCallbacks.onTileOpened(f);
+		});
 		c.scenesPanel.setOnAdd(() -> NewFolderDialog.show(ed,
 				NewFolderDialog.FolderType.GAME, null, () -> ed.refreshSceneFiles(idx)));
 		c.scenesPanel.setFileDropOverride(files -> ed.createSceneFromDrop(files, idx));
@@ -834,5 +842,16 @@ class UIBuilder {
 				setBackground(AppColors.BG_DARK);
 			}
 		};
+	}
+
+	/** Activating any panel in the group highlights it and de-highlights the others. */
+	private static void wireMutualHighlight(TileGalleryPanel... panels) {
+		for (TileGalleryPanel p : panels) {
+			if (p == null) continue;
+			p.setOnActivated(() -> {
+				for (TileGalleryPanel other : panels)
+					if (other != null) other.setHighlighted(other == p);
+			});
+		}
 	}
 }
