@@ -12,6 +12,8 @@ import java.awt.RenderingHints;
 import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Stack;
 
@@ -69,28 +71,42 @@ public class PaintEngine {
      *
      * @param strength  0..1, how strongly the source pixel dominates (0.65 is a good default)
      */
+    /**
+     * Returns the raw int[] pixel array for TYPE_INT_ARGB/TYPE_INT_RGB images,
+     * or null if the image type doesn't support direct array access.
+     * Writing into the returned array immediately updates the image — no setRGB needed.
+     */
+    private static int[] rawPixels(BufferedImage img) {
+        if (img.getType() != BufferedImage.TYPE_INT_ARGB
+                && img.getType() != BufferedImage.TYPE_INT_RGB
+                && img.getType() != BufferedImage.TYPE_INT_ARGB_PRE) return null;
+        try {
+            return ((DataBufferInt) img.getRaster().getDataBuffer()).getData();
+        } catch (ClassCastException e) {
+            return null;
+        }
+    }
+
     public static void smear(BufferedImage img, Point from, Point to, int strokeWidth, float strength) {
         if (from == null || img == null) return;
         int w = img.getWidth(), h = img.getHeight();
         int r = Math.max(1, strokeWidth / 2);
         int dx = to.x - from.x, dy = to.y - from.y;
+        int[] px = rawPixels(img);
+        if (px == null) { smearFallback(img, from, to, strokeWidth, strength); return; }
 
-        // Iterate over the brush circle centred on `to`
         for (int oy = -r; oy <= r; oy++) {
             for (int ox = -r; ox <= r; ox++) {
-                if (ox * ox + oy * oy > r * r) continue; // circular mask
-
-                int tx = to.x + ox,   ty = to.y + oy;
-                int fx = tx   - dx,   fy = ty   - dy;   // corresponding source pixel
-
+                if (ox * ox + oy * oy > r * r) continue;
+                int tx = to.x + ox, ty = to.y + oy;
+                int fx = tx - dx,   fy = ty - dy;
                 if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
                 if (fx < 0 || fx >= w || fy < 0 || fy >= h) continue;
 
-                int srcARGB = img.getRGB(fx, fy);
-                int dstARGB = img.getRGB(tx, ty);
+                int srcARGB = px[fy * w + fx];
+                int dstARGB = px[ty * w + tx];
 
-                // Soft radial falloff: full strength at centre, 50% at edge
-                float dist = (float) Math.sqrt(ox * ox + oy * oy) / r;
+                float dist  = (float) Math.sqrt(ox * ox + oy * oy) / r;
                 float blend = strength * (1f - dist * 0.5f);
                 float inv   = 1f - blend;
 
@@ -104,7 +120,34 @@ public class PaintEngine {
                 int nG = Math.min(255, (int)(sG * blend + dG * inv));
                 int nB = Math.min(255, (int)(sB * blend + dB * inv));
 
-                img.setRGB(tx, ty, (nA << 24) | (nR << 16) | (nG << 8) | nB);
+                px[ty * w + tx] = (nA << 24) | (nR << 16) | (nG << 8) | nB;
+            }
+        }
+    }
+
+    private static void smearFallback(BufferedImage img, Point from, Point to, int strokeWidth, float strength) {
+        int w = img.getWidth(), h = img.getHeight();
+        int r = Math.max(1, strokeWidth / 2);
+        int dx = to.x - from.x, dy = to.y - from.y;
+        for (int oy = -r; oy <= r; oy++) {
+            for (int ox = -r; ox <= r; ox++) {
+                if (ox * ox + oy * oy > r * r) continue;
+                int tx = to.x + ox, ty = to.y + oy;
+                int fx = tx - dx,   fy = ty - dy;
+                if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
+                if (fx < 0 || fx >= w || fy < 0 || fy >= h) continue;
+                int srcARGB = img.getRGB(fx, fy), dstARGB = img.getRGB(tx, ty);
+                float dist = (float) Math.sqrt(ox * ox + oy * oy) / r;
+                float blend = strength * (1f - dist * 0.5f), inv = 1f - blend;
+                int sA = (srcARGB >> 24) & 0xFF, sR = (srcARGB >> 16) & 0xFF,
+                    sG = (srcARGB >>  8) & 0xFF, sB =  srcARGB        & 0xFF;
+                int dA = (dstARGB >> 24) & 0xFF, dR = (dstARGB >> 16) & 0xFF,
+                    dG = (dstARGB >>  8) & 0xFF, dB =  dstARGB        & 0xFF;
+                img.setRGB(tx, ty,
+                    (Math.min(255,(int)(sA*blend+dA*inv)) << 24) |
+                    (Math.min(255,(int)(sR*blend+dR*inv)) << 16) |
+                    (Math.min(255,(int)(sG*blend+dG*inv)) <<  8) |
+                     Math.min(255,(int)(sB*blend+dB*inv)));
             }
         }
     }
@@ -192,25 +235,28 @@ public class PaintEngine {
 
     // Floodfill
     public static void floodFill(BufferedImage img, int x, int y, Color fillColor, int tolerance) {
-        if (x < 0 || x >= img.getWidth() || y < 0 || y >= img.getHeight()) return;
-        int targetARGB = img.getRGB(x, y);
+        int w = img.getWidth(), h = img.getHeight();
+        if (x < 0 || x >= w || y < 0 || y >= h) return;
+        int[] px = rawPixels(img);
+        int targetARGB = px != null ? px[y * w + x] : img.getRGB(x, y);
         int fillARGB   = fillColor.getRGB();
         if (targetARGB == fillARGB) return;
 
-        int w = img.getWidth(), h = img.getHeight();
-        Stack<Point>  stack   = new Stack<>();
-        boolean[][]   visited = new boolean[w][h];
-        stack.push(new Point(x, y));
-        while (!stack.isEmpty()) {
-            Point p = stack.pop();
-            if (p.x < 0 || p.x >= w || p.y < 0 || p.y >= h || visited[p.x][p.y]) continue;
-            if (!colorsMatch(img.getRGB(p.x, p.y), targetARGB, tolerance)) continue;
-            visited[p.x][p.y] = true;
-            img.setRGB(p.x, p.y, fillARGB);
-            stack.push(new Point(p.x + 1, p.y));
-            stack.push(new Point(p.x - 1, p.y));
-            stack.push(new Point(p.x, p.y + 1));
-            stack.push(new Point(p.x, p.y - 1));
+        boolean[] visited = new boolean[w * h];
+        ArrayDeque<Integer> queue = new ArrayDeque<>();
+        queue.push(y * w + x);
+        while (!queue.isEmpty()) {
+            int coord = queue.pop();
+            if (visited[coord]) continue;
+            int px_ = coord % w, py_ = coord / w;
+            int cur = px != null ? px[coord] : img.getRGB(px_, py_);
+            if (!colorsMatch(cur, targetARGB, tolerance)) continue;
+            visited[coord] = true;
+            if (px != null) px[coord] = fillARGB; else img.setRGB(px_, py_, fillARGB);
+            if (px_ + 1 < w) queue.push(coord + 1);
+            if (px_ - 1 >= 0) queue.push(coord - 1);
+            if (py_ + 1 < h) queue.push(coord + w);
+            if (py_ - 1 >= 0) queue.push(coord - w);
         }
     }
 
@@ -456,19 +502,27 @@ public class PaintEngine {
     public static boolean[][] floodFillRegion(BufferedImage img, int x, int y, int tolerance) {
         int w = img.getWidth(), h = img.getHeight();
         if (x < 0 || x >= w || y < 0 || y >= h) return new boolean[w][h];
-        int targetARGB = img.getRGB(x, y);
+        int[] px = rawPixels(img);
+        int targetARGB = px != null ? px[y * w + x] : img.getRGB(x, y);
+        boolean[] flat = new boolean[w * h];
+        ArrayDeque<Integer> queue = new ArrayDeque<>();
+        queue.push(y * w + x);
+        while (!queue.isEmpty()) {
+            int coord = queue.pop();
+            if (flat[coord]) continue;
+            int cx = coord % w, cy = coord / w;
+            int cur = px != null ? px[coord] : img.getRGB(cx, cy);
+            if (!colorsMatch(cur, targetARGB, tolerance)) continue;
+            flat[coord] = true;
+            if (cx + 1 < w) queue.push(coord + 1);
+            if (cx - 1 >= 0) queue.push(coord - 1);
+            if (cy + 1 < h) queue.push(coord + w);
+            if (cy - 1 >= 0) queue.push(coord - w);
+        }
+        // Convert flat row-major mask to [x][y] for callers that expect it
         boolean[][] region = new boolean[w][h];
-        Stack<Point> stack = new Stack<>();
-        stack.push(new Point(x, y));
-        while (!stack.isEmpty()) {
-            Point p = stack.pop();
-            if (p.x < 0 || p.x >= w || p.y < 0 || p.y >= h || region[p.x][p.y]) continue;
-            if (!colorsMatch(img.getRGB(p.x, p.y), targetARGB, tolerance)) continue;
-            region[p.x][p.y] = true;
-            stack.push(new Point(p.x + 1, p.y));
-            stack.push(new Point(p.x - 1, p.y));
-            stack.push(new Point(p.x, p.y + 1));
-            stack.push(new Point(p.x, p.y - 1));
+        for (int i = 0; i < flat.length; i++) {
+            if (flat[i]) region[i % w][i / w] = true;
         }
         return region;
     }
@@ -482,23 +536,28 @@ public class PaintEngine {
             Color stopColor, int stopTolerance) {
         int w = img.getWidth(), h = img.getHeight();
         if (x < 0 || x >= w || y < 0 || y >= h) return new boolean[w][h];
-        int stopARGB = stopColor.getRGB();
-        int startARGB = img.getRGB(x, y);
-        // If the starting pixel itself is the stop color, return empty region
+        int[] px = rawPixels(img);
+        int stopARGB  = stopColor.getRGB();
+        int startARGB = px != null ? px[y * w + x] : img.getRGB(x, y);
         if (colorsMatch(startARGB, stopARGB, stopTolerance)) return new boolean[w][h];
+        boolean[] flat = new boolean[w * h];
+        ArrayDeque<Integer> queue = new ArrayDeque<>();
+        queue.push(y * w + x);
+        while (!queue.isEmpty()) {
+            int coord = queue.pop();
+            if (flat[coord]) continue;
+            int cx = coord % w, cy = coord / w;
+            int rgb = px != null ? px[coord] : img.getRGB(cx, cy);
+            if (colorsMatch(rgb, stopARGB, stopTolerance)) continue;
+            flat[coord] = true;
+            if (cx + 1 < w) queue.push(coord + 1);
+            if (cx - 1 >= 0) queue.push(coord - 1);
+            if (cy + 1 < h) queue.push(coord + w);
+            if (cy - 1 >= 0) queue.push(coord - w);
+        }
         boolean[][] region = new boolean[w][h];
-        Stack<Point> stack = new Stack<>();
-        stack.push(new Point(x, y));
-        while (!stack.isEmpty()) {
-            Point p = stack.pop();
-            if (p.x < 0 || p.x >= w || p.y < 0 || p.y >= h || region[p.x][p.y]) continue;
-            int rgb = img.getRGB(p.x, p.y);
-            if (colorsMatch(rgb, stopARGB, stopTolerance)) continue;  // boundary
-            region[p.x][p.y] = true;
-            stack.push(new Point(p.x + 1, p.y));
-            stack.push(new Point(p.x - 1, p.y));
-            stack.push(new Point(p.x, p.y + 1));
-            stack.push(new Point(p.x, p.y - 1));
+        for (int i = 0; i < flat.length; i++) {
+            if (flat[i]) region[i % w][i / w] = true;
         }
         return region;
     }
@@ -508,10 +567,21 @@ public class PaintEngine {
      */
     public static void clearRegionMask(BufferedImage img, boolean[][] region) {
         int w = Math.min(img.getWidth(), region.length);
-        for (int x = 0; x < w; x++) {
-            int h = Math.min(img.getHeight(), region[x].length);
+        int h = img.getHeight();
+        int[] px = rawPixels(img);
+        if (px != null) {
             for (int y = 0; y < h; y++) {
-                if (region[x][y]) img.setRGB(x, y, 0x00000000);
+                for (int x = 0; x < w; x++) {
+                    if (x < region.length && y < region[x].length && region[x][y])
+                        px[y * img.getWidth() + x] = 0x00000000;
+                }
+            }
+        } else {
+            for (int x = 0; x < w; x++) {
+                int rh = Math.min(h, region[x].length);
+                for (int y = 0; y < rh; y++) {
+                    if (region[x][y]) img.setRGB(x, y, 0x00000000);
+                }
             }
         }
     }
