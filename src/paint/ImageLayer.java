@@ -18,7 +18,8 @@ public class ImageLayer extends Layer {
     private final BufferedImage image;
     private final double rotationAngle;
     private final int opacity;  // 0-100, where 100 = fully opaque, 0 = fully transparent
-    private final boolean hidden;  // true = invisible (doesn't render)
+    private final boolean hidden;          // true = invisible (doesn't render)
+    private final boolean mouseTransparent; // true = invisible to mouse hit-testing
 
     // Legacy constructor (for backward compatibility)
     public ImageLayer(int id, BufferedImage image, int x, int y, int w, int h) {
@@ -37,11 +38,16 @@ public class ImageLayer extends Layer {
 
     // Full constructor with rotation angle, opacity, and hidden flag
     public ImageLayer(int id, BufferedImage image, int x, int y, int w, int h, double rotationAngle, int opacity, boolean hidden) {
+        this(id, image, x, y, w, h, rotationAngle, opacity, hidden, false);
+    }
+
+    public ImageLayer(int id, BufferedImage image, int x, int y, int w, int h, double rotationAngle, int opacity, boolean hidden, boolean mouseTransparent) {
         super(id, x, y, Math.max(1, w), Math.max(1, h));
         this.image = image;
         this.rotationAngle = rotationAngle;
-        this.opacity = Math.max(0, Math.min(100, opacity));  // Clamp to 0-100
+        this.opacity = Math.max(0, Math.min(100, opacity));
         this.hidden = hidden;
+        this.mouseTransparent = mouseTransparent;
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────
@@ -50,29 +56,34 @@ public class ImageLayer extends Layer {
     public double rotationAngle() { return rotationAngle; }
     public int opacity() { return opacity; }
     public boolean isHidden() { return hidden; }
+    @Override public boolean isMouseTransparent() { return mouseTransparent; }
 
     // ── Mutations (return new instances) ──────────────────────────────────────
 
     @Override
     public ImageLayer withPosition(int nx, int ny) {
-        return new ImageLayer(id, image, nx, ny, width, height, rotationAngle, opacity, hidden);
+        return new ImageLayer(id, image, nx, ny, width, height, rotationAngle, opacity, hidden, mouseTransparent);
     }
 
     @Override
     public ImageLayer withBounds(int nx, int ny, int nw, int nh) {
-        return new ImageLayer(id, image, nx, ny, nw, nh, rotationAngle, opacity, hidden);
+        return new ImageLayer(id, image, nx, ny, nw, nh, rotationAngle, opacity, hidden, mouseTransparent);
     }
 
     public ImageLayer withRotation(double newAngle) {
-        return new ImageLayer(id, image, x, y, width, height, newAngle, opacity, hidden);
+        return new ImageLayer(id, image, x, y, width, height, newAngle, opacity, hidden, mouseTransparent);
     }
 
     public ImageLayer withOpacity(int newOpacity) {
-        return new ImageLayer(id, image, x, y, width, height, rotationAngle, newOpacity, hidden);
+        return new ImageLayer(id, image, x, y, width, height, rotationAngle, newOpacity, hidden, mouseTransparent);
     }
 
     public ImageLayer withHidden(boolean newHidden) {
-        return new ImageLayer(id, image, x, y, width, height, rotationAngle, opacity, newHidden);
+        return new ImageLayer(id, image, x, y, width, height, rotationAngle, opacity, newHidden, mouseTransparent);
+    }
+
+    public ImageLayer withMouseTransparent(boolean mt) {
+        return new ImageLayer(id, image, x, y, width, height, rotationAngle, opacity, hidden, mt);
     }
 
     // ── Convenience ───────────────────────────────────────────────────────────

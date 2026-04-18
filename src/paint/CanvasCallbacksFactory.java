@@ -592,6 +592,12 @@ class CanvasCallbacksFactory {
 			}
 
 			@Override
+			public boolean isFrameLayerMovable() {
+				return ed.pageLayoutToolbar != null
+						&& ed.pageLayoutToolbar.getPageLayout().frameLayerMovable;
+			}
+
+			@Override
 			public void showTextToolbar(String font, int size, boolean bold, boolean italic, java.awt.Color color) {
 				if (ed.textToolbar != null) {
 					ed.textToolbar.showToolbar(font, size, bold, italic, color);

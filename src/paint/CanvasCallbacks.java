@@ -141,6 +141,9 @@ public interface CanvasCallbacks {
     /** Returns true when book mode is active. */
     boolean isBookMode();
 
+    /** Returns true when the page-frame TextLayer (wrapping=true) may be moved/resized. */
+    boolean isFrameLayerMovable();
+
     /** Shows the TextToolbar with the given text properties. */
     void showTextToolbar(String font, int size, boolean bold, boolean italic, java.awt.Color color);
 

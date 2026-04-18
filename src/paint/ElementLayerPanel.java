@@ -88,13 +88,15 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         void exportElementAsMap(Layer el);
         /** Toggle visibility (hidden state) of a layer. */
         void toggleElementVisibility(Layer el);
+        /** Toggle mouse-transparency of a layer (tool-invisible). */
+        void toggleElementMouseTransparent(Layer el);
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
-    private static  int TILE_W  = 140;
+    private static  int TILE_W  = 158;
     private static  int PADDING = 18;  // 9px left + 9px right
     private static  int SCROLLBAR = 16;
-    public  static  int PANEL_W = TILE_W + PADDING + SCROLLBAR;  // 174
+    public  static  int PANEL_W = TILE_W + PADDING + SCROLLBAR;  // 192
     private static  int TILE_H  = 106;
     private static  int THUMB_H =  74;
 
@@ -367,7 +369,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         private final boolean selected;
         private final boolean isShowAll;
         private final Layer linkedLayerRef;
-        private JLabel toImage, burn, del, resetRot, mapBtn, vis, lbl;
+        private JLabel toImage, burn, del, resetRot, mapBtn, vis, mouseTrans, lbl;
 
         LayerTile(Layer layer, boolean selected, boolean showAll, Layer linkedElement) {
             this.layer    = layer;
@@ -537,6 +539,37 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                 }
             });
             add(vis);
+
+            // ── Mouse-transparent toggle (⊘) – for all layers ─────────────────
+            boolean mt = layer.isMouseTransparent();
+            mouseTrans = new JLabel(mt ? "⊘" : "⊙", JLabel.CENTER);
+            mouseTrans.setForeground(mt ? new Color(200, 150, 50) : new Color(100, 100, 100));
+            mouseTrans.setFont(new Font("SansSerif", Font.BOLD, 10));
+            mouseTrans.setBounds(TILE_W - 127, 4, 16, 16);
+            mouseTrans.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            mouseTrans.setOpaque(true);
+            mouseTrans.setBackground(new Color(50, 50, 50));
+            mouseTrans.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            mouseTrans.setToolTipText(mt ? "Maus-transparent (Klick zum Deaktivieren)" : "Für Maus sichtbar (Klick für tool-transparent)");
+            mouseTrans.addMouseListener(new MouseAdapter() {
+                @Override public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() > 1) return;
+                    e.consume();
+                    cb.toggleElementMouseTransparent(layer);
+                }
+                @Override public void mouseEntered(MouseEvent e) {
+                    mouseTrans.setBackground(new Color(140, 100, 30));
+                    mouseTrans.setForeground(Color.WHITE);
+                    mouseTrans.setBorder(BorderFactory.createLineBorder(new Color(200, 150, 50), 1));
+                }
+                @Override public void mouseExited(MouseEvent e) {
+                    boolean isMt = layer.isMouseTransparent();
+                    mouseTrans.setBackground(new Color(50, 50, 50));
+                    mouseTrans.setForeground(isMt ? new Color(200, 150, 50) : new Color(100, 100, 100));
+                    mouseTrans.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                }
+            });
+            add(mouseTrans);
 
             // ── Purple map button (🗺) – only for TextLayers ────────────────────
             if (layer instanceof TextLayer) {

@@ -47,6 +47,10 @@ public abstract class Layer {
      */
     public abstract Layer withBounds(int nx, int ny, int nw, int nh);
 
+    // ── Mouse transparency ────────────────────────────────────────────────────
+    /** Returns true when the layer is invisible to mouse hit-testing (tool-transparent). */
+    public boolean isMouseTransparent() { return false; }
+
     // ── Convenience ───────────────────────────────────────────────────────────
 
     /** Human-readable display name for the layer panel. */

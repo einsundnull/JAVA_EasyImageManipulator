@@ -2211,9 +2211,9 @@ public class CanvasPanel extends JPanel {
 		java.util.List<Layer> els = callbacks.getActiveElements();
 		for (int i = els.size() - 1; i >= 0; i--) {
 			Layer el = els.get(i);
-			// Never hit the element being text-edited — it is visually replaced by the live preview
-			// and must not re-trigger enterTextEditMode mid-session.
 			if (editingTextElementId >= 0 && el.id() == editingTextElementId) continue;
+			if (el.isMouseTransparent()) continue;
+			if (el instanceof TextLayer tl && tl.isWrapping() && !callbacks.isFrameLayerMovable()) continue;
 			if (callbacks.elemRectScreen(el).contains(screenPt)) return el;
 		}
 		return null;

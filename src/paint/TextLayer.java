@@ -29,23 +29,31 @@ public final class TextLayer extends Layer {
     private final boolean fontBold;
     private final boolean fontItalic;
     private final Color   fontColor;
-    private final boolean hidden;   // true = invisible (doesn't render)
-    private final boolean wrapping; // true = word-wrap within bounds, font size fixed
+    private final boolean hidden;          // true = invisible (doesn't render)
+    private final boolean wrapping;        // true = word-wrap within bounds, font size fixed
+    private final boolean mouseTransparent; // true = invisible to mouse hit-testing
 
     // ── Private constructor – callers use the factory method ─────────────────
 
     private TextLayer(int id, String text, String fontName, int fontSize,
                       boolean fontBold, boolean fontItalic, Color fontColor,
                       int x, int y, int w, int h, boolean hidden, boolean wrapping) {
+        this(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, x, y, w, h, hidden, wrapping, false);
+    }
+
+    private TextLayer(int id, String text, String fontName, int fontSize,
+                      boolean fontBold, boolean fontItalic, Color fontColor,
+                      int x, int y, int w, int h, boolean hidden, boolean wrapping, boolean mouseTransparent) {
         super(id, x, y, w, h);
-        this.text       = text;
-        this.fontName   = fontName;
-        this.fontSize   = fontSize;
-        this.fontBold   = fontBold;
-        this.fontItalic = fontItalic;
-        this.fontColor  = fontColor;
-        this.hidden     = hidden;
-        this.wrapping   = wrapping;
+        this.text            = text;
+        this.fontName        = fontName;
+        this.fontSize        = fontSize;
+        this.fontBold        = fontBold;
+        this.fontItalic      = fontItalic;
+        this.fontColor       = fontColor;
+        this.hidden          = hidden;
+        this.wrapping        = wrapping;
+        this.mouseTransparent = mouseTransparent;
     }
 
     // ── Factory method ────────────────────────────────────────────────────────
@@ -122,21 +130,15 @@ public final class TextLayer extends Layer {
     public Color   fontColor()  { return fontColor; }
     public boolean isHidden()   { return hidden;    }
     public boolean isWrapping() { return wrapping;  }
+    @Override public boolean isMouseTransparent() { return mouseTransparent; }
 
     // ── Mutations (return new instances) ──────────────────────────────────────
 
     @Override
     public TextLayer withPosition(int nx, int ny) {
-        return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, nx, ny, width, height, hidden, wrapping);
+        return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, nx, ny, width, height, hidden, wrapping, mouseTransparent);
     }
 
-    /**
-     * Returns a copy with updated bounds.
-     * <ul>
-     *   <li>Normal layers: font size scales proportionally, bounding box recomputed.</li>
-     *   <li>Wrapping layers: bounds resize, font size stays fixed (text reflows).</li>
-     * </ul>
-     */
     @Override
     public TextLayer withBounds(int nx, int ny, int nw, int nh) {
         if (wrapping) {
@@ -144,7 +146,7 @@ public final class TextLayer extends Layer {
                     nx, ny,
                     Math.max(TEXT_PADDING * 2 + 1, nw),
                     Math.max(TEXT_PADDING * 2 + 1, nh),
-                    hidden, true);
+                    hidden, true, mouseTransparent);
         }
         double scaleX = (double) nw / Math.max(1, width);
         double scaleY = (double) nh / Math.max(1, height);
@@ -153,10 +155,6 @@ public final class TextLayer extends Layer {
         return of(id, text, fontName, newFontSize, fontBold, fontItalic, fontColor, nx, ny, hidden);
     }
 
-    /**
-     * Returns a copy with updated text content and/or font settings.
-     * For wrapping layers the bounding box is preserved; for normal layers it is recomputed.
-     */
     public TextLayer withText(String newText, String newFontName, int newFontSize,
                               boolean newBold, boolean newItalic, Color newColor) {
         if (wrapping) {
@@ -164,19 +162,15 @@ public final class TextLayer extends Layer {
             String fn = newFontName != null ? newFontName : "SansSerif";
             return new TextLayer(id, newText != null ? newText : "", fn,
                     Math.max(6, newFontSize), newBold, newItalic, col,
-                    x, y, width, height, hidden, true);
+                    x, y, width, height, hidden, true, mouseTransparent);
         }
         return of(id, newText, newFontName, newFontSize, newBold, newItalic, newColor, x, y, hidden);
     }
 
-    /**
-     * Returns a copy with only the font size changed.
-     * For wrapping layers the bounding box is preserved; for normal layers it is recomputed.
-     */
     public TextLayer withFontSize(int newFontSize) {
         if (wrapping) {
             return new TextLayer(id, text, fontName, Math.max(6, newFontSize),
-                    fontBold, fontItalic, fontColor, x, y, width, height, hidden, true);
+                    fontBold, fontItalic, fontColor, x, y, width, height, hidden, true, mouseTransparent);
         }
         return of(id, text, fontName, newFontSize, fontBold, fontItalic, fontColor, x, y, hidden);
     }
@@ -184,9 +178,14 @@ public final class TextLayer extends Layer {
     public TextLayer withHidden(boolean newHidden) {
         if (wrapping) {
             return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor,
-                    x, y, width, height, newHidden, true);
+                    x, y, width, height, newHidden, true, mouseTransparent);
         }
         return of(id, text, fontName, fontSize, fontBold, fontItalic, fontColor, x, y, newHidden);
+    }
+
+    public TextLayer withMouseTransparent(boolean mt) {
+        return new TextLayer(id, text, fontName, fontSize, fontBold, fontItalic, fontColor,
+                x, y, width, height, hidden, wrapping, mt);
     }
 
     // ── Convenience ───────────────────────────────────────────────────────────

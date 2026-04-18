@@ -245,6 +245,26 @@ class ElementLayerCallbacksFactory {
 				}
 			}
 
+			@Override
+			public void toggleElementMouseTransparent(Layer el) {
+				CanvasInstance c = c();
+				boolean nowMt = !el.isMouseTransparent();
+				Layer updated = null;
+				if (el instanceof ImageLayer il) {
+					updated = il.withMouseTransparent(nowMt);
+				} else if (el instanceof TextLayer tl) {
+					updated = tl.withMouseTransparent(nowMt);
+				} else if (el instanceof PathLayer pl) {
+					updated = pl.withMouseTransparent(nowMt);
+				}
+				if (updated != null) {
+					ed.replaceInLists(c, updated);
+					ed.refreshElementPanel();
+					if (c.canvasPanel != null)
+						c.canvasPanel.repaint();
+				}
+			}
+
 			// ── Case 2: LayerTile dropped onto another ElementLayerPanel ─────
 			@Override
 			public void insertLayerCopyAt(Layer layer, int visualIdx) {

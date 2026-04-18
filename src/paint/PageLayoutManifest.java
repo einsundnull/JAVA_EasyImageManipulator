@@ -76,6 +76,9 @@ class PageLayoutManifest {
                     case "headerVisible"     -> pl.headerVisible     = Boolean.parseBoolean(val);
                     case "footerVisible"     -> pl.footerVisible     = Boolean.parseBoolean(val);
                     case "pageNumberVisible" -> pl.pageNumberVisible = Boolean.parseBoolean(val);
+                    case "frameLayerMovable" -> pl.frameLayerMovable = Boolean.parseBoolean(val);
+                    case "paperFormat"       -> pl.paperFormat       = val;
+                    case "landscape"         -> pl.landscape         = Boolean.parseBoolean(val);
                     case "snapMode"          -> {
                         try { pl.snapMode = PageLayout.SnapMode.valueOf(val); }
                         catch (IllegalArgumentException ignored) {}
@@ -100,6 +103,9 @@ class PageLayoutManifest {
             "headerVisible: "     + pl.headerVisible,
             "footerVisible: "     + pl.footerVisible,
             "pageNumberVisible: " + pl.pageNumberVisible,
+            "frameLayerMovable: " + pl.frameLayerMovable,
+            "paperFormat: "       + pl.paperFormat,
+            "landscape: "         + pl.landscape,
             "snapMode: "          + pl.snapMode.name()
         );
         try {

@@ -24,16 +24,23 @@ public final class PathLayer extends Layer {
     private final BufferedImage image;  // null if no image
     private final boolean closed;       // true = polygon (close path), false = open path
     private final boolean hidden;       // true = invisible (doesn't render)
+    private final boolean mouseTransparent; // true = invisible to mouse hit-testing
 
     // ── Private constructor – callers use the factory method ─────────────────
 
     private PathLayer(int id, List<Point3D> points, BufferedImage image, boolean closed,
                       int x, int y, int w, int h, boolean hidden) {
+        this(id, points, image, closed, x, y, w, h, hidden, false);
+    }
+
+    private PathLayer(int id, List<Point3D> points, BufferedImage image, boolean closed,
+                      int x, int y, int w, int h, boolean hidden, boolean mouseTransparent) {
         super(id, x, y, w, h);
         this.points = new ArrayList<>(points);
         this.image = image;
         this.closed = closed;
         this.hidden = hidden;
+        this.mouseTransparent = mouseTransparent;
     }
 
     // ── Factory method ────────────────────────────────────────────────────────
@@ -83,12 +90,17 @@ public final class PathLayer extends Layer {
     public BufferedImage image()      { return image; }
     public boolean isClosed()         { return closed; }
     public boolean isHidden()         { return hidden; }
+    @Override public boolean isMouseTransparent() { return mouseTransparent; }
 
     // ── Mutations (return new instances) ──────────────────────────────────────
 
     @Override
     public PathLayer withPosition(int nx, int ny) {
-        return new PathLayer(id, points, image, closed, nx, ny, width, height, hidden);
+        return new PathLayer(id, points, image, closed, nx, ny, width, height, hidden, mouseTransparent);
+    }
+
+    public PathLayer withMouseTransparent(boolean mt) {
+        return new PathLayer(id, points, image, closed, x, y, width, height, hidden, mt);
     }
 
     /**

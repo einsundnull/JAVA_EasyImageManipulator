@@ -178,13 +178,7 @@ public class TextToolbar extends JPanel {
         strip.add(vSep());
         strip.add(Box.createHorizontalStrut(GAP));
 
-        // Commit button
-        JButton commitBtn = actionBtn("✓ Fertig", "Text übernehmen (Enter)");
-        commitBtn.addActionListener(e -> cb.onCommit());
-        strip.add(commitBtn);
-        strip.add(Box.createHorizontalStrut(GAP));
-
-        // Cancel button
+        // Cancel button (commit is implicit — changes apply immediately)
         JButton cancelBtn = actionBtn("✗ Abbrechen", "Bearbeitung abbrechen (Esc)");
         cancelBtn.addActionListener(e -> cb.onCancel());
         strip.add(cancelBtn);
