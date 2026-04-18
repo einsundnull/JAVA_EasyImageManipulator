@@ -36,7 +36,7 @@ class ElementController {
 	 * Renders a TextLayer to a pixel image at its natural (image-space) font size.
 	 * Wrapping layers render word-wrapped within their stored bounds.
 	 */
-	BufferedImage renderTextLayerToImage(TextLayer tl) {
+	static BufferedImage renderTextLayerToImage(TextLayer tl) {
 		int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
 		Font font = new Font(tl.fontName(), style, Math.max(6, tl.fontSize()));
 		BufferedImage dummy = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
@@ -227,10 +227,14 @@ class ElementController {
 		BufferedImage comp = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g2 = comp.createGraphics();
 		g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		g2.drawImage(c.workingImage, 0, 0, null);
 		for (Layer el : c.activeElements) {
 			if (el instanceof ImageLayer il) {
 				drawImageLayer(g2, il);
+			} else if (el instanceof TextLayer tl && !tl.isHidden()) {
+				BufferedImage txt = renderTextLayerToImage(tl);
+				g2.drawImage(txt, tl.x(), tl.y(), null);
 			}
 		}
 		g2.dispose();
@@ -408,20 +412,24 @@ class ElementController {
 		List<Layer> layers = new ArrayList<>(c.activeElements);
 		File bgFile = c.sourceFile;
 		File sceneFileFinal = c.activeSceneFile;
-		new SwingWorker<BufferedImage, Void>() {
+		new SwingWorker<Void, Void>() {
 			@Override
-			protected BufferedImage doInBackground() throws Exception {
+			protected Void doInBackground() throws Exception {
 				SceneFileWriter.writeScene(sceneDir, sceneName, bgFile, layers);
-				SceneImageAdapter.SceneAsImage updated = SceneImageAdapter.loadSceneAsImage(sceneFileFinal);
-				return updated != null ? updated.thumbnail : null;
+				return null;
 			}
 
 			@Override
 			protected void done() {
 				try {
-					BufferedImage thumb = get();
+					get();
+					BufferedImage thumb = renderCompositeForThumbnail(ed.ci(idx));
 					if (thumb != null) {
-						ed.ci(idx).scenesPanel.refreshThumbnailFor(sceneFileFinal, thumb);
+						CanvasInstance ci = ed.ci(idx);
+						if (ci.scenesPanel != null)
+							ci.scenesPanel.refreshThumbnailFor(sceneFileFinal, thumb);
+						if (ed.bookPagesPanel  != null) ed.bookPagesPanel .refreshThumbnailFor(bgFile, thumb);
+						if (ed.bookPagesPanel2 != null) ed.bookPagesPanel2.refreshThumbnailFor(bgFile, thumb);
 					}
 				} catch (Exception ex) {
 					System.err.println("[ERROR] Scene persist failed: " + ex.getMessage());

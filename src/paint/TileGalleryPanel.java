@@ -812,8 +812,16 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                             }
                         }
                     } else {
-                        // Regular image file
-                        img = ImageIO.read(imageFile);
+                        // Book page PNG: composite layers via scene manifest if present
+                        if (PageLayoutManifest.isBookPage(imageFile)) {
+                            File manifest = BookController.getPageManifest(imageFile);
+                            if (manifest.exists()) {
+                                SceneImageAdapter.SceneAsImage scene = SceneImageAdapter.loadSceneAsImage(manifest);
+                                if (scene != null) img = scene.thumbnail;
+                            }
+                        }
+                        // Regular image file (or page fallback when no manifest yet)
+                        if (img == null) img = ImageIO.read(imageFile);
                     }
 
                     if (img == null) return null;

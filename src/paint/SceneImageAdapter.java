@@ -104,73 +104,17 @@ public class SceneImageAdapter {
         // Zeichne alle Layers
         for (Layer layer : layers) {
             if (layer instanceof ImageLayer il) {
-                if (il.isHidden()) continue;
-
-                BufferedImage img = il.image();
-                if (img != null) {
-                    // Zeichne mit Position, Größe, Rotation, Opacity
-                    float alpha = il.opacity() / 100.0f;
-                    g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha));
-
-                    // TODO: Rotation implementieren wenn nötig
-                    g2.drawImage(img,
-                        il.x(), il.y(),
-                        il.width, il.height,
-                        null);
-
-                    g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, 1.0f));
-                }
-            } else if (layer instanceof TextLayer tl) {
-                if (!tl.isHidden()) {
-                    renderTextLayerOnGraphics(g2, tl);
-                }
-            } else if (layer instanceof PathLayer pl) {
-                if (!pl.isHidden()) {
-                    renderPathLayerOnGraphics(g2, pl);
-                }
+                ElementController.drawImageLayer(g2, il);
+            } else if (layer instanceof TextLayer tl && !tl.isHidden()) {
+                BufferedImage txt = ElementController.renderTextLayerToImage(tl);
+                g2.drawImage(txt, tl.x(), tl.y(), null);
+            } else if (layer instanceof PathLayer pl && !pl.isHidden()) {
+                renderPathLayerOnGraphics(g2, pl);
             }
         }
 
         g2.dispose();
         return result;
-    }
-
-    /**
-     * Zeichnet einen TextLayer auf einen Graphics2D mit Font, Farbe und Position.
-     */
-    private static void renderTextLayerOnGraphics(Graphics2D g2, TextLayer tl) {
-        String text = tl.text();
-        if (text == null || text.isEmpty()) {
-            return;
-        }
-
-        // Erstelle Font mit den TextLayer-Einstellungen
-        int fontStyle = 0;
-        if (tl.fontBold()) fontStyle |= java.awt.Font.BOLD;
-        if (tl.fontItalic()) fontStyle |= java.awt.Font.ITALIC;
-
-        java.awt.Font font = new java.awt.Font(
-            tl.fontName() != null ? tl.fontName() : "SansSerif",
-            fontStyle,
-            tl.fontSize()
-        );
-
-        g2.setFont(font);
-        g2.setColor(tl.fontColor() != null ? tl.fontColor() : java.awt.Color.BLACK);
-
-        // Zeichne Text mit Zeilenumbruch-Unterstützung
-        String[] lines = text.split("\n", -1);
-        java.awt.FontMetrics fm = g2.getFontMetrics();
-        int lineHeight = fm.getHeight();
-
-        // Starte bei Position + Padding
-        int drawX = tl.x() + TextLayer.TEXT_PADDING;
-        int drawY = tl.y() + fm.getAscent() + TextLayer.TEXT_PADDING;
-
-        for (String line : lines) {
-            g2.drawString(line != null ? line : "", drawX, drawY);
-            drawY += lineHeight;
-        }
     }
 
     /**
