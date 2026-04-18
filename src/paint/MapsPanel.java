@@ -31,8 +31,16 @@ public class MapsPanel extends BaseSidebarPanel {
         void onMapEdited(TranslationMap oldMap, TranslationMap newMap);
     }
 
+    private static class MapsScrollablePanel extends JPanel implements javax.swing.Scrollable {
+        @Override public java.awt.Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) { return 14; }
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) { return 100; }
+        @Override public boolean getScrollableTracksViewportWidth()  { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
+
     private final Callbacks cb;
-    private final JPanel mapsContainer;
+    private final MapsScrollablePanel mapsContainer;
     private final JScrollPane scrollPane;
     private java.util.Map<String, java.util.List<TranslationMap>> allMaps = new LinkedHashMap<>();
     private boolean showAll = false;
@@ -50,8 +58,7 @@ public class MapsPanel extends BaseSidebarPanel {
         }, null);
         add(header, BorderLayout.NORTH);
 
-        // Maps container
-        mapsContainer = new JPanel();
+        mapsContainer = new MapsScrollablePanel();
         mapsContainer.setLayout(new BoxLayout(mapsContainer, BoxLayout.Y_AXIS));
         mapsContainer.setBackground(AppColors.BG_PANEL);
 
@@ -99,7 +106,6 @@ public class MapsPanel extends BaseSidebarPanel {
             JLabel emptyLbl = new JLabel("Keine Maps vorhanden");
             emptyLbl.setForeground(AppColors.TEXT_MUTED);
             emptyLbl.setAlignmentX(CENTER_ALIGNMENT);
-            mapsContainer.add(Box.createVerticalStrut(16));
             mapsContainer.add(emptyLbl);
         } else {
             for (String language : allMaps.keySet()) {
@@ -118,12 +124,10 @@ public class MapsPanel extends BaseSidebarPanel {
                         MapTile tile = new MapTile(map);
                         mapsContainer.add(tile);
                     }
-                    mapsContainer.add(Box.createVerticalStrut(4));
                 }
             }
         }
 
-        mapsContainer.add(Box.createVerticalGlue());
         mapsContainer.revalidate();
         mapsContainer.repaint();
     }

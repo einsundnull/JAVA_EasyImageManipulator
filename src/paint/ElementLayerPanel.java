@@ -101,7 +101,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
     private static  int THUMB_H =  74;
 
     private final Callbacks      cb;
-    private final JPanel         tilesContainer;
+    private final TilesScrollablePanel tilesContainer;
     private boolean              showAllOutlines = false;
     private boolean              showAll = false;
     private Layer                linkedElement = null;
@@ -109,6 +109,30 @@ public class ElementLayerPanel extends BaseSidebarPanel {
     private int                  hoveredElementId = -1;
     /** Y-coordinate of the drop indicator line in tilesContainer, or -1 if none. */
     private int                  dropIndicatorY   = -1;
+
+    private class TilesScrollablePanel extends JPanel implements javax.swing.Scrollable {
+        @Override public java.awt.Dimension getPreferredSize() {
+            java.awt.Dimension d = super.getPreferredSize();
+            if (getParent() != null && getParent().getWidth() > 0)
+                d.width = getParent().getWidth();
+            return d;
+        }
+        @Override public void paint(Graphics g) {
+            super.paint(g);
+            if (dropIndicatorY >= 0) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(AppColors.ACCENT);
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawLine(0, dropIndicatorY, getWidth(), dropIndicatorY);
+                g2.dispose();
+            }
+        }
+        @Override public java.awt.Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) { return 14; }
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) { return 100; }
+        @Override public boolean getScrollableTracksViewportWidth()  { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
 
     // =========================================================================
     // Constructor
@@ -215,24 +239,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         // ── Tiles container ───────────────────────────────────────────────────
         // Override getPreferredSize so JViewport sizes this panel to the viewport width,
         // which causes BoxLayout Y_AXIS to resize tiles accordingly.
-        tilesContainer = new JPanel() {
-            @Override public java.awt.Dimension getPreferredSize() {
-                java.awt.Dimension d = super.getPreferredSize();
-                if (getParent() != null && getParent().getWidth() > 0)
-                    d.width = getParent().getWidth();
-                return d;
-            }
-            @Override public void paint(Graphics g) {
-                super.paint(g);
-                if (dropIndicatorY >= 0) {
-                    Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setColor(AppColors.ACCENT);
-                    g2.setStroke(new BasicStroke(2f));
-                    g2.drawLine(0, dropIndicatorY, getWidth(), dropIndicatorY);
-                    g2.dispose();
-                }
-            }
-        };
+        tilesContainer = new TilesScrollablePanel();
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));
         tilesContainer.setBackground(new Color(36, 36, 36));
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
@@ -343,7 +350,6 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             Layer layer = layers.get(i);
             boolean sel = selectedEls.stream().anyMatch(s -> s.id() == layer.id());
             tilesContainer.add(new LayerTile(layer, sel, showAll, linkedElement));
-            tilesContainer.add(Box.createVerticalStrut(5));
         }
 
         // "Keine Ebenen" placeholder
@@ -440,7 +446,8 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             });
             add(burn);
 
-            // ── Red (×) delete button – top-right corner ──────────────────────
+            // ── Red (×) delete button – top-right corner (hidden for wrapping TextLayer) ──
+            boolean isWrappingFrame = (layer instanceof TextLayer tl2 && tl2.isWrapping());
             del = new JLabel("✕", JLabel.CENTER);
             del.setForeground(new Color(220, 60, 60));
             del.setFont(new Font("SansSerif", Font.BOLD, 10));
@@ -466,6 +473,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                     del.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
                 }
             });
+            del.setVisible(!isWrappingFrame);
             add(del);
 
             // ── Green reset rotation button (↺) – only for rotated ImageLayers ─

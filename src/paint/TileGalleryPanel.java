@@ -208,11 +208,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             @Override public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) { return 14; }
             @Override public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) { return 100; }
             @Override public boolean getScrollableTracksViewportWidth()  { return true; }
-            // Only fill viewport height when content is shorter — allows normal scrolling when content is taller
-            @Override public boolean getScrollableTracksViewportHeight() {
-                java.awt.Container p = getParent();
-                return p == null || getPreferredSize().height < p.getHeight();
-            }
+            @Override public boolean getScrollableTracksViewportHeight() { return false; }
         }
         tilesContainer = new ScrollableTilesContainer();
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));

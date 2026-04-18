@@ -136,6 +136,7 @@ class PageLayoutToolbar extends JPanel {
         pageNameLabel.setText(pageFile.getName());
         pageNameLabel.setForeground(AppColors.TEXT);
         populateControls();
+        updateBookTextLayerBounds(); // enforce margin-defined bounds on load
     }
 
     /** Returns the currently active {@link PageLayout} (may be defaults if no page loaded). */
@@ -445,7 +446,7 @@ class PageLayoutToolbar extends JPanel {
     }
 
     /** Repositions the book wrapping TextLayer to match current content area. */
-    private void updateBookTextLayerBounds() {
+    void updateBookTextLayerBounds() {
         CanvasInstance c = ed.ci();
         if (c.workingImage == null) return;
         int imgW = c.workingImage.getWidth(), imgH = c.workingImage.getHeight();

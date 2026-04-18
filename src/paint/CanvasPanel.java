@@ -90,6 +90,9 @@ public class CanvasPanel extends JPanel {
 	private Layer editingOriginalElement = null;
 	/** True when the element being edited is a wrapping TextLayer (book page text frame). */
 	private boolean editingWrappingLayer = false;
+	/** Per-keystroke text snapshots for scoped undo while editing the wrapping frame. */
+	private final java.util.ArrayDeque<String> textUndoStack = new java.util.ArrayDeque<>();
+	private final java.util.ArrayDeque<String> textRedoStack = new java.util.ArrayDeque<>();
 
 	// ── Text caret + selection ─────────────────────────────────────────────────
 	/** Character index of the insertion caret (0 = before first char). */
@@ -403,7 +406,8 @@ public class CanvasPanel extends JPanel {
 
 					// Check resize handles on the primary selected element
 					Layer primary = callbacks.getSelectedElement();
-					if (primary != null) {
+					if (primary != null && !primary.isMouseTransparent()
+							&& !(primary instanceof TextLayer ptl && ptl.isWrapping())) {
 						Rectangle[] handles = callbacks.handleRects(callbacks.elemRectScreen(primary));
 						for (int hi = 0; hi < handles.length; hi++) {
 							if (handles[hi].contains(e.getPoint())) {
@@ -418,6 +422,8 @@ public class CanvasPanel extends JPanel {
 
 					// Click on any currently selected element → drag ALL selected
 					for (Layer sel : callbacks.getSelectedElements()) {
+						if (sel.isMouseTransparent()) continue;
+						if (sel instanceof TextLayer stl && stl.isWrapping()) continue;
 						if (callbacks.elemRectScreen(sel).contains(e.getPoint())) {
 							callbacks.setDraggingElement(true);
 							elemLastImgPt = imgPt;
@@ -1371,8 +1377,31 @@ public class CanvasPanel extends JPanel {
 				// Clipboard
 				if (ctrl && code == KeyEvent.VK_A) { textSelAnchor = 0; textCaretPos = textBuffer.length(); ke.consume(); repaintIfEditing(); return; }
 				if (ctrl && code == KeyEvent.VK_C) { copyToClipboard(); ke.consume(); return; }
-				if (ctrl && code == KeyEvent.VK_X) { copyToClipboard(); deleteSel(); textCaretVisible = true; syncDialogText(); ke.consume(); repaintIfEditing(); return; }
+				if (ctrl && code == KeyEvent.VK_X) { copyToClipboard(); pushTextUndo(); deleteSel(); textCaretVisible = true; syncDialogText(); ke.consume(); repaintIfEditing(); return; }
 				if (ctrl && code == KeyEvent.VK_V) { pasteFromClipboard(); textCaretVisible = true; syncDialogText(); ke.consume(); repaintIfEditing(); return; }
+				// Scoped text undo/redo (only while editing the wrapping frame layer)
+				if (editingWrappingLayer && ctrl && code == KeyEvent.VK_Z) {
+					if (!textUndoStack.isEmpty()) {
+						textRedoStack.push(textBuffer.toString());
+						String prev = textUndoStack.pop();
+						textBuffer = new StringBuilder(prev);
+						textCaretPos = Math.min(textCaretPos, textBuffer.length());
+						clearTextSel(); lastTextLines = null;
+						textCaretVisible = true; syncDialogText();
+					}
+					ke.consume(); repaintIfEditing(); return;
+				}
+				if (editingWrappingLayer && ctrl && code == KeyEvent.VK_Y) {
+					if (!textRedoStack.isEmpty()) {
+						textUndoStack.push(textBuffer.toString());
+						String next = textRedoStack.pop();
+						textBuffer = new StringBuilder(next);
+						textCaretPos = Math.min(textCaretPos, textBuffer.length());
+						clearTextSel(); lastTextLines = null;
+						textCaretVisible = true; syncDialogText();
+					}
+					ke.consume(); repaintIfEditing(); return;
+				}
 				// Arrow navigation
 				if (code == KeyEvent.VK_LEFT || code == KeyEvent.VK_RIGHT ||
 					code == KeyEvent.VK_UP   || code == KeyEvent.VK_DOWN  ||
@@ -1615,6 +1644,7 @@ public class CanvasPanel extends JPanel {
 		editingTextElementId   = el.id();
 		editingOriginalElement = el;
 		editingWrappingLayer   = tl.isWrapping();
+		textUndoStack.clear(); textRedoStack.clear();
 		textCaretPos   = textBuffer.length();
 		textSelAnchor  = -1;
 		lastTextLines  = null;
@@ -1821,20 +1851,28 @@ public class CanvasPanel extends JPanel {
 		clearTextSel();
 	}
 
+	private void pushTextUndo() {
+		if (!editingWrappingLayer) return;
+		textUndoStack.push(textBuffer.toString());
+		if (textUndoStack.size() > 200) textUndoStack.pollLast();
+		textRedoStack.clear();
+	}
+
 	private void insertAtCaret(String s) {
 		if (hasTextSel()) deleteSel();
+		pushTextUndo();
 		textBuffer.insert(textCaretPos, s);
 		textCaretPos += s.length();
 	}
 
 	private void deleteBeforeCaret() {
-		if (hasTextSel()) { deleteSel(); return; }
-		if (textCaretPos > 0) { textBuffer.deleteCharAt(textCaretPos - 1); textCaretPos--; }
+		if (hasTextSel()) { pushTextUndo(); deleteSel(); return; }
+		if (textCaretPos > 0) { pushTextUndo(); textBuffer.deleteCharAt(textCaretPos - 1); textCaretPos--; }
 	}
 
 	private void deleteAfterCaret() {
-		if (hasTextSel()) { deleteSel(); return; }
-		if (textCaretPos < textBuffer.length()) textBuffer.deleteCharAt(textCaretPos);
+		if (hasTextSel()) { pushTextUndo(); deleteSel(); return; }
+		if (textCaretPos < textBuffer.length()) { pushTextUndo(); textBuffer.deleteCharAt(textCaretPos); }
 	}
 
 	private int wordStart(int pos) {
@@ -2213,7 +2251,7 @@ public class CanvasPanel extends JPanel {
 			Layer el = els.get(i);
 			if (editingTextElementId >= 0 && el.id() == editingTextElementId) continue;
 			if (el.isMouseTransparent()) continue;
-			if (el instanceof TextLayer tl && tl.isWrapping() && !callbacks.isFrameLayerMovable()) continue;
+			if (el instanceof TextLayer tl && tl.isWrapping()) continue; // bounds set by margins, never draggable
 			if (callbacks.elemRectScreen(el).contains(screenPt)) return el;
 		}
 		return null;
