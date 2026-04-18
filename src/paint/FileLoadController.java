@@ -129,7 +129,10 @@ class FileLoadController {
 		if (c.canvasPanel != null)
 			c.canvasPanel.resetInputState();
 
-		c.appMode = ed.defaultAppMode;
+		// Preserve the currently active mode across image switches.
+		// Only override with a scene-saved mode if one exists; fall back to
+		// defaultAppMode only when there is genuinely no prior state (first load).
+		AppMode modeBeforeLoad = c.appMode;
 
 		try {
 			if (ed.projectManager.getProjectName() != null) {
@@ -144,11 +147,13 @@ class FileLoadController {
 					c.userHasManuallyZoomed = true;
 				}
 				AppMode savedMode = ed.projectManager.loadSceneMode(file);
-				if (savedMode != null)
-					c.appMode = savedMode;
+				c.appMode = savedMode != null ? savedMode : modeBeforeLoad;
+			} else {
+				c.appMode = modeBeforeLoad;
 			}
 		} catch (IOException e) {
 			System.err.println("[WARN] Fehler beim Laden der Szenen-Daten: " + e.getMessage());
+			c.appMode = modeBeforeLoad;
 		}
 
 		ed.activeCanvasIndex = idx;
