@@ -98,11 +98,22 @@ class GalleryCallbacksFactory {
 						}
 					}.execute();
 				} else {
-					File dest = BaseSidebarPanel.copyFileWithUniqueName(src, src.getParentFile());
-					if (dest != null) {
-						c.tileGallery.addFileAtIndex(dest, insertIndex);
-						c.tileGallery.setActiveFile(dest);
-						ToastNotification.show(ed, "Kopie: " + dest.getName());
+					File destDir = c.tileGallery.getTileGalleryDirectory();
+					if (destDir == null || src.getParentFile().equals(destDir)) return;
+					File destFile = new File(destDir, src.getName());
+					if (destFile.exists()) {
+						// Already present in target folder — just activate it
+						c.tileGallery.addFileAtIndex(destFile, insertIndex);
+						c.tileGallery.setActiveFile(destFile);
+					} else {
+						try {
+							java.nio.file.Files.copy(src.toPath(), destFile.toPath());
+							c.tileGallery.addFileAtIndex(destFile, insertIndex);
+							c.tileGallery.setActiveFile(destFile);
+							ToastNotification.show(ed, "Kopiert: " + destFile.getName());
+						} catch (java.io.IOException ex) {
+							System.err.println("[GalleryCallbacks] copy failed: " + ex.getMessage());
+						}
 					}
 				}
 			}

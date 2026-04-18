@@ -258,17 +258,22 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                                             dtde.dropComplete(false);
                                             return;
                                         }
-                                        // If the file is currently loaded, write the rendered composite
-                                        // (workingImage + elements) instead of copying the raw disk file.
-                                        java.awt.image.BufferedImage composite = callbacks.getCompositeForFile(sourceFile);
-                                        File destFile;
-                                        if (composite != null) {
-                                            destFile = writeCompositeWithUniqueName(composite, sourceFile, destDir);
-                                        } else {
-                                            destFile = BaseSidebarPanel.copyFileWithUniqueName(sourceFile, destDir);
-                                        }
-                                        if (destFile != null) {
+                                        // Skip if source and target are in the same directory
+                                        if (sourceFile.getParentFile().equals(destDir)) continue;
+                                        File destFile = new File(destDir, sourceFile.getName());
+                                        if (destFile.exists()) {
+                                            // Already present — just activate it, no copy
                                             callbacks.onFileElementDropped(destFile, insertIndex);
+                                        } else {
+                                            java.awt.image.BufferedImage composite = callbacks.getCompositeForFile(sourceFile);
+                                            if (composite != null) {
+                                                destFile = writeCompositeWithUniqueName(composite, sourceFile, destDir);
+                                            } else {
+                                                java.nio.file.Files.copy(sourceFile.toPath(), destFile.toPath());
+                                            }
+                                            if (destFile != null) {
+                                                callbacks.onFileElementDropped(destFile, insertIndex);
+                                            }
                                         }
                                     } catch (Exception ex) {
                                         System.err.println("[ERROR] Failed to copy file: " + ex.getMessage());
@@ -576,7 +581,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     /**
      * Get the current gallery directory from the tiles.
      */
-    private File getTileGalleryDirectory() {
+    public File getTileGalleryDirectory() {
         if (activeFile != null) {
             return activeFile.getParentFile();
         }
