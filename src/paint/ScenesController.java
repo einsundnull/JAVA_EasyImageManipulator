@@ -1,6 +1,7 @@
 package paint;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -248,6 +249,13 @@ class ScenesController {
 			}
 
 			File syntheticManifest = new File(sceneDir, sceneName + ".txt");
+			if (!syntheticManifest.exists()) {
+				try {
+					GameSceneWriter.writeManifest(sceneDir, sceneName, gameData.layers, gameData.canvasW, gameData.canvasH);
+				} catch (IOException e) {
+					System.err.println("[ScenesController] Manifest konnte nicht erstellt werden: " + e.getMessage());
+				}
+			}
 			c.gameSceneRoot   = sceneDir;
 			c.gameCanvasW     = gameData.canvasW;
 			c.gameCanvasH     = gameData.canvasH;

@@ -54,6 +54,8 @@ public class CanvasPanel extends JPanel {
 	// ── Right-click snap-drag state ───────────────────────────────────────────
 	private boolean isSnapDragging = false;
 	private static final int SNAP_DIST = 12;  // image-space pixels
+	// True when the current stroke was started with right-click (paint with secondary color)
+	private boolean rightClickStroke = false;
 
 	// ── Text tool state ───────────────────────────────────────────────────────
 	private static final int TEXT_PADDING = 4;
@@ -126,6 +128,14 @@ public class CanvasPanel extends JPanel {
 	private int hoveredElementId = -1;
 	/** Index (0-7) of the scale handle the mouse is over on the primary element, or -1. */
 	private int hoveredHandleIndex = -1;
+
+	// ── Brush-Preview Cursor ─────────────────────────────────────────────────
+	/** Screen-space position for the dashed brush-shape preview, or null when outside canvas. */
+	private Point brushPreviewPt = null;
+	/** Invisible cursor used while PENCIL/ERASER is active so the dashed preview acts as cursor. */
+	private static final java.awt.Cursor BLANK_CURSOR = java.awt.Toolkit.getDefaultToolkit()
+			.createCustomCursor(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB),
+					new Point(0, 0), "blank");
 
 	// ── Canvas-submode draw overlay ───────────────────────────────────────────
 	/** Transparent scratch image used when drawing in Canvas sub-mode (becomes an Element on release). */
@@ -217,19 +227,34 @@ public class CanvasPanel extends JPanel {
 				if ((!isLeft && !isRight) || callbacks.getWorkingImage() == null)
 					return;
 
-				// ── Right-click snap-drag: start snap element drag (before text commit) ────
+				// ── Right-click: snap-drag OR secondary-color paint ──────────────────────
 				if (isRight) {
-					Point imgPt = callbacks.screenToImage(e.getPoint());
-					Layer hit = hitElement(e.getPoint());
-					if (hit != null) {
-						if (!callbacks.getSelectedElements().contains(hit)) {
-							callbacks.setSelectedElement(hit);
-						}
-						isSnapDragging = true;
-						elemLastImgPt = imgPt;
-						callbacks.pushUndo();
+					boolean isPaintDrawTool = false;
+					if (callbacks.getAppMode() == AppMode.PAINT && callbacks.getPaintToolbar() != null) {
+						PaintEngine.Tool t = callbacks.getPaintToolbar().getActiveTool();
+						isPaintDrawTool = t == PaintEngine.Tool.PENCIL
+								|| t == PaintEngine.Tool.ERASER
+								|| t == PaintEngine.Tool.SMEAR
+								|| t == PaintEngine.Tool.FLOODFILL;
 					}
-					return;
+					if (!isPaintDrawTool) {
+						// Snap-drag mode (non-paint tools)
+						Point imgPt = callbacks.screenToImage(e.getPoint());
+						Layer hit = hitElement(e.getPoint());
+						if (hit != null) {
+							if (!callbacks.getSelectedElements().contains(hit)) {
+								callbacks.setSelectedElement(hit);
+							}
+							isSnapDragging = true;
+							elemLastImgPt = imgPt;
+							callbacks.pushUndo();
+						}
+						return;
+					}
+					// else: fall through to the PAINT switch with rightClickStroke = true
+					rightClickStroke = true;
+				} else {
+					rightClickStroke = false;
 				}
 
 				// ── In-canvas caret positioning (click/double-click/drag inside active text box) ─
@@ -456,7 +481,7 @@ public class CanvasPanel extends JPanel {
 					if (tool == null) return;
 					switch (tool) {
 					case PENCIL, ERASER -> {
-						if (callbacks.isCanvasSubMode() && tool == PaintEngine.Tool.PENCIL) {
+						if (callbacks.isCanvasSubMode() && tool == PaintEngine.Tool.PENCIL && !rightClickStroke) {
 							// Canvas sub-mode: draw on a transparent overlay → becomes Element on release
 							canvasDrawOverlay = newOverlay();
 							overlayLastPt = imgPt;
@@ -469,15 +494,33 @@ public class CanvasPanel extends JPanel {
 							}
 							repaint();
 						} else {
+							Color strokeColor = rightClickStroke
+									? callbacks.getPaintToolbar().getSecondaryColor()
+									: callbacks.getPaintToolbar().getPrimaryColor();
 							callbacks.pushUndo();
 							callbacks.setLastPaintPoint(imgPt);
-							callbacks.paintDot(imgPt);
+							int sw = callbacks.getPaintToolbar().getStrokeWidth();
+							boolean aa = callbacks.getPaintToolbar().isAntialiasing();
+							if (tool == PaintEngine.Tool.ERASER || strokeColor.getAlpha() == 0) {
+								PaintEngine.drawEraser(callbacks.getWorkingImage(), imgPt, imgPt, sw, aa);
+							} else {
+								PaintEngine.drawPencil(callbacks.getWorkingImage(), imgPt, imgPt,
+										strokeColor, sw, callbacks.getPaintToolbar().getBrushShape(), aa);
+							}
+							callbacks.markDirty();
+							callbacks.repaintCanvas();
 						}
+					}
+					case SMEAR -> {
+						callbacks.pushUndo();
+						callbacks.setLastPaintPoint(imgPt);
 					}
 					case FLOODFILL -> {
 						callbacks.pushUndo();
-						PaintEngine.floodFill(callbacks.getWorkingImage(), imgPt.x, imgPt.y,
-								callbacks.getPaintToolbar().getPrimaryColor(), 30);
+						Color fillColor = rightClickStroke
+								? callbacks.getPaintToolbar().getSecondaryColor()
+								: callbacks.getPaintToolbar().getPrimaryColor();
+						PaintEngine.floodFill(callbacks.getWorkingImage(), imgPt.x, imgPt.y, fillColor, 30);
 						callbacks.markDirty();
 					}
 					case EYEDROPPER -> {
@@ -796,16 +839,14 @@ public class CanvasPanel extends JPanel {
 					if (tool == PaintEngine.Tool.PENCIL || tool == PaintEngine.Tool.ERASER) {
 						boolean aa = callbacks.getPaintToolbar().isAntialiasing();
 						if (callbacks.isCanvasSubMode() && tool == PaintEngine.Tool.PENCIL
-								&& canvasDrawOverlay != null) {
+								&& canvasDrawOverlay != null && !rightClickStroke) {
 							// Canvas sub-mode: draw on overlay
 							java.awt.Color primaryColor = callbacks.getPaintToolbar().getPrimaryColor();
 							if (primaryColor.getAlpha() == 0) {
-								// Alpha = 0 → transparent painting
 								PaintEngine.drawEraser(canvasDrawOverlay,
 										overlayLastPt != null ? overlayLastPt : imgPt, imgPt,
 										callbacks.getPaintToolbar().getStrokeWidth(), aa);
 							} else {
-								// Normal pencil with color
 								PaintEngine.drawPencil(canvasDrawOverlay,
 										overlayLastPt != null ? overlayLastPt : imgPt, imgPt,
 										primaryColor,
@@ -815,16 +856,15 @@ public class CanvasPanel extends JPanel {
 							overlayLastPt = imgPt;
 							repaint();
 						} else if (tool == PaintEngine.Tool.PENCIL) {
-							// Check if alpha is 0: if so, use eraser instead
-							java.awt.Color primaryColor = callbacks.getPaintToolbar().getPrimaryColor();
-							if (primaryColor.getAlpha() == 0) {
-								// Alpha = 0 → transparent painting
+							java.awt.Color strokeColor = rightClickStroke
+									? callbacks.getPaintToolbar().getSecondaryColor()
+									: callbacks.getPaintToolbar().getPrimaryColor();
+							if (strokeColor.getAlpha() == 0) {
 								PaintEngine.drawEraser(callbacks.getWorkingImage(), callbacks.getLastPaintPoint(), imgPt,
 										callbacks.getPaintToolbar().getStrokeWidth(), aa);
 							} else {
-								// Normal pencil with color
 								PaintEngine.drawPencil(callbacks.getWorkingImage(), callbacks.getLastPaintPoint(), imgPt,
-										primaryColor,
+										strokeColor,
 										callbacks.getPaintToolbar().getStrokeWidth(),
 										callbacks.getPaintToolbar().getBrushShape(), aa);
 							}
@@ -836,6 +876,13 @@ public class CanvasPanel extends JPanel {
 							callbacks.setLastPaintPoint(imgPt);
 							callbacks.markDirty();
 						}
+					} else if (tool == PaintEngine.Tool.SMEAR) {
+						Point last = callbacks.getLastPaintPoint();
+						if (last == null) last = imgPt;
+						PaintEngine.smear(callbacks.getWorkingImage(), last, imgPt,
+								callbacks.getPaintToolbar().getStrokeWidth(), 0.65f);
+						callbacks.setLastPaintPoint(imgPt);
+						callbacks.markDirty();
 					} else if (tool == PaintEngine.Tool.LINE || tool == PaintEngine.Tool.CIRCLE
 							|| tool == PaintEngine.Tool.RECT) {
 						if (callbacks.isCanvasSubMode() && canvasDrawOverlay != null
@@ -900,6 +947,7 @@ public class CanvasPanel extends JPanel {
 				panViewPos = null;
 				elemLastImgPt = null;
 				textMouseDragSel = false;
+				rightClickStroke = false;
 
 				// Finalize rotation drag
 				if (isDraggingRotation) {
@@ -1106,6 +1154,9 @@ public class CanvasPanel extends JPanel {
 				if (hoveredHandleIndex >= 0) {
 					hoveredHandleIndex = -1;
 					setCursor(Cursor.getDefaultCursor());
+				}
+				if (brushPreviewPt != null) {
+					brushPreviewPt = null;
 					repaint();
 				}
 			}
@@ -1197,6 +1248,35 @@ public class CanvasPanel extends JPanel {
 				}
 			}
 		});
+
+		// Brush-preview: eigener Listener – immer aktiv, unabhängig von Canvas-Modus
+		addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+			@Override public void mouseMoved(java.awt.event.MouseEvent e)   { updateBrushPreview(e.getPoint()); }
+			@Override public void mouseDragged(java.awt.event.MouseEvent e) { updateBrushPreview(e.getPoint()); }
+		});
+		addMouseListener(new java.awt.event.MouseAdapter() {
+			@Override public void mouseExited(java.awt.event.MouseEvent e) {
+				if (brushPreviewPt != null) { brushPreviewPt = null; repaint(); }
+			}
+		});
+	}
+
+	/** Updates the brush-preview position and cursor; triggers a repaint if anything changed. */
+	private void updateBrushPreview(Point screenPt) {
+		if (callbacks.getAppMode() != AppMode.PAINT) {
+			if (brushPreviewPt != null) { brushPreviewPt = null; repaint(); }
+			return;
+		}
+		PaintEngine.Tool tool = callbacks.getPaintToolbar() != null ? callbacks.getPaintToolbar().getActiveTool() : null;
+		boolean isBrushTool = tool == PaintEngine.Tool.PENCIL || tool == PaintEngine.Tool.ERASER
+				|| tool == PaintEngine.Tool.SMEAR;
+		if (!isBrushTool) {
+			if (brushPreviewPt != null) { brushPreviewPt = null; setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR)); repaint(); }
+			return;
+		}
+		brushPreviewPt = screenPt;
+		setCursor(BLANK_CURSOR);
+		repaint();
 	}
 
 	private void setupKeyBindings() {
@@ -2027,37 +2107,25 @@ public class CanvasPanel extends JPanel {
 		BufferedImage img = callbacks.getWorkingImage();
 		if (img == null) { repaint(); return; }
 
-		// Densify the drawn outline so every edge contributes collapse candidates.
-		// This ensures the collapsed path has enough points to trace fine details,
-		// regardless of how fast or slow the user drew the initial boundary.
-		java.util.List<java.awt.Point> dense = PaintEngine.densifyPath(raw, 3);
-		if (dense.size() < 3) { repaint(); return; }
+		// Build polygon arrays from raw drawn points
+		int[] xs = new int[raw.size()];
+		int[] ys = new int[raw.size()];
+		for (int i = 0; i < raw.size(); i++) { xs[i] = raw.get(i).x; ys[i] = raw.get(i).y; }
 
-		// Collapse each densified vertex inward toward content
+		// Pixel-level inward collapse: rasterize polygon, find all non-pass-through
+		// pixels inside it. Every pixel is checked independently at pixel resolution,
+		// spreading "circularly" with no jumps.
 		java.awt.Color secColor = callbacks.getPaintToolbar().getSecondaryColor();
 		int            tolPct   = callbacks.getPaintToolbar().getWandTolerance();
-		java.util.List<java.awt.Point> collapsed =
-				PaintEngine.collapsePathInward(dense, img, secColor, tolPct);
-
-		// Light post-simplification to remove redundant collinear points while
-		// keeping the fine-grained shape discovered by the collapse
-		java.util.List<java.awt.Point> simplified = PaintEngine.simplifyPath(collapsed, 0.8);
-		if (simplified.size() < 3) { repaint(); return; }
-
-		// Build PathLayer
-		int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
-		for (java.awt.Point p : simplified) {
-			minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+		boolean[][] content = PaintEngine.collapseInward(xs, ys, img, secColor, tolPct);
+		if (content == null) {
+			ToastNotification.show(null, "Kein Inhalt im Bereich gefunden");
+			repaint();
+			return;
 		}
-		java.util.List<Point3D> pts = new java.util.ArrayList<>();
-		for (java.awt.Point p : simplified) pts.add(new Point3D(p.x - minX, p.y - minY));
 
-		PathLayer newPath = PathLayer.of(callbacks.getNextElementId(), pts, null, true, minX, minY);
-		callbacks.addElement(newPath);
-		callbacks.setSelectedElement(newPath);
-		callbacks.getPaintToolbar().setActiveTool(PaintEngine.Tool.SELECT);
-		callbacks.markDirty();
-		repaint();
+		// Trace the boundary of the content mask and create a PathLayer
+		createPathFromRegion(content, img.getWidth(), img.getHeight());
 	}
 
 	// ── Magic Wand helpers ─────────────────────────────────────────────────────
@@ -2664,6 +2732,47 @@ public class CanvasPanel extends JPanel {
 		if (callbacks.isGridVisible()) {
 			drawGrid(g2, callbacks.getZoom());
 		}
+
+		// ── Brush-shape preview cursor ────────────────────────────────────────
+		if (brushPreviewPt != null && callbacks.getPaintToolbar() != null) {
+			drawBrushPreview(g2, brushPreviewPt);
+		}
+	}
+
+	/**
+	 * Draws a dashed outline representing the current brush shape and stroke width
+	 * at the given screen position. Renders two overlapping dashes (white + black)
+	 * for contrast on any background — identical style to the floating-selection outline.
+	 */
+	private void drawBrushPreview(Graphics2D g2, Point screenPt) {
+		PaintEngine.Tool         tool  = callbacks.getPaintToolbar().getActiveTool();
+		PaintEngine.BrushShape   shape = callbacks.getPaintToolbar().getBrushShape();
+		int strokePx = callbacks.getPaintToolbar().getStrokeWidth();
+		double zoom  = callbacks.getZoom();
+
+		// Diameter in screen pixels; at least 2 px so the outline is always visible
+		int d = Math.max(2, (int) Math.round(strokePx * zoom));
+		int cx = screenPt.x, cy = screenPt.y;
+		int x  = cx - d / 2, y  = cy - d / 2;
+
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+		float[] dash = { 4f, 4f };
+		java.awt.Stroke dashWhite = new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 0f);
+		java.awt.Stroke dashBlack = new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 4f);
+
+		boolean round = (shape == PaintEngine.BrushShape.ROUND)
+				|| tool == PaintEngine.Tool.ERASER; // eraser always shows round
+
+		g2.setStroke(dashWhite); g2.setColor(Color.WHITE);
+		if (round) g2.drawOval(x, y, d, d); else g2.drawRect(x, y, d, d);
+
+		g2.setStroke(dashBlack); g2.setColor(Color.BLACK);
+		if (round) g2.drawOval(x, y, d, d); else g2.drawRect(x, y, d, d);
+
+		// Reset to avoid leaking stroke/AA settings
+		g2.setStroke(new BasicStroke(1f));
+		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 	}
 
 	private static final int GRID_PX = 32; // grid cell size in image pixels

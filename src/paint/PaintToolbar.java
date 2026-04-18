@@ -117,6 +117,7 @@ public class PaintToolbar extends JPanel {
     private boolean             pickingSecondary = false;
     private java.util.Map<PaintEngine.Tool, javax.swing.JToggleButton> toolButtons = new java.util.HashMap<>();
     private JToggleButton rulerBtn;
+    private JToggleButton aaBtn;
     private JSlider       wandTolSlider;
     private JLabel        wandTolLabel;
 
@@ -187,36 +188,36 @@ public class PaintToolbar extends JPanel {
         cb.onColorChanged(primaryColor, secondaryColor);
     }
 
-    // Setter für Settings-Restore
+    // Setter für Settings-Restore – aktualisieren immer auch die UI-Widgets
+
     public void setAntialiasing(boolean aa) {
         antialias = aa;
-        // Button-Zustand synchronisieren (über Callback)
+        if (aaBtn != null) aaBtn.setSelected(aa);
         cb.onAntialiasingChanged(aa);
     }
 
     public void setPrimaryColor(Color c) {
         primaryColor = c;
-        colorPrimaryPreview.setBackground(c);
+        if (colorPrimaryPreview != null) colorPrimaryPreview.setBackground(c);
         syncAlphaSlider();
         cb.onColorChanged(primaryColor, secondaryColor);
     }
 
     public void setSecondaryColor(Color c) {
         secondaryColor = c;
-        colorSecondaryPreview.setBackground(c);
+        if (colorSecondaryPreview != null) colorSecondaryPreview.setBackground(c);
         cb.onColorChanged(primaryColor, secondaryColor);
     }
 
     public void setStrokeWidth(int w) {
         strokeWidth = Math.max(1, w);
+        if (strokeSlider != null) { strokeSlider.setValue(strokeWidth); strokeLabel.setText(String.valueOf(strokeWidth)); }
         cb.onStrokeChanged(strokeWidth);
     }
 
     public void setActiveTool(String toolName) {
         try {
-            PaintEngine.Tool t = PaintEngine.Tool.valueOf(toolName);
-            activeTool = t;
-            cb.onToolChanged(activeTool);
+            setActiveTool(PaintEngine.Tool.valueOf(toolName));
         } catch (IllegalArgumentException e) {
             System.err.println("[WARN] Unbekanntes Tool: " + toolName);
         }
@@ -226,6 +227,7 @@ public class PaintToolbar extends JPanel {
         try {
             PaintEngine.FillMode m = PaintEngine.FillMode.valueOf(modeName);
             fillMode = m;
+            if (fillModeCombo != null) fillModeCombo.setSelectedIndex(m.ordinal());
         } catch (IllegalArgumentException e) {
             System.err.println("[WARN] Unbekannter FillMode: " + modeName);
         }
@@ -235,10 +237,18 @@ public class PaintToolbar extends JPanel {
         try {
             PaintEngine.BrushShape s = PaintEngine.BrushShape.valueOf(shapeName);
             brushShape = s;
+            if (brushShapeCombo != null) brushShapeCombo.setSelectedIndex(s.ordinal());
         } catch (IllegalArgumentException e) {
             System.err.println("[WARN] Unbekannte BrushShape: " + shapeName);
         }
     }
+
+    public void setWandTolerance(int tol) {
+        wandTolerance = Math.max(0, Math.min(100, tol));
+        if (wandTolSlider != null) { wandTolSlider.setValue(wandTolerance); wandTolLabel.setText(wandTolerance + "%"); }
+    }
+
+    public int getWandTolerancePct() { return wandTolerance; }
 
     public void setRulerSelected(boolean selected) { if (rulerBtn != null) rulerBtn.setSelected(selected); }
     public boolean isRulerSelected() { return rulerBtn != null && rulerBtn.isSelected(); }
@@ -448,14 +458,14 @@ public class PaintToolbar extends JPanel {
     // ── Antialiasing toggle ───────────────────────────────────────────────────
     private JPanel buildAntialias() {
         JPanel p = hBox();
-        JToggleButton btn = toggleBtn("AA", "Antialiasing ein/aus (weiche Kanten)");
-        btn.setSelected(true); // on by default
-        btn.setFont(new Font("SansSerif", Font.BOLD, 11));
-        btn.addActionListener(e -> {
-            antialias = btn.isSelected();
+        aaBtn = toggleBtn("AA", "Antialiasing ein/aus (weiche Kanten)");
+        aaBtn.setSelected(true); // on by default
+        aaBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+        aaBtn.addActionListener(e -> {
+            antialias = aaBtn.isSelected();
             cb.onAntialiasingChanged(antialias);
         });
-        p.add(btn);
+        p.add(aaBtn);
         return p;
     }
 
@@ -580,6 +590,7 @@ public class PaintToolbar extends JPanel {
             case WAND_II    -> new String[]{ "⚡", "Zauberstab II – Zielfarbe (2)"   };
             case WAND_III   -> new String[]{ "⚡", "Zauberstab III – Transparent (3)" };
             case WAND_IV    -> new String[]{ "⚡", "Zauberstab IV – Inwards Collapse (4)" };
+            case SMEAR      -> new String[]{ "~", "Verwischen (M)"  };
         };
     }
 

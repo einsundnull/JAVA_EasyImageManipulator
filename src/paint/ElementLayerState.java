@@ -181,9 +181,11 @@ public class ElementLayerState {
         if (onUndo != null) onUndo.run();
         for (Layer el : new ArrayList<>(selectedElements)) {
             if (el instanceof ImageLayer il) {
-                BufferedImage scaled = PaintEngine.scale(il.image(),
-                        Math.max(1, el.width()), Math.max(1, el.height()));
-                PaintEngine.pasteRegion(workingImage, scaled, new Point(el.x(), el.y()));
+                Graphics2D mg = workingImage.createGraphics();
+                mg.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                mg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                ElementController.drawImageLayer(mg, il);
+                mg.dispose();
             } else if (el instanceof TextLayer tl) {
                 BufferedImage rendered = renderTextLayerToImage(tl);
                 PaintEngine.pasteRegion(workingImage, rendered, new Point(el.x(), el.y()));

@@ -421,6 +421,23 @@ class CanvasCallbacksFactory {
 
 			@Override
 			public void paintDot(Point imagePt) {
+				if (c().workingImage == null || ed.paintToolbar == null) return;
+				PaintEngine.Tool tool = ed.paintToolbar.getActiveTool();
+				int sw  = ed.paintToolbar.getStrokeWidth();
+				boolean aa = ed.paintToolbar.isAntialiasing();
+				if (tool == PaintEngine.Tool.ERASER) {
+					PaintEngine.drawEraser(c().workingImage, imagePt, imagePt, sw, aa);
+				} else {
+					Color col = ed.paintToolbar.getPrimaryColor();
+					if (col.getAlpha() == 0) {
+						PaintEngine.drawEraser(c().workingImage, imagePt, imagePt, sw, aa);
+					} else {
+						PaintEngine.drawPencil(c().workingImage, imagePt, imagePt, col, sw,
+								ed.paintToolbar.getBrushShape(), aa);
+					}
+				}
+				ed.markDirty(idx);
+				if (c().canvasPanel != null) c().canvasPanel.repaint();
 			}
 
 			@Override

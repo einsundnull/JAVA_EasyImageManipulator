@@ -66,6 +66,11 @@ class LayoutController {
 		boolean isPaint = ed.ci().appMode == AppMode.PAINT;
 		ed.paintModeBtn.setSelected(isPaint);
 		ed.canvasModeBtn.setEnabled(isPaint);
+		// Toolbar-Sichtbarkeit immer mit dem Button-Zustand synchronisieren
+		if (ed.paintToolbar != null) {
+			if (isPaint) ed.paintToolbar.showToolbar();
+			else         ed.paintToolbar.hideToolbar();
+		}
 		ed.updateModeLabel();
 		ed.refreshElementPanel();
 	}

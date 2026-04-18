@@ -141,7 +141,7 @@ public class SceneSerializer {
                 boolean wrapping = "true".equals(extractField(json, "wrapping"));
 
                 if (wrapping) {
-                    return TextLayer.wrappingOf(id, text, fontName, fontSize, bold, italic, color, x, y, w, h);
+                    return TextLayer.wrappingOf(id, text, fontName, fontSize, bold, italic, color, x, y, w, h, hidden);
                 }
                 return TextLayer.of(id, text, fontName, fontSize, bold, italic, color, x, y, hidden);
             } else if ("ImageLayer".equals(type)) {
@@ -228,31 +228,32 @@ public class SceneSerializer {
 
     private static List<Point3D> extractPoints(String json) {
         List<Point3D> points = new ArrayList<>();
-        String pointsStr = extractField(json, "points");
-        if (pointsStr == null) return points;
+        // extractField kann Arrays nicht lesen – Array-Grenzen direkt suchen
+        String key = "\"points\":";
+        int keyIdx = json.indexOf(key);
+        if (keyIdx < 0) return points;
 
-        // Vereinfachtes Parsing von [{x:...,y:...,z:...}, ...]
-        String[] pointStrs = pointsStr.split("\\},");
-        for (String pStr : pointStrs) {
-            pStr = pStr.replaceAll("[\\[\\]{}]", "").trim();
-            if (pStr.isEmpty()) continue;
+        int start = json.indexOf('[', keyIdx + key.length());
+        if (start < 0) return points;
 
+        // Passendes ']' finden
+        int depth = 0, end = -1;
+        for (int i = start; i < json.length(); i++) {
+            char ch = json.charAt(i);
+            if (ch == '[') depth++;
+            else if (ch == ']') { if (--depth == 0) { end = i; break; } }
+        }
+        if (end < 0) return points;
+
+        // Einzelne Punkt-Objekte { } aufteilen (reuse splitLayers)
+        for (String pStr : splitLayers(json.substring(start + 1, end))) {
             try {
-                Double x = null, y = null, z = 0.0;
-                String[] parts = pStr.split(",");
-                for (String part : parts) {
-                    part = part.trim();
-                    if (part.startsWith("\"x\"") || part.startsWith("x")) {
-                        x = Double.parseDouble(part.substring(part.indexOf(":") + 1).trim());
-                    } else if (part.startsWith("\"y\"") || part.startsWith("y")) {
-                        y = Double.parseDouble(part.substring(part.indexOf(":") + 1).trim());
-                    } else if (part.startsWith("\"z\"") || part.startsWith("z")) {
-                        z = Double.parseDouble(part.substring(part.indexOf(":") + 1).trim());
-                    }
-                }
-                if (x != null && y != null) {
-                    points.add(new Point3D(x, y, z));
-                }
+                String xs = extractField(pStr, "x");
+                String ys = extractField(pStr, "y");
+                String zs = extractField(pStr, "z");
+                if (xs == null || ys == null) continue;
+                double z = (zs != null && !zs.isEmpty()) ? Double.parseDouble(zs) : 0.0;
+                points.add(new Point3D(Double.parseDouble(xs), Double.parseDouble(ys), z));
             } catch (Exception e) {
                 System.err.println("[WARN] Fehler beim Parsen eines Punkts: " + e.getMessage());
             }

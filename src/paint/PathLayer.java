@@ -99,7 +99,7 @@ public final class PathLayer extends Layer {
     public PathLayer withBounds(int nx, int ny, int nw, int nh) {
         double scaleX = (double) nw / Math.max(1, width);
         double scaleY = (double) nh / Math.max(1, height);
-        double scale = Math.max(scaleX, scaleY);  // Preserve aspect ratio
+        double scale = Math.min(scaleX, scaleY);  // Preserve aspect ratio: min keeps points inside bounds
 
         List<Point3D> scaledPoints = new ArrayList<>();
         for (Point3D p : points) {
@@ -215,14 +215,13 @@ public final class PathLayer extends Layer {
     }
 
     /**
-     * Checks if a screen-space point hits any path point within the given radius.
+     * Checks if an image-space point hits any path point within the given radius.
+     * Callers must convert screen coordinates to image-space (divide by zoom) before calling.
      * Returns the index of the hit point, or -1 if no hit.
      */
-    public int hitTestPoint(int screenX, int screenY, int radius) {
-        // This is a placeholder; actual implementation in CanvasPanel
-        // will need to convert screen coords to image-space coords first
+    public int hitTestPoint(int imgX, int imgY, int radius) {
         for (int i = 0; i < points.size(); i++) {
-            double dist = points.get(i).distanceTo(screenX, screenY);
+            double dist = points.get(i).distanceTo(imgX, imgY);
             if (dist <= radius) {
                 return i;
             }

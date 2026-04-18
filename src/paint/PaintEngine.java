@@ -26,7 +26,7 @@ public class PaintEngine {
     // ── Tool enum ─────────────────────────────────────────────────────────────
     public enum Tool {
         PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT, TEXT, PATH,
-        FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV
+        FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV, SMEAR
     }
 
     // ── Fill mode enum ────────────────────────────────────────────────────────
@@ -59,6 +59,54 @@ public class PaintEngine {
             g2.drawLine(from.x, from.y, to.x, to.y);
         }
         g2.dispose();
+    }
+
+    /**
+     * Smear: pushes pixels from {@code from} toward {@code to}.
+     * For each pixel in the brush circle at {@code to}, blends the corresponding
+     * source pixel from {@code from} with the existing destination pixel.
+     * Strength falls off softly from centre to edge.
+     *
+     * @param strength  0..1, how strongly the source pixel dominates (0.65 is a good default)
+     */
+    public static void smear(BufferedImage img, Point from, Point to, int strokeWidth, float strength) {
+        if (from == null || img == null) return;
+        int w = img.getWidth(), h = img.getHeight();
+        int r = Math.max(1, strokeWidth / 2);
+        int dx = to.x - from.x, dy = to.y - from.y;
+
+        // Iterate over the brush circle centred on `to`
+        for (int oy = -r; oy <= r; oy++) {
+            for (int ox = -r; ox <= r; ox++) {
+                if (ox * ox + oy * oy > r * r) continue; // circular mask
+
+                int tx = to.x + ox,   ty = to.y + oy;
+                int fx = tx   - dx,   fy = ty   - dy;   // corresponding source pixel
+
+                if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
+                if (fx < 0 || fx >= w || fy < 0 || fy >= h) continue;
+
+                int srcARGB = img.getRGB(fx, fy);
+                int dstARGB = img.getRGB(tx, ty);
+
+                // Soft radial falloff: full strength at centre, 50% at edge
+                float dist = (float) Math.sqrt(ox * ox + oy * oy) / r;
+                float blend = strength * (1f - dist * 0.5f);
+                float inv   = 1f - blend;
+
+                int sA = (srcARGB >> 24) & 0xFF, sR = (srcARGB >> 16) & 0xFF,
+                    sG = (srcARGB >>  8) & 0xFF, sB =  srcARGB        & 0xFF;
+                int dA = (dstARGB >> 24) & 0xFF, dR = (dstARGB >> 16) & 0xFF,
+                    dG = (dstARGB >>  8) & 0xFF, dB =  dstARGB        & 0xFF;
+
+                int nA = Math.min(255, (int)(sA * blend + dA * inv));
+                int nR = Math.min(255, (int)(sR * blend + dR * inv));
+                int nG = Math.min(255, (int)(sG * blend + dG * inv));
+                int nB = Math.min(255, (int)(sB * blend + dB * inv));
+
+                img.setRGB(tx, ty, (nA << 24) | (nR << 16) | (nG << 8) | nB);
+            }
+        }
     }
 
     // Draw Eraser stroke
@@ -473,43 +521,68 @@ public class PaintEngine {
      * then simplifies with Douglas-Peucker.
      * Returns an array of [x, y] pairs as int[n][2], or null if region is empty.
      */
+    /**
+     * Traces the outer contour of a boolean region mask using Java2D {@link Area}.
+     *
+     * Scanline runs of content pixels are merged into an Area, whose PathIterator
+     * produces a mathematically correct, closed, non-self-intersecting polygon —
+     * no pixel-ordering hacks, no cut-through lines between first and last vertex.
+     * The staircase outline is then simplified with closed-polygon D-P.
+     *
+     * Returns {@code null} if the region is empty.
+     */
     public static int[][] traceContour(boolean[][] region, int imgW, int imgH) {
-        // Find any boundary pixel (leftmost of topmost row)
-        int startX = -1, startY = -1;
-        outer:
+        // Build area from horizontal scanline runs
+        java.awt.geom.GeneralPath path = new java.awt.geom.GeneralPath(
+                java.awt.geom.GeneralPath.WIND_NON_ZERO);
         for (int y = 0; y < imgH; y++) {
-            for (int x = 0; x < imgW; x++) {
-                if (x < region.length && y < region[x].length && region[x][y]) {
-                    startX = x; startY = y;
-                    break outer;
+            int runStart = -1;
+            for (int x = 0; x <= imgW; x++) {
+                boolean in = x < imgW && inRegion(region, x, y, imgW, imgH);
+                if (in && runStart < 0) {
+                    runStart = x;
+                } else if (!in && runStart >= 0) {
+                    path.moveTo(runStart, y);
+                    path.lineTo(x,        y);
+                    path.lineTo(x,        y + 1);
+                    path.lineTo(runStart, y + 1);
+                    path.closePath();
+                    runStart = -1;
                 }
             }
         }
-        if (startX < 0) return null;
+        java.awt.geom.Area area = new java.awt.geom.Area(path);
+        if (area.isEmpty()) return null;
 
-        // Simple boundary trace: walk around using 8-connectivity
-        java.util.List<int[]> boundary = new java.util.ArrayList<>();
-        int[] dx = {1, 1, 0, -1, -1, -1, 0, 1};
-        int[] dy = {0, 1, 1, 1, 0, -1, -1, -1};
-        // For each boundary pixel, emit centroid of that pixel
-        // Use a simple scan-based contour instead of Moore tracing to avoid complexity
-        for (int y = 0; y < imgH; y++) {
-            for (int x = 0; x < imgW; x++) {
-                if (!inRegion(region, x, y, imgW, imgH)) continue;
-                // Boundary pixel = has at least one 4-neighbor outside region
-                if (!inRegion(region, x-1, y, imgW, imgH) || !inRegion(region, x+1, y, imgW, imgH)
-                 || !inRegion(region, x, y-1, imgW, imgH) || !inRegion(region, x, y+1, imgW, imgH)) {
-                    boundary.add(new int[]{x, y});
+        // Extract subpaths; keep the one with the most vertices (outer boundary)
+        java.util.List<java.util.List<int[]>> subpaths = new java.util.ArrayList<>();
+        java.util.List<int[]> cur = null;
+        java.awt.geom.PathIterator pi = area.getPathIterator(null);
+        float[] coords = new float[6];
+        while (!pi.isDone()) {
+            switch (pi.currentSegment(coords)) {
+                case java.awt.geom.PathIterator.SEG_MOVETO ->
+                    cur = new java.util.ArrayList<>();
+                case java.awt.geom.PathIterator.SEG_LINETO -> {
+                    if (cur != null)
+                        cur.add(new int[]{Math.round(coords[0]), Math.round(coords[1])});
+                }
+                case java.awt.geom.PathIterator.SEG_CLOSE -> {
+                    if (cur != null && cur.size() >= 3) subpaths.add(cur);
+                    cur = null;
                 }
             }
+            pi.next();
         }
-        if (boundary.isEmpty()) return null;
+        if (cur != null && cur.size() >= 3) subpaths.add(cur);
+        if (subpaths.isEmpty()) return null;
 
-        // Sort boundary pixels into a connected chain using nearest-neighbor
-        java.util.List<int[]> ordered = orderBoundary(boundary);
+        java.util.List<int[]> outer = subpaths.stream()
+                .max(java.util.Comparator.comparingInt(java.util.List::size))
+                .orElse(null);
+        if (outer == null || outer.size() < 3) return null;
 
-        // Douglas-Peucker simplification
-        return douglasPeucker(ordered, 1.5);
+        return douglasPeuckerClosed(outer, 1.5);
     }
 
     private static boolean inRegion(boolean[][] region, int x, int y, int w, int h) {
@@ -518,28 +591,44 @@ public class PaintEngine {
         return region[x][y];
     }
 
-    private static java.util.List<int[]> orderBoundary(java.util.List<int[]> pts) {
-        if (pts.size() <= 2) return pts;
-        java.util.List<int[]> ordered = new java.util.ArrayList<>();
-        boolean[] used = new boolean[pts.size()];
-        int cur = 0;
-        used[0] = true;
-        ordered.add(pts.get(0));
-        for (int i = 1; i < pts.size(); i++) {
-            int bestIdx = -1;
-            double bestDist = Double.MAX_VALUE;
-            int[] c = ordered.get(ordered.size() - 1);
-            for (int j = 0; j < pts.size(); j++) {
-                if (used[j]) continue;
-                int[] p = pts.get(j);
-                double d = Math.hypot(c[0] - p[0], c[1] - p[1]);
-                if (d < bestDist) { bestDist = d; bestIdx = j; }
+    /**
+     * Douglas-Peucker for a CLOSED polygon ring.
+     * Splits the ring at its two approximate diameter endpoints and applies
+     * open-polyline D-P independently to each half, then concatenates.
+     * This avoids the degenerate base-line that occurs when first and last
+     * are adjacent pixels (angle −π and +π from centroid).
+     */
+    private static int[][] douglasPeuckerClosed(java.util.List<int[]> pts, double epsilon) {
+        int n = pts.size();
+        if (n <= 4) return pts.stream().toArray(int[][]::new);
+
+        // Find approximate diameter: scan a sample of pairs for max distance
+        int p1 = 0, p2 = n / 2;
+        double maxD = 0;
+        int step = Math.max(1, n / 60);
+        for (int i = 0; i < n; i += step) {
+            for (int j = i + n / 4; j < i + 3 * n / 4; j++) {
+                int jj = j % n;
+                int[] a = pts.get(i), b = pts.get(jj);
+                double d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+                if (d > maxD) { maxD = d; p1 = i; p2 = jj; }
             }
-            if (bestIdx < 0) break;
-            used[bestIdx] = true;
-            ordered.add(pts.get(bestIdx));
         }
-        return ordered;
+        if (p1 > p2) { int t = p1; p1 = p2; p2 = t; }
+
+        // Two arcs: [p1..p2] and [p2..n) + [0..p1]
+        int[][] r1 = douglasPeucker(pts.subList(p1, p2 + 1), epsilon);
+
+        java.util.List<int[]> arc2 = new java.util.ArrayList<>(pts.subList(p2, n));
+        arc2.addAll(pts.subList(0, p1 + 1));
+        int[][] r2 = douglasPeucker(arc2, epsilon);
+
+        // Concatenate: r1 (all) + r2 (skip first, which == r1 last; skip last, which == r1 first)
+        int total = r1.length + Math.max(0, r2.length - 2);
+        int[][] result = new int[total][];
+        System.arraycopy(r1, 0, result, 0, r1.length);
+        for (int i = 1; i < r2.length - 1; i++) result[r1.length + i - 1] = r2[i];
+        return result;
     }
 
     private static int[][] douglasPeucker(java.util.List<int[]> pts, double epsilon) {
@@ -574,61 +663,62 @@ public class PaintEngine {
     }
 
     /**
-     * Wand IV – inwards collapse.
-     * Takes a closed freehand polygon and collapses each vertex inward (toward
-     * centroid, 1 px per step) until the pixel under the vertex is neither
-     * transparent nor matches {@code secondaryColor} within the given tolerance.
+     * Wand IV – pixel-level inwards collapse.
      *
-     * @param pts          polygon vertices in image-space
+     * Rasterizes the drawn polygon, then marks every pixel inside it that is
+     * neither transparent nor matches {@code secondaryColor} as "content".
+     * This spreads at pixel resolution from every boundary point simultaneously
+     * (wavefront semantics) so there are no jumps.
+     *
+     * Returns a boolean[w][h] content mask suitable for {@link #traceContour},
+     * or {@code null} if no content was found inside the polygon.
+     *
+     * @param polyXs       polygon X coordinates in image-space
+     * @param polyYs       polygon Y coordinates in image-space
      * @param img          the canvas image
-     * @param secondaryColor the "pass-through" color (treated like transparency)
-     * @param tolerancePct tolerance 0-100 % (how closely a pixel must match
-     *                     secondaryColor to be treated as "pass-through")
-     * @return new list of collapsed image-space vertices
+     * @param secondaryColor pixels matching this color are treated as pass-through
+     * @param tolerancePct tolerance 0-100 % for secondary-color matching
      */
-    public static java.util.List<java.awt.Point> collapsePathInward(
-            java.util.List<java.awt.Point> pts, java.awt.image.BufferedImage img,
+    public static boolean[][] collapseInward(int[] polyXs, int[] polyYs,
+            java.awt.image.BufferedImage img,
             java.awt.Color secondaryColor, int tolerancePct) {
 
-        if (pts == null || pts.size() < 3) return pts;
-        int w = img.getWidth(), h = img.getHeight();
-        int secRGB   = secondaryColor.getRGB();
-        int tolAbs   = tolerancePct * 255 / 100;
+        int w   = img.getWidth(), h = img.getHeight();
+        int secRGB = secondaryColor.getRGB();
+        int tolAbs = tolerancePct * 255 / 100;
 
-        // Centroid used as "inward" direction reference
-        double cx = 0, cy = 0;
-        for (java.awt.Point p : pts) { cx += p.x; cy += p.y; }
-        cx /= pts.size(); cy /= pts.size();
+        boolean[][] inside  = rasterizePolygonMask(polyXs, polyYs, w, h);
+        boolean[][] content = new boolean[w][h];
+        boolean anyContent  = false;
 
-        java.util.List<java.awt.Point> result = new java.util.ArrayList<>();
-        for (java.awt.Point p : pts) {
-            double dx = cx - p.x, dy = cy - p.y;
-            double len = Math.sqrt(dx * dx + dy * dy);
-            if (len < 0.5) { result.add(p); continue; }
-            dx /= len; dy /= len;  // unit vector toward centroid
-
-            double nx = p.x, ny = p.y;
-            java.awt.Point best = p;   // last "pass-through" position
-            while (true) {
-                nx += dx; ny += dy;
-                int ix = (int) Math.round(nx), iy = (int) Math.round(ny);
-                // Stop at image boundary or centroid overshoot
-                if (ix < 0 || ix >= w || iy < 0 || iy >= h) break;
-                if (Math.hypot(ix - cx, iy - cy) < 1.0) break; // reached centroid
-                int rgb   = img.getRGB(ix, iy);
-                int alpha = (rgb >>> 24) & 0xFF;
-                boolean isTransparent   = alpha == 0;
-                boolean isSecondaryLike = alpha > 0 && colorsMatch(rgb, secRGB, tolAbs);
-                if (isTransparent || isSecondaryLike) {
-                    best = new java.awt.Point(ix, iy);  // still pass-through, keep moving
-                } else {
-                    best = new java.awt.Point(ix, iy);  // stop at the first blocking pixel
-                    break;
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                if (!inside[x][y]) continue;
+                int  rgb   = img.getRGB(x, y);
+                int  alpha = (rgb >>> 24) & 0xFF;
+                boolean passThrough = alpha == 0 || colorsMatch(rgb, secRGB, tolAbs);
+                if (!passThrough) {
+                    content[x][y] = true;
+                    anyContent     = true;
                 }
             }
-            result.add(best);
         }
-        return result;
+        return anyContent ? content : null;
+    }
+
+    /** Fills the given polygon into a boolean mask using Java2D. */
+    private static boolean[][] rasterizePolygonMask(int[] xs, int[] ys, int w, int h) {
+        java.awt.image.BufferedImage tmp =
+                new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2 = tmp.createGraphics();
+        g2.setColor(java.awt.Color.WHITE);
+        g2.fillPolygon(xs, ys, xs.length);
+        g2.dispose();
+        boolean[][] mask = new boolean[w][h];
+        for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+                mask[x][y] = (tmp.getRGB(x, y) & 0xFF) > 128;
+        return mask;
     }
 
     /**

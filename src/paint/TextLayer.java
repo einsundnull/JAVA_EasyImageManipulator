@@ -78,7 +78,9 @@ public final class TextLayer extends Layer {
 
         Font font = new Font(fn, style, fs);
         BufferedImage dummy = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-        FontMetrics fm = dummy.createGraphics().getFontMetrics(font);
+        java.awt.Graphics2D dummyG = dummy.createGraphics();
+        FontMetrics fm = dummyG.getFontMetrics(font);
+        dummyG.dispose();
         String[] lines = txt.split("\n", -1);
         int w = 1;
         for (String line : lines) w = Math.max(w, fm.stringWidth(line));
@@ -94,6 +96,12 @@ public final class TextLayer extends Layer {
     public static TextLayer wrappingOf(int id, String text, String fontName, int fontSize,
                                        boolean bold, boolean italic, Color color,
                                        int x, int y, int w, int h) {
+        return wrappingOf(id, text, fontName, fontSize, bold, italic, color, x, y, w, h, false);
+    }
+
+    public static TextLayer wrappingOf(int id, String text, String fontName, int fontSize,
+                                       boolean bold, boolean italic, Color color,
+                                       int x, int y, int w, int h, boolean hidden) {
         String fn  = fontName != null ? fontName : "SansSerif";
         int    fs  = Math.max(6, fontSize);
         Color  col = color != null ? color : Color.BLACK;
@@ -101,7 +109,7 @@ public final class TextLayer extends Layer {
         return new TextLayer(id, txt, fn, fs, bold, italic, col, x, y,
                 Math.max(TEXT_PADDING * 2 + 1, w),
                 Math.max(TEXT_PADDING * 2 + 1, h),
-                false, true);
+                hidden, true);
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────

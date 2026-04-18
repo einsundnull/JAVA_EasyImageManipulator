@@ -81,11 +81,13 @@ public class SceneFileWriter {
                 TextWriter.writeConfigFile(textFile.getAbsolutePath(), tl);
                 textRefs.append("-").append(textFileName).append("\n");
             } else if (layer instanceof PathLayer pl) {
-                // Path: speichere als separate .txt Datei
+                // TODO: PathWriter implementieren – Eintrag wird erst geschrieben wenn Datei existiert
                 String pathFileName = "path_" + pl.id() + ".txt";
                 File pathFile = new File(pathsDir, pathFileName);
-                // TODO: PathWriter.writeConfigFile(pathFile.getAbsolutePath(), pl);
-                pathRefs.append("-").append(pathFileName).append("\n");
+                // PathWriter.writeConfigFile(pathFile.getAbsolutePath(), pl);
+                if (pathFile.exists()) {
+                    pathRefs.append("-").append(pathFileName).append("\n");
+                }
             }
         }
 

@@ -1,6 +1,8 @@
 package paint;
 
+import java.awt.Graphics2D;
 import java.awt.Point;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.List;
@@ -65,17 +67,22 @@ class ElementLayerCallbacksFactory {
 			public void burnElement(Layer el) {
 				if (c().workingImage == null)
 					return;
-				// Tile holds a snapshot — look up live layer so position/scale are current
+				// Tile holds a snapshot — look up live layer so position/scale/rotation are current
 				Layer live = c().activeElements.stream().filter(e -> e.id() == el.id()).findFirst().orElse(el);
 				ed.pushUndo();
-				BufferedImage imgToBurn;
-				if (live instanceof TextLayer tl) {
-					imgToBurn = ed.renderTextLayerToImage(tl);
+				Graphics2D mg = c().workingImage.createGraphics();
+				mg.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+				mg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+				if (live instanceof ImageLayer il) {
+					ElementController.drawImageLayer(mg, il);
+					mg.dispose();
 				} else {
-					ImageLayer il = (ImageLayer) live;
-					imgToBurn = PaintEngine.scale(il.image(), Math.max(1, live.width()), Math.max(1, live.height()));
+					mg.dispose();
+					if (live instanceof TextLayer tl) {
+						BufferedImage rendered = ed.renderTextLayerToImage(tl);
+						PaintEngine.pasteRegion(c().workingImage, rendered, new Point(live.x(), live.y()));
+					}
 				}
-				PaintEngine.pasteRegion(c().workingImage, imgToBurn, new Point(live.x(), live.y()));
 				c().activeElements.removeIf(e -> e.id() == el.id());
 				c().selectedElements.removeIf(e -> e.id() == el.id());
 				ed.markDirty();

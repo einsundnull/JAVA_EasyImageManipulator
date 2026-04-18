@@ -122,15 +122,6 @@ public class GameSceneReader {
                 + " – " + data.layers.size() + " Layer, Canvas " + data.canvasW + "×" + data.canvasH
                 + (data.backgroundImage != null ? ", Background gesetzt" : ", kein Background"));
 
-        // Manifest auto-erstellen wenn noch keines vorhanden
-        if (!manifest.exists()) {
-            try {
-                GameSceneWriter.writeManifest(sceneRoot, sceneName, data.layers, data.canvasW, data.canvasH);
-            } catch (IOException e) {
-                System.err.println("[GameSceneReader] Manifest konnte nicht erstellt werden: " + e.getMessage());
-            }
-        }
-
         return data;
     }
 

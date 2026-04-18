@@ -29,6 +29,7 @@ public class AppSettings {
     private String fillMode = "SOLID";
     private String brushShape = "ROUND";
     private String activeTool = "PENCIL";
+    private int wandTolerance = 20;
 
     // Text-Tool
     private String fontName = "SansSerif";
@@ -134,6 +135,7 @@ public class AppSettings {
         if (data.containsKey("fillMode")) fillMode = data.get("fillMode");
         if (data.containsKey("brushShape")) brushShape = data.get("brushShape");
         if (data.containsKey("activeTool")) activeTool = data.get("activeTool");
+        if (data.containsKey("wandTolerance")) wandTolerance = parseInt(data.get("wandTolerance"));
 
         if (data.containsKey("fontName")) fontName = data.get("fontName");
         if (data.containsKey("fontSize")) fontSize = parseInt(data.get("fontSize"));
@@ -228,6 +230,7 @@ public class AppSettings {
             writeField(writer, "fillMode", fillMode, true);
             writeField(writer, "brushShape", brushShape, true);
             writeField(writer, "activeTool", activeTool, true);
+            writeField(writer, "wandTolerance", wandTolerance, true);
 
             writeField(writer, "fontName", fontName, true);
             writeField(writer, "fontSize", fontSize, true);
@@ -337,6 +340,9 @@ public class AppSettings {
 
     public String getActiveTool() { return activeTool; }
     public void setActiveTool(String t) { activeTool = t; }
+
+    public int getWandTolerance() { return wandTolerance; }
+    public void setWandTolerance(int t) { wandTolerance = t; }
 
     public String getFontName() { return fontName; }
     public void setFontName(String n) { fontName = n; }

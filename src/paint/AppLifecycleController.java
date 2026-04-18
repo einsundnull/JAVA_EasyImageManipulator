@@ -116,6 +116,7 @@ class AppLifecycleController {
 				ed.paintToolbar.setSecondaryColor(new Color(settings.getSecondaryColor(), true));
 				ed.paintToolbar.setStrokeWidth(settings.getStrokeWidth());
 				ed.paintToolbar.setAntialiasing(settings.isAntialias());
+				ed.paintToolbar.setWandTolerance(settings.getWandTolerance());
 				try {
 					ed.paintToolbar.setFillMode(settings.getFillMode());
 					ed.paintToolbar.setBrushShape(settings.getBrushShape());
@@ -177,6 +178,7 @@ class AppLifecycleController {
 				settings.setSecondaryColor(ed.paintToolbar.getSecondaryColor().getRGB());
 				settings.setStrokeWidth(ed.paintToolbar.getStrokeWidth());
 				settings.setAntialias(ed.paintToolbar.isAntialiasing());
+				settings.setWandTolerance(ed.paintToolbar.getWandTolerancePct());
 				if (ed.paintToolbar.getActiveTool() != null)
 					settings.setActiveTool(ed.paintToolbar.getActiveTool().toString());
 				settings.setFillMode(ed.paintToolbar.getFillMode().toString());
