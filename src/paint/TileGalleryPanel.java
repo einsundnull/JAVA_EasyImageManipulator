@@ -121,6 +121,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     private       File            activeFile      = null;
     private final Runnable[]      onHeaderClickRef  = {null};
     private final Runnable[]      onQuickOpenRef    = {null};
+    private java.util.function.Supplier<File> currentBookDirSupplier = null;
     private       java.util.Set<File> dirtyFiles = new java.util.HashSet<>();
     private       boolean         showAll = false;  // Toggle: false = Only, true = All
     private       File            linkedScene = null;  // Scene to filter by when in "Only" mode
@@ -338,6 +339,10 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
     /** Adds a "+" button to the gallery header that calls {@code r} when clicked. */
     public void setOnAdd(Runnable r) { addAddButton(sidebarHeader, r); }
+
+    /** Supplies the active book directory for this pages panel (null if no book selected). */
+    public void setCurrentBookDirSupplier(java.util.function.Supplier<File> s) { currentBookDirSupplier = s; }
+    public File getCurrentBookDir() { return currentBookDirSupplier != null ? currentBookDirSupplier.get() : null; }
 
     public void setFiles(List<File> files, File active) {
         activeFile = active;

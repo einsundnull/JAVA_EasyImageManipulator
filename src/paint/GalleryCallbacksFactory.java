@@ -307,6 +307,7 @@ class GalleryCallbacksFactory {
 		pagesPanel.setOnAdd(() -> ed.bookController.showNewPageDialog(null, currentBook[0],
 				() -> javax.swing.SwingUtilities.invokeLater(
 						() -> pagesPanel.setFiles(BookController.listPages(currentBook[0]), null))));
+		pagesPanel.setCurrentBookDirSupplier(() -> currentBook[0]);
 		pagesPanel.setVisible(false);
 
 		// ── List panel ────────────────────────────────────────────────────────

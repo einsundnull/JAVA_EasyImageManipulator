@@ -38,7 +38,8 @@ class ElementController {
 	 */
 	static BufferedImage renderTextLayerToImage(TextLayer tl) {
 		int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
-		Font font = new Font(tl.fontName(), style, Math.max(6, tl.fontSize()));
+		int pixelSize = Math.max(6, (int) Math.round(tl.fontSize() * 96.0 / 72.0));
+		Font font = new Font(tl.fontName(), style, pixelSize);
 		BufferedImage dummy = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
 		FontMetrics fm = dummy.createGraphics().getFontMetrics(font);
 

@@ -42,6 +42,18 @@ class NewFileController {
 	 * The created file is assigned to that canvas; the view switches to it.
 	 */
 	void doNewBitmapForCanvas(int idx) {
+		// If a book's pages panel is active and has a book selected → create a new page instead
+		TileGalleryPanel pagesPanel = idx == 0 ? ed.bookPagesPanel : ed.bookPagesPanel2;
+		if (pagesPanel != null && pagesPanel.isVisible()) {
+			File bookDir = pagesPanel.getCurrentBookDir();
+			if (bookDir != null) {
+				ed.bookController.showNewPageDialog(null, bookDir, () ->
+						javax.swing.SwingUtilities.invokeLater(() ->
+								pagesPanel.setFiles(BookController.listPages(bookDir), null)));
+				return;
+			}
+		}
+
 		NewImageDialog dlg = new NewImageDialog(ed);
 		NewImageDialog.Result res = dlg.showAndGet();
 		if (res == null) return;
