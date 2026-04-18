@@ -407,6 +407,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	void showQuickOpenDialog()                                     { quickOpenController.show(); }
 	void showQuickOpenDialog(int canvasIdx)                        { quickOpenController.show(canvasIdx); }
 	void showQuickOpenDialog(int canvasIdx, String initialCategory){ quickOpenController.show(canvasIdx, initialCategory); }
+	void showQuickOpenDialogForGallery2(int canvasIdx, String cat) { quickOpenController.showForGallery2(canvasIdx, cat); }
 
 	// ── Dialogs → EditorDialogs / UIComponentFactory ──────────────────────────
 	void showErrorDialog(String title, String message)             { editorDialogs.showErrorDialog(title, message); }

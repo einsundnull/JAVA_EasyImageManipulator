@@ -501,6 +501,10 @@ class UIBuilder {
 		// Header click reloads the active file for panels whose tiles load into canvas
 		ed.bookPagesPanel .setOnHeaderClick(() -> { File f = ed.bookPagesPanel .getActiveFile(); if (f != null) ed.loadFile(f, 0); });
 		ed.bookPagesPanel2.setOnHeaderClick(() -> { File f = ed.bookPagesPanel2.getActiveFile(); if (f != null) ed.loadFile(f, 1); });
+		ed.bookListPanel  .setOnQuickOpen(() -> ed.showQuickOpenDialog(0, LastProjectsManager.CAT_BOOKS));
+		ed.bookListPanel2 .setOnQuickOpen(() -> ed.showQuickOpenDialog(1, LastProjectsManager.CAT_BOOKS));
+		ed.bookPagesPanel .setOnQuickOpen(() -> ed.showQuickOpenDialog(0, LastProjectsManager.CAT_BOOKS));
+		ed.bookPagesPanel2.setOnQuickOpen(() -> ed.showQuickOpenDialog(1, LastProjectsManager.CAT_BOOKS));
 
 		ed.galleryWrapper.addComponentListener(new ComponentAdapter() {
 			@Override
@@ -683,6 +687,14 @@ class UIBuilder {
 			java.io.File f = c.tileGallery.getActiveFile();
 			if (f != null) ed.loadFile(f, idx);
 		});
+		c.tileGallery.setOnQuickOpen(() -> ed.showQuickOpenDialog(idx, LastProjectsManager.CAT_IMAGES));
+		c.tileGallery.setOnAddList(() -> {
+			boolean show = !c.tileGallery2.isVisible();
+			c.tileGallery2.setVisible(show);
+			javax.swing.JToggleButton btn2 = idx == 0 ? ed.filmstripBtn2 : ed.secondGalleryBtn2;
+			if (btn2 != null) { btn2.setVisible(show); btn2.setSelected(show); }
+			ed.updateLayoutVisibility();
+		});
 		c.tileGallery.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
@@ -724,6 +736,7 @@ class UIBuilder {
 			java.io.File f = c.tileGallery2.getActiveFile();
 			if (f != null) ed.loadFileIntoGallery2(f, idx);
 		});
+		c.tileGallery2.setOnQuickOpen(() -> ed.showQuickOpenDialogForGallery2(idx, LastProjectsManager.CAT_IMAGES));
 		c.tileGallery2.addMouseListener(new MouseAdapter() {
 			@Override public void mousePressed(MouseEvent e) {
 				if (ed.activeCanvasIndex != idx)
@@ -766,6 +779,7 @@ class UIBuilder {
 		});
 		c.scenesPanel.setOnAdd(() -> NewFolderDialog.show(ed,
 				NewFolderDialog.FolderType.GAME, null, () -> ed.refreshSceneFiles(idx)));
+		c.scenesPanel.setOnQuickOpen(() -> ed.showQuickOpenDialog(idx, LastProjectsManager.CAT_SCENES));
 		c.scenesPanel.setFileDropOverride(files -> ed.createSceneFromDrop(files, idx));
 		c.scenesPanel.addMouseListener(new MouseAdapter() {
 			@Override

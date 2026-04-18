@@ -158,9 +158,9 @@ public abstract class BaseSidebarPanel extends JPanel {
             eastPanel.setBackground(new Color(42, 42, 42));
             eastPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
 
-            // All/Only toggle button using link-alt icon
+            // All/Only toggle button — constructed but NOT added to the panel
             if (onAllOnlyToggle != null) {
-                final boolean[] isAll = {false};  // Default: Only
+                final boolean[] isAll = {false};
                 ImageIcon icon = loadIcon("link-alt.png", 14);
                 JLabel toggleBtn = new JLabel(icon);
                 toggleBtn.setForeground(AppColors.TEXT_MUTED);
@@ -171,13 +171,12 @@ public abstract class BaseSidebarPanel extends JPanel {
                     @Override public void mouseClicked(MouseEvent e) {
                         isAll[0] = !isAll[0];
                         onAllOnlyToggle.accept(isAll[0]);
-                        // Update icon opacity to show state
                         toggleBtn.setForeground(isAll[0] ? Color.WHITE : AppColors.TEXT_MUTED);
                     }
                     @Override public void mouseEntered(MouseEvent e) { toggleBtn.setForeground(Color.WHITE); }
                     @Override public void mouseExited (MouseEvent e) { toggleBtn.setForeground(isAll[0] ? Color.WHITE : AppColors.TEXT_MUTED); }
                 });
-                eastPanel.add(toggleBtn);
+                // intentionally not added: eastPanel.add(toggleBtn)
             }
 
             if (onRefresh != null) {
@@ -241,6 +240,45 @@ public abstract class BaseSidebarPanel extends JPanel {
             @Override public void mouseExited (MouseEvent e) { addBtn.setForeground(AppColors.TEXT_MUTED); }
         });
         east.add(addBtn, 0);
+        east.revalidate();
+        east.repaint();
+    }
+
+    /** Adds a 📁 quick-open button to the left of the east-panel button row. */
+    protected static void addQuickOpenButton(JPanel header, Runnable onOpen) {
+        Object prop = header.getClientProperty("eastPanel");
+        if (!(prop instanceof JPanel east)) return;
+        JLabel btn = new JLabel("📁");
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        btn.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setToolTipText("Schnellauswahl öffnen");
+        btn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { onOpen.run(); }
+            @Override public void mouseEntered(MouseEvent e) { btn.setFont(btn.getFont().deriveFont(Font.BOLD)); }
+            @Override public void mouseExited (MouseEvent e) { btn.setFont(btn.getFont().deriveFont(Font.PLAIN)); }
+        });
+        east.add(btn, 0);
+        east.revalidate();
+        east.repaint();
+    }
+
+    /** Adds an extra-list (⊞) button to the left of the east-panel button row. */
+    protected static void addExtraListButton(JPanel header, Runnable onAddList) {
+        Object prop = header.getClientProperty("eastPanel");
+        if (!(prop instanceof JPanel east)) return;
+        JLabel btn = new JLabel("⊞");
+        btn.setForeground(AppColors.TEXT_MUTED);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        btn.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setToolTipText("Zusätzliche Liste erstellen");
+        btn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { onAddList.run(); }
+            @Override public void mouseEntered(MouseEvent e) { btn.setForeground(Color.WHITE); }
+            @Override public void mouseExited (MouseEvent e) { btn.setForeground(AppColors.TEXT_MUTED); }
+        });
+        east.add(btn, 0);
         east.revalidate();
         east.repaint();
     }

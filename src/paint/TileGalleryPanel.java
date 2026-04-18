@@ -119,7 +119,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     private final List<File>      selectedImages = new ArrayList<>();
     private       boolean         multiSelectMode = false;
     private       File            activeFile      = null;
-    private final Runnable[]      onHeaderClickRef = {null};
+    private final Runnable[]      onHeaderClickRef  = {null};
+    private final Runnable[]      onQuickOpenRef    = {null};
     private       java.util.Set<File> dirtyFiles = new java.util.HashSet<>();
     private       boolean         showAll = false;  // Toggle: false = Only, true = All
     private       File            linkedScene = null;  // Scene to filter by when in "Only" mode
@@ -174,6 +175,9 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             if (onActivatedRef[0] != null) onActivatedRef[0].run();
             if (onHeaderClickRef[0] != null && activeFile != null) onHeaderClickRef[0].run();
         });
+
+        // ── 📁 quick-open button in header ────────────────────────────────────
+        addQuickOpenButton(sidebarHeader, () -> { if (onQuickOpenRef[0] != null) onQuickOpenRef[0].run(); });
 
         // ── Select-All / Deselect-All (initially hidden) ──────────────────────
         actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
@@ -318,6 +322,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
     /** Called when the user clicks the gallery header title — typically re-shows the active file. */
     public void setOnHeaderClick(Runnable r) { onHeaderClickRef[0] = r; }
+    public void setOnQuickOpen(Runnable r)   { onQuickOpenRef[0] = r; }
+    public void setOnAddList(Runnable r)     { addExtraListButton(sidebarHeader, r); }
 
     public void setHighlighted(boolean h) {
         if (highlighted == h) return;

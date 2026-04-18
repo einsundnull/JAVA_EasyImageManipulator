@@ -28,6 +28,20 @@ class QuickOpenController {
 		show(canvasIdx, LastProjectsManager.CAT_IMAGES);
 	}
 
+	/** Show quick open dialog and load the chosen path into the secondary gallery (gallery2). */
+	void showForGallery2(int canvasIdx, String initialCategory) {
+		try {
+			Map<String, List<String>> recent = LastProjectsManager.loadAll();
+			StartupDialog dlg = new StartupDialog(ed, recent, StartupDialog.Mode.QUICK_OPEN, canvasIdx, initialCategory);
+			dlg.setVisible(true);
+			File chosen = dlg.getSelectedPath();
+			if (chosen == null) return;
+			ed.fileLoader.indexDirectory2(chosen, canvasIdx);
+		} catch (IOException ex) {
+			ed.showErrorDialog("Fehler", "Schnellauswahl konnte nicht geöffnet werden:\n" + ex.getMessage());
+		}
+	}
+
 	/** Show quick open dialog with a specific initial category. */
 	void show(int canvasIdx, String initialCategory) {
 		try {
