@@ -89,7 +89,7 @@ public final class PathLayer extends Layer {
     public int pointCount()           { return points.size(); }
     public BufferedImage image()      { return image; }
     public boolean isClosed()         { return closed; }
-    public boolean isHidden()         { return hidden; }
+    @Override public boolean isHidden() { return hidden; }
     @Override public boolean isMouseTransparent() { return mouseTransparent; }
 
     // ── Mutations (return new instances) ──────────────────────────────────────

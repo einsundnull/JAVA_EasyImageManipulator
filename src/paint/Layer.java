@@ -51,6 +51,14 @@ public abstract class Layer {
     /** Returns true when the layer is invisible to mouse hit-testing (tool-transparent). */
     public boolean isMouseTransparent() { return false; }
 
+    // ── Visibility ────────────────────────────────────────────────────────────
+    /**
+     * Returns true when the layer should be skipped from rendering/serialization.
+     * Subclasses that track per-instance visibility (ImageLayer, TextLayer, PathLayer)
+     * override this; layers without a hide flag default to visible.
+     */
+    public boolean isHidden() { return false; }
+
     // ── Convenience ───────────────────────────────────────────────────────────
 
     /** Human-readable display name for the layer panel. */

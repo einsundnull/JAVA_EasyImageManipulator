@@ -128,7 +128,7 @@ public final class TextLayer extends Layer {
     public boolean fontBold()   { return fontBold;  }
     public boolean fontItalic() { return fontItalic; }
     public Color   fontColor()  { return fontColor; }
-    public boolean isHidden()   { return hidden;    }
+    @Override public boolean isHidden() { return hidden; }
     public boolean isWrapping() { return wrapping;  }
     @Override public boolean isMouseTransparent() { return mouseTransparent; }
 

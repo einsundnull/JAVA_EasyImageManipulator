@@ -55,7 +55,7 @@ public class ImageLayer extends Layer {
     public BufferedImage image() { return image; }
     public double rotationAngle() { return rotationAngle; }
     public int opacity() { return opacity; }
-    public boolean isHidden() { return hidden; }
+    @Override public boolean isHidden() { return hidden; }
     @Override public boolean isMouseTransparent() { return mouseTransparent; }
 
     // ── Mutations (return new instances) ──────────────────────────────────────

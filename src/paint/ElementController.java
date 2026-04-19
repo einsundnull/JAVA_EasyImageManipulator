@@ -41,7 +41,9 @@ class ElementController {
 		int pixelSize = Math.max(6, (int) Math.round(tl.fontSize() * 96.0 / 72.0));
 		Font font = new Font(tl.fontName(), style, pixelSize);
 		BufferedImage dummy = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-		FontMetrics fm = dummy.createGraphics().getFontMetrics(font);
+		java.awt.Graphics2D dg = dummy.createGraphics();
+		FontMetrics fm;
+		try { fm = dg.getFontMetrics(font); } finally { dg.dispose(); }
 
 		java.util.List<String> lines;
 		int imgW, imgH;

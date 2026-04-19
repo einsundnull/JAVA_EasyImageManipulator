@@ -297,7 +297,8 @@ class ClipboardController {
 				Image img = (Image) t.getTransferData(DataFlavor.imageFlavor);
 				BufferedImage bi = new BufferedImage(img.getWidth(null), img.getHeight(null),
 						BufferedImage.TYPE_INT_ARGB);
-				bi.createGraphics().drawImage(img, 0, 0, null);
+				java.awt.Graphics2D g = bi.createGraphics();
+				try { g.drawImage(img, 0, 0, null); } finally { g.dispose(); }
 				return bi;
 			}
 		} catch (Exception ignored) {

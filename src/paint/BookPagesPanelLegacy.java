@@ -257,7 +257,8 @@ class BookPagesPanelLegacy extends BaseSidebarPanel {
 				if (img instanceof BufferedImage bi) return bi;
 				BufferedImage bi = new BufferedImage(img.getWidth(null), img.getHeight(null),
 						BufferedImage.TYPE_INT_ARGB);
-				bi.createGraphics().drawImage(img, 0, 0, null);
+				java.awt.Graphics2D g = bi.createGraphics();
+				try { g.drawImage(img, 0, 0, null); } finally { g.dispose(); }
 				return bi;
 			}
 			// File list (external drag from Explorer or TileGallery)

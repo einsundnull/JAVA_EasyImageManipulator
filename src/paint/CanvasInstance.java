@@ -7,10 +7,9 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.swing.JButton;
 import javax.swing.JLayeredPane;
@@ -38,10 +37,12 @@ public class CanvasInstance {
     // ── Undo/Redo ─────────────────────────────────────────────────────────────
     public final ArrayDeque<BufferedImage>   undoStack  = new ArrayDeque<>();
     public final ArrayDeque<BufferedImage>   redoStack  = new ArrayDeque<>();
-    public final Map<File, CanvasFileState>  fileCache  = new LinkedHashMap<>();
+    // Thread-safe: PreloadController.doInBackground() writes from a worker thread
+    // while the EDT reads via FileLoadController.
+    public final Map<File, CanvasFileState>  fileCache  = new ConcurrentHashMap<>();
 
     // ── Preload Cache (for hover/browsing optimization) ───────────────────────
-    public final Map<File, PreloadedFileState> preloadCache = new HashMap<>();
+    public final Map<File, PreloadedFileState> preloadCache = new ConcurrentHashMap<>();
 
     // ── Layers / Elements ─────────────────────────────────────────────────────
     public List<Layer>    activeElements   = new ArrayList<>();

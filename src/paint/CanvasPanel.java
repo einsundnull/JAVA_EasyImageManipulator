@@ -51,6 +51,17 @@ public class CanvasPanel extends JPanel {
 	private double  rotDragStartAngle  = 0.0;  // atan2 angle at press
 	private double  rotDragBaseAngle   = 0.0;  // element.rotationAngle at press
 
+	// ── Deferred undo ─────────────────────────────────────────────────────────
+	/**
+	 * True while a drag-start was registered (snap-drag, rotation) but no actual
+	 * mouse movement has happened yet. The undo snapshot is pushed on the first
+	 * real move, avoiding stack pollution when the user only clicks without dragging.
+	 */
+	private boolean pendingUndo = false;
+	private void commitPendingUndo() {
+		if (pendingUndo) { callbacks.pushUndo(); pendingUndo = false; }
+	}
+
 	// ── Right-click snap-drag state ───────────────────────────────────────────
 	private boolean isSnapDragging = false;
 	private static final int SNAP_DIST = 12;  // image-space pixels
@@ -229,6 +240,8 @@ public class CanvasPanel extends JPanel {
 		// Hover state
 		hoveredElementId = -1;
 		hoveredHandleIndex = -1;
+		// Discard any pending undo carried over from a previous image
+		pendingUndo = false;
 	}
 
 	private void setupMouseHandling() {
@@ -273,7 +286,7 @@ public class CanvasPanel extends JPanel {
 							}
 							isSnapDragging = true;
 							elemLastImgPt = imgPt;
-							callbacks.pushUndo();
+							pendingUndo = true;  // commit on first real move
 						}
 						return;
 					}
@@ -336,7 +349,7 @@ public class CanvasPanel extends JPanel {
 						double cy = elemRectSc.y + elemRectSc.height / 2.0;
 						rotDragStartAngle = Math.toDegrees(Math.atan2(e.getY() - cy, e.getX() - cx));
 						rotDragBaseAngle = il.rotationAngle();
-						callbacks.pushUndo();
+						pendingUndo = true;  // commit on first real move
 						return;
 					}
 				}
@@ -729,10 +742,13 @@ public class CanvasPanel extends JPanel {
 						double cx = sr.x + sr.width / 2.0;
 						double cy = sr.y + sr.height / 2.0;
 						double currentAngle = Math.toDegrees(Math.atan2(e.getY() - cy, e.getX() - cx));
-						double newAngle = rotDragBaseAngle + (currentAngle - rotDragStartAngle);
-						callbacks.updateSelectedElement(il.withRotation(newAngle));
-						callbacks.onElementTransformed();
-						repaint();
+						double delta = currentAngle - rotDragStartAngle;
+						if (delta != 0) {
+							commitPendingUndo();
+							callbacks.updateSelectedElement(il.withRotation(rotDragBaseAngle + delta));
+							callbacks.onElementTransformed();
+							repaint();
+						}
 					}
 					return;
 				}
@@ -747,6 +763,7 @@ public class CanvasPanel extends JPanel {
 						int dx = imgPt.x - elemLastImgPt.x;
 						int dy = imgPt.y - elemLastImgPt.y;
 						if (dx != 0 || dy != 0) {
+							commitPendingUndo();
 							callbacks.moveSelectedElements(dx, dy);
 							elemLastImgPt = imgPt;
 							// Get the primary element and apply snap
@@ -977,6 +994,8 @@ public class CanvasPanel extends JPanel {
 				elemLastImgPt = null;
 				textMouseDragSel = false;
 				rightClickStroke = false;
+				// Discard any pending undo that was never committed (click without drag)
+				pendingUndo = false;
 
 				// Finalize rotation drag
 				if (isDraggingRotation) {
@@ -2474,9 +2493,7 @@ public class CanvasPanel extends JPanel {
 				if (editingTextElementId >= 0 && el.id() == editingTextElementId) continue;
 
 				// Skip hidden layers
-				if (el instanceof ImageLayer il && il.isHidden()) continue;
-				if (el instanceof TextLayer tl && tl.isHidden()) continue;
-				if (el instanceof PathLayer pl && pl.isHidden()) continue;
+				if (el.isHidden()) continue;
 
 				Rectangle sr = callbacks.elemRectScreen(el);
 

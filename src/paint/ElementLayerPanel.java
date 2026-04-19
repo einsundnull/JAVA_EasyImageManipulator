@@ -510,10 +510,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             }
 
             // ── Cyan visibility button (👁) – for all layers ────────────────────
-            boolean hidden = false;
-            if (layer instanceof ImageLayer il) hidden = il.isHidden();
-            else if (layer instanceof TextLayer tl) hidden = tl.isHidden();
-            else if (layer instanceof PathLayer pl) hidden = pl.isHidden();
+            boolean hidden = layer.isHidden();
 
             vis = new JLabel(hidden ? "🚫" : "👁", JLabel.CENTER);
             vis.setForeground(hidden ? new Color(180, 60, 60) : new Color(60, 180, 180));
@@ -531,18 +528,14 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                     cb.toggleElementVisibility(layer);
                 }
                 @Override public void mouseEntered(MouseEvent e) {
-                    boolean h = layer instanceof ImageLayer il && il.isHidden() ||
-                               layer instanceof TextLayer tl && tl.isHidden() ||
-                               layer instanceof PathLayer pl && pl.isHidden();
+                    boolean h = layer.isHidden();
                     vis.setBackground(h ? new Color(140, 40, 40) : new Color(40, 140, 140));
                     vis.setForeground(Color.WHITE);
                     vis.setBorder(BorderFactory.createLineBorder(
                         h ? new Color(180, 60, 60) : new Color(60, 180, 180), 1));
                 }
                 @Override public void mouseExited(MouseEvent e) {
-                    boolean h = layer instanceof ImageLayer il && il.isHidden() ||
-                               layer instanceof TextLayer tl && tl.isHidden() ||
-                               layer instanceof PathLayer pl && pl.isHidden();
+                    boolean h = layer.isHidden();
                     vis.setBackground(new Color(50, 50, 50));
                     vis.setForeground(h ? new Color(180, 60, 60) : new Color(60, 180, 180));
                     vis.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));

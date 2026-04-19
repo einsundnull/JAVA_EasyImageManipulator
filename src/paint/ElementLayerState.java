@@ -363,7 +363,9 @@ public class ElementLayerState {
         int style = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
         Font font = new Font(tl.fontName(), style, Math.max(6, tl.fontSize()));
         BufferedImage dummy = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-        FontMetrics fm = dummy.createGraphics().getFontMetrics(font);
+        java.awt.Graphics2D dg = dummy.createGraphics();
+        FontMetrics fm;
+        try { fm = dg.getFontMetrics(font); } finally { dg.dispose(); }
         String[] lines = tl.text().split("\n", -1);
         int w = 1;
         for (String l : lines) w = Math.max(w, fm.stringWidth(l));
