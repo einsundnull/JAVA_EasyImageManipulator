@@ -254,12 +254,7 @@ class BookPagesPanelLegacy extends BaseSidebarPanel {
 			// Direct image flavor
 			if (trans.isDataFlavorSupported(DataFlavor.imageFlavor)) {
 				Image img = (Image) trans.getTransferData(DataFlavor.imageFlavor);
-				if (img instanceof BufferedImage bi) return bi;
-				BufferedImage bi = new BufferedImage(img.getWidth(null), img.getHeight(null),
-						BufferedImage.TYPE_INT_ARGB);
-				java.awt.Graphics2D g = bi.createGraphics();
-				try { g.drawImage(img, 0, 0, null); } finally { g.dispose(); }
-				return bi;
+				return ImageLoader.toBuffered(img);
 			}
 			// File list (external drag from Explorer or TileGallery)
 			if (trans.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {

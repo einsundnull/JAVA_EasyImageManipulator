@@ -295,11 +295,7 @@ class ClipboardController {
 			Transferable t = Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null);
 			if (t != null && t.isDataFlavorSupported(DataFlavor.imageFlavor)) {
 				Image img = (Image) t.getTransferData(DataFlavor.imageFlavor);
-				BufferedImage bi = new BufferedImage(img.getWidth(null), img.getHeight(null),
-						BufferedImage.TYPE_INT_ARGB);
-				java.awt.Graphics2D g = bi.createGraphics();
-				try { g.drawImage(img, 0, 0, null); } finally { g.dispose(); }
-				return bi;
+				return ImageLoader.toBuffered(img);
 			}
 		} catch (Exception ignored) {
 		}

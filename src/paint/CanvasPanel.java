@@ -151,6 +151,19 @@ public class CanvasPanel extends JPanel {
 			.createCustomCursor(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB),
 					new Point(0, 0), "blank");
 
+	// ── Font cache (avoids per-frame Font allocation in paintComponent) ──────
+	private final java.util.Map<String, Font> fontCache = new java.util.HashMap<>();
+	private Font cachedFont(String name, int style, int size) {
+		String key = name + '|' + style + '|' + size;
+		Font f = fontCache.get(key);
+		if (f == null) {
+			f = new Font(name, style, size);
+			if (fontCache.size() > 64) fontCache.clear();  // bound cache
+			fontCache.put(key, f);
+		}
+		return f;
+	}
+
 	// ── Checkerboard cache ───────────────────────────────────────────────────
 	/** Cached 2×2-cell tile used to fill the canvas checkerboard in a single fillRect. */
 	private java.awt.TexturePaint cachedCheckerPaint = null;
@@ -1578,26 +1591,6 @@ public class CanvasPanel extends JPanel {
 		g2.dispose();
 	}
 
-	private void drawShapePreview(BufferedImage img, PaintEngine.Tool tool, Point from, Point to) {
-		Graphics2D g2 = img.createGraphics();
-		g2.setColor(callbacks.getPaintToolbar().getPrimaryColor());
-		g2.setStroke(new BasicStroke(callbacks.getPaintToolbar().getStrokeWidth()));
-
-		int x = Math.min(from.x, to.x);
-		int y = Math.min(from.y, to.y);
-		int w = Math.abs(to.x - from.x);
-		int h = Math.abs(to.y - from.y);
-
-		if (tool == PaintEngine.Tool.LINE) {
-			g2.drawLine(from.x, from.y, to.x, to.y);
-		} else if (tool == PaintEngine.Tool.CIRCLE) {
-			g2.drawOval(x, y, w, h);
-		} else if (tool == PaintEngine.Tool.RECT) {
-			g2.drawRect(x, y, w, h);
-		}
-		g2.dispose();
-	}
-
 	/** Same as drawShape but targets {@code canvasDrawOverlay} (Canvas sub-mode). */
 	private void drawShapeOnOverlay(PaintEngine.Tool tool, Point from, Point to) {
 		if (canvasDrawOverlay == null) return;
@@ -2546,7 +2539,7 @@ public class CanvasPanel extends JPanel {
 					// TextLayer: render glyphs live
 					int tstyle = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
 					int screenFontSz = Math.max(1, (int) Math.round(tl.fontSize() * callbacks.getZoom()));
-					Font  tfont  = new Font(tl.fontName(), tstyle, screenFontSz);
+					Font  tfont  = cachedFont(tl.fontName(), tstyle, screenFontSz);
 					g2.setFont(tfont);
 					g2.setColor(tl.fontColor());
 					java.awt.FontMetrics tfm = g2.getFontMetrics();
@@ -2614,7 +2607,7 @@ public class CanvasPanel extends JPanel {
 			double z = callbacks.getZoom();
 			int    tstyle   = (textBold ? Font.BOLD : 0) | (textItalic ? Font.ITALIC : 0);
 			int    screenSz = Math.max(1, (int) Math.round(Math.max(6, textFontSize) * z));
-			Font   tfont    = new Font(textFontName, tstyle, screenSz);
+			Font   tfont    = cachedFont(textFontName, tstyle, screenSz);
 			g2.setFont(tfont);
 			java.awt.FontMetrics fm = g2.getFontMetrics();
 			int lineH = fm.getHeight();
