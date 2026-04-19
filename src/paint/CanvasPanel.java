@@ -2476,130 +2476,15 @@ public class CanvasPanel extends JPanel {
 		// Show all outlines during snap-drag so user can see snap targets
 		boolean showOutlinesDuringSnap = showOutlines || isSnapDragging;
 
-		// Draw all non-primary elements first; primary draws last (on top)
-		for (int pass = 0; pass < 2; pass++) {
-			for (Layer el : activeEls) {
-				boolean isPrimary = primaryEl != null && primaryEl.id() == el.id();
-				if (pass == 0 && isPrimary) continue;  // skip primary on first pass
-				if (pass == 1 && !isPrimary) continue; // skip others on second pass
-				// Skip the element currently being text-edited — the live preview replaces it
-				if (editingTextElementId >= 0 && el.id() == editingTextElementId) continue;
-
-				// Skip hidden layers
-				if (el.isHidden()) continue;
-
-				Rectangle sr = callbacks.elemRectScreen(el);
-
-				// For PathLayer the frame must be derived from the actual point
-				// extents, not from the stored pl.x/pl.y/pl.width/pl.height.
-				// pl.x() is the layer origin; points can have negative coordinates
-				// (to the left/above the origin), so elemRectScreen gives the wrong rect.
-				Rectangle frameRect = sr;
-				if (el instanceof PathLayer pl) {
-					double fMinX = Double.MAX_VALUE, fMaxX = -Double.MAX_VALUE;
-					double fMinY = Double.MAX_VALUE, fMaxY = -Double.MAX_VALUE;
-					for (Point3D p : pl.points()) {
-						if (p.x < fMinX) fMinX = p.x;
-						if (p.x > fMaxX) fMaxX = p.x;
-						if (p.y < fMinY) fMinY = p.y;
-						if (p.y > fMaxY) fMaxY = p.y;
-					}
-					int fx = (int) Math.round((pl.x() + fMinX - 8) * zoom);
-					int fy = (int) Math.round((pl.y() + fMinY - 8) * zoom);
-					int fw = (int) Math.round((fMaxX - fMinX + 16) * zoom);
-					int fh = (int) Math.round((fMaxY - fMinY + 16) * zoom);
-					frameRect = new Rectangle(fx, fy, Math.max(1, fw), Math.max(1, fh));
-				}
-
-				if (el instanceof ImageLayer il) {
-					// Set opacity (alpha composite)
-					java.awt.Composite origComposite = g2.getComposite();
-					float alpha = il.opacity() / 100.0f;
-					if (alpha < 1.0f) {
-						g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha));
-					}
-
-					// Draw with rotation if needed
-					if (Math.abs(il.rotationAngle()) > 0.001) {
-						java.awt.geom.AffineTransform orig = g2.getTransform();
-						double cx = sr.x + sr.width / 2.0;
-						double cy = sr.y + sr.height / 2.0;
-						g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
-						g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
-						g2.setTransform(orig);
-					} else {
-						g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
-					}
-
-					// Restore original composite
-					if (alpha < 1.0f) {
-						g2.setComposite(origComposite);
-					}
-				} else if (el instanceof TextLayer tl) {
-					// TextLayer: render glyphs live
-					int tstyle = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
-					int screenFontSz = Math.max(1, (int) Math.round(tl.fontSize() * callbacks.getZoom()));
-					Font  tfont  = cachedFont(tl.fontName(), tstyle, screenFontSz);
-					g2.setFont(tfont);
-					g2.setColor(tl.fontColor());
-					java.awt.FontMetrics tfm = g2.getFontMetrics();
-					int tpx = sr.x + (int)(TEXT_PADDING * callbacks.getZoom());
-					int tpy = sr.y + (int)(TEXT_PADDING * callbacks.getZoom());
-					if (tl.isWrapping()) {
-						int maxW = sr.width - (int)(TEXT_PADDING * 2 * callbacks.getZoom());
-						if (maxW < 1) maxW = 1;
-						java.util.List<String> wrapped = wrapText(tl.text(), tfm, maxW);
-						for (int li = 0; li < wrapped.size(); li++) {
-							g2.drawString(wrapped.get(li), tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
-						}
-					} else {
-						String[] tLines = tl.text().split("\n", -1);
-						for (int li = 0; li < tLines.length; li++) {
-							g2.drawString(tLines[li], tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
-						}
-					}
-				} else if (el instanceof PathLayer pl) {
-					// PathLayer: render path lines and control points
-					renderPathLayer(g2, pl, sr, callbacks.getZoom(), isPrimary);
-				}
-
-				boolean isHov = el.id() == hoveredElementId;
-				boolean isSel = selectedEls.stream().anyMatch(s -> s.id() == el.id());
-				if (isSel) {
-					g2.setColor(AppColors.ACCENT);
-					g2.setStroke(STROKE_SEL_DASH);
-					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
-					if (isPrimary) {
-						g2.setStroke(STROKE_1);
-						Rectangle[] hrs = callbacks.handleRects(frameRect);
-						for (int hi = 0; hi < hrs.length; hi++) {
-							Rectangle hr = hrs[hi];
-							boolean hov = (hi == hoveredHandleIndex);
-							g2.setColor(hov ? COLOR_HANDLE_HOV_FILL : Color.WHITE);
-							g2.fillRect(hr.x, hr.y, hr.width, hr.height);
-							g2.setColor(hov ? COLOR_HANDLE_HOV_BORDER : AppColors.ACCENT);
-							g2.setStroke(hov ? STROKE_1_5 : STROKE_1);
-							g2.drawRect(hr.x, hr.y, hr.width, hr.height);
-						}
-					}
-					// Draw rotation handle (circle above center of element)
-					Point rotPos = callbacks.getRotationHandlePos(frameRect);
-					g2.setColor(hoveredHandleIndex == -2 ? COLOR_ROT_HOV : COLOR_ROT);
-					g2.setStroke(STROKE_1_5);
-					g2.drawOval(rotPos.x - 6, rotPos.y - 6, 12, 12);
-					g2.fillOval(rotPos.x - 3, rotPos.y - 3, 6, 6);
-				} else if (isHov) {
-					// Hover outline: brighter, solid
-					g2.setColor(COLOR_HOVER_OUTLINE);
-					g2.setStroke(STROKE_1_5);
-					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
-				} else if (showOutlinesDuringSnap) {
-					// Dim outline for unselected layers when toggle is on or during snap-drag
-					g2.setColor(COLOR_DIM_OUTLINE);
-					g2.setStroke(STROKE_DIM_DASH);
-					g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
-				}
-			}
+		// Single pass for non-primary; primary drawn separately on top.
+		int primaryId = primaryEl != null ? primaryEl.id() : Integer.MIN_VALUE;
+		boolean primaryRenderable = false;
+		for (Layer el : activeEls) {
+			if (el.id() == primaryId) { primaryRenderable = true; continue; }
+			renderElement(g2, el, false, selectedEls, showOutlinesDuringSnap, zoom);
+		}
+		if (primaryRenderable) {
+			renderElement(g2, primaryEl, true, selectedEls, showOutlinesDuringSnap, zoom);
 		}
 
 		// ── Text tool bounding-box preview (rubber-band draw phase + typing phase) ─
@@ -2912,6 +2797,127 @@ public class CanvasPanel extends JPanel {
 		g2.setColor(new java.awt.Color(255, 255, 255, 70));
 		for (int x = 0; x <= screenW; x += step * 4) g2.drawLine(x, 0, x, screenH);
 		for (int y = 0; y <= screenH; y += step * 4) g2.drawLine(0, y, screenW, y);
+	}
+
+	// =========================================================================
+	// Element Rendering (single-pass helper)
+	// =========================================================================
+
+	/**
+	 * Renders a single layer element (ImageLayer / TextLayer / PathLayer) plus its
+	 * selection / hover / dim outline. Extracted from the old two-pass loop; the
+	 * caller decides the draw order (non-primary first, primary last).
+	 */
+	private void renderElement(Graphics2D g2, Layer el, boolean isPrimary,
+			java.util.List<Layer> selectedEls, boolean showOutlinesDuringSnap, double zoom) {
+		// Skip the element currently being text-edited — the live preview replaces it
+		if (editingTextElementId >= 0 && el.id() == editingTextElementId) return;
+		if (el.isHidden()) return;
+
+		Rectangle sr = callbacks.elemRectScreen(el);
+
+		// For PathLayer the frame must be derived from the actual point
+		// extents, not from the stored pl.x/pl.y/pl.width/pl.height.
+		Rectangle frameRect = sr;
+		if (el instanceof PathLayer pl) {
+			double fMinX = Double.MAX_VALUE, fMaxX = -Double.MAX_VALUE;
+			double fMinY = Double.MAX_VALUE, fMaxY = -Double.MAX_VALUE;
+			for (Point3D p : pl.points()) {
+				if (p.x < fMinX) fMinX = p.x;
+				if (p.x > fMaxX) fMaxX = p.x;
+				if (p.y < fMinY) fMinY = p.y;
+				if (p.y > fMaxY) fMaxY = p.y;
+			}
+			int fx = (int) Math.round((pl.x() + fMinX - 8) * zoom);
+			int fy = (int) Math.round((pl.y() + fMinY - 8) * zoom);
+			int fw = (int) Math.round((fMaxX - fMinX + 16) * zoom);
+			int fh = (int) Math.round((fMaxY - fMinY + 16) * zoom);
+			frameRect = new Rectangle(fx, fy, Math.max(1, fw), Math.max(1, fh));
+		}
+
+		if (el instanceof ImageLayer il) {
+			java.awt.Composite origComposite = g2.getComposite();
+			float alpha = il.opacity() / 100.0f;
+			if (alpha < 1.0f) {
+				g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha));
+			}
+
+			if (Math.abs(il.rotationAngle()) > 0.001) {
+				java.awt.geom.AffineTransform orig = g2.getTransform();
+				double cx = sr.x + sr.width / 2.0;
+				double cy = sr.y + sr.height / 2.0;
+				g2.rotate(Math.toRadians(il.rotationAngle()), cx, cy);
+				g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
+				g2.setTransform(orig);
+			} else {
+				g2.drawImage(il.image(), sr.x, sr.y, sr.width, sr.height, null);
+			}
+
+			if (alpha < 1.0f) {
+				g2.setComposite(origComposite);
+			}
+		} else if (el instanceof TextLayer tl) {
+			int tstyle = (tl.fontBold() ? Font.BOLD : 0) | (tl.fontItalic() ? Font.ITALIC : 0);
+			int screenFontSz = Math.max(1, (int) Math.round(tl.fontSize() * zoom));
+			Font tfont = cachedFont(tl.fontName(), tstyle, screenFontSz);
+			g2.setFont(tfont);
+			g2.setColor(tl.fontColor());
+			java.awt.FontMetrics tfm = g2.getFontMetrics();
+			int tpx = sr.x + (int)(TEXT_PADDING * zoom);
+			int tpy = sr.y + (int)(TEXT_PADDING * zoom);
+			if (tl.isWrapping()) {
+				int maxW = sr.width - (int)(TEXT_PADDING * 2 * zoom);
+				if (maxW < 1) maxW = 1;
+				java.util.List<String> wrapped = wrapText(tl.text(), tfm, maxW);
+				for (int li = 0; li < wrapped.size(); li++) {
+					g2.drawString(wrapped.get(li), tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
+				}
+			} else {
+				String[] tLines = tl.text().split("\n", -1);
+				for (int li = 0; li < tLines.length; li++) {
+					g2.drawString(tLines[li], tpx, tpy + tfm.getHeight() * li + tfm.getAscent());
+				}
+			}
+		} else if (el instanceof PathLayer pl) {
+			renderPathLayer(g2, pl, sr, zoom, isPrimary);
+		}
+
+		boolean isHov = el.id() == hoveredElementId;
+		boolean isSel = false;
+		for (Layer s : selectedEls) {
+			if (s.id() == el.id()) { isSel = true; break; }
+		}
+		if (isSel) {
+			g2.setColor(AppColors.ACCENT);
+			g2.setStroke(STROKE_SEL_DASH);
+			g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
+			if (isPrimary) {
+				g2.setStroke(STROKE_1);
+				Rectangle[] hrs = callbacks.handleRects(frameRect);
+				for (int hi = 0; hi < hrs.length; hi++) {
+					Rectangle hr = hrs[hi];
+					boolean hov = (hi == hoveredHandleIndex);
+					g2.setColor(hov ? COLOR_HANDLE_HOV_FILL : Color.WHITE);
+					g2.fillRect(hr.x, hr.y, hr.width, hr.height);
+					g2.setColor(hov ? COLOR_HANDLE_HOV_BORDER : AppColors.ACCENT);
+					g2.setStroke(hov ? STROKE_1_5 : STROKE_1);
+					g2.drawRect(hr.x, hr.y, hr.width, hr.height);
+				}
+			}
+			Point rotPos = callbacks.getRotationHandlePos(frameRect);
+			g2.setColor(hoveredHandleIndex == -2 ? COLOR_ROT_HOV : COLOR_ROT);
+			g2.setStroke(STROKE_1_5);
+			g2.drawOval(rotPos.x - 6, rotPos.y - 6, 12, 12);
+			g2.fillOval(rotPos.x - 3, rotPos.y - 3, 6, 6);
+		} else if (isHov) {
+			g2.setColor(COLOR_HOVER_OUTLINE);
+			g2.setStroke(STROKE_1_5);
+			g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
+		} else if (showOutlinesDuringSnap) {
+			g2.setColor(COLOR_DIM_OUTLINE);
+			g2.setStroke(STROKE_DIM_DASH);
+			g2.drawRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height);
+		}
 	}
 
 	// =========================================================================
