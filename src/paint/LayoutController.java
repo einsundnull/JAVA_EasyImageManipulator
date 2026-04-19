@@ -149,13 +149,15 @@ class LayoutController {
 			ed.galleryWrapper.revalidate();
 			ed.galleryWrapper.repaint();
 		}
-		// Re-center visible canvases at their current zoom after layout change
-		SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> {
+		// Re-center visible canvases at their current zoom after layout change.
+		// centerCanvas() already defers via its own invokeLater + revalidate, so a
+		// single outer invokeLater is enough for the layout pass to settle.
+		SwingUtilities.invokeLater(() -> {
 			if (ed.ci(0).workingImage != null && ed.firstCanvasBtn.isSelected())
 				ed.centerCanvas(0);
 			if (ed.ci(1).workingImage != null && ed.secondCanvasBtn.isSelected())
 				ed.centerCanvas(1);
-		}));
+		});
 		syncToggleButtons();
 	}
 

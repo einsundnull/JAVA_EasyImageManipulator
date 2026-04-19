@@ -427,7 +427,7 @@ class FileLoadController {
 		if (visible)
 			ed.refreshSceneFiles(idx);
 		ed.updateLayoutVisibility();
-		SwingUtilities.invokeLater(() -> SwingUtilities.invokeLater(() -> reloadCurrentImage(idx)));
+		SwingUtilities.invokeLater(() -> reloadCurrentImage(idx));
 	}
 
 	public void swapToImageView(int idx) {
