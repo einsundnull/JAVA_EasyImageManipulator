@@ -1218,6 +1218,9 @@ public class CanvasPanel extends JPanel {
 				}
 				if (brushPreviewPt != null) {
 					brushPreviewPt = null;
+					// Also restore the cursor — otherwise BLANK_CURSOR persists and the
+					// user sees no cursor at all when they re-enter with a non-brush tool.
+					setCursor(Cursor.getDefaultCursor());
 					repaint();
 				}
 			}
@@ -1317,7 +1320,11 @@ public class CanvasPanel extends JPanel {
 		});
 		addMouseListener(new java.awt.event.MouseAdapter() {
 			@Override public void mouseExited(java.awt.event.MouseEvent e) {
-				if (brushPreviewPt != null) { brushPreviewPt = null; repaint(); }
+				if (brushPreviewPt != null) {
+					brushPreviewPt = null;
+					setCursor(Cursor.getDefaultCursor());
+					repaint();
+				}
 			}
 		});
 	}

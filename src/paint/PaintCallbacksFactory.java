@@ -13,6 +13,15 @@ class PaintCallbacksFactory {
 		return new PaintToolbar.Callbacks() {
 			@Override
 			public void onToolChanged(PaintEngine.Tool tool) {
+				// If we're leaving a brush tool (PENCIL/ERASER/SMEAR), the canvas cursor
+				// may still be BLANK_CURSOR from the brush-preview overlay. Reset it so the
+				// user doesn't see "no cursor" when the mouse is already over the canvas.
+				boolean isBrushTool = tool == PaintEngine.Tool.PENCIL
+						|| tool == PaintEngine.Tool.ERASER
+						|| tool == PaintEngine.Tool.SMEAR;
+				if (!isBrushTool) {
+					ed.ci().canvasPanel.setCursor(java.awt.Cursor.getDefaultCursor());
+				}
 				ed.ci().canvasPanel.repaint();
 			}
 
