@@ -45,6 +45,22 @@ public class PathEditor extends JFrame {
         @Override public String toString() { return label; }
     }
 
+    // ── Sprite layer ────────────────────────────────────────────────────────
+
+    static class SpriteLayer {
+        BufferedImage image;
+        double        x, y;
+        boolean       visible = true;
+        String        name;
+        Map<PathModel, List<PathPoint>> restPoses  = new LinkedHashMap<>();
+        Map<PathModel, float[]>         weightMaps = new LinkedHashMap<>();
+        Map<PathModel, byte[]>          rigidMaps  = new LinkedHashMap<>();
+
+        SpriteLayer(String name, BufferedImage img, double x, double y) {
+            this.name = name; this.image = img; this.x = x; this.y = y;
+        }
+    }
+
     // ── Animation model ─────────────────────────────────────────────────────
 
     static class Keyframe {
@@ -118,7 +134,6 @@ public class PathEditor extends JFrame {
 
         static double lerp(double a, double b, double t) { return a + (b - a) * t; }
 
-        /** Keyframe exists at this exact frame? */
         boolean hasKeyframeAt(int frame) {
             for (Keyframe k : keyframes) if (k.frame == frame) return true;
             return false;
@@ -168,18 +183,17 @@ public class PathEditor extends JFrame {
 
     // ── Heatmap paint modes ─────────────────────────────────────────────────
 
-    boolean        pixelBrush  = false;   // 1-px hard brush, no falloff
-    boolean        binaryMode  = false;   // weight = 0 or 1 only
-    boolean        paintRigid  = false;   // paint "rigid/pinned" region (third color)
-    Map<PathModel, byte[]> rigidMaps = new LinkedHashMap<>();
+    boolean        pixelBrush  = false;
+    boolean        binaryMode  = false;
+    boolean        paintRigid  = false;
 
-    // ── Sprite / skeleton binding ───────────────────────────────────────────
+    // ── Layer system ────────────────────────────────────────────────────────
 
-    BufferedImage spriteImage = null;
-    double        spriteX = 100, spriteY = 100;
-    Map<PathModel, List<PathPoint>> restPoses  = new LinkedHashMap<>();
-    Map<PathModel, float[]>         weightMaps = new LinkedHashMap<>();
-    JLabel bindLabel;
+    List<SpriteLayer> layers      = new ArrayList<>();
+    SpriteLayer       activeLayer = null;
+    int               layerCounter = 1;
+    JPanel            layerListPanel;
+    JLabel            bindLabel;
 
     // ── Paint / heatmap mode ────────────────────────────────────────────────
 
@@ -217,7 +231,7 @@ public class PathEditor extends JFrame {
     PathEditor() {
         super("Path Editor");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(1200, 820);
+        setSize(1300, 820);
         setLayout(new BorderLayout());
 
         // ── Left panel ──────────────────────────────────────────────────────
@@ -259,11 +273,11 @@ public class PathEditor extends JFrame {
 
         JPanel spritePanel = new JPanel(new GridLayout(0, 1, 2, 2));
         spritePanel.setBorder(BorderFactory.createTitledBorder("Sprite"));
-        JButton loadSpriteBtn = new JButton("Sprite laden…");
+        JButton loadSpriteBtn = new JButton("Layer hinzufügen…");
         JButton bindBtn       = new JButton("Skelett binden");
         JButton unbindBtn     = new JButton("Bindung lösen");
         paintModeBtn          = new JButton("🎨 Heatmap malen");
-        bindLabel = new JLabel("<html><small><i>kein Sprite</i></small></html>");
+        bindLabel = new JLabel("<html><small><i>kein Layer aktiv</i></small></html>");
         loadSpriteBtn.addActionListener(e -> loadSprite());
         bindBtn      .addActionListener(e -> bindSkeleton());
         unbindBtn    .addActionListener(e -> unbind());
@@ -315,6 +329,9 @@ public class PathEditor extends JFrame {
 
         canvas = new CanvasPanel();
 
+        // ── Layer panel (EAST) ───────────────────────────────────────────────
+        JPanel eastPanel = buildLayerPanel();
+
         // ── Timeline / animation controls ────────────────────────────────────
         JPanel animControls = buildAnimControls();
         timelinePanel = new TimelinePanel();
@@ -324,6 +341,7 @@ public class PathEditor extends JFrame {
 
         add(left,       BorderLayout.WEST);
         add(canvas,     BorderLayout.CENTER);
+        add(eastPanel,  BorderLayout.EAST);
         add(southPanel, BorderLayout.SOUTH);
 
         buildPlayTimer();
@@ -331,6 +349,80 @@ public class PathEditor extends JFrame {
         setLocationRelativeTo(null);
         setVisible(true);
         installDropTarget();
+    }
+
+    // ── Layer panel ──────────────────────────────────────────────────────────
+
+    JPanel buildLayerPanel() {
+        JPanel outer = new JPanel(new BorderLayout(4, 4));
+        outer.setPreferredSize(new Dimension(170, 0));
+        outer.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 6));
+
+        JLabel title = new JLabel("Layer");
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 12f));
+
+        JButton addBtn = new JButton("+  Layer laden");
+        addBtn.addActionListener(e -> loadSprite());
+
+        layerListPanel = new JPanel();
+        layerListPanel.setLayout(new BoxLayout(layerListPanel, BoxLayout.Y_AXIS));
+        JScrollPane sp = new JScrollPane(layerListPanel);
+        sp.setBorder(null);
+
+        outer.add(title,  BorderLayout.NORTH);
+        outer.add(sp,     BorderLayout.CENTER);
+        outer.add(addBtn, BorderLayout.SOUTH);
+        return outer;
+    }
+
+    void rebuildLayerList() {
+        layerListPanel.removeAll();
+        for (SpriteLayer layer : layers) {
+            JPanel row = new JPanel(new BorderLayout(2, 0));
+            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+            row.setBorder(BorderFactory.createEmptyBorder(1, 2, 1, 2));
+
+            JCheckBox vis = new JCheckBox();
+            vis.setSelected(layer.visible);
+            vis.setPreferredSize(new Dimension(20, 20));
+            vis.addActionListener(e -> { layer.visible = vis.isSelected(); canvas.repaint(); });
+
+            JButton nameBtn = new JButton(layer.name);
+            nameBtn.setHorizontalAlignment(SwingConstants.LEFT);
+            nameBtn.setFont(nameBtn.getFont().deriveFont(10f));
+            nameBtn.setBorderPainted(layer == activeLayer);
+            nameBtn.setBackground(layer == activeLayer ? new Color(60, 100, 160) : null);
+            nameBtn.setForeground(layer == activeLayer ? Color.WHITE : null);
+            nameBtn.addActionListener(e -> setActiveLayer(layer));
+
+            JButton delBtn = new JButton("✕");
+            delBtn.setPreferredSize(new Dimension(22, 20));
+            delBtn.setFont(delBtn.getFont().deriveFont(9f));
+            delBtn.addActionListener(e -> removeLayer(layer));
+
+            row.add(vis,     BorderLayout.WEST);
+            row.add(nameBtn, BorderLayout.CENTER);
+            row.add(delBtn,  BorderLayout.EAST);
+            layerListPanel.add(row);
+            layerListPanel.add(Box.createVerticalStrut(2));
+        }
+        layerListPanel.revalidate();
+        layerListPanel.repaint();
+    }
+
+    void setActiveLayer(SpriteLayer layer) {
+        activeLayer = layer;
+        rebuildLayerList();
+        updateBindLabel();
+        canvas.repaint();
+    }
+
+    void removeLayer(SpriteLayer layer) {
+        layers.remove(layer);
+        if (activeLayer == layer) activeLayer = layers.isEmpty() ? null : layers.get(layers.size() - 1);
+        rebuildLayerList();
+        updateBindLabel();
+        canvas.repaint();
     }
 
     // ── Animation controls panel ─────────────────────────────────────────────
@@ -469,7 +561,6 @@ public class PathEditor extends JFrame {
         if (t != null)
             for (Keyframe k : t.keyframes) if (k.frame == (int) currentFrame) { kf = k; break; }
         if (kf == null) {
-            // No keyframe here — snapshot current point positions
             kf = new Keyframe((int) currentFrame, selectedPath.points);
         }
         copiedKeyframe = new Keyframe(kf);
@@ -548,7 +639,6 @@ public class PathEditor extends JFrame {
         am.put("prevFrame",    new AbstractAction() { public void actionPerformed(ActionEvent e) { if (!playing) seekToFrame((int) currentFrame - 1); } });
         am.put("nextFrame",    new AbstractAction() { public void actionPerformed(ActionEvent e) { if (!playing) seekToFrame((int) currentFrame + 1); } });
 
-        // DEL: context-aware — point → remove point; no point but path → delete path; keyframe at frame → remove KF
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
             if (e.getID() == KeyEvent.KEY_PRESSED && e.getKeyCode() == KeyEvent.VK_DELETE) {
                 Component focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
@@ -622,11 +712,14 @@ public class PathEditor extends JFrame {
     void deleteSelectedPath() {
         if (selectedPath == null) return;
         PathModel toDelete = selectedPath;
-        // Remove child branches that depend on this path
         paths.removeIf(p -> p.parentPath == toDelete);
         paths.remove(toDelete);
-        restPoses.remove(toDelete);
-        weightMaps.remove(toDelete);
+        // remove from all layers
+        for (SpriteLayer layer : layers) {
+            layer.restPoses.remove(toDelete);
+            layer.weightMaps.remove(toDelete);
+            layer.rigidMaps.remove(toDelete);
+        }
         animation.tracks.removeIf(t -> t.path == toDelete);
         selectedPath  = null;
         selectedPoint = -1;
@@ -649,7 +742,7 @@ public class PathEditor extends JFrame {
         Clipboard cb = Toolkit.getDefaultToolkit().getSystemClipboard();
         try {
             if (cb.isDataFlavorAvailable(DataFlavor.imageFlavor)) {
-                applySpriteImage(toBufferedImage((Image) cb.getData(DataFlavor.imageFlavor)));
+                addSpriteLayer(toBufferedImage((Image) cb.getData(DataFlavor.imageFlavor)));
                 return;
             }
             if (cb.isDataFlavorAvailable(DataFlavor.javaFileListFlavor)) {
@@ -657,7 +750,7 @@ public class PathEditor extends JFrame {
                 List<File> files = (List<File>) cb.getData(DataFlavor.javaFileListFlavor);
                 if (!files.isEmpty()) {
                     BufferedImage img = ImageIO.read(files.get(0));
-                    if (img != null) applySpriteImage(img);
+                    if (img != null) addSpriteLayer(img);
                 }
             }
         } catch (Exception ex) {
@@ -676,13 +769,13 @@ public class PathEditor extends JFrame {
                 try {
                     Transferable t = e.getTransferable();
                     if (t.isDataFlavorSupported(DataFlavor.imageFlavor)) {
-                        applySpriteImage(toBufferedImage((Image) t.getTransferData(DataFlavor.imageFlavor)));
+                        addSpriteLayer(toBufferedImage((Image) t.getTransferData(DataFlavor.imageFlavor)));
                     } else if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
                         @SuppressWarnings("unchecked")
                         List<File> files = (List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
                         for (File f : files) {
                             BufferedImage img = ImageIO.read(f);
-                            if (img != null) { applySpriteImage(img); break; }
+                            if (img != null) addSpriteLayer(img);
                         }
                     }
                     e.dropComplete(true);
@@ -696,15 +789,13 @@ public class PathEditor extends JFrame {
         }, true);
     }
 
-    void applySpriteImage(BufferedImage img) {
-        spriteImage = img;
-        spriteX = (canvas.getWidth()  - img.getWidth())  / 2.0;
-        spriteY = (canvas.getHeight() - img.getHeight()) / 2.0;
-        restPoses.clear();
-        weightMaps.clear();
-        rigidMaps.clear();
-        updateBindLabel();
-        canvas.repaint();
+    void addSpriteLayer(BufferedImage img) {
+        String name = "Layer " + layerCounter++;
+        double lx = (canvas.getWidth()  - img.getWidth())  / 2.0;
+        double ly = (canvas.getHeight() - img.getHeight()) / 2.0;
+        SpriteLayer layer = new SpriteLayer(name, img, lx, ly);
+        layers.add(layer);
+        setActiveLayer(layer);   // also calls rebuildLayerList + updateBindLabel + repaint
     }
 
     static BufferedImage toBufferedImage(Image img) {
@@ -718,25 +809,34 @@ public class PathEditor extends JFrame {
 
     void loadSprite() {
         JFileChooser fc = new JFileChooser();
-        fc.setDialogTitle("Sprite-Bild laden");
+        fc.setDialogTitle("Bild als Layer laden");
         fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
                 "Bilder (PNG, JPG, GIF, BMP)", "png", "jpg", "jpeg", "gif", "bmp"));
         if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
         try {
             BufferedImage img = ImageIO.read(fc.getSelectedFile());
-            if (img != null) applySpriteImage(img);
+            if (img != null) {
+                String baseName = fc.getSelectedFile().getName();
+                int dot = baseName.lastIndexOf('.');
+                if (dot > 0) baseName = baseName.substring(0, dot);
+                double lx = (canvas.getWidth()  - img.getWidth())  / 2.0;
+                double ly = (canvas.getHeight() - img.getHeight()) / 2.0;
+                SpriteLayer layer = new SpriteLayer(baseName, img, lx, ly);
+                layers.add(layer);
+                setActiveLayer(layer);
+            }
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Fehler beim Laden: " + ex.getMessage());
         }
     }
 
     void bindSkeleton() {
-        if (spriteImage == null)  { JOptionPane.showMessageDialog(this, "Zuerst ein Sprite laden."); return; }
+        if (activeLayer == null)  { JOptionPane.showMessageDialog(this, "Zuerst einen Layer laden."); return; }
         if (selectedPath == null) { JOptionPane.showMessageDialog(this, "Zuerst einen Pfad auswählen."); return; }
-        if (!restPoses.containsKey(selectedPath)) {
+        if (!activeLayer.restPoses.containsKey(selectedPath)) {
             List<PathPoint> rest = new ArrayList<>();
             for (PathPoint p : selectedPath.points) rest.add(p.copy());
-            restPoses.put(selectedPath, rest);
+            activeLayer.restPoses.put(selectedPath, rest);
             getOrCreateWeightMap(selectedPath);
         }
         updateBindLabel();
@@ -744,26 +844,28 @@ public class PathEditor extends JFrame {
     }
 
     void unbind() {
+        if (activeLayer == null) return;
         if (selectedPath != null) {
-            restPoses.remove(selectedPath);
-            weightMaps.remove(selectedPath);
-            rigidMaps.remove(selectedPath);
+            activeLayer.restPoses.remove(selectedPath);
+            activeLayer.weightMaps.remove(selectedPath);
+            activeLayer.rigidMaps.remove(selectedPath);
         } else {
-            restPoses.clear();
-            weightMaps.clear();
+            activeLayer.restPoses.clear();
+            activeLayer.weightMaps.clear();
+            activeLayer.rigidMaps.clear();
         }
         updateBindLabel();
         canvas.repaint();
     }
 
     void updateBindLabel() {
-        if (spriteImage == null) {
-            bindLabel.setText("<html><small><i>kein Sprite</i></small></html>");
-        } else if (restPoses.isEmpty()) {
-            bindLabel.setText("<html><small>Sprite geladen – kein Skelett gebunden</small></html>");
+        if (activeLayer == null) {
+            bindLabel.setText("<html><small><i>kein Layer aktiv</i></small></html>");
+        } else if (activeLayer.restPoses.isEmpty()) {
+            bindLabel.setText("<html><small>Layer: <b>" + activeLayer.name + "</b> – kein Skelett</small></html>");
         } else {
-            StringBuilder sb = new StringBuilder("<html><small>");
-            for (PathModel pm : restPoses.keySet())
+            StringBuilder sb = new StringBuilder("<html><small><b>" + activeLayer.name + "</b><br>");
+            for (PathModel pm : activeLayer.restPoses.keySet())
                 sb.append("● ").append(pm.name).append("<br>");
             sb.append("</small></html>");
             bindLabel.setText(sb.toString());
@@ -781,8 +883,9 @@ public class PathEditor extends JFrame {
     }
 
     float[] getOrCreateWeightMap(PathModel path) {
-        return weightMaps.computeIfAbsent(path, p -> {
-            int size = spriteImage.getWidth() * spriteImage.getHeight();
+        if (activeLayer == null) return new float[0];
+        return activeLayer.weightMaps.computeIfAbsent(path, p -> {
+            int size = activeLayer.image.getWidth() * activeLayer.image.getHeight();
             float[] wm = new float[size];
             java.util.Arrays.fill(wm, 1.0f);
             return wm;
@@ -790,18 +893,18 @@ public class PathEditor extends JFrame {
     }
 
     byte[] getOrCreateRigidMap(PathModel path) {
-        return rigidMaps.computeIfAbsent(path, p ->
-            new byte[spriteImage.getWidth() * spriteImage.getHeight()]);
+        if (activeLayer == null) return new byte[0];
+        return activeLayer.rigidMaps.computeIfAbsent(path, p ->
+            new byte[activeLayer.image.getWidth() * activeLayer.image.getHeight()]);
     }
 
     void paintWeight(int canvasX, int canvasY, boolean erase) {
-        if (spriteImage == null || selectedPath == null) return;
-        if (!restPoses.containsKey(selectedPath)) return;
-        int imgW = spriteImage.getWidth(), imgH = spriteImage.getHeight();
-        int cx = (int)(canvasX - spriteX), cy = (int)(canvasY - spriteY);
+        if (activeLayer == null || selectedPath == null) return;
+        if (!activeLayer.restPoses.containsKey(selectedPath)) return;
+        int imgW = activeLayer.image.getWidth(), imgH = activeLayer.image.getHeight();
+        int cx = (int)(canvasX - activeLayer.x), cy = (int)(canvasY - activeLayer.y);
 
         if (paintRigid) {
-            // paint / erase rigid region
             byte[] rm = getOrCreateRigidMap(selectedPath);
             if (pixelBrush) {
                 if (cx >= 0 && cy >= 0 && cx < imgW && cy < imgH)
@@ -844,16 +947,15 @@ public class PathEditor extends JFrame {
     }
 
     void drawHeatmapOverlay(Graphics2D g2) {
-        if (!paintMode || spriteImage == null || selectedPath == null) return;
-        float[] wm = weightMaps.get(selectedPath);
+        if (!paintMode || activeLayer == null || selectedPath == null) return;
+        float[] wm = activeLayer.weightMaps.get(selectedPath);
         if (wm == null) return;
-        int imgW = spriteImage.getWidth(), imgH = spriteImage.getHeight();
-        byte[] rm = rigidMaps.get(selectedPath);
+        int imgW = activeLayer.image.getWidth(), imgH = activeLayer.image.getHeight();
+        byte[] rm = activeLayer.rigidMaps.get(selectedPath);
         int[] pixels = new int[imgW * imgH];
         for (int i = 0; i < pixels.length; i++) {
             if (rm != null && rm[i] == 1) {
-                // orange = starr (rigid/pinned)
-                pixels[i] = (200 << 24) | (255 << 16) | (140 << 8) | 0;
+                pixels[i] = (200 << 24) | (255 << 16) | (140 << 8) | 0; // orange = starr
             } else {
                 float w = wm[i];
                 if (binaryMode) {
@@ -870,7 +972,7 @@ public class PathEditor extends JFrame {
         }
         BufferedImage overlay = new BufferedImage(imgW, imgH, BufferedImage.TYPE_INT_ARGB);
         overlay.setRGB(0, 0, imgW, imgH, pixels, 0, imgW);
-        g2.drawImage(overlay, (int)spriteX, (int)spriteY, null);
+        g2.drawImage(overlay, (int)activeLayer.x, (int)activeLayer.y, null);
     }
 
     // ── Selection ────────────────────────────────────────────────────────────
@@ -974,9 +1076,10 @@ public class PathEditor extends JFrame {
                 ? "  \u21A9 " + path.parentPath.name + "[" + path.parentPointIdx + "]" : "";
         AnimTrack track = animation.trackFor(path);
         String kfInfo = (track != null && track.hasKeyframeAt((int) currentFrame)) ? " ◆" : "";
+        boolean isBound = activeLayer != null && activeLayer.restPoses.containsKey(path);
         cb.addItem(new ComboItem(ComboItem.Kind.HEADER, -1,
                 "\u25B6 " + path.name + "  (" + path.points.size() + " Punkte)"
-                + (restPoses.containsKey(path) ? " [gebunden]" : "") + branchInfo + kfInfo));
+                + (isBound ? " [gebunden]" : "") + branchInfo + kfInfo));
         for (int i = 0; i < path.points.size(); i++) {
             cb.addItem(new ComboItem(ComboItem.Kind.POINT, i, "   " + i + ": " + path.points.get(i)));
             if (showEdgesInList && i < path.points.size() - 1) {
@@ -1013,11 +1116,17 @@ public class PathEditor extends JFrame {
     // ── Sprite deformation rendering ─────────────────────────────────────────
 
     void drawDeformedSprite(Graphics2D g2) {
-        if (spriteImage == null) return;
-        int imgW = spriteImage.getWidth(), imgH = spriteImage.getHeight();
+        for (SpriteLayer layer : layers) {
+            if (!layer.visible) continue;
+            drawLayerDeformed(g2, layer);
+        }
+    }
 
-        if (restPoses.isEmpty()) {
-            g2.drawImage(spriteImage, (int) spriteX, (int) spriteY, null);
+    void drawLayerDeformed(Graphics2D g2, SpriteLayer layer) {
+        int imgW = layer.image.getWidth(), imgH = layer.image.getHeight();
+
+        if (layer.restPoses.isEmpty()) {
+            g2.drawImage(layer.image, (int) layer.x, (int) layer.y, null);
             return;
         }
 
@@ -1025,17 +1134,15 @@ public class PathEditor extends JFrame {
         double[][] gx = new double[R+1][C+1], gy = new double[R+1][C+1];
         for (int r = 0; r <= R; r++) {
             for (int c = 0; c <= C; c++) {
-                double rx = spriteX + (double)c * imgW / C;
-                double ry = spriteY + (double)r * imgH / R;
-                int imgX = (int)(rx - spriteX), imgY = (int)(ry - spriteY);
+                double rx = layer.x + (double)c * imgW / C;
+                double ry = layer.y + (double)r * imgH / R;
+                int imgX = (int)(rx - layer.x), imgY = (int)(ry - layer.y);
                 boolean isRigid = false;
 
-                // check rigid maps
                 if (imgX >= 0 && imgY >= 0 && imgX < imgW && imgY < imgH) {
-                    for (Map.Entry<PathModel, List<PathPoint>> entry : restPoses.entrySet()) {
-                        byte[] rm = rigidMaps.get(entry.getKey());
+                    for (Map.Entry<PathModel, List<PathPoint>> entry : layer.restPoses.entrySet()) {
+                        byte[] rm = layer.rigidMaps.get(entry.getKey());
                         if (rm != null && rm[imgY * imgW + imgX] == 1) {
-                            // rigid: snap to nearest control point's displacement
                             List<PathPoint> rest = entry.getValue();
                             PathModel bp = entry.getKey();
                             double minD = Double.MAX_VALUE; double rdx = 0, rdy = 0;
@@ -1052,10 +1159,10 @@ public class PathEditor extends JFrame {
 
                 if (!isRigid) {
                     double totalW = 0, dx = 0, dy = 0;
-                    for (Map.Entry<PathModel, List<PathPoint>> entry : restPoses.entrySet()) {
+                    for (Map.Entry<PathModel, List<PathPoint>> entry : layer.restPoses.entrySet()) {
                         PathModel bp   = entry.getKey();
                         List<PathPoint> rest = entry.getValue();
-                        float[] wm = weightMaps.get(bp);
+                        float[] wm = layer.weightMaps.get(bp);
                         float pathWeight = 1f;
                         if (wm != null && imgX >= 0 && imgY >= 0 && imgX < imgW && imgY < imgH)
                             pathWeight = wm[imgY * imgW + imgX];
@@ -1080,13 +1187,13 @@ public class PathEditor extends JFrame {
             for (int c = 0; c < C; c++) {
                 double u0 = (double)c    *imgW/C, v0 = (double)r    *imgH/R;
                 double u1 = (double)(c+1)*imgW/C, v1 = (double)(r+1)*imgH/R;
-                drawTexturedTri(g2, gx[r][c],   gy[r][c],   gx[r][c+1],   gy[r][c+1],   gx[r+1][c],   gy[r+1][c],   u0,v0, u1,v0, u0,v1);
-                drawTexturedTri(g2, gx[r][c+1], gy[r][c+1], gx[r+1][c+1], gy[r+1][c+1], gx[r+1][c],   gy[r+1][c],   u1,v0, u1,v1, u0,v1);
+                drawTexturedTri(g2, layer.image, gx[r][c],   gy[r][c],   gx[r][c+1],   gy[r][c+1],   gx[r+1][c],   gy[r+1][c],   u0,v0, u1,v0, u0,v1);
+                drawTexturedTri(g2, layer.image, gx[r][c+1], gy[r][c+1], gx[r+1][c+1], gy[r+1][c+1], gx[r+1][c],   gy[r+1][c],   u1,v0, u1,v1, u0,v1);
             }
         }
     }
 
-    void drawTexturedTri(Graphics2D g2,
+    void drawTexturedTri(Graphics2D g2, BufferedImage img,
         double x1, double y1, double x2, double y2, double x3, double y3,
         double u1, double v1, double u2, double v2, double u3, double v3) {
 
@@ -1105,7 +1212,7 @@ public class PathEditor extends JFrame {
         tri.moveTo(x1,y1); tri.lineTo(x2,y2); tri.lineTo(x3,y3); tri.closePath();
         Graphics2D g = (Graphics2D) g2.create();
         g.clip(tri);
-        g.drawImage(spriteImage, at, null);
+        g.drawImage(img, at, null);
         g.dispose();
     }
 
@@ -1121,10 +1228,10 @@ public class PathEditor extends JFrame {
     // ── Timeline panel ────────────────────────────────────────────────────────
 
     class TimelinePanel extends JPanel {
-        static final int LEFT   = 110;   // label column width
-        static final int RULER_H = 22;   // ruler height
-        static final int TRACK_H = 18;   // per-track height
-        static final int KF      = 5;    // keyframe diamond half-size
+        static final int LEFT   = 110;
+        static final int RULER_H = 22;
+        static final int TRACK_H = 18;
+        static final int KF      = 5;
 
         double    pxPerFrame  = 5.0;
         boolean   dragging    = false;
@@ -1150,7 +1257,6 @@ public class PathEditor extends JFrame {
                         }
                         return;
                     }
-                    // keyframe diamond hit → start drag
                     if (trackIdx >= 0 && trackIdx < paths.size()) {
                         PathModel pm = paths.get(trackIdx);
                         AnimTrack t = animation.trackFor(pm);
@@ -1232,7 +1338,6 @@ public class PathEditor extends JFrame {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             int w = getWidth(), h = getHeight();
 
-            // ── Ruler ────────────────────────────────────────────────────────
             g2.setColor(new Color(42, 42, 54));
             g2.fillRect(LEFT, 0, w, RULER_H);
 
@@ -1249,13 +1354,11 @@ public class PathEditor extends JFrame {
                 }
             }
 
-            // ── Tracks (alle Pfade, auch ohne Keyframes) ─────────────────────
             int ty = RULER_H;
             for (int ti = 0; ti < paths.size(); ti++) {
                 PathModel pm = paths.get(ti);
                 AnimTrack track = animation.trackFor(pm);
 
-                // label — klickbar, gelb wenn selektiert
                 boolean isSel = (pm == selectedPath);
                 g2.setColor(isSel ? new Color(70, 60, 30) : new Color(50, 50, 62));
                 g2.fillRect(0, ty, LEFT, TRACK_H);
@@ -1265,12 +1368,10 @@ public class PathEditor extends JFrame {
                 if (lbl.length() > 13) lbl = lbl.substring(0, 11) + "..";
                 g2.drawString(lbl, 4, ty + TRACK_H - 4);
 
-                // track bg
                 g2.setColor(ti % 2 == 0 ? new Color(36, 36, 46) : new Color(32, 32, 42));
                 g2.fillRect(LEFT, ty, w, TRACK_H);
 
                 if (track != null) {
-                    // bar connecting first to last keyframe
                     if (track.keyframes.size() >= 2) {
                         int x0 = px(track.keyframes.get(0).frame);
                         int x1 = px(track.keyframes.get(track.keyframes.size()-1).frame);
@@ -1279,7 +1380,6 @@ public class PathEditor extends JFrame {
                         g2.fillRect(x0, cy2 - 2, x1 - x0, 4);
                     }
 
-                    // keyframe diamonds
                     for (Keyframe kf : track.keyframes) {
                         int px = px(kf.frame), cy2 = ty + TRACK_H/2;
                         boolean atCurrent = kf.frame == (int) currentFrame;
@@ -1296,7 +1396,6 @@ public class PathEditor extends JFrame {
                 ty += TRACK_H;
             }
 
-            // ── End-of-animation marker ───────────────────────────────────────
             int endPx = px(animation.totalFrames);
             if (endPx < w) {
                 g2.setColor(new Color(200, 80, 80, 180));
@@ -1304,7 +1403,6 @@ public class PathEditor extends JFrame {
                 g2.drawLine(endPx, 0, endPx, h);
             }
 
-            // ── Playhead ─────────────────────────────────────────────────────
             int phx = px(currentFrame);
             g2.setColor(new Color(255, 70, 70));
             g2.setStroke(new BasicStroke(1.5f));
@@ -1348,21 +1446,17 @@ public class PathEditor extends JFrame {
                                     SwingUtilities.isRightMouseButton(e));
                         return;
                     }
-                    // ALT + left drag → move sprite in world space
                     if (e.isAltDown() && SwingUtilities.isLeftMouseButton(e)) {
-                        viewPanning = false; // reuse prevDragX/Y
+                        viewPanning = false;
                         prevDragX = e.getX(); prevDragY = e.getY();
                         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                        dragPath = null; dragIdx = -1;
-                        // signal sprite drag via dragIdx = -2
-                        dragIdx = -2;
+                        dragPath = null; dragIdx = -2;
                         return;
                     }
                     if (playing) pause();
 
                     double wx = toWorldX(e.getX()), wy = toWorldY(e.getY());
 
-                    // ── Try point hit first ──────────────────────────────────
                     PathPoint hit = null;
                     outer:
                     for (PathModel pm : paths) {
@@ -1388,7 +1482,6 @@ public class PathEditor extends JFrame {
                         return;
                     }
 
-                    // ── Try edge hit ────────────────────────────────────────
                     double edgeThresh = 6.0 / zoom;
                     for (PathModel pm : paths) {
                         List<PathPoint> pts = pm.points;
@@ -1412,7 +1505,6 @@ public class PathEditor extends JFrame {
                     double wx = toWorldX(e.getX()), wy = toWorldY(e.getY());
                     boolean needRepaint = false;
 
-                    // point hover
                     PathModel newHovPtPath = null; int newHovPtIdx = -1;
                     outer1:
                     for (PathModel pm : paths) {
@@ -1427,7 +1519,6 @@ public class PathEditor extends JFrame {
                         needRepaint = true;
                     }
 
-                    // edge hover (only if not hovering a point)
                     PathModel newHovPath = null; int newHovIdx = -1;
                     if (newHovPtPath == null) {
                         double edgeThresh = 6.0 / zoom;
@@ -1463,12 +1554,14 @@ public class PathEditor extends JFrame {
                         repaint(); return;
                     }
                     if (dragIdx == -2) {
-                        // sprite drag (ALT+left)
-                        double dx = (e.getX() - prevDragX) / zoom;
-                        double dy = (e.getY() - prevDragY) / zoom;
-                        spriteX += dx; spriteY += dy;
-                        for (List<PathPoint> rest : restPoses.values())
-                            for (PathPoint p : rest) { p.x += dx; p.y += dy; }
+                        // ALT+drag: move active layer
+                        if (activeLayer != null) {
+                            double dx = (e.getX() - prevDragX) / zoom;
+                            double dy = (e.getY() - prevDragY) / zoom;
+                            activeLayer.x += dx; activeLayer.y += dy;
+                            for (List<PathPoint> rest : activeLayer.restPoses.values())
+                                for (PathPoint p : rest) { p.x += dx; p.y += dy; }
+                        }
                         prevDragX = e.getX(); prevDragY = e.getY();
                         repaint(); return;
                     }
@@ -1559,7 +1652,6 @@ public class PathEditor extends JFrame {
             Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            // apply view transform
             java.awt.geom.AffineTransform savedTx = g2.getTransform();
             g2.translate(viewOffX, viewOffY);
             g2.scale(zoom, zoom);
@@ -1567,20 +1659,33 @@ public class PathEditor extends JFrame {
             drawDeformedSprite(g2);
             drawHeatmapOverlay(g2);
 
-            // rest-pose overlay
-            for (List<PathPoint> restPose : restPoses.values()) {
-                if (restPose.size() < 2) continue;
-                g2.setColor(new Color(180, 180, 80, 100));
-                g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{4f,4f}, 0f));
-                for (int i = 0; i < restPose.size()-1; i++) {
-                    PathPoint a = restPose.get(i), b = restPose.get(i+1);
-                    g2.drawLine((int)a.x,(int)a.y,(int)b.x,(int)b.y);
+            // rest-pose overlay for all layers
+            for (SpriteLayer layer : layers) {
+                if (!layer.visible) continue;
+                for (List<PathPoint> restPose : layer.restPoses.values()) {
+                    if (restPose.size() < 2) continue;
+                    g2.setColor(new Color(180, 180, 80, 100));
+                    g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{4f,4f}, 0f));
+                    for (int i = 0; i < restPose.size()-1; i++) {
+                        PathPoint a = restPose.get(i), b = restPose.get(i+1);
+                        g2.drawLine((int)a.x,(int)a.y,(int)b.x,(int)b.y);
+                    }
+                    g2.setStroke(new BasicStroke(1f));
+                    for (PathPoint p : restPose) {
+                        g2.setColor(new Color(180,180,80,120));
+                        g2.fillOval((int)p.x-3,(int)p.y-3,6,6);
+                    }
                 }
+            }
+
+            // highlight active layer border
+            if (activeLayer != null && activeLayer.visible) {
+                g2.setColor(new Color(100, 160, 255, 80));
+                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+                        10f, new float[]{5f, 4f}, 0f));
+                g2.drawRect((int)activeLayer.x, (int)activeLayer.y,
+                            activeLayer.image.getWidth(), activeLayer.image.getHeight());
                 g2.setStroke(new BasicStroke(1f));
-                for (PathPoint p : restPose) {
-                    g2.setColor(new Color(180,180,80,120));
-                    g2.fillOval((int)p.x-3,(int)p.y-3,6,6);
-                }
             }
 
             // skeleton paths
@@ -1614,7 +1719,6 @@ public class PathEditor extends JFrame {
                     boolean isRoot = pm.isBranch() && i == 0;
                     boolean hov    = (pm == hoveredPointPath && i == hoveredPointIdx);
 
-                    // keyframe indicator ring
                     AnimTrack trk = animation.trackFor(pm);
                     if (trk != null && trk.hasKeyframeAt((int) currentFrame)) {
                         g2.setColor(new Color(255, 160, 40, 180));
@@ -1623,7 +1727,6 @@ public class PathEditor extends JFrame {
                     }
 
                     if (hov) {
-                        // hover: transparent fill, dashed outline (auch wenn selektiert)
                         g2.setColor(isRoot ? new Color(230,150,60,50) : (sel ? new Color(255,220,50,50) : new Color(80,180,255,50)));
                         if (isRoot) {
                             int[] xs = {(int)p.x,(int)p.x+R,(int)p.x,(int)p.x-R};
@@ -1670,7 +1773,7 @@ public class PathEditor extends JFrame {
                 g2.fillOval((int)ghost.x-R,(int)ghost.y-R,R*2,R*2);
             }
 
-            // brush cursor in world space — always pixel-accurate
+            // brush cursor in world space
             if (paintMode && paintCursorX >= 0) {
                 double wx = toWorldX(paintCursorX), wy = toWorldY(paintCursorY);
                 g2.setColor(new Color(255, 255, 255, 180));
@@ -1683,18 +1786,16 @@ public class PathEditor extends JFrame {
                 }
             }
 
-            // restore screen-space transform
             g2.setTransform(savedTx);
 
-            if (paths.isEmpty() && spriteImage == null) {
+            if (paths.isEmpty() && layers.isEmpty()) {
                 g2.setColor(new Color(120,120,130));
                 g2.setFont(g2.getFont().deriveFont(14f));
-                String msg = "ALT+N → Pfad anlegen   |   'Sprite laden' → Bild wählen";
+                String msg = "ALT+N → Pfad anlegen   |   'Layer hinzufügen' → Bild laden";
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(msg,(getWidth()-fm.stringWidth(msg))/2,getHeight()/2);
             }
 
-            // playing indicator + zoom level
             if (playing) {
                 g2.setColor(new Color(255, 80, 80, 200));
                 g2.setFont(g2.getFont().deriveFont(Font.BOLD, 12f));
