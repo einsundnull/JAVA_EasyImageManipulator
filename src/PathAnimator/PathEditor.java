@@ -36,6 +36,15 @@ public class PathEditor extends JFrame {
         @Override public String toString() { return name; }
     }
 
+    static class ComboItem {
+        enum Kind { HEADER, POINT, EDGE }
+        final Kind   kind;
+        final int    idx;
+        final String label;
+        ComboItem(Kind k, int i, String l) { kind = k; idx = i; label = l; }
+        @Override public String toString() { return label; }
+    }
+
     // ── Animation model ─────────────────────────────────────────────────────
 
     static class Keyframe {
@@ -145,8 +154,24 @@ public class PathEditor extends JFrame {
     final List<PathModel> paths = new ArrayList<>();
     PathModel selectedPath  = null;
     int       selectedPoint = -1;
+    PathModel selectedEdgePath = null;
+    int       selectedEdgeIdx  = -1;
     int       pathCounter   = 1;
     boolean   updating      = false;
+
+    // ── Edge / keep-length ──────────────────────────────────────────────────
+
+    boolean        showEdgesInList  = false;
+    boolean        keepLength       = false;
+    double         dragOrigLength   = 0;
+    JCheckBox      keepLengthBox;
+
+    // ── Heatmap paint modes ─────────────────────────────────────────────────
+
+    boolean        pixelBrush  = false;   // 1-px hard brush, no falloff
+    boolean        binaryMode  = false;   // weight = 0 or 1 only
+    boolean        paintRigid  = false;   // paint "rigid/pinned" region (third color)
+    Map<PathModel, byte[]> rigidMaps = new LinkedHashMap<>();
 
     // ── Sprite / skeleton binding ───────────────────────────────────────────
 
@@ -200,13 +225,20 @@ public class PathEditor extends JFrame {
         left.setPreferredSize(new Dimension(270, 0));
         left.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
 
-        JPanel pathBtns = new JPanel(new GridLayout(1, 2, 4, 0));
+        JPanel pathBtns = new JPanel(new GridLayout(2, 2, 4, 2));
         JButton newBtn = new JButton("Neuer Pfad  (ALT+N)");
         JButton delPathBtn = new JButton("Pfad löschen  (ALT+DEL)");
-        newBtn    .addActionListener(e -> createNewPath());
-        delPathBtn.addActionListener(e -> deleteSelectedPath());
+        JToggleButton showEdgesBtn = new JToggleButton("Kanten in Liste");
+        newBtn      .addActionListener(e -> createNewPath());
+        delPathBtn  .addActionListener(e -> deleteSelectedPath());
+        showEdgesBtn.addActionListener(e -> {
+            showEdgesInList = showEdgesBtn.isSelected();
+            for (PathModel pm : paths) refreshCombo(pm);
+        });
         pathBtns.add(newBtn);
         pathBtns.add(delPathBtn);
+        pathBtns.add(showEdgesBtn);
+        pathBtns.add(new JLabel()); // placeholder
         left.add(pathBtns, BorderLayout.NORTH);
 
         pathListPanel = new JPanel();
@@ -236,16 +268,32 @@ public class PathEditor extends JFrame {
         bindBtn      .addActionListener(e -> bindSkeleton());
         unbindBtn    .addActionListener(e -> unbind());
         paintModeBtn .addActionListener(e -> togglePaintMode());
+        JCheckBox     pixelBrushBox  = new JCheckBox("Pixel-Pinsel");
+        JCheckBox     binaryModeBox  = new JCheckBox("Ja/Nein-Modus");
+        JToggleButton paintRigidBtn  = new JToggleButton("Starr malen");
+        pixelBrushBox.addActionListener(e -> pixelBrush = pixelBrushBox.isSelected());
+        binaryModeBox.addActionListener(e -> { binaryMode = binaryModeBox.isSelected(); canvas.repaint(); });
+        paintRigidBtn.addActionListener(e -> {
+            paintRigid = paintRigidBtn.isSelected();
+            paintRigidBtn.setBackground(paintRigid ? new Color(255, 160, 40) : null);
+            paintRigidBtn.setForeground(paintRigid ? Color.BLACK : null);
+        });
         spritePanel.add(loadSpriteBtn);
         spritePanel.add(bindBtn);
         spritePanel.add(unbindBtn);
         spritePanel.add(paintModeBtn);
+        spritePanel.add(pixelBrushBox);
+        spritePanel.add(binaryModeBox);
+        spritePanel.add(paintRigidBtn);
         spritePanel.add(bindLabel);
 
         JButton removeBtn = new JButton("Punkt entfernen  (DEL)");
         removeBtn.addActionListener(e -> removeSelectedPoint());
-        JPanel hints = new JPanel(new GridLayout(4, 1));
+        keepLengthBox = new JCheckBox("Keep Length");
+        keepLengthBox.addActionListener(e -> keepLength = keepLengthBox.isSelected());
+        JPanel hints = new JPanel(new GridLayout(5, 1));
         hints.add(removeBtn);
+        hints.add(keepLengthBox);
         hints.add(new JLabel("<html><small>+/NUM+ → Punkt nach N</small></html>"));
         hints.add(new JLabel("<html><small>CTRL++ → Punkt vor N</small></html>"));
         hints.add(new JLabel("<html><small>SHIFT+K → Keyframe löschen</small></html>"));
@@ -500,12 +548,18 @@ public class PathEditor extends JFrame {
         am.put("prevFrame",    new AbstractAction() { public void actionPerformed(ActionEvent e) { if (!playing) seekToFrame((int) currentFrame - 1); } });
         am.put("nextFrame",    new AbstractAction() { public void actionPerformed(ActionEvent e) { if (!playing) seekToFrame((int) currentFrame + 1); } });
 
-        // DEL via KeyEventDispatcher so it works even when a text field has focus
+        // DEL: context-aware — point → remove point; no point but path → delete path; keyframe at frame → remove KF
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
             if (e.getID() == KeyEvent.KEY_PRESSED && e.getKeyCode() == KeyEvent.VK_DELETE) {
                 Component focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-                if (focused instanceof JTextField) return false; // let text field handle it
-                removeSelectedPoint();
+                if (focused instanceof JTextField) return false;
+                if (selectedPoint >= 0) {
+                    removeSelectedPoint();
+                } else if (selectedPath != null) {
+                    AnimTrack t = animation.trackFor(selectedPath);
+                    if (t != null && t.hasKeyframeAt((int) currentFrame)) removeKeyframeForSelected();
+                    else deleteSelectedPath();
+                }
                 return true;
             }
             return false;
@@ -648,6 +702,7 @@ public class PathEditor extends JFrame {
         spriteY = (canvas.getHeight() - img.getHeight()) / 2.0;
         restPoses.clear();
         weightMaps.clear();
+        rigidMaps.clear();
         updateBindLabel();
         canvas.repaint();
     }
@@ -692,6 +747,7 @@ public class PathEditor extends JFrame {
         if (selectedPath != null) {
             restPoses.remove(selectedPath);
             weightMaps.remove(selectedPath);
+            rigidMaps.remove(selectedPath);
         } else {
             restPoses.clear();
             weightMaps.clear();
@@ -733,22 +789,55 @@ public class PathEditor extends JFrame {
         });
     }
 
+    byte[] getOrCreateRigidMap(PathModel path) {
+        return rigidMaps.computeIfAbsent(path, p ->
+            new byte[spriteImage.getWidth() * spriteImage.getHeight()]);
+    }
+
     void paintWeight(int canvasX, int canvasY, boolean erase) {
         if (spriteImage == null || selectedPath == null) return;
         if (!restPoses.containsKey(selectedPath)) return;
-        float[] wm = getOrCreateWeightMap(selectedPath);
         int imgW = spriteImage.getWidth(), imgH = spriteImage.getHeight();
         int cx = (int)(canvasX - spriteX), cy = (int)(canvasY - spriteY);
-        for (int dy = -brushRadius; dy <= brushRadius; dy++) {
-            for (int dx = -brushRadius; dx <= brushRadius; dx++) {
-                int px = cx + dx, py = cy + dy;
-                if (px < 0 || py < 0 || px >= imgW || py >= imgH) continue;
-                double dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist > brushRadius) continue;
-                float falloff = (float)(1.0 - dist / brushRadius);
-                int idx = py * imgW + px;
-                if (erase) wm[idx] = Math.max(0f, wm[idx] - brushOpacity * falloff);
-                else        wm[idx] = Math.min(1f, wm[idx] + brushOpacity * falloff);
+
+        if (paintRigid) {
+            // paint / erase rigid region
+            byte[] rm = getOrCreateRigidMap(selectedPath);
+            if (pixelBrush) {
+                if (cx >= 0 && cy >= 0 && cx < imgW && cy < imgH)
+                    rm[cy * imgW + cx] = erase ? (byte)0 : (byte)1;
+            } else {
+                for (int dy = -brushRadius; dy <= brushRadius; dy++) {
+                    for (int dx = -brushRadius; dx <= brushRadius; dx++) {
+                        int px = cx+dx, py = cy+dy;
+                        if (px<0||py<0||px>=imgW||py>=imgH) continue;
+                        if (dx*dx+dy*dy > brushRadius*brushRadius) continue;
+                        rm[py * imgW + px] = erase ? (byte)0 : (byte)1;
+                    }
+                }
+            }
+        } else {
+            float[] wm = getOrCreateWeightMap(selectedPath);
+            if (pixelBrush) {
+                if (cx >= 0 && cy >= 0 && cx < imgW && cy < imgH)
+                    wm[cy * imgW + cx] = erase ? 0f : 1f;
+            } else {
+                for (int dy = -brushRadius; dy <= brushRadius; dy++) {
+                    for (int dx = -brushRadius; dx <= brushRadius; dx++) {
+                        int px = cx+dx, py = cy+dy;
+                        if (px<0||py<0||px>=imgW||py>=imgH) continue;
+                        double dist = Math.sqrt(dx*dx+dy*dy);
+                        if (dist > brushRadius) continue;
+                        int idx = py * imgW + px;
+                        if (binaryMode) {
+                            wm[idx] = erase ? 0f : 1f;
+                        } else {
+                            float falloff = (float)(1.0 - dist / brushRadius);
+                            if (erase) wm[idx] = Math.max(0f, wm[idx] - brushOpacity * falloff);
+                            else       wm[idx] = Math.min(1f, wm[idx] + brushOpacity * falloff);
+                        }
+                    }
+                }
             }
         }
         canvas.repaint();
@@ -759,13 +848,25 @@ public class PathEditor extends JFrame {
         float[] wm = weightMaps.get(selectedPath);
         if (wm == null) return;
         int imgW = spriteImage.getWidth(), imgH = spriteImage.getHeight();
+        byte[] rm = rigidMaps.get(selectedPath);
         int[] pixels = new int[imgW * imgH];
         for (int i = 0; i < pixels.length; i++) {
-            float w = wm[i];
-            int r = (int)(Math.min(1f, w * 2f)         * 220);
-            int gv= (int)(Math.max(0f, 1f - Math.abs(w - 0.5f) * 2f) * 220);
-            int b = (int)(Math.max(0f, (1f - w) * 2f)  * 220);
-            pixels[i] = (170 << 24) | (r << 16) | (gv << 8) | b;
+            if (rm != null && rm[i] == 1) {
+                // orange = starr (rigid/pinned)
+                pixels[i] = (200 << 24) | (255 << 16) | (140 << 8) | 0;
+            } else {
+                float w = wm[i];
+                if (binaryMode) {
+                    pixels[i] = w >= 0.5f
+                        ? (180 << 24) | (220 << 16) | (60 << 8) | 0
+                        : (120 << 24) | (40  << 16) | (40  << 8) | 180;
+                } else {
+                    int r  = (int)(Math.min(1f, w * 2f)                   * 220);
+                    int gv = (int)(Math.max(0f, 1f - Math.abs(w-0.5f)*2f) * 220);
+                    int b  = (int)(Math.max(0f, (1f - w) * 2f)            * 220);
+                    pixels[i] = (170 << 24) | (r << 16) | (gv << 8) | b;
+                }
+            }
         }
         BufferedImage overlay = new BufferedImage(imgW, imgH, BufferedImage.TYPE_INT_ARGB);
         overlay.setRGB(0, 0, imgW, imgH, pixels, 0, imgW);
@@ -774,17 +875,42 @@ public class PathEditor extends JFrame {
 
     // ── Selection ────────────────────────────────────────────────────────────
 
+    @SuppressWarnings("unchecked")
     void selectPointOf(PathModel path, int idx) {
         selectedPath = path; selectedPoint = idx;
+        selectedEdgePath = null; selectedEdgeIdx = -1;
         for (Component c : pathListPanel.getComponents()) {
             if (!(c instanceof JComboBox)) continue;
-            @SuppressWarnings("unchecked") JComboBox<String> cb = (JComboBox<String>) c;
+            JComboBox<ComboItem> cb = (JComboBox<ComboItem>) c;
             if (cb.getClientProperty("path") != path) continue;
             updating = true;
-            cb.setSelectedIndex(idx + 1);
+            for (int i = 0; i < cb.getItemCount(); i++) {
+                ComboItem it = cb.getItemAt(i);
+                if (it.kind == ComboItem.Kind.POINT && it.idx == idx) { cb.setSelectedIndex(i); break; }
+            }
             updating = false;
         }
         syncCoordsFromModel();
+        canvas.repaint();
+    }
+
+    @SuppressWarnings("unchecked")
+    void selectEdge(PathModel path, int edgeIdx) {
+        selectedEdgePath = path; selectedEdgeIdx = edgeIdx;
+        selectedPath = path; selectedPoint = -1;
+        for (Component c : pathListPanel.getComponents()) {
+            if (!(c instanceof JComboBox)) continue;
+            JComboBox<ComboItem> cb = (JComboBox<ComboItem>) c;
+            if (cb.getClientProperty("path") != path) continue;
+            updating = true;
+            for (int i = 0; i < cb.getItemCount(); i++) {
+                ComboItem it = cb.getItemAt(i);
+                if (it.kind == ComboItem.Kind.EDGE && it.idx == edgeIdx) { cb.setSelectedIndex(i); break; }
+            }
+            updating = false;
+        }
+        syncCoordsFromModel();
+        refreshCombo(path);
         canvas.repaint();
     }
 
@@ -821,17 +947,18 @@ public class PathEditor extends JFrame {
 
     // ── Path list (ComboBox rows) ────────────────────────────────────────────
 
+    @SuppressWarnings("unchecked")
     void addPathRow(PathModel path) {
-        JComboBox<String> cb = new JComboBox<>();
+        JComboBox<ComboItem> cb = new JComboBox<>();
         cb.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
         cb.putClientProperty("path", path);
         fillCombo(cb, path);
         cb.addActionListener(e -> {
             if (updating) return;
-            int sel = cb.getSelectedIndex();
-            if (sel <= 0) return;
-            int ptIdx = sel - 1;
-            if (ptIdx < path.points.size()) selectPointOf(path, ptIdx);
+            ComboItem item = (ComboItem) cb.getSelectedItem();
+            if (item == null || item.kind == ComboItem.Kind.HEADER) return;
+            if      (item.kind == ComboItem.Kind.POINT) selectPointOf(path, item.idx);
+            else if (item.kind == ComboItem.Kind.EDGE)  selectEdge(path, item.idx);
         });
         pathListPanel.add(cb);
         pathListPanel.add(Box.createVerticalStrut(4));
@@ -839,30 +966,47 @@ public class PathEditor extends JFrame {
         pathListPanel.repaint();
     }
 
-    void fillCombo(JComboBox<String> cb, PathModel path) {
+    @SuppressWarnings("unchecked")
+    void fillCombo(JComboBox<ComboItem> cb, PathModel path) {
         updating = true;
         cb.removeAllItems();
         String branchInfo = path.isBranch()
                 ? "  \u21A9 " + path.parentPath.name + "[" + path.parentPointIdx + "]" : "";
         AnimTrack track = animation.trackFor(path);
         String kfInfo = (track != null && track.hasKeyframeAt((int) currentFrame)) ? " ◆" : "";
-        cb.addItem("\u25B6 " + path.name + "  (" + path.points.size() + " Punkte)"
-                + (restPoses.containsKey(path) ? " [gebunden]" : "") + branchInfo + kfInfo);
-        for (int i = 0; i < path.points.size(); i++)
-            cb.addItem("   " + i + ": " + path.points.get(i));
+        cb.addItem(new ComboItem(ComboItem.Kind.HEADER, -1,
+                "\u25B6 " + path.name + "  (" + path.points.size() + " Punkte)"
+                + (restPoses.containsKey(path) ? " [gebunden]" : "") + branchInfo + kfInfo));
+        for (int i = 0; i < path.points.size(); i++) {
+            cb.addItem(new ComboItem(ComboItem.Kind.POINT, i, "   " + i + ": " + path.points.get(i)));
+            if (showEdgesInList && i < path.points.size() - 1) {
+                PathPoint a = path.points.get(i), b = path.points.get(i + 1);
+                double len = Math.hypot(b.x - a.x, b.y - a.y);
+                boolean edgeSel = (path == selectedEdgePath && i == selectedEdgeIdx);
+                cb.addItem(new ComboItem(ComboItem.Kind.EDGE, i,
+                        (edgeSel ? " ▶ " : "  ↔ ") + i + "-" + (i+1)
+                        + "  [" + String.format("%.1f", len) + " px]"));
+            }
+        }
         updating = false;
     }
 
+    @SuppressWarnings("unchecked")
     void refreshCombo(PathModel path) {
         for (Component c : pathListPanel.getComponents()) {
             if (!(c instanceof JComboBox)) continue;
-            @SuppressWarnings("unchecked") JComboBox<String> cb = (JComboBox<String>) c;
+            JComboBox<ComboItem> cb = (JComboBox<ComboItem>) c;
             if (cb.getClientProperty("path") != path) continue;
-            int sel = cb.getSelectedIndex();
+            ComboItem sel = (ComboItem) cb.getSelectedItem();
             fillCombo(cb, path);
-            updating = true;
-            cb.setSelectedIndex(Math.min(sel, cb.getItemCount()-1));
-            updating = false;
+            if (sel != null) {
+                updating = true;
+                for (int i = 0; i < cb.getItemCount(); i++) {
+                    ComboItem it = cb.getItemAt(i);
+                    if (it.kind == sel.kind && it.idx == sel.idx) { cb.setSelectedIndex(i); break; }
+                }
+                updating = false;
+            }
         }
     }
 
@@ -883,29 +1027,51 @@ public class PathEditor extends JFrame {
             for (int c = 0; c <= C; c++) {
                 double rx = spriteX + (double)c * imgW / C;
                 double ry = spriteY + (double)r * imgH / R;
-                double totalW = 0, dx = 0, dy = 0;
-                for (Map.Entry<PathModel, List<PathPoint>> entry : restPoses.entrySet()) {
-                    PathModel bp   = entry.getKey();
-                    List<PathPoint> rest = entry.getValue();
-                    float[] wm = weightMaps.get(bp);
-                    float pathWeight = 1f;
-                    if (wm != null) {
-                        int ix = (int)(rx - spriteX), iy = (int)(ry - spriteY);
-                        if (ix >= 0 && iy >= 0 && ix < imgW && iy < imgH)
-                            pathWeight = wm[iy * imgW + ix];
-                    }
-                    int n = Math.min(rest.size(), bp.points.size());
-                    for (int i = 0; i < n; i++) {
-                        PathPoint restPt = rest.get(i), currPt = bp.points.get(i);
-                        double ex = rx - restPt.x, ey = ry - restPt.y;
-                        double w = pathWeight / (ex*ex + ey*ey + 200.0);
-                        totalW += w;
-                        dx += w * (currPt.x - restPt.x);
-                        dy += w * (currPt.y - restPt.y);
+                int imgX = (int)(rx - spriteX), imgY = (int)(ry - spriteY);
+                boolean isRigid = false;
+
+                // check rigid maps
+                if (imgX >= 0 && imgY >= 0 && imgX < imgW && imgY < imgH) {
+                    for (Map.Entry<PathModel, List<PathPoint>> entry : restPoses.entrySet()) {
+                        byte[] rm = rigidMaps.get(entry.getKey());
+                        if (rm != null && rm[imgY * imgW + imgX] == 1) {
+                            // rigid: snap to nearest control point's displacement
+                            List<PathPoint> rest = entry.getValue();
+                            PathModel bp = entry.getKey();
+                            double minD = Double.MAX_VALUE; double rdx = 0, rdy = 0;
+                            for (int i = 0; i < Math.min(rest.size(), bp.points.size()); i++) {
+                                PathPoint rp = rest.get(i), cp = bp.points.get(i);
+                                double d = Math.hypot(rx - rp.x, ry - rp.y);
+                                if (d < minD) { minD = d; rdx = cp.x - rp.x; rdy = cp.y - rp.y; }
+                            }
+                            gx[r][c] = rx + rdx; gy[r][c] = ry + rdy;
+                            isRigid = true; break;
+                        }
                     }
                 }
-                gx[r][c] = totalW > 0 ? rx + dx / totalW : rx;
-                gy[r][c] = totalW > 0 ? ry + dy / totalW : ry;
+
+                if (!isRigid) {
+                    double totalW = 0, dx = 0, dy = 0;
+                    for (Map.Entry<PathModel, List<PathPoint>> entry : restPoses.entrySet()) {
+                        PathModel bp   = entry.getKey();
+                        List<PathPoint> rest = entry.getValue();
+                        float[] wm = weightMaps.get(bp);
+                        float pathWeight = 1f;
+                        if (wm != null && imgX >= 0 && imgY >= 0 && imgX < imgW && imgY < imgH)
+                            pathWeight = wm[imgY * imgW + imgX];
+                        int n = Math.min(rest.size(), bp.points.size());
+                        for (int i = 0; i < n; i++) {
+                            PathPoint restPt = rest.get(i), currPt = bp.points.get(i);
+                            double ex = rx - restPt.x, ey = ry - restPt.y;
+                            double w = pathWeight / (ex*ex + ey*ey + 200.0);
+                            totalW += w;
+                            dx += w * (currPt.x - restPt.x);
+                            dy += w * (currPt.y - restPt.y);
+                        }
+                    }
+                    gx[r][c] = totalW > 0 ? rx + dx / totalW : rx;
+                    gy[r][c] = totalW > 0 ? ry + dy / totalW : ry;
+                }
             }
         }
 
@@ -943,6 +1109,15 @@ public class PathEditor extends JFrame {
         g.dispose();
     }
 
+    static double distToSegment(double px, double py,
+                                double ax, double ay, double bx, double by) {
+        double dx = bx - ax, dy = by - ay;
+        double lenSq = dx*dx + dy*dy;
+        if (lenSq == 0) return Math.hypot(px - ax, py - ay);
+        double t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / lenSq));
+        return Math.hypot(px - (ax + t*dx), py - (ay + t*dy));
+    }
+
     // ── Timeline panel ────────────────────────────────────────────────────────
 
     class TimelinePanel extends JPanel {
@@ -951,8 +1126,11 @@ public class PathEditor extends JFrame {
         static final int TRACK_H = 18;   // per-track height
         static final int KF      = 5;    // keyframe diamond half-size
 
-        double pxPerFrame = 5.0;         // zoom
-        boolean dragging  = false;
+        double    pxPerFrame  = 5.0;
+        boolean   dragging    = false;
+        boolean   kfDragging  = false;
+        AnimTrack kfDragTrack = null;
+        Keyframe  kfDragKf    = null;
 
         TimelinePanel() {
             setPreferredSize(new Dimension(0, 130));
@@ -960,12 +1138,77 @@ public class PathEditor extends JFrame {
 
             MouseAdapter ma = new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e) {
-                    if (e.getX() >= LEFT) { dragging = true; scrub(e.getX()); }
+                    int trackIdx = (e.getY() - RULER_H) / TRACK_H;
+                    if (e.getX() < LEFT) {
+                        if (trackIdx >= 0 && trackIdx < paths.size()) {
+                            PathModel pm = paths.get(trackIdx);
+                            selectedPath  = pm; selectedPoint = -1;
+                            selectedEdgePath = null; selectedEdgeIdx = -1;
+                            syncCoordsFromModel();
+                            for (PathModel p : paths) refreshCombo(p);
+                            canvas.repaint(); repaint();
+                        }
+                        return;
+                    }
+                    // keyframe diamond hit → start drag
+                    if (trackIdx >= 0 && trackIdx < paths.size()) {
+                        PathModel pm = paths.get(trackIdx);
+                        AnimTrack t = animation.trackFor(pm);
+                        if (t != null) {
+                            for (Keyframe kf : t.keyframes) {
+                                if (Math.abs(px(kf.frame) - e.getX()) <= KF + 3) {
+                                    kfDragging = true;
+                                    kfDragTrack = t; kfDragKf = kf;
+                                    selectedPath = pm; selectedPoint = -1;
+                                    seekToFrame(kf.frame);
+                                    setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    dragging = true; scrub(e.getX());
                 }
+
                 @Override public void mouseDragged(MouseEvent e) {
+                    if (kfDragging && kfDragKf != null) {
+                        int newFrame = Math.max(0, Math.min(animation.totalFrames,
+                                (int) Math.round((e.getX() - LEFT) / pxPerFrame)));
+                        kfDragTrack.keyframes.remove(kfDragKf);
+                        kfDragKf.frame = newFrame;
+                        kfDragTrack.keyframes.add(kfDragKf);
+                        kfDragTrack.keyframes.sort(Comparator.comparingInt(k -> k.frame));
+                        seekToFrame(newFrame);
+                        return;
+                    }
                     if (dragging) scrub(e.getX());
                 }
-                @Override public void mouseReleased(MouseEvent e) { dragging = false; }
+
+                @Override public void mouseReleased(MouseEvent e) {
+                    dragging = false;
+                    if (kfDragging) {
+                        kfDragging = false; kfDragKf = null; kfDragTrack = null;
+                        setCursor(Cursor.getDefaultCursor());
+                        for (PathModel p : paths) refreshCombo(p);
+                    }
+                }
+
+                @Override public void mouseMoved(MouseEvent e) {
+                    if (e.getX() < LEFT) { setCursor(Cursor.getDefaultCursor()); return; }
+                    int trackIdx = (e.getY() - RULER_H) / TRACK_H;
+                    if (trackIdx >= 0 && trackIdx < paths.size()) {
+                        AnimTrack t = animation.trackFor(paths.get(trackIdx));
+                        if (t != null) {
+                            for (Keyframe kf : t.keyframes) {
+                                if (Math.abs(px(kf.frame) - e.getX()) <= KF + 3) {
+                                    setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    setCursor(Cursor.getDefaultCursor());
+                }
             };
             addMouseListener(ma);
             addMouseMotionListener(ma);
@@ -1006,17 +1249,19 @@ public class PathEditor extends JFrame {
                 }
             }
 
-            // ── Tracks ───────────────────────────────────────────────────────
+            // ── Tracks (alle Pfade, auch ohne Keyframes) ─────────────────────
             int ty = RULER_H;
-            for (int ti = 0; ti < animation.tracks.size(); ti++) {
-                AnimTrack track = animation.tracks.get(ti);
+            for (int ti = 0; ti < paths.size(); ti++) {
+                PathModel pm = paths.get(ti);
+                AnimTrack track = animation.trackFor(pm);
 
-                // label
-                g2.setColor(new Color(50, 50, 62));
+                // label — klickbar, gelb wenn selektiert
+                boolean isSel = (pm == selectedPath);
+                g2.setColor(isSel ? new Color(70, 60, 30) : new Color(50, 50, 62));
                 g2.fillRect(0, ty, LEFT, TRACK_H);
-                g2.setColor(track.path == selectedPath ? new Color(255, 220, 80) : new Color(180, 180, 200));
+                g2.setColor(isSel ? new Color(255, 220, 80) : new Color(180, 180, 200));
                 g2.setFont(g2.getFont().deriveFont(10f));
-                String lbl = track.path.name;
+                String lbl = pm.name;
                 if (lbl.length() > 13) lbl = lbl.substring(0, 11) + "..";
                 g2.drawString(lbl, 4, ty + TRACK_H - 4);
 
@@ -1024,26 +1269,28 @@ public class PathEditor extends JFrame {
                 g2.setColor(ti % 2 == 0 ? new Color(36, 36, 46) : new Color(32, 32, 42));
                 g2.fillRect(LEFT, ty, w, TRACK_H);
 
-                // bar connecting first to last keyframe
-                if (track.keyframes.size() >= 2) {
-                    int x0 = px(track.keyframes.get(0).frame);
-                    int x1 = px(track.keyframes.get(track.keyframes.size()-1).frame);
-                    int cy = ty + TRACK_H/2;
-                    g2.setColor(new Color(80, 80, 120));
-                    g2.fillRect(x0, cy - 2, x1 - x0, 4);
-                }
+                if (track != null) {
+                    // bar connecting first to last keyframe
+                    if (track.keyframes.size() >= 2) {
+                        int x0 = px(track.keyframes.get(0).frame);
+                        int x1 = px(track.keyframes.get(track.keyframes.size()-1).frame);
+                        int cy2 = ty + TRACK_H/2;
+                        g2.setColor(new Color(80, 80, 120));
+                        g2.fillRect(x0, cy2 - 2, x1 - x0, 4);
+                    }
 
-                // keyframe diamonds
-                for (Keyframe kf : track.keyframes) {
-                    int px = px(kf.frame), cy = ty + TRACK_H/2;
-                    boolean atCurrent = kf.frame == (int) currentFrame;
-                    int[] xs = {px, px+KF, px, px-KF};
-                    int[] ys = {cy-KF, cy, cy+KF, cy};
-                    g2.setColor(atCurrent ? new Color(255, 120, 60) : new Color(255, 200, 50));
-                    g2.fillPolygon(xs, ys, 4);
-                    g2.setColor(Color.WHITE);
-                    g2.setStroke(new BasicStroke(1f));
-                    g2.drawPolygon(xs, ys, 4);
+                    // keyframe diamonds
+                    for (Keyframe kf : track.keyframes) {
+                        int px = px(kf.frame), cy2 = ty + TRACK_H/2;
+                        boolean atCurrent = kf.frame == (int) currentFrame;
+                        int[] xs = {px, px+KF, px, px-KF};
+                        int[] ys = {cy2-KF, cy2, cy2+KF, cy2};
+                        g2.setColor(atCurrent ? new Color(255, 120, 60) : new Color(255, 200, 50));
+                        g2.fillPolygon(xs, ys, 4);
+                        g2.setColor(Color.WHITE);
+                        g2.setStroke(new BasicStroke(1f));
+                        g2.drawPolygon(xs, ys, 4);
+                    }
                 }
 
                 ty += TRACK_H;
@@ -1074,9 +1321,13 @@ public class PathEditor extends JFrame {
         int       dragIdx      = -1;
         boolean   rightDrag    = false;
         PathPoint ghost        = null;
-        boolean   spriteDrag   = false;
+        boolean   viewPanning  = false;
         double    prevDragX, prevDragY;
         double    zoom = 1.0, viewOffX = 0, viewOffY = 0;
+        PathModel hoveredEdgePath  = null;
+        int       hoveredEdgeIdx   = -1;
+        PathModel hoveredPointPath = null;
+        int       hoveredPointIdx  = -1;
 
         double toWorldX(double sx) { return (sx - viewOffX) / zoom; }
         double toWorldY(double sy) { return (sy - viewOffY) / zoom; }
@@ -1087,16 +1338,31 @@ public class PathEditor extends JFrame {
 
                 @Override public void mousePressed(MouseEvent e) {
                     if (SwingUtilities.isMiddleMouseButton(e)) {
-                        spriteDrag = true;
-                        prevDragX = e.getX(); prevDragY = e.getY(); return;
+                        viewPanning = true;
+                        prevDragX = e.getX(); prevDragY = e.getY();
+                        setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                        return;
                     }
                     if (paintMode) {
                         paintWeight((int)toWorldX(e.getX()), (int)toWorldY(e.getY()),
                                     SwingUtilities.isRightMouseButton(e));
                         return;
                     }
+                    // ALT + left drag → move sprite in world space
+                    if (e.isAltDown() && SwingUtilities.isLeftMouseButton(e)) {
+                        viewPanning = false; // reuse prevDragX/Y
+                        prevDragX = e.getX(); prevDragY = e.getY();
+                        setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                        dragPath = null; dragIdx = -1;
+                        // signal sprite drag via dragIdx = -2
+                        dragIdx = -2;
+                        return;
+                    }
                     if (playing) pause();
 
+                    double wx = toWorldX(e.getX()), wy = toWorldY(e.getY());
+
+                    // ── Try point hit first ──────────────────────────────────
                     PathPoint hit = null;
                     outer:
                     for (PathModel pm : paths) {
@@ -1107,21 +1373,80 @@ public class PathEditor extends JFrame {
                             }
                         }
                     }
-                    if (hit == null) { dragPath = null; dragIdx = -1; return; }
-                    if (SwingUtilities.isRightMouseButton(e)) {
-                        rightDrag = true;
-                        ghost = new PathPoint(hit.x, hit.y, hit.z);
-                    } else {
-                        rightDrag = false;
-                        selectPointOf(dragPath, dragIdx);
+                    if (hit != null) {
+                        if (keepLength && dragIdx > 0) {
+                            PathPoint prev = dragPath.points.get(dragIdx - 1);
+                            dragOrigLength = Math.hypot(hit.x - prev.x, hit.y - prev.y);
+                        }
+                        if (SwingUtilities.isRightMouseButton(e)) {
+                            rightDrag = true;
+                            ghost = new PathPoint(hit.x, hit.y, hit.z);
+                        } else {
+                            rightDrag = false;
+                            selectPointOf(dragPath, dragIdx);
+                        }
+                        return;
                     }
+
+                    // ── Try edge hit ────────────────────────────────────────
+                    double edgeThresh = 6.0 / zoom;
+                    for (PathModel pm : paths) {
+                        List<PathPoint> pts = pm.points;
+                        for (int i = 0; i < pts.size() - 1; i++) {
+                            PathPoint a = pts.get(i), b = pts.get(i + 1);
+                            if (distToSegment(wx, wy, a.x, a.y, b.x, b.y) <= edgeThresh) {
+                                selectEdge(pm, i);
+                                dragPath = null; dragIdx = -1;
+                                return;
+                            }
+                        }
+                    }
+                    dragPath = null; dragIdx = -1;
                 }
 
                 @Override public void mouseMoved(MouseEvent e) {
                     if (paintMode) {
                         paintCursorX = e.getX(); paintCursorY = e.getY();
-                        repaint();
+                        repaint(); return;
                     }
+                    double wx = toWorldX(e.getX()), wy = toWorldY(e.getY());
+                    boolean needRepaint = false;
+
+                    // point hover
+                    PathModel newHovPtPath = null; int newHovPtIdx = -1;
+                    outer1:
+                    for (PathModel pm : paths) {
+                        for (int i = 0; i < pm.points.size(); i++) {
+                            if (dist(e.getPoint(), pm.points.get(i)) <= R + 4) {
+                                newHovPtPath = pm; newHovPtIdx = i; break outer1;
+                            }
+                        }
+                    }
+                    if (newHovPtPath != hoveredPointPath || newHovPtIdx != hoveredPointIdx) {
+                        hoveredPointPath = newHovPtPath; hoveredPointIdx = newHovPtIdx;
+                        needRepaint = true;
+                    }
+
+                    // edge hover (only if not hovering a point)
+                    PathModel newHovPath = null; int newHovIdx = -1;
+                    if (newHovPtPath == null) {
+                        double edgeThresh = 6.0 / zoom;
+                        outer2:
+                        for (PathModel pm : paths) {
+                            List<PathPoint> pts = pm.points;
+                            for (int i = 0; i < pts.size() - 1; i++) {
+                                PathPoint a = pts.get(i), b = pts.get(i + 1);
+                                if (distToSegment(wx, wy, a.x, a.y, b.x, b.y) <= edgeThresh) {
+                                    newHovPath = pm; newHovIdx = i; break outer2;
+                                }
+                            }
+                        }
+                    }
+                    if (newHovPath != hoveredEdgePath || newHovIdx != hoveredEdgeIdx) {
+                        hoveredEdgePath = newHovPath; hoveredEdgeIdx = newHovIdx;
+                        needRepaint = true;
+                    }
+                    if (needRepaint) repaint();
                 }
 
                 @Override public void mouseDragged(MouseEvent e) {
@@ -1131,7 +1456,14 @@ public class PathEditor extends JFrame {
                                     SwingUtilities.isRightMouseButton(e));
                         return;
                     }
-                    if (spriteDrag) {
+                    if (viewPanning) {
+                        viewOffX += e.getX() - prevDragX;
+                        viewOffY += e.getY() - prevDragY;
+                        prevDragX = e.getX(); prevDragY = e.getY();
+                        repaint(); return;
+                    }
+                    if (dragIdx == -2) {
+                        // sprite drag (ALT+left)
                         double dx = (e.getX() - prevDragX) / zoom;
                         double dy = (e.getY() - prevDragY) / zoom;
                         spriteX += dx; spriteY += dy;
@@ -1145,7 +1477,15 @@ public class PathEditor extends JFrame {
                         ghost.x = toWorldX(e.getX()); ghost.y = toWorldY(e.getY()); repaint();
                     } else {
                         PathPoint p = dragPath.points.get(dragIdx);
-                        p.x = toWorldX(e.getX()); p.y = toWorldY(e.getY());
+                        double wx = toWorldX(e.getX()), wy = toWorldY(e.getY());
+                        if (keepLength && dragIdx > 0 && dragOrigLength > 0) {
+                            PathPoint parent = dragPath.points.get(dragIdx - 1);
+                            double dx = wx - parent.x, dy = wy - parent.y;
+                            double d = Math.hypot(dx, dy);
+                            if (d > 0) { p.x = parent.x + dx/d * dragOrigLength; p.y = parent.y + dy/d * dragOrigLength; }
+                        } else {
+                            p.x = wx; p.y = wy;
+                        }
                         if (dragPath == selectedPath && dragIdx == selectedPoint) syncCoordsFromModel();
                         refreshCombo(dragPath);
                         repaint();
@@ -1153,7 +1493,16 @@ public class PathEditor extends JFrame {
                 }
 
                 @Override public void mouseReleased(MouseEvent e) {
-                    spriteDrag = false;
+                    if (viewPanning) {
+                        viewPanning = false;
+                        setCursor(Cursor.getDefaultCursor());
+                        return;
+                    }
+                    if (dragIdx == -2) {
+                        dragIdx = -1;
+                        setCursor(Cursor.getDefaultCursor());
+                        return;
+                    }
                     if (paintMode) return;
                     if (rightDrag && dragPath != null && ghost != null) {
                         PathPoint sharedRoot = dragPath.points.get(dragIdx);
@@ -1171,7 +1520,9 @@ public class PathEditor extends JFrame {
 
                 @Override public void mouseExited(MouseEvent e) {
                     paintCursorX = -1; paintCursorY = -1;
-                    if (paintMode) repaint();
+                    hoveredEdgePath  = null; hoveredEdgeIdx  = -1;
+                    hoveredPointPath = null; hoveredPointIdx = -1;
+                    repaint();
                 }
             };
             addMouseListener(ma);
@@ -1185,8 +1536,14 @@ public class PathEditor extends JFrame {
                     viewOffY = my + (viewOffY - my) * factor;
                     zoom = Math.max(0.05, Math.min(20.0, zoom * factor));
                     repaint();
+                } else if (e.isShiftDown()) {
+                    brushRadius = Math.max(1, Math.min(200, brushRadius - (int) e.getPreciseWheelRotation() * 2));
+                    repaint();
                 } else if (paintMode) {
-                    brushRadius = Math.max(2, Math.min(200, brushRadius - (int) e.getPreciseWheelRotation() * 2));
+                    brushRadius = Math.max(1, Math.min(200, brushRadius - (int) e.getPreciseWheelRotation() * 2));
+                    repaint();
+                } else if (zoom != 1.0) {
+                    viewOffY -= e.getPreciseWheelRotation() * 40;
                     repaint();
                 }
             });
@@ -1229,17 +1586,33 @@ public class PathEditor extends JFrame {
             // skeleton paths
             for (PathModel pm : paths) {
                 List<PathPoint> pts = pm.points;
-                Color edgeColor = pm.isBranch() ? new Color(230,150,60) : new Color(160,160,200);
-                g2.setColor(edgeColor);
-                g2.setStroke(new BasicStroke(1.5f));
+                Color baseEdgeColor = pm.isBranch() ? new Color(230,150,60) : new Color(160,160,200);
                 for (int i = 0; i < pts.size()-1; i++) {
                     PathPoint a = pts.get(i), b = pts.get(i+1);
+                    boolean hov = (pm == hoveredEdgePath  && i == hoveredEdgeIdx);
+                    boolean sel = (pm == selectedEdgePath && i == selectedEdgeIdx);
+                    if (sel) {
+                        g2.setColor(new Color(255, 220, 50));
+                        g2.setStroke(new BasicStroke(3f));
+                    } else if (hov) {
+                        g2.setColor(new Color(120, 220, 255));
+                        g2.setStroke(new BasicStroke(2.5f));
+                    } else {
+                        g2.setColor(baseEdgeColor);
+                        g2.setStroke(new BasicStroke(1.5f));
+                    }
                     g2.drawLine((int)a.x,(int)a.y,(int)b.x,(int)b.y);
                 }
+                g2.setColor(baseEdgeColor);
+                g2.setStroke(new BasicStroke(1.5f));
+                float[] dash = {3f, 3f};
+                Stroke dashedStroke = new BasicStroke(1f, BasicStroke.CAP_BUTT,
+                        BasicStroke.JOIN_MITER, 10f, dash, 0f);
                 for (int i = 0; i < pts.size(); i++) {
                     PathPoint p = pts.get(i);
                     boolean sel    = (pm == selectedPath && i == selectedPoint);
                     boolean isRoot = pm.isBranch() && i == 0;
+                    boolean hov    = (pm == hoveredPointPath && i == hoveredPointIdx);
 
                     // keyframe indicator ring
                     AnimTrack trk = animation.trackFor(pm);
@@ -1249,9 +1622,25 @@ public class PathEditor extends JFrame {
                         g2.drawOval((int)p.x-R-3,(int)p.y-R-3,(R+3)*2,(R+3)*2);
                     }
 
-                    if (isRoot) {
-                        int[] xs = {(int)p.x, (int)p.x+R, (int)p.x, (int)p.x-R};
-                        int[] ys = {(int)p.y-R, (int)p.y, (int)p.y+R, (int)p.y};
+                    if (hov) {
+                        // hover: transparent fill, dashed outline (auch wenn selektiert)
+                        g2.setColor(isRoot ? new Color(230,150,60,50) : (sel ? new Color(255,220,50,50) : new Color(80,180,255,50)));
+                        if (isRoot) {
+                            int[] xs = {(int)p.x,(int)p.x+R,(int)p.x,(int)p.x-R};
+                            int[] ys = {(int)p.y-R,(int)p.y,(int)p.y+R,(int)p.y};
+                            g2.fillPolygon(xs,ys,4);
+                            g2.setColor(new Color(255,255,255,160));
+                            g2.setStroke(dashedStroke);
+                            g2.drawPolygon(xs,ys,4);
+                        } else {
+                            g2.fillOval((int)p.x-R,(int)p.y-R,R*2,R*2);
+                            g2.setColor(new Color(255,255,255,160));
+                            g2.setStroke(dashedStroke);
+                            g2.drawOval((int)p.x-R,(int)p.y-R,R*2,R*2);
+                        }
+                    } else if (isRoot) {
+                        int[] xs = {(int)p.x,(int)p.x+R,(int)p.x,(int)p.x-R};
+                        int[] ys = {(int)p.y-R,(int)p.y,(int)p.y+R,(int)p.y};
                         g2.setColor(sel ? new Color(255,220,50) : new Color(230,150,60));
                         g2.fillPolygon(xs,ys,4);
                         g2.setColor(Color.WHITE);
@@ -1264,9 +1653,10 @@ public class PathEditor extends JFrame {
                         g2.setStroke(new BasicStroke(sel?2f:1f));
                         g2.drawOval((int)p.x-R,(int)p.y-R,R*2,R*2);
                     }
-                    g2.setColor(Color.WHITE);
+                    g2.setColor(hov ? new Color(255,255,255,160) : Color.WHITE);
                     g2.setFont(g2.getFont().deriveFont(9f));
                     g2.drawString(String.valueOf(i),(int)p.x-3,(int)p.y+3);
+                    g2.setStroke(new BasicStroke(1.5f));
                 }
             }
 
@@ -1280,6 +1670,19 @@ public class PathEditor extends JFrame {
                 g2.fillOval((int)ghost.x-R,(int)ghost.y-R,R*2,R*2);
             }
 
+            // brush cursor in world space — always pixel-accurate
+            if (paintMode && paintCursorX >= 0) {
+                double wx = toWorldX(paintCursorX), wy = toWorldY(paintCursorY);
+                g2.setColor(new Color(255, 255, 255, 180));
+                g2.setStroke(new BasicStroke((float)(1.0 / zoom)));
+                if (pixelBrush) {
+                    g2.drawRect((int)wx, (int)wy, 1, 1);
+                } else {
+                    g2.drawOval((int)(wx - brushRadius), (int)(wy - brushRadius),
+                                brushRadius * 2, brushRadius * 2);
+                }
+            }
+
             // restore screen-space transform
             g2.setTransform(savedTx);
 
@@ -1289,14 +1692,6 @@ public class PathEditor extends JFrame {
                 String msg = "ALT+N → Pfad anlegen   |   'Sprite laden' → Bild wählen";
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(msg,(getWidth()-fm.stringWidth(msg))/2,getHeight()/2);
-            }
-
-            // brush cursor in screen space
-            if (paintMode && paintCursorX >= 0) {
-                g2.setColor(new Color(255, 255, 255, 180));
-                g2.setStroke(new BasicStroke(1.2f));
-                g2.drawOval(paintCursorX - brushRadius, paintCursorY - brushRadius,
-                            brushRadius * 2, brushRadius * 2);
             }
 
             // playing indicator + zoom level
