@@ -45,18 +45,29 @@ public class PaintEngine {
         Graphics2D g2 = img.createGraphics();
         applyQuality(g2, aa);
         g2.setColor(color);
-        g2.setStroke(new BasicStroke(strokeWidth,
-                shape == BrushShape.ROUND ? BasicStroke.CAP_ROUND : BasicStroke.CAP_SQUARE,
-                shape == BrushShape.ROUND ? BasicStroke.JOIN_ROUND : BasicStroke.JOIN_MITER));
-        if (from.equals(to)) {
-            int r = strokeWidth / 2;
-            if (shape == BrushShape.ROUND) {
-                g2.fillOval(from.x - r, from.y - r, strokeWidth, strokeWidth);
-            } else {
+        int r = strokeWidth / 2;
+        if (shape == BrushShape.SQUARE) {
+            // Axis-aligned square stamped along the interpolated path (MS-Paint style).
+            // AA must be off for crisp edges — the brush shape is a pixel-grid square.
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+            int dx = to.x - from.x, dy = to.y - from.y;
+            int steps = Math.max(Math.abs(dx), Math.abs(dy));
+            if (steps == 0) {
                 g2.fillRect(from.x - r, from.y - r, strokeWidth, strokeWidth);
+            } else {
+                for (int i = 0; i <= steps; i++) {
+                    int px = from.x + dx * i / steps;
+                    int py = from.y + dy * i / steps;
+                    g2.fillRect(px - r, py - r, strokeWidth, strokeWidth);
+                }
             }
         } else {
-            g2.drawLine(from.x, from.y, to.x, to.y);
+            g2.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            if (from.equals(to)) {
+                g2.fillOval(from.x - r, from.y - r, strokeWidth, strokeWidth);
+            } else {
+                g2.drawLine(from.x, from.y, to.x, to.y);
+            }
         }
         g2.dispose();
     }
