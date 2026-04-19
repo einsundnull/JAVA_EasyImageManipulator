@@ -6,6 +6,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 
 import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
 
 /**
  * Controls the secondary preview window (F1–F7): initialization, show/hide,
@@ -157,6 +158,42 @@ class SecondaryWindowController {
 		ToastNotification.show(ed, msg);
 		if (ed.secPanel != null)
 			ed.secPanel.repaint();
+	}
+
+	void showSecondaryTextInput() {
+		if (ed.secWin == null)
+			initSecondaryWindow();
+		if (!ed.secWin.isVisible()) {
+			ed.secWin.setVisible(true);
+			if (ed.secMode != PreviewMode.SNAPSHOT)
+				ed.secTimer.start();
+		}
+		SwingUtilities.invokeLater(() -> ed.secPanel.showTextInput());
+	}
+
+	void addTextLayerFromInput(String text, int panelX, int panelY, int tfW, int tfH, int panelW, int panelH) {
+		CanvasInstance c = ed.ci();
+		int imgX = 50, imgY = 50, imgW = 300, imgH = 60;
+		if (c.workingImage != null && panelW > 0 && panelH > 0) {
+			int iw = c.workingImage.getWidth(), ih = c.workingImage.getHeight();
+			double scale = Math.min((double) panelW / iw, (double) panelH / ih);
+			int ox = (panelW - (int) (iw * scale)) / 2;
+			int oy = (panelH - (int) (ih * scale)) / 2;
+			imgX = Math.max(0, (int) ((panelX - ox) / scale));
+			imgY = Math.max(0, (int) ((panelY - oy) / scale));
+			imgW = Math.max(10, (int) (tfW / scale));
+			imgH = Math.max(10, (int) (tfH / scale));
+		}
+		TextLayer tl = TextLayer.wrappingOf(c.nextElementId++, text, "SansSerif", 28, false, false,
+				Color.WHITE, imgX, imgY, imgW, imgH);
+		c.activeElements.add(tl);
+		c.selectedElements.clear();
+		c.selectedElements.add(tl);
+		ed.markDirty();
+		ed.refreshElementPanel();
+		if (c.canvasPanel != null)
+			c.canvasPanel.repaint();
+		ToastNotification.show(ed, "Text hinzugefügt");
 	}
 
 	void applySecondaryWindowToCanvas() {

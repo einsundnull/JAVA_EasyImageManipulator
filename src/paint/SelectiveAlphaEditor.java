@@ -381,6 +381,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	void cycleAlwaysOnTop()            { secWinController.cycleAlwaysOnTop(); }
 	void cycleCanvasDisplayMode()      { secWinController.cycleCanvasDisplayMode(); }
 	void applySecondaryWindowToCanvas(){ secWinController.applySecondaryWindowToCanvas(); }
+	void showSecondaryTextInput()      { secWinController.showSecondaryTextInput(); }
 
 	private void setupKeyBindings()        { new KeyboardShortcutManager(this).setup(); }
 

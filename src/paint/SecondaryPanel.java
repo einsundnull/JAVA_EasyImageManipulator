@@ -3,14 +3,21 @@ package paint;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Cursor;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 
+import javax.swing.BorderFactory;
 import javax.swing.JPanel;
+import javax.swing.JTextField;
 
 /**
  * Secondary preview window panel. Handles window drag/resize via mouse, and
@@ -23,9 +30,90 @@ class SecondaryPanel extends JPanel {
 	private String resizeEdge = null; // "tl", "t", "tr", "l", "r", "bl", "b", "br", or null for drag
 
 	private final SelectiveAlphaEditor editor;
+	private JTextField textInput;
+	private int textDragOffsetX, textDragOffsetY;
+	private String textResizeMode = null; // null=move, "r","b","br","l","t","tl","tr","bl"
+	private static final int TF_HANDLE = 10;
 
 	SecondaryPanel(SelectiveAlphaEditor editor) {
 		this.editor = editor;
+		setLayout(null);
+
+		textInput = new JTextField();
+		textInput.setFont(new Font("SansSerif", Font.BOLD, 22));
+		textInput.setForeground(Color.WHITE);
+		textInput.setBackground(new Color(30, 30, 30));
+		textInput.setCaretColor(Color.WHITE);
+		textInput.setBorder(BorderFactory.createCompoundBorder(
+				BorderFactory.createLineBorder(new Color(80, 140, 255), 2),
+				BorderFactory.createEmptyBorder(6, 12, 6, 12)));
+		textInput.setVisible(false);
+		textInput.addKeyListener(new KeyAdapter() {
+			@Override
+			public void keyPressed(KeyEvent e) {
+				if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+					hideTextInput();
+				} else if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+					confirmTextInput();
+				}
+			}
+		});
+		textInput.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent e) {
+				textDragOffsetX = e.getX();
+				textDragOffsetY = e.getY();
+				textResizeMode = getTfResizeEdge(e.getX(), e.getY());
+				updateTfCursor(textResizeMode);
+			}
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				textResizeMode = null;
+				updateTfCursor(getTfResizeEdge(e.getX(), e.getY()));
+			}
+		});
+		textInput.addMouseMotionListener(new MouseAdapter() {
+			@Override
+			public void mouseMoved(MouseEvent e) {
+				updateTfCursor(getTfResizeEdge(e.getX(), e.getY()));
+			}
+			@Override
+			public void mouseDragged(MouseEvent e) {
+				int dx = e.getX() - textDragOffsetX;
+				int dy = e.getY() - textDragOffsetY;
+				if (textResizeMode == null) {
+					// Move
+					int nx = textInput.getX() + dx;
+					int ny = textInput.getY() + dy;
+					nx = Math.max(0, Math.min(getWidth()  - textInput.getWidth(),  nx));
+					ny = Math.max(0, Math.min(getHeight() - textInput.getHeight(), ny));
+					textInput.setLocation(nx, ny);
+				} else {
+					// Resize
+					int x = textInput.getX(), y = textInput.getY();
+					int w = textInput.getWidth(), h = textInput.getHeight();
+					if (textResizeMode.contains("r")) w = Math.max(80, w + dx);
+					if (textResizeMode.contains("b")) h = Math.max(30, h + dy);
+					if (textResizeMode.contains("l")) { x += dx; w = Math.max(80, w - dx); }
+					if (textResizeMode.contains("t")) { y += dy; h = Math.max(30, h - dy); }
+					x = Math.max(0, x);
+					y = Math.max(0, y);
+					w = Math.min(getWidth()  - x, w);
+					h = Math.min(getHeight() - y, h);
+					textInput.setBounds(x, y, w, h);
+					textDragOffsetX = e.getX();
+					textDragOffsetY = e.getY();
+				}
+			}
+		});
+		add(textInput);
+
+		addComponentListener(new ComponentAdapter() {
+			@Override
+			public void componentResized(ComponentEvent e) {
+				repositionTextInput();
+			}
+		});
 
 		addMouseListener(new MouseAdapter() {
 			@Override
@@ -77,6 +165,72 @@ class SecondaryPanel extends JPanel {
 				}
 			}
 		});
+	}
+
+	void showTextInput() {
+		if (textInput.isVisible()) {
+			hideTextInput();
+			return;
+		}
+		textInput.setText("");
+		repositionTextInput();
+		textInput.setVisible(true);
+		textInput.requestFocusInWindow();
+		repaint();
+	}
+
+	void hideTextInput() {
+		textInput.setVisible(false);
+		repaint();
+	}
+
+	private void repositionTextInput() {
+		int pw = getWidth(), ph = getHeight();
+		if (pw <= 0 || ph <= 0)
+			return;
+		int tw = Math.min((int) (pw * 0.65), 800);
+		int th = 48;
+		textInput.setBounds((pw - tw) / 2, (ph - th) / 2, tw, th);
+	}
+
+	private void confirmTextInput() {
+		String text   = textInput.getText();
+		int panelX    = textInput.getX();
+		int panelY    = textInput.getY();
+		int tfW       = textInput.getWidth();
+		int tfH       = textInput.getHeight();
+		int panelW    = getWidth();
+		int panelH    = getHeight();
+		hideTextInput();
+		if (text != null && !text.isBlank()) {
+			editor.secWinController.addTextLayerFromInput(text, panelX, panelY, tfW, tfH, panelW, panelH);
+		}
+	}
+
+	private String getTfResizeEdge(int x, int y) {
+		int w = textInput.getWidth(), h = textInput.getHeight();
+		boolean l = x < TF_HANDLE, r = x >= w - TF_HANDLE;
+		boolean t = y < TF_HANDLE, b = y >= h - TF_HANDLE;
+		if (t && l) return "tl";
+		if (t && r) return "tr";
+		if (b && l) return "bl";
+		if (b && r) return "br";
+		if (r) return "r";
+		if (b) return "b";
+		if (l) return "l";
+		if (t) return "t";
+		return null;
+	}
+
+	private void updateTfCursor(String edge) {
+		int c = switch (edge == null ? "" : edge) {
+			case "tl", "br" -> Cursor.NW_RESIZE_CURSOR;
+			case "tr", "bl" -> Cursor.NE_RESIZE_CURSOR;
+			case "t",  "b"  -> Cursor.N_RESIZE_CURSOR;
+			case "l",  "r"  -> Cursor.W_RESIZE_CURSOR;
+			default -> Cursor.MOVE_CURSOR;
+		};
+		textInput.setCursor(Cursor.getPredefinedCursor(c));
 	}
 
 	private String getResizeEdgeAt(int x, int y) {

@@ -273,6 +273,13 @@ class KeyboardShortcutManager {
 		java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
 			if (e.getID() != KeyEvent.KEY_PRESSED)
 				return false;
+			// Alt+T: Textfeld im sekundären Fenster anzeigen
+			if (e.getKeyCode() == KeyEvent.VK_T
+					&& (e.getModifiersEx() & InputEvent.ALT_DOWN_MASK) != 0
+					&& ed.secWin != null && ed.secWin.isVisible()) {
+				ed.showSecondaryTextInput();
+				return true;
+			}
 			switch (e.getKeyCode()) {
 			case KeyEvent.VK_F1 -> {
 				ed.toggleSecondaryWindow();
