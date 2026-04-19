@@ -140,6 +140,12 @@ public class CanvasPanel extends JPanel {
 			.createCustomCursor(new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB),
 					new Point(0, 0), "blank");
 
+	// ── Checkerboard cache ───────────────────────────────────────────────────
+	/** Cached 2×2-cell tile used to fill the canvas checkerboard in a single fillRect. */
+	private java.awt.TexturePaint cachedCheckerPaint = null;
+	private Color cachedCheckerBg1 = null;
+	private Color cachedCheckerBg2 = null;
+
 	// ── Canvas-submode draw overlay ───────────────────────────────────────────
 	/** Transparent scratch image used when drawing in Canvas sub-mode (becomes an Element on release). */
 	private BufferedImage canvasDrawOverlay = null;
@@ -1975,6 +1981,30 @@ public class CanvasPanel extends JPanel {
 
 
 	/**
+	 * Returns a cached TexturePaint containing a 2×2-cell checker tile.
+	 * Rebuilt only when the background colors change — a single fillRect then
+	 * paints the whole canvas instead of thousands of per-cell fillRects.
+	 */
+	private java.awt.TexturePaint getCheckerPaint(Color bg1, Color bg2) {
+		if (cachedCheckerPaint != null
+				&& bg1.equals(cachedCheckerBg1)
+				&& bg2.equals(cachedCheckerBg2)) {
+			return cachedCheckerPaint;
+		}
+		int cell = 16;
+		int size = cell * 2;
+		BufferedImage tile = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+		Graphics2D g = tile.createGraphics();
+		g.setColor(bg1); g.fillRect(0, 0, cell, cell);      g.fillRect(cell, cell, cell, cell);
+		g.setColor(bg2); g.fillRect(cell, 0, cell, cell);   g.fillRect(0, cell, cell, cell);
+		g.dispose();
+		cachedCheckerPaint = new java.awt.TexturePaint(tile, new Rectangle(0, 0, size, size));
+		cachedCheckerBg1 = bg1;
+		cachedCheckerBg2 = bg2;
+		return cachedCheckerPaint;
+	}
+
+	/**
 	 * Creates a transparent overlay image (same size as workingImage) used for
 	 * drawing in Canvas sub-mode so the stroke becomes a separate Element layer.
 	 */
@@ -2334,27 +2364,23 @@ public class CanvasPanel extends JPanel {
 
 		Graphics2D g2 = (Graphics2D) g;
 		double zoom = callbacks.getZoom();
-		// Bei hohem Zoom (Pixel-Level): NEAREST_NEIGHBOR für schnelleres Rendering
-		// Bei normalem Zoom: BICUBIC für glattes Rendering
-		if (zoom > 2.0) {
+		// Zoom >= 1: NEAREST (pixelgenau, MS-Paint-artig, schnell).
+		// Zoom  < 1: BILINEAR (glatt beim Runterskalieren, deutlich schneller als BICUBIC).
+		if (zoom >= 1.0) {
 			g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 		} else {
-			g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+			g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 		}
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
 		int cw = (int) Math.round(callbacks.getWorkingImage().getWidth() * zoom);
 		int ch = (int) Math.round(callbacks.getWorkingImage().getHeight() * zoom);
 
-		// ── Draw checkerboard background ──────────────────────────────────────
-		int cellSize = 16;
-		for (int y = 0; y < ch; y += cellSize) {
-			for (int x = 0; x < cw; x += cellSize) {
-				boolean even = ((x / cellSize) + (y / cellSize)) % 2 == 0;
-				g2.setColor(even ? callbacks.getCanvasBg1() : callbacks.getCanvasBg2());
-				g2.fillRect(x, y, Math.min(cellSize, cw - x), Math.min(cellSize, ch - y));
-			}
-		}
+		// ── Draw checkerboard background (one fillRect with cached TexturePaint) ──
+		java.awt.Paint savedPaint = g2.getPaint();
+		g2.setPaint(getCheckerPaint(callbacks.getCanvasBg1(), callbacks.getCanvasBg2()));
+		g2.fillRect(0, 0, cw, ch);
+		g2.setPaint(savedPaint);
 
 		g2.drawImage(callbacks.getWorkingImage(), 0, 0, cw, ch, null);
 
