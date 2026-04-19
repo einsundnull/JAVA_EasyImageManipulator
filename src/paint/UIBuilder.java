@@ -804,6 +804,7 @@ class UIBuilder {
 
 		// Stack from top: pageLayoutToolbar → textToolbar → paintToolbar
 		JPanel toolbarStack = new JPanel(new BorderLayout());
+		ed.toolbarDockPanel = toolbarStack;
 		toolbarStack.setOpaque(false);
 		JPanel upper = new JPanel(new BorderLayout());
 		upper.setOpaque(false);

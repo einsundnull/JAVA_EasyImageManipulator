@@ -190,10 +190,13 @@ class SecondaryWindowController {
 		c.selectedElements.clear();
 		c.selectedElements.add(tl);
 		ed.markDirty();
-		ed.refreshElementPanel();
-		if (c.canvasPanel != null)
-			c.canvasPanel.repaint();
-		ToastNotification.show(ed, "Text hinzugefügt");
+		SwingUtilities.invokeLater(() -> {
+			ed.refreshElementPanel();
+			if (c.canvasPanel != null) c.canvasPanel.repaint();
+		});
+		if (ed.secPanel != null) ed.secPanel.repaint();
+		// Toast auf dem Sekundärfenster anzeigen – vermeidet Focus-Wechsel zum Hauptfenster
+		ToastNotification.show(ed.secWin != null ? ed.secWin : ed, "Text hinzugefügt");
 	}
 
 	void applySecondaryWindowToCanvas() {

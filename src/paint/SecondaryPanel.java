@@ -52,8 +52,10 @@ class SecondaryPanel extends JPanel {
 			@Override
 			public void keyPressed(KeyEvent e) {
 				if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+					e.consume();
 					hideTextInput();
 				} else if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+					e.consume();
 					confirmTextInput();
 				}
 			}

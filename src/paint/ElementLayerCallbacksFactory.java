@@ -53,8 +53,14 @@ class ElementLayerCallbacksFactory {
 			}
 
 			@Override
+			public boolean isPageFrame(Layer el) {
+				return el instanceof TextLayer tl && tl.isWrapping()
+						&& (c().activeSceneFile != null || c().gameSceneRoot != null);
+			}
+
+			@Override
 			public void deleteElement(Layer el) {
-				if (el instanceof TextLayer tl && tl.isWrapping()) return; // page frame is permanent
+				if (isPageFrame(el)) return;
 				c().activeElements.removeIf(e -> e.id() == el.id());
 				c().selectedElements.removeIf(e -> e.id() == el.id());
 				ed.markDirty();

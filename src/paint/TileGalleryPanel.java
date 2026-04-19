@@ -84,6 +84,8 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         default void onFilesAdded(List<File> files) {}
         default void onDragStarted(File file) {}
         default void onDragEnded() {}
+        /** True when the canvas has selected layers – suppresses tile-Delete to avoid wrong dialog. */
+        default boolean hasSelectedLayers() { return false; }
         /** A LayerTile was dropped on this gallery – save it as a PNG image file. */
         default void onLayerDropped(Layer layer) {}
         /**
@@ -735,7 +737,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
             addKeyListener(new KeyAdapter() {
                 @Override public void keyPressed(KeyEvent e) {
-                    if (e.getKeyCode() == KeyEvent.VK_DELETE) {
+                    if (e.getKeyCode() == KeyEvent.VK_DELETE && !callbacks.hasSelectedLayers()) {
                         deleteTile();
                     }
                 }

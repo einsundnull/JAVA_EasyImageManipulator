@@ -280,6 +280,12 @@ class KeyboardShortcutManager {
 				ed.showSecondaryTextInput();
 				return true;
 			}
+			// Alt+P: PaintBar als schwebendes Fenster ein-/ausblenden
+			if (e.getKeyCode() == KeyEvent.VK_P
+					&& (e.getModifiersEx() & InputEvent.ALT_DOWN_MASK) != 0) {
+				ed.toggleFloatingPaintBar();
+				return true;
+			}
 			switch (e.getKeyCode()) {
 			case KeyEvent.VK_F1 -> {
 				ed.toggleSecondaryWindow();

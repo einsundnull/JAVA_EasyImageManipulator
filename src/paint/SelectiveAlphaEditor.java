@@ -120,6 +120,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	final BookController bookController = new BookController(this);
 	final ZoomController zoomController = new ZoomController(this);
 
+	// ── Floating PaintBar Window (Alt+P) ────────────────────────────────────────
+	JFrame paintBarFloat;
+	boolean paintBarFloating = false;
+	JPanel toolbarDockPanel; // set by UIBuilder – the stack that normally holds paintToolbar
+
 	// ── Secondary Canvas Window (F1/F2/F3/F4/F5/F7) ──────────────────────────────
 	// PreviewMode, AlwaysOnTopMode, CanvasDisplayMode → eigene Dateien
 
@@ -382,6 +387,75 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	void cycleCanvasDisplayMode()      { secWinController.cycleCanvasDisplayMode(); }
 	void applySecondaryWindowToCanvas(){ secWinController.applySecondaryWindowToCanvas(); }
 	void showSecondaryTextInput()      { secWinController.showSecondaryTextInput(); }
+
+	// ── Floating PaintBar ─────────────────────────────────────────────────────
+	void toggleFloatingPaintBar() {
+		if (paintBarFloating) {
+			// ── Dock back ──────────────────────────────────────────────────────
+			paintBarFloat.setVisible(false);
+			paintBarFloat.getContentPane().remove(paintToolbar);
+			toolbarDockPanel.add(paintToolbar, java.awt.BorderLayout.SOUTH);
+			toolbarDockPanel.revalidate();
+			toolbarDockPanel.repaint();
+			paintBarFloating = false;
+			if (ci().appMode == AppMode.PAINT) paintToolbar.showToolbar();
+			else                               paintToolbar.hideToolbar();
+			revalidate();
+			repaint();
+			ToastNotification.show(this, "PaintBar: Docked");
+		} else {
+			// ── Float ──────────────────────────────────────────────────────────
+			// Remove from dock
+			if (paintToolbar.getParent() != null) {
+				paintToolbar.getParent().remove(paintToolbar);
+				toolbarDockPanel.revalidate();
+				toolbarDockPanel.repaint();
+				revalidate();
+				repaint();
+			}
+
+			// Build float window once
+			if (paintBarFloat == null) {
+				paintBarFloat = new JFrame();
+				paintBarFloat.setUndecorated(true);
+				paintBarFloat.setAlwaysOnTop(true);
+				paintBarFloat.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+				paintBarFloat.setResizable(false);
+				// Drag: screen-coordinate based so it works even when mouse leaves the handle
+				final int[] screenPress = new int[2];
+				final int[] winPress    = new int[2];
+				java.awt.event.MouseAdapter drag = new java.awt.event.MouseAdapter() {
+					@Override public void mousePressed(java.awt.event.MouseEvent e) {
+						java.awt.Point sp = e.getLocationOnScreen();
+						screenPress[0] = sp.x; screenPress[1] = sp.y;
+						winPress[0] = paintBarFloat.getX(); winPress[1] = paintBarFloat.getY();
+					}
+					@Override public void mouseDragged(java.awt.event.MouseEvent e) {
+						java.awt.Point sp = e.getLocationOnScreen();
+						paintBarFloat.setLocation(winPress[0] + sp.x - screenPress[0],
+						                          winPress[1] + sp.y - screenPress[1]);
+					}
+				};
+				paintToolbar.addMouseListener(drag);
+				paintToolbar.addMouseMotionListener(drag);
+			}
+
+			paintBarFloat.getContentPane().removeAll();
+			paintBarFloat.getContentPane().add(paintToolbar);
+			paintToolbar.setVisible(true);
+			paintBarFloat.pack();
+
+			// Center on main window first time; remember position on reopen
+			if (paintBarFloat.getX() == 0 && paintBarFloat.getY() == 0) {
+				paintBarFloat.setLocation(
+					getX() + (getWidth()  - paintBarFloat.getWidth())  / 2,
+					getY() + (getHeight() - paintBarFloat.getHeight()) - 80);
+			}
+			paintBarFloat.setVisible(true);
+			paintBarFloating = true;
+			ToastNotification.show(this, "PaintBar: Floating");
+		}
+	}
 
 	private void setupKeyBindings()        { new KeyboardShortcutManager(this).setup(); }
 

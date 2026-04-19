@@ -86,6 +86,8 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         void resetElementRotation(Layer el);
         /** Export a TextLayer as a translation map. */
         void exportElementAsMap(Layer el);
+        /** True when this layer is a permanent page-frame that must not be deleted (Book/Scene context). */
+        default boolean isPageFrame(Layer el) { return false; }
         /** Toggle visibility (hidden state) of a layer. */
         void toggleElementVisibility(Layer el);
         /** Toggle mouse-transparency of a layer (tool-invisible). */
@@ -446,8 +448,8 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             });
             add(burn);
 
-            // ── Red (×) delete button – top-right corner (hidden for wrapping TextLayer) ──
-            boolean isWrappingFrame = (layer instanceof TextLayer tl2 && tl2.isWrapping());
+            // ── Red (×) delete button – top-right corner (hidden for permanent page frames) ──
+            boolean isWrappingFrame = cb.isPageFrame(layer);
             del = new JLabel("✕", JLabel.CENTER);
             del.setForeground(new Color(220, 60, 60));
             del.setFont(new Font("SansSerif", Font.BOLD, 10));

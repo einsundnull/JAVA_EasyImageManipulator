@@ -13,6 +13,9 @@ class GalleryCallbacksFactory {
 	static TileGalleryPanel.Callbacks build(SelectiveAlphaEditor ed, int idx) {
 		return new TileGalleryPanel.Callbacks() {
 			@Override
+			public boolean hasSelectedLayers() { return !ed.ci(idx).selectedElements.isEmpty(); }
+
+			@Override
 			public void onTileOpened(File f) {
 				if (ed.ci(idx).scenesPanel != null)
 					ed.ci(idx).scenesPanel.clearActiveAndSelection();
@@ -140,6 +143,9 @@ class GalleryCallbacksFactory {
 	/** Callbacks for the second (optional) gallery panel — loads into the same canvas as the primary. */
 	static TileGalleryPanel.Callbacks buildGallery2(SelectiveAlphaEditor ed, int idx) {
 		return new TileGalleryPanel.Callbacks() {
+			@Override
+			public boolean hasSelectedLayers() { return !ed.ci(idx).selectedElements.isEmpty(); }
+
 			@Override
 			public void onTileOpened(File f) {
 				if (ed.ci(idx).scenesPanel != null)
