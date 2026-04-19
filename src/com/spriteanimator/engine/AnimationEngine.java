@@ -1,11 +1,12 @@
 package com.spriteanimator.engine;
 
+import com.spriteanimator.model.AppState;
+import com.spriteanimator.model.Tile;
+
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.spriteanimator.model.AppState;
-import com.spriteanimator.model.Tile;
 
 /**
  * Core animation engine.

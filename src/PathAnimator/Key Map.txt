@@ -1,0 +1,30 @@
+
+  Keyframes aufnehmen:
+  1. Skeleton in Ruhepose → K oder "◆ Keyframe" — Frame 0 aufnehmen                                                                                                                                                                 2. Playhead auf Frame 30 schieben (Klick/Drag auf Ruler)
+  3. Punkte verschieben → K — Frame 30 aufnehmen                                                                                                                                                                                    4. Weiter für weitere Keyframes
+
+  Wiedergabe:
+
+  ┌─────────────────────────────────┬───────────────────────────────────────┐
+  │         Taste / Aktion          │               Funktion                │
+  ├─────────────────────────────────┼───────────────────────────────────────┤
+  │ Space                           │ Play / Pause                          │
+  ├─────────────────────────────────┼───────────────────────────────────────┤
+  │ ■                               │ Stop (zurück zu Frame 0)              │
+  ├─────────────────────────────────┼───────────────────────────────────────┤
+  │ ← / →                           │ Frame-genaues Scrubben                │
+  ├─────────────────────────────────┼───────────────────────────────────────┤
+  │ K                               │ Keyframe für ausgewählten Pfad setzen │
+  ├─────────────────────────────────┼───────────────────────────────────────┤
+  │ |◀ / ▶|                         │ Zum vorherigen / nächsten Keyframe    │
+  ├─────────────────────────────────┼───────────────────────────────────────┤
+  │ Mausrad auf Timeline            │ Zoom rein/raus                        │
+  ├─────────────────────────────────┼───────────────────────────────────────┤
+  │ Klick auf Canvas (während Play) │ Automatisch pausieren + bearbeiten    │
+  └─────────────────────────────────┴───────────────────────────────────────┘
+
+  Visuelles Feedback:
+  - Gelbe Rauten auf der Timeline = Keyframes
+  - Oranger Ring um Punkt = Keyframe an diesem Frame vorhanden
+  - Roter Playhead + Frame-Nummer oben links während Wiedergabe
+  - Sprite verformt sich vollständig animiert wenn Skelett gebunden ist

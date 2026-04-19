@@ -1,8 +1,8 @@
 package com.spriteanimator;
 
-import javax.swing.SwingUtilities;
-
 import com.spriteanimator.ui.MainWindow;
+
+import javax.swing.*;
 
 /**
  * Sprite Animator – Entry point.
