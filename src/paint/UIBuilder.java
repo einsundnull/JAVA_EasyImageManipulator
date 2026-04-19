@@ -331,14 +331,14 @@ class UIBuilder {
 		newBitmapBtn.setToolTipText("Neue leere Bitmap erstellen");
 		newBitmapBtn.setForeground(AppColors.TEXT);
 		newBitmapBtn.addActionListener(e -> ed.doNewBitmap());
+		newBitmapBtn.setVisible(false);
 		center.add(newBitmapBtn);
 		center.add(resetButton);
 		center.add(saveButton);
 		center.add(Box.createHorizontalStrut(6));
-		center.add(ed.canvasModeBtn);
-		center.add(ed.paintModeBtn);
 		center.add(ed.bookModeBtn);
 		center.add(ed.sceneModeBtn);
+		center.add(ed.paintModeBtn);
 		center.add(Box.createHorizontalStrut(4));
 		ed.pageLayoutBtn = UIComponentFactory.buildModeToggleBtn("📑", "SeitenLayout ein/ausblenden");
 		ed.pageLayoutBtn.setPreferredSize(new Dimension(ed.TOPBAR_BTN_W, ed.TOPBAR_BTN_H));
@@ -347,6 +347,7 @@ class UIBuilder {
 				ed.pageLayoutToolbar.setVisible(ed.pageLayoutBtn.isSelected());
 		});
 		center.add(ed.pageLayoutBtn);
+		center.add(ed.canvasModeBtn);
 		center.add(Box.createHorizontalStrut(6));
 		center.add(ed.mapsBtn);
 		center.add(ed.toggleDropZoneBtn);

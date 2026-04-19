@@ -433,6 +433,85 @@ class BookController {
 		dialog.setVisible(true);
 	}
 
+	// ── Immediate page creation (no dialog) ─────────────────────────────────
+
+	/**
+	 * Copies {@code src} into the book as a new page immediately, without showing any dialog.
+	 * {@code layers} (may be null/empty) are saved as the page's scene layers.
+	 */
+	void createPageFromFile(File src, List<Layer> layers, File bookDir, Runnable onAdded) {
+		try {
+			String pageName = nextPageName(bookDir);
+			File pageFile = new File(getPagesDir(bookDir), pageName);
+			java.nio.file.Files.copy(src.toPath(), pageFile.toPath(),
+					java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+			List<String> pages = readManifestPages(bookDir);
+			pages.add(pageName);
+			writeManifest(bookDir, bookDir.getName(), pages);
+
+			BufferedImage img = ImageIO.read(pageFile);
+			if (img == null) { ed.showErrorDialog("Fehler", "Bild konnte nicht geladen werden."); return; }
+
+			CanvasInstance c = ed.ci();
+			c.workingImage      = ed.normalizeImage(img);
+			c.originalImage     = ed.deepCopy(c.workingImage);
+			c.activeElements    = layers != null ? new ArrayList<>(layers) : new ArrayList<>();
+			c.selectedElements.clear();
+			c.undoStack.clear(); c.redoStack.clear();
+			c.selectedAreas.clear();
+			c.floatingImg = null; c.floatRect = null;
+			c.sourceFile        = pageFile;
+			c.hasUnsavedChanges = false;
+
+			savePageScene(pageFile, c.activeElements);
+			c.activeSceneFile = getPageManifest(pageFile);
+
+			ed.swapToImageView(ed.activeCanvasIndex);
+			SwingUtilities.invokeLater(() -> ed.fitToViewport(ed.activeCanvasIndex));
+			ed.refreshElementPanel();
+			ed.updateTitle();
+			ed.updateStatus();
+			ed.setBottomButtonsEnabled(true);
+
+			if (onAdded != null) SwingUtilities.invokeLater(onAdded);
+		} catch (IOException ex) {
+			ed.showErrorDialog("Fehler", "Seite konnte nicht erstellt werden:\n" + ex.getMessage());
+		}
+	}
+
+	/**
+	 * Loads the scene layers associated with an image file, if a matching scene
+	 * directory exists next to it. Returns an empty list when no scene is found.
+	 */
+	static List<Layer> loadLayersForFile(File imageFile) {
+		if (imageFile == null) return new ArrayList<>();
+		String name = imageFile.getName();
+		int dot = name.lastIndexOf('.');
+		String base = dot > 0 ? name.substring(0, dot) : name;
+		File sceneDir  = new File(imageFile.getParentFile(), base);
+		File manifest  = new File(sceneDir, base + ".txt");
+		if (!manifest.exists()) return new ArrayList<>();
+		try {
+			SceneFileReader.SceneData data = SceneFileReader.readScene(sceneDir, base);
+			List<Layer> all = new ArrayList<>();
+			int nextId = System.identityHashCode(new Object());
+			for (SceneFileReader.ImageLayerRef ref : data.imageLayers) {
+				java.awt.image.BufferedImage img = ImageLoader.loadImage(ref.file);
+				if (img != null) {
+					int w = ref.w > 0 ? ref.w : img.getWidth();
+					int h = ref.h > 0 ? ref.h : img.getHeight();
+					all.add(new ImageLayer(nextId++, img, ref.x, ref.y, w, h, ref.rotation, ref.opacity));
+				}
+			}
+			all.addAll(data.textLayers);
+			all.addAll(data.pathLayers);
+			return all;
+		} catch (Exception e) {
+			return new ArrayList<>();
+		}
+	}
+
 	// ── Page copy ─────────────────────────────────────────────────────────────
 
 	/**

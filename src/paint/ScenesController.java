@@ -196,24 +196,18 @@ class ScenesController {
 
 		CanvasInstance c = ed.ci(idx);
 
-		String defaultName = "Scene_" + new java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss")
-				.format(new java.util.Date());
-		String sceneName = (String) javax.swing.JOptionPane.showInputDialog(
-				ed,
-				"Szenen-Name:",
-				"Neue Szene erstellen",
-				javax.swing.JOptionPane.PLAIN_MESSAGE,
-				null, null, defaultName);
-		if (sceneName == null || sceneName.isBlank())
-			return;
-		sceneName = sceneName.trim();
+		// Auto-generate scene name from image file + timestamp
+		String sceneName = imageFile.getName().replaceAll("\\.[^.]+$", "") + "_"
+				+ new java.text.SimpleDateFormat("HHmmss").format(new java.util.Date());
 
 		List<String> projects = SceneLocator.getToolProjects();
 		String projectName = projects.isEmpty() ? "Default" : projects.get(0);
 		File scenesRoot = SceneLocator.getToolScenesDir(projectName);
 		File sceneDir   = new File(scenesRoot, sceneName);
 
-		List<Layer> layers = new ArrayList<>(c.activeElements);
+		// Use layers from the image's own scene; fall back to current canvas elements
+		List<Layer> fileLayers = BookController.loadLayersForFile(imageFile);
+		final List<Layer> layers = fileLayers.isEmpty() ? new ArrayList<>(c.activeElements) : fileLayers;
 		final String finalName = sceneName;
 		new javax.swing.SwingWorker<Void, Void>() {
 			@Override

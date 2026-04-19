@@ -99,10 +99,19 @@ class GalleryCallbacksFactory {
 					}.execute();
 				} else {
 					File destDir = c.tileGallery.getTileGalleryDirectory();
-					if (destDir == null || src.getParentFile().equals(destDir)) return;
+					if (destDir == null) return;
+					if (src.getParentFile().equals(destDir)) {
+						// Same gallery — duplicate with unique name
+						File dest = BaseSidebarPanel.copyFileWithUniqueName(src, destDir);
+						if (dest != null) {
+							c.tileGallery.addFileAtIndex(dest, insertIndex);
+							c.tileGallery.setActiveFile(dest);
+							ToastNotification.show(ed, "Kopiert: " + dest.getName());
+						}
+						return;
+					}
 					File destFile = new File(destDir, src.getName());
 					if (destFile.exists()) {
-						// Already present in target folder — just activate it
 						c.tileGallery.addFileAtIndex(destFile, insertIndex);
 						c.tileGallery.setActiveFile(destFile);
 					} else {
@@ -276,19 +285,29 @@ class GalleryCallbacksFactory {
 							ed.showErrorDialog("Fehler", ex.getMessage());
 						}
 					} else {
-						BufferedImage img = ImageLoader.loadImage(src);
-						ed.bookController.showNewPageDialog(img, currentBook[0],
+						// Immediately create a page — load scene layers from the image if available
+						java.util.List<Layer> layers = BookController.loadLayersForFile(src);
+						ed.bookController.createPageFromFile(src, layers, currentBook[0],
 								() -> javax.swing.SwingUtilities.invokeLater(
 										() -> pagesPanelRef[0].setFiles(BookController.listPages(currentBook[0]), null)));
 					}
 				}
 				@Override public void onLayerDropped(Layer layer) {
 					if (currentBook[0] == null) return;
-					BufferedImage img = ed.renderLayerToImage(layer);
+					java.awt.image.BufferedImage img = ed.renderLayerToImage(layer);
 					if (img == null) return;
-					ed.bookController.showNewPageDialog(img, currentBook[0],
-							() -> javax.swing.SwingUtilities.invokeLater(
-									() -> pagesPanelRef[0].setFiles(BookController.listPages(currentBook[0]), null)));
+					try {
+						java.io.File tmp = java.io.File.createTempFile("layer_page_", ".png");
+						tmp.deleteOnExit();
+						javax.imageio.ImageIO.write(img, "PNG", tmp);
+						java.util.List<Layer> layers = new java.util.ArrayList<>();
+						layers.add(layer);
+						ed.bookController.createPageFromFile(tmp, layers, currentBook[0],
+								() -> javax.swing.SwingUtilities.invokeLater(
+										() -> pagesPanelRef[0].setFiles(BookController.listPages(currentBook[0]), null)));
+					} catch (java.io.IOException ex) {
+						ed.showErrorDialog("Fehler", ex.getMessage());
+					}
 				}
 			},
 			null, "Seiten", null,

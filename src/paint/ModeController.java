@@ -93,8 +93,6 @@ class ModeController {
 
 	void toggleBookMode() {
 		boolean entering = ed.bookModeBtn.isSelected();
-		if (entering && ed.sceneModeBtn.isSelected())
-			ed.sceneModeBtn.setSelected(false);
 
 		// Show/hide book context buttons in top bar
 		ed.bookListIBtn  .setVisible(entering);
@@ -141,8 +139,6 @@ class ModeController {
 
 	void toggleSceneMode() {
 		boolean entering = ed.sceneModeBtn.isSelected();
-		if (entering && ed.bookModeBtn.isSelected())
-			ed.bookModeBtn.setSelected(false);
 
 		// Show/hide scene context buttons like book mode does for its buttons
 		if (ed.scenesBtn    != null) ed.scenesBtn   .setVisible(entering);

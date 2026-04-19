@@ -225,72 +225,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             @Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
             @Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde)  { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
             @Override public void drop(DropTargetDropEvent dtde) {
-                dtde.acceptDrop(DnDConstants.ACTION_COPY);
-                try {
-                    Transferable t = dtde.getTransferable();
-
-                    // Right-drag from any panel: delegate fully to callback
-                    if (t.isDataFlavorSupported(FILE_AS_ELEMENT_FLAVOR)) {
-                        FileForElement ffe = (FileForElement) t.getTransferData(FILE_AS_ELEMENT_FLAVOR);
-                        int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, dtde.getLocation().y);
-                        callbacks.onFileElementDropped(ffe.file, insertIndex);
-                        dtde.dropComplete(true);
-                    } else if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
-                        Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
-                        callbacks.onLayerDropped(layer);
-                        dtde.dropComplete(true);
-                    } else if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                        // Handle file drops from external sources or other galleries
-                        @SuppressWarnings("unchecked")
-                        java.util.List<File> droppedFiles = (java.util.List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
-                        if (droppedFiles != null && !droppedFiles.isEmpty()) {
-                            // If an override handler is registered, delegate entirely to it
-                            if (fileDropOverride != null) {
-                                fileDropOverride.accept(new ArrayList<>(droppedFiles));
-                                dtde.dropComplete(true);
-                                return;
-                            }
-                            Point dropPt = dtde.getLocation();
-                            int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, dropPt.y);
-                            // Copy files from external source to current gallery directory
-                            for (File sourceFile : droppedFiles) {
-                                if (sourceFile.isFile()) {
-                                    try {
-                                        File destDir = getTileGalleryDirectory();
-                                        if (destDir == null) {
-                                            dtde.dropComplete(false);
-                                            return;
-                                        }
-                                        // Skip if source and target are in the same directory
-                                        if (sourceFile.getParentFile().equals(destDir)) continue;
-                                        File destFile = new File(destDir, sourceFile.getName());
-                                        if (destFile.exists()) {
-                                            // Already present — just activate it, no copy
-                                            callbacks.onFileElementDropped(destFile, insertIndex);
-                                        } else {
-                                            java.awt.image.BufferedImage composite = callbacks.getCompositeForFile(sourceFile);
-                                            if (composite != null) {
-                                                destFile = writeCompositeWithUniqueName(composite, sourceFile, destDir);
-                                            } else {
-                                                java.nio.file.Files.copy(sourceFile.toPath(), destFile.toPath());
-                                            }
-                                            if (destFile != null) {
-                                                callbacks.onFileElementDropped(destFile, insertIndex);
-                                            }
-                                        }
-                                    } catch (Exception ex) {
-                                        System.err.println("[ERROR] Failed to copy file: " + ex.getMessage());
-                                    }
-                                }
-                            }
-                            dtde.dropComplete(true);
-                            return;
-                        }
-                        dtde.dropComplete(false);
-                    } else {
-                        dtde.dropComplete(false);
-                    }
-                } catch (Exception ex) { dtde.dropComplete(false); }
+                handleGalleryDrop(dtde, dtde.getLocation().y);
             }
         }, true);
 
@@ -302,6 +237,80 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         galleryScroll.getVerticalScrollBar().setUnitIncrement(14);
         applyDarkScrollBar(galleryScroll.getVerticalScrollBar());
         add(galleryScroll, BorderLayout.CENTER);
+
+        // ── Viewport drop target: catches drops in empty space below tiles ───
+        new DropTarget(galleryScroll.getViewport(), DnDConstants.ACTION_COPY, new DropTargetAdapter() {
+            @Override public void dragEnter(java.awt.dnd.DropTargetDragEvent dtde) { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
+            @Override public void dragOver(java.awt.dnd.DropTargetDragEvent dtde)  { dtde.acceptDrag(DnDConstants.ACTION_COPY); }
+            @Override public void drop(DropTargetDropEvent dtde) {
+                Point tcPt = SwingUtilities.convertPoint(
+                        galleryScroll.getViewport(), dtde.getLocation(), tilesContainer);
+                handleGalleryDrop(dtde, tcPt.y);
+            }
+        }, true);
+    }
+
+    // =========================================================================
+    // Drop handling
+    // =========================================================================
+
+    /** Shared drop logic for both the tilesContainer and the viewport drop targets. */
+    private void handleGalleryDrop(DropTargetDropEvent dtde, int yInTilesContainer) {
+        dtde.acceptDrop(DnDConstants.ACTION_COPY);
+        try {
+            Transferable t = dtde.getTransferable();
+
+            if (t.isDataFlavorSupported(FILE_AS_ELEMENT_FLAVOR)) {
+                FileForElement ffe = (FileForElement) t.getTransferData(FILE_AS_ELEMENT_FLAVOR);
+                int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, yInTilesContainer);
+                callbacks.onFileElementDropped(ffe.file, insertIndex);
+                dtde.dropComplete(true);
+
+            } else if (t.isDataFlavorSupported(ElementLayerPanel.LAYER_FLAVOR)) {
+                Layer layer = (Layer) t.getTransferData(ElementLayerPanel.LAYER_FLAVOR);
+                callbacks.onLayerDropped(layer);
+                dtde.dropComplete(true);
+
+            } else if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                @SuppressWarnings("unchecked")
+                java.util.List<File> droppedFiles = (java.util.List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
+                if (droppedFiles != null && !droppedFiles.isEmpty()) {
+                    if (fileDropOverride != null) {
+                        fileDropOverride.accept(new ArrayList<>(droppedFiles));
+                        dtde.dropComplete(true);
+                        return;
+                    }
+                    int insertIndex = BaseSidebarPanel.computeDropIndex(tilesContainer, yInTilesContainer);
+                    for (File sourceFile : droppedFiles) {
+                        if (!sourceFile.isFile()) continue;
+                        try {
+                            File destDir = getTileGalleryDirectory();
+                            if (destDir == null) { dtde.dropComplete(false); return; }
+                            if (sourceFile.getParentFile().equals(destDir)) continue;
+                            File destFile = new File(destDir, sourceFile.getName());
+                            if (destFile.exists()) {
+                                callbacks.onFileElementDropped(destFile, insertIndex);
+                            } else {
+                                java.awt.image.BufferedImage composite = callbacks.getCompositeForFile(sourceFile);
+                                if (composite != null) {
+                                    destFile = writeCompositeWithUniqueName(composite, sourceFile, destDir);
+                                } else {
+                                    java.nio.file.Files.copy(sourceFile.toPath(), destFile.toPath());
+                                }
+                                if (destFile != null) callbacks.onFileElementDropped(destFile, insertIndex);
+                            }
+                        } catch (Exception ex) {
+                            System.err.println("[ERROR] Failed to copy file: " + ex.getMessage());
+                        }
+                    }
+                    dtde.dropComplete(true);
+                } else {
+                    dtde.dropComplete(false);
+                }
+            } else {
+                dtde.dropComplete(false);
+            }
+        } catch (Exception ex) { dtde.dropComplete(false); }
     }
 
     // =========================================================================
