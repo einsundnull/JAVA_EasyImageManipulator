@@ -398,7 +398,8 @@ public class PaintToolbar extends JPanel {
             || t == PaintEngine.Tool.WAND_III || t == PaintEngine.Tool.WAND_IV
             || t == PaintEngine.Tool.WAND_REPLACE_OUTER || t == PaintEngine.Tool.WAND_REPLACE_INNER
             || t == PaintEngine.Tool.WAND_AA_OUTER || t == PaintEngine.Tool.WAND_AA_INNER
-            || t == PaintEngine.Tool.CUT_COLOR || t == PaintEngine.Tool.CUT_UNTIL_COLOR;
+            || t == PaintEngine.Tool.CUT_COLOR || t == PaintEngine.Tool.CUT_UNTIL_COLOR
+            || t == PaintEngine.Tool.CUT_SAME_COLOR;
     }
 
     // ── Color swatches ────────────────────────────────────────────────────────
@@ -743,6 +744,8 @@ public class PaintToolbar extends JPanel {
                 "Ausschneiden – Zielfarbe: alle Pixel die der Sekundärfarbe entsprechen werden pixelgenau transparent (global, kein Flood-Fill)" };
             case CUT_UNTIL_COLOR -> new String[]{ "✂",
                 "Ausschneiden – bis Zielfarbe: Flood-Fill vom Klickpunkt, stoppt an Sekundärfarbe, schneidet die Region pixelgenau aus" };
+            case CUT_SAME_COLOR -> new String[]{ "✂",
+                "Ausschneiden – gleiche Farbe: Flood-Fill vom Klickpunkt, stoppt an jeder anderen Farbe, schneidet nur die angeklickte Farbregion aus" };
             case SMEAR      -> new String[]{ "~", "Verwischen (M)"  };
         };
     }

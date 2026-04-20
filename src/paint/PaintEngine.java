@@ -30,7 +30,7 @@ public class PaintEngine {
         FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV,
         WAND_REPLACE_OUTER, WAND_REPLACE_INNER,
         WAND_AA_OUTER, WAND_AA_INNER,
-        CUT_COLOR, CUT_UNTIL_COLOR,
+        CUT_COLOR, CUT_UNTIL_COLOR, CUT_SAME_COLOR,
         SMEAR
     }
 
@@ -936,6 +936,16 @@ public class PaintEngine {
     public static void cutUntilColor(BufferedImage img, int x, int y,
                                       Color stopColor, int tolerancePct) {
         boolean[][] region = floodFillRegionUntilColor(img, x, y, stopColor, tolerancePct * 255 / 100);
+        clearRegionMask(img, region);
+    }
+
+    /**
+     * CUT_SAME_COLOR: flood-fills from (x,y) collecting only pixels whose color matches
+     * the clicked pixel within {@code tolerancePct}, then makes that region transparent.
+     * Stops at any pixel of a different color.
+     */
+    public static void cutSameColor(BufferedImage img, int x, int y, int tolerancePct) {
+        boolean[][] region = floodFillRegion(img, x, y, tolerancePct * 255 / 100);
         clearRegionMask(img, region);
     }
 

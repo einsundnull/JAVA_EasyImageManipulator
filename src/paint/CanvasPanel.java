@@ -778,6 +778,7 @@ public class CanvasPanel extends JPanel {
 					case WAND_AA_INNER -> handleWandAA(imgPt, false);
 					case CUT_COLOR -> handleCutColor();
 					case CUT_UNTIL_COLOR -> handleCutUntilColor(imgPt);
+					case CUT_SAME_COLOR -> handleCutSameColor(imgPt);
 					}
 				} else {
 					if (callbacks.isFloodfillMode()) {
@@ -2503,6 +2504,17 @@ public class CanvasPanel extends JPanel {
 		callbacks.pushUndo();
 		PaintEngine.cutUntilColor(img, imgPt.x, imgPt.y,
 				tb.getSecondaryColor(), tb.getWandTolerance());
+		callbacks.markDirty();
+		repaint();
+	}
+
+	/** CUT_SAME_COLOR: flood-fill from click, stop at any other color, cut to transparent. */
+	private void handleCutSameColor(Point imgPt) {
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		callbacks.pushUndo();
+		PaintEngine.cutSameColor(img, imgPt.x, imgPt.y,
+				callbacks.getPaintToolbar().getWandTolerance());
 		callbacks.markDirty();
 		repaint();
 	}

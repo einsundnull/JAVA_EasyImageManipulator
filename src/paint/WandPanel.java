@@ -67,7 +67,8 @@ public class WandPanel extends JDialog {
                 PaintEngine.Tool.WAND_AA_OUTER,
                 PaintEngine.Tool.WAND_AA_INNER,
                 PaintEngine.Tool.CUT_COLOR,
-                PaintEngine.Tool.CUT_UNTIL_COLOR
+                PaintEngine.Tool.CUT_UNTIL_COLOR,
+                PaintEngine.Tool.CUT_SAME_COLOR
         }) {
             JToggleButton btn = toolbar.buildToolButton(t);
             p.add(btn);
