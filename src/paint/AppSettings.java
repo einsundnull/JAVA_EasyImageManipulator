@@ -79,6 +79,7 @@ public class AppSettings {
     private String  cardFontFamily      = "SansSerif";
     private int     cardFontSize        = 13;
     private int     cardFontColor       = java.awt.Color.WHITE.getRGB();
+    private int     cardBgColor         = new java.awt.Color(59, 59, 59).getRGB();
     private String  cardTtsLanguageLeft  = "ja";
     private String  cardTtsLanguageRight = "de";
     private String  cardCurrentFolder   = "default";
@@ -192,6 +193,7 @@ public class AppSettings {
         if (data.containsKey("cardFontFamily"))       cardFontFamily       = data.get("cardFontFamily");
         if (data.containsKey("cardFontSize"))         cardFontSize         = parseInt(data.get("cardFontSize"));
         if (data.containsKey("cardFontColor"))        cardFontColor        = parseInt(data.get("cardFontColor"));
+        if (data.containsKey("cardBgColor"))          cardBgColor          = parseInt(data.get("cardBgColor"));
         if (data.containsKey("cardTtsLanguageLeft"))  cardTtsLanguageLeft  = data.get("cardTtsLanguageLeft");
         if (data.containsKey("cardTtsLanguageRight")) cardTtsLanguageRight = data.get("cardTtsLanguageRight");
         if (data.containsKey("cardCurrentFolder"))    cardCurrentFolder    = data.get("cardCurrentFolder");
