@@ -296,6 +296,9 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 	// ── Zoom → ZoomController ────────────────────────────────────────────────
 	public void setZoom(double nz, Point anchorCanvas) { zoomController.setZoom(nz, anchorCanvas); }
+	public void beginZoomLive(Point anchorCanvas)      { zoomController.beginZoomLive(anchorCanvas); }
+	public void setZoomLive(double nz)                 { zoomController.setZoomLive(nz); }
+	public void endZoomLive()                          { zoomController.endZoomLive(); }
 	public void fitToViewport()                         { fitToViewport(activeCanvasIndex); }
 	void startZoomAnimation(int idx)                    { zoomController.startZoomAnimation(idx); }
 	void startZoomAnimation()                           { zoomController.startZoomAnimation(); }

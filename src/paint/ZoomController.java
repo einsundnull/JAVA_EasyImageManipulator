@@ -49,6 +49,44 @@ class ZoomController {
 		startZoomAnimation(idx);
 	}
 
+	// ── Live zoom (Google Earth style right-mouse-drag) ──────────────────────
+
+	/**
+	 * Begin a live (non-animated) zoom gesture anchored on the given canvas point.
+	 * The image pixel under {@code anchorCanvas} is captured and pinned to the same
+	 * viewport-relative position for the whole gesture. Subsequent {@link #setZoomLive}
+	 * calls reuse this anchor so the pin stays stable even as canvas coords drift.
+	 */
+	void beginZoomLive(Point anchorCanvas) {
+		CanvasInstance c = ed.ci();
+		if (c.zoomTimer != null) { c.zoomTimer.stop(); c.zoomTimer = null; }
+		if (anchorCanvas == null || c.scrollPane == null) return;
+		JViewport vp = c.scrollPane.getViewport();
+		c.zoomImgPt   = new Point2D.Double(anchorCanvas.x / c.zoom, anchorCanvas.y / c.zoom);
+		c.zoomVpMouse = SwingUtilities.convertPoint(c.canvasPanel, anchorCanvas, vp);
+	}
+
+	/**
+	 * Apply a live zoom value instantly (no animation). Must be called after
+	 * {@link #beginZoomLive} — the anchor captured there pins the pixel in place.
+	 */
+	void setZoomLive(double nz) {
+		CanvasInstance c = ed.ci();
+		if (c.zoomTimer != null) { c.zoomTimer.stop(); c.zoomTimer = null; }
+		double clamped = Math.max(ed.ZOOM_MIN, Math.min(ed.ZOOM_MAX, nz));
+		c.userHasManuallyZoomed = true;
+		c.zoom = c.zoomTarget = clamped;
+		applyZoomFrame(ed.activeCanvasIndex);
+		updateZoomLabel();
+	}
+
+	/** End the live-zoom gesture: clears the anchor so normal animated zoom resumes. */
+	void endZoomLive() {
+		CanvasInstance c = ed.ci();
+		c.zoomImgPt = null;
+		c.zoomVpMouse = null;
+	}
+
 	// ── Animation ─────────────────────────────────────────────────────────────
 
 	/**

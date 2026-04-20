@@ -73,6 +73,13 @@ class CanvasCallbacksFactory {
 			}
 
 			@Override
+			public void beginZoomLive(Point anchor) { ed.beginZoomLive(anchor); }
+			@Override
+			public void setZoomLive(double nz)      { ed.setZoomLive(nz); }
+			@Override
+			public void endZoomLive()               { ed.endZoomLive(); }
+
+			@Override
 			public JScrollPane getScrollPane() {
 				return c().scrollPane;
 			}

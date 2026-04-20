@@ -21,6 +21,10 @@ public interface CanvasCallbacks {
     boolean isGridVisible();
     double getZoom();
     void setZoom(double newZoom, Point anchorCanvas);
+    /** Google-Earth style right-mouse-drag zoom: pin anchor, then apply instant zooms. */
+    void beginZoomLive(Point anchorCanvas);
+    void setZoomLive(double newZoom);
+    void endZoomLive();
     JScrollPane getScrollPane();
 
     // Image-space utilities
