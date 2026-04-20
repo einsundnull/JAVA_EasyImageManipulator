@@ -1468,6 +1468,7 @@ public class CanvasPanel extends JPanel {
 		}
 		PaintEngine.Tool tool = callbacks.getPaintToolbar() != null ? callbacks.getPaintToolbar().getActiveTool() : null;
 		boolean isBrushTool = tool == PaintEngine.Tool.PENCIL || tool == PaintEngine.Tool.ERASER
+				|| tool == PaintEngine.Tool.ERASER_BG || tool == PaintEngine.Tool.ERASER_COLOR
 				|| tool == PaintEngine.Tool.SMEAR;
 		if (!isBrushTool) {
 			if (brushPreviewPt != null) {
@@ -2964,7 +2965,9 @@ public class CanvasPanel extends JPanel {
 		java.awt.Stroke dashBlack = new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 4f);
 
 		boolean round = (shape == PaintEngine.BrushShape.ROUND)
-				|| tool == PaintEngine.Tool.ERASER; // eraser always shows round
+				|| tool == PaintEngine.Tool.ERASER
+				|| tool == PaintEngine.Tool.ERASER_BG
+				|| tool == PaintEngine.Tool.ERASER_COLOR;
 
 		g2.setStroke(dashWhite); g2.setColor(Color.WHITE);
 		if (round) g2.drawOval(x, y, d, d); else g2.drawRect(x, y, d, d);

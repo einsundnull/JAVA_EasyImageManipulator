@@ -18,6 +18,8 @@ class PaintCallbacksFactory {
 				// user doesn't see "no cursor" when the mouse is already over the canvas.
 				boolean isBrushTool = tool == PaintEngine.Tool.PENCIL
 						|| tool == PaintEngine.Tool.ERASER
+						|| tool == PaintEngine.Tool.ERASER_BG
+						|| tool == PaintEngine.Tool.ERASER_COLOR
 						|| tool == PaintEngine.Tool.SMEAR;
 				if (!isBrushTool) {
 					ed.ci().canvasPanel.setCursor(java.awt.Cursor.getDefaultCursor());
