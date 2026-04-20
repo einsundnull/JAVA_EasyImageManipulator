@@ -205,14 +205,26 @@ class ScenesController {
 		File scenesRoot = SceneLocator.getToolScenesDir(projectName);
 		File sceneDir   = new File(scenesRoot, sceneName);
 
-		// Use layers from the image's own scene; fall back to current canvas elements
-		List<Layer> fileLayers = BookController.loadLayersForFile(imageFile);
-		final List<Layer> layers = fileLayers.isEmpty() ? new ArrayList<>(c.activeElements) : fileLayers;
+		// Save exactly what's on the canvas + current layers (no cached manifest lookup,
+		// no copy-of-disk-file background). If the canvas has a workingImage we snapshot
+		// it to a temp PNG; otherwise fall back to the dropped file on disk.
+		final List<Layer> layers = new ArrayList<>(c.activeElements);
+		final java.awt.image.BufferedImage canvasSnapshot =
+				c.workingImage != null ? ed.deepCopy(c.workingImage) : null;
+		final File fallbackFile = imageFile;
 		final String finalName = sceneName;
 		new javax.swing.SwingWorker<Void, Void>() {
 			@Override
 			protected Void doInBackground() throws Exception {
-				SceneFileWriter.writeScene(sceneDir, finalName, imageFile, layers);
+				File bgFile;
+				if (canvasSnapshot != null) {
+					bgFile = File.createTempFile("scene_bg_", ".png");
+					bgFile.deleteOnExit();
+					javax.imageio.ImageIO.write(canvasSnapshot, "PNG", bgFile);
+				} else {
+					bgFile = fallbackFile;
+				}
+				SceneFileWriter.writeScene(sceneDir, finalName, bgFile, layers);
 				return null;
 			}
 
