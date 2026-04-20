@@ -714,7 +714,9 @@ public class PaintToolbar extends JPanel {
             case LINE       -> new String[]{ "/", "Linie (L)"      };
             case CIRCLE     -> new String[]{ "O", "Ellipse (E)"    };
             case RECT       -> new String[]{ "R", "Rechteck (R)"   };
-            case ERASER     -> new String[]{ "⌫", "Radierer (X)"   };
+            case ERASER       -> new String[]{ "⌫", "Radierer – Transparent (X) · Rechtsklick = mit Sekundärfarbe radieren" };
+            case ERASER_BG    -> new String[]{ "⬜", "Radierer – Sekundärfarbe: malt mit Sekundärfarbe statt Transparent" };
+            case ERASER_COLOR -> new String[]{ "⌧", "Farbradierer (MS-Paint) · Ersetzt Primärfarbe durch Sekundärfarbe – andere Farben bleiben unberührt" };
             case EYEDROPPER -> new String[]{ "✦", "Pipette (I)"    };
             case SELECT     -> new String[]{ "⬚", "Auswahl (S)"    };
             case TEXT       -> new String[]{ "A", "Text (T)"       };

@@ -312,6 +312,8 @@ public class CanvasPanel extends JPanel {
 						PaintEngine.Tool t = callbacks.getPaintToolbar().getActiveTool();
 						isPaintDrawTool = t == PaintEngine.Tool.PENCIL
 								|| t == PaintEngine.Tool.ERASER
+								|| t == PaintEngine.Tool.ERASER_BG
+								|| t == PaintEngine.Tool.ERASER_COLOR
 								|| t == PaintEngine.Tool.SMEAR
 								|| t == PaintEngine.Tool.FLOODFILL
 								|| t == PaintEngine.Tool.EYEDROPPER;
@@ -562,6 +564,28 @@ public class CanvasPanel extends JPanel {
 					PaintEngine.Tool tool = callbacks.getPaintToolbar().getActiveTool();
 					if (tool == null) return;
 					switch (tool) {
+					case ERASER_BG -> {
+						callbacks.pushUndo();
+						callbacks.setLastPaintPoint(imgPt);
+						int sw = callbacks.getPaintToolbar().getStrokeWidth();
+						boolean aa = callbacks.getPaintToolbar().isAntialiasing();
+						PaintEngine.drawEraserBG(callbacks.getWorkingImage(), imgPt, imgPt,
+								callbacks.getPaintToolbar().getSecondaryColor(), sw, aa);
+						callbacks.markDirty();
+						callbacks.repaintCanvas();
+					}
+					case ERASER_COLOR -> {
+						callbacks.pushUndo();
+						callbacks.setLastPaintPoint(imgPt);
+						int sw = callbacks.getPaintToolbar().getStrokeWidth();
+						boolean aa = callbacks.getPaintToolbar().isAntialiasing();
+						PaintEngine.drawColorEraser(callbacks.getWorkingImage(), imgPt, imgPt,
+								callbacks.getPaintToolbar().getPrimaryColor(),
+								callbacks.getPaintToolbar().getSecondaryColor(),
+								sw, callbacks.getPaintToolbar().getWandTolerance(), aa);
+						callbacks.markDirty();
+						callbacks.repaintCanvas();
+					}
 					case PENCIL, ERASER -> {
 						if (callbacks.isCanvasSubMode() && tool == PaintEngine.Tool.PENCIL && !rightClickStroke) {
 							// Canvas sub-mode: draw on a transparent overlay → becomes Element on release
@@ -583,7 +607,13 @@ public class CanvasPanel extends JPanel {
 							callbacks.setLastPaintPoint(imgPt);
 							int sw = callbacks.getPaintToolbar().getStrokeWidth();
 							boolean aa = callbacks.getPaintToolbar().isAntialiasing();
-							if (tool == PaintEngine.Tool.ERASER || strokeColor.getAlpha() == 0) {
+							Color secondary = callbacks.getPaintToolbar().getSecondaryColor();
+							if (tool == PaintEngine.Tool.ERASER) {
+								if (rightClickStroke)
+									PaintEngine.drawEraserBG(callbacks.getWorkingImage(), imgPt, imgPt, secondary, sw, aa);
+								else
+									PaintEngine.drawEraser(callbacks.getWorkingImage(), imgPt, imgPt, sw, aa);
+							} else if (strokeColor.getAlpha() == 0) {
 								PaintEngine.drawEraser(callbacks.getWorkingImage(), imgPt, imgPt, sw, aa);
 							} else {
 								PaintEngine.drawPencil(callbacks.getWorkingImage(), imgPt, imgPt,
@@ -964,7 +994,29 @@ public class CanvasPanel extends JPanel {
 
 				if (callbacks.getAppMode() == AppMode.PAINT) {
 					PaintEngine.Tool tool = callbacks.getPaintToolbar().getActiveTool();
-					if (tool == PaintEngine.Tool.PENCIL || tool == PaintEngine.Tool.ERASER) {
+					if (tool == PaintEngine.Tool.ERASER_BG) {
+						int sw = callbacks.getPaintToolbar().getStrokeWidth();
+						boolean aa = callbacks.getPaintToolbar().isAntialiasing();
+						Point prevPt = callbacks.getLastPaintPoint();
+						if (prevPt == null) prevPt = imgPt;
+						PaintEngine.drawEraserBG(callbacks.getWorkingImage(), prevPt, imgPt,
+								callbacks.getPaintToolbar().getSecondaryColor(), sw, aa);
+						callbacks.setLastPaintPoint(imgPt);
+						callbacks.markDirty();
+						repaintStrokeSegment(prevPt, imgPt, sw);
+					} else if (tool == PaintEngine.Tool.ERASER_COLOR) {
+						int sw = callbacks.getPaintToolbar().getStrokeWidth();
+						boolean aa = callbacks.getPaintToolbar().isAntialiasing();
+						Point prevPt = callbacks.getLastPaintPoint();
+						if (prevPt == null) prevPt = imgPt;
+						PaintEngine.drawColorEraser(callbacks.getWorkingImage(), prevPt, imgPt,
+								callbacks.getPaintToolbar().getPrimaryColor(),
+								callbacks.getPaintToolbar().getSecondaryColor(),
+								sw, callbacks.getPaintToolbar().getWandTolerance(), aa);
+						callbacks.setLastPaintPoint(imgPt);
+						callbacks.markDirty();
+						repaintStrokeSegment(prevPt, imgPt, sw);
+					} else if (tool == PaintEngine.Tool.PENCIL || tool == PaintEngine.Tool.ERASER) {
 						boolean aa = callbacks.getPaintToolbar().isAntialiasing();
 						int strokeW = callbacks.getPaintToolbar().getStrokeWidth();
 						if (callbacks.isCanvasSubMode() && tool == PaintEngine.Tool.PENCIL

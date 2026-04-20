@@ -25,7 +25,8 @@ public class PaintEngine {
 
     // ── Tool enum ─────────────────────────────────────────────────────────────
     public enum Tool {
-        PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT, TEXT, PATH,
+        PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, ERASER_BG, ERASER_COLOR,
+        EYEDROPPER, SELECT, TEXT, PATH,
         FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV,
         WAND_REPLACE_OUTER, WAND_REPLACE_INNER,
         WAND_AA_OUTER, WAND_AA_INNER, SMEAR
@@ -179,6 +180,49 @@ public class PaintEngine {
             g2.drawLine(from.x, from.y, to.x, to.y);
         }
         g2.dispose();
+    }
+
+    /**
+     * Eraser BG: paints with {@code bgColor} (opaque solid), same brush shape as the normal eraser.
+     * Used when "erase to secondary color" is selected.
+     */
+    public static void drawEraserBG(BufferedImage img, Point from, Point to,
+                                     Color bgColor, int strokeWidth, boolean aa) {
+        drawPencil(img, from, to, bgColor, strokeWidth, BrushShape.ROUND, aa);
+    }
+
+    /**
+     * Color eraser (MS-Paint style): for every pixel under the round brush that matches
+     * {@code targetColor} within {@code tolerance}, replace it with {@code replacement}.
+     * Pixels that don't match are left untouched.
+     */
+    public static void drawColorEraser(BufferedImage img, Point from, Point to,
+                                        Color targetColor, Color replacement,
+                                        int strokeWidth, int tolerance, boolean aa) {
+        int w = img.getWidth(), h = img.getHeight();
+        int[] px = rawPixels(img);
+        int targetARGB = targetColor.getRGB();
+        int replARGB   = replacement.getRGB();
+        int r = Math.max(1, strokeWidth / 2);
+
+        // For each point along the segment, stamp a circle
+        int dx = to.x - from.x, dy = to.y - from.y;
+        int steps = Math.max(1, Math.max(Math.abs(dx), Math.abs(dy)));
+        for (int s = 0; s <= steps; s++) {
+            int cx = from.x + dx * s / steps;
+            int cy = from.y + dy * s / steps;
+            for (int y = cy - r; y <= cy + r; y++) {
+                for (int x = cx - r; x <= cx + r; x++) {
+                    if (x < 0 || y < 0 || x >= w || y >= h) continue;
+                    if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > r * r) continue;
+                    int cur = px != null ? px[y * w + x] : img.getRGB(x, y);
+                    if (colorsMatch(cur, targetARGB, tolerance * 255 / 100)) {
+                        if (px != null) px[y * w + x] = replARGB;
+                        else img.setRGB(x, y, replARGB);
+                    }
+                }
+            }
+        }
     }
 
     // Draw Line
