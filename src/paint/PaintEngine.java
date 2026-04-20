@@ -29,7 +29,9 @@ public class PaintEngine {
         EYEDROPPER, SELECT, TEXT, PATH,
         FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV,
         WAND_REPLACE_OUTER, WAND_REPLACE_INNER,
-        WAND_AA_OUTER, WAND_AA_INNER, SMEAR
+        WAND_AA_OUTER, WAND_AA_INNER,
+        CUT_COLOR, CUT_UNTIL_COLOR,
+        SMEAR
     }
 
     /** Which color the Replace / AA wands write. */
@@ -903,6 +905,38 @@ public class PaintEngine {
                 }
             }
         }
+    }
+
+    /**
+     * CUT_COLOR: makes every pixel in {@code img} that matches {@code targetColor}
+     * within {@code tolerancePct} (0-100) fully transparent.
+     * Operates globally on the entire image — no flood fill, purely pixel-exact.
+     */
+    public static void cutByColor(BufferedImage img, Color targetColor, int tolerancePct) {
+        int w = img.getWidth(), h = img.getHeight();
+        int targetARGB = targetColor.getRGB();
+        int tol = tolerancePct * 255 / 100;
+        int[] px = rawPixels(img);
+        if (px != null) {
+            for (int i = 0; i < px.length; i++) {
+                if (colorsMatch(px[i], targetARGB, tol)) px[i] = 0x00000000;
+            }
+        } else {
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    if (colorsMatch(img.getRGB(x, y), targetARGB, tol)) img.setRGB(x, y, 0x00000000);
+        }
+    }
+
+    /**
+     * CUT_UNTIL_COLOR: flood-fills from (x,y), stopping wherever a pixel matches
+     * {@code stopColor} within {@code tolerancePct}, then makes the filled region transparent.
+     * Identical boundary logic to {@link #floodFillRegionUntilColor} but writes alpha=0.
+     */
+    public static void cutUntilColor(BufferedImage img, int x, int y,
+                                      Color stopColor, int tolerancePct) {
+        boolean[][] region = floodFillRegionUntilColor(img, x, y, stopColor, tolerancePct * 255 / 100);
+        clearRegionMask(img, region);
     }
 
     /**

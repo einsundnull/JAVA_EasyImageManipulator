@@ -53,7 +53,7 @@ public class WandPanel extends JDialog {
     }
 
     private JPanel buildToolGrid() {
-        JPanel p = new JPanel(new GridLayout(2, 4, 6, 6));
+        JPanel p = new JPanel(new GridLayout(3, 4, 6, 6));
         p.setOpaque(false);
         p.setBorder(BorderFactory.createTitledBorder("Werkzeuge"));
 
@@ -65,7 +65,9 @@ public class WandPanel extends JDialog {
                 PaintEngine.Tool.WAND_REPLACE_OUTER,
                 PaintEngine.Tool.WAND_REPLACE_INNER,
                 PaintEngine.Tool.WAND_AA_OUTER,
-                PaintEngine.Tool.WAND_AA_INNER
+                PaintEngine.Tool.WAND_AA_INNER,
+                PaintEngine.Tool.CUT_COLOR,
+                PaintEngine.Tool.CUT_UNTIL_COLOR
         }) {
             JToggleButton btn = toolbar.buildToolButton(t);
             p.add(btn);

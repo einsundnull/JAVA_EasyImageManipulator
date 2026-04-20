@@ -305,6 +305,10 @@ public class CanvasPanel extends JPanel {
 				if ((!isLeft && !isRight) || callbacks.getWorkingImage() == null)
 					return;
 
+				// CTRL suppresses all draw/fill/erase actions (reserved for pan and zoom).
+				if ((e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0)
+					return;
+
 				// ── Right-click: snap-drag OR secondary-color paint ──────────────────────
 				if (isRight) {
 					boolean isPaintDrawTool = false;
@@ -772,6 +776,8 @@ public class CanvasPanel extends JPanel {
 					case WAND_REPLACE_INNER -> handleWandReplace(imgPt, false);
 					case WAND_AA_OUTER -> handleWandAA(imgPt, true);
 					case WAND_AA_INNER -> handleWandAA(imgPt, false);
+					case CUT_COLOR -> handleCutColor();
+					case CUT_UNTIL_COLOR -> handleCutUntilColor(imgPt);
 					}
 				} else {
 					if (callbacks.isFloodfillMode()) {
@@ -2469,6 +2475,34 @@ public class CanvasPanel extends JPanel {
 		callbacks.pushUndo();
 		if (outer) PaintEngine.antiAliasOuter(img, imgPt.x, imgPt.y, col, tol, bw, closed);
 		else       PaintEngine.antiAliasInner(img, imgPt.x, imgPt.y, col, tol, bw, closed);
+		callbacks.markDirty();
+		repaint();
+	}
+
+	/**
+	 * CUT_COLOR: removes all pixels matching the secondary color (global, pixel-exact).
+	 */
+	private void handleCutColor() {
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		PaintToolbar tb = callbacks.getPaintToolbar();
+		callbacks.pushUndo();
+		PaintEngine.cutByColor(img, tb.getSecondaryColor(), tb.getWandTolerance());
+		callbacks.markDirty();
+		repaint();
+	}
+
+	/**
+	 * CUT_UNTIL_COLOR: flood-fills from click, stops at secondary color, cuts the
+	 * enclosed region to transparent (pixel-exact).
+	 */
+	private void handleCutUntilColor(Point imgPt) {
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		PaintToolbar tb = callbacks.getPaintToolbar();
+		callbacks.pushUndo();
+		PaintEngine.cutUntilColor(img, imgPt.x, imgPt.y,
+				tb.getSecondaryColor(), tb.getWandTolerance());
 		callbacks.markDirty();
 		repaint();
 	}

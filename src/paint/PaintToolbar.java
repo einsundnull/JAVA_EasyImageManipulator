@@ -397,7 +397,8 @@ public class PaintToolbar extends JPanel {
         return t == PaintEngine.Tool.WAND_I || t == PaintEngine.Tool.WAND_II
             || t == PaintEngine.Tool.WAND_III || t == PaintEngine.Tool.WAND_IV
             || t == PaintEngine.Tool.WAND_REPLACE_OUTER || t == PaintEngine.Tool.WAND_REPLACE_INNER
-            || t == PaintEngine.Tool.WAND_AA_OUTER || t == PaintEngine.Tool.WAND_AA_INNER;
+            || t == PaintEngine.Tool.WAND_AA_OUTER || t == PaintEngine.Tool.WAND_AA_INNER
+            || t == PaintEngine.Tool.CUT_COLOR || t == PaintEngine.Tool.CUT_UNTIL_COLOR;
     }
 
     // ── Color swatches ────────────────────────────────────────────────────────
@@ -738,6 +739,10 @@ public class PaintToolbar extends JPanel {
                 "Zauberstab AA Outer · n-Pixel-Ring AUSSERHALB wird antialiased eingeblendet (weiche Kante)" };
             case WAND_AA_INNER -> new String[]{ "◡",
                 "Zauberstab AA Inner · n-Pixel-Ring INNERHALB wird antialiased eingeblendet (weiche Kante)" };
+            case CUT_COLOR -> new String[]{ "✂",
+                "Ausschneiden – Zielfarbe: alle Pixel die der Sekundärfarbe entsprechen werden pixelgenau transparent (global, kein Flood-Fill)" };
+            case CUT_UNTIL_COLOR -> new String[]{ "✂",
+                "Ausschneiden – bis Zielfarbe: Flood-Fill vom Klickpunkt, stoppt an Sekundärfarbe, schneidet die Region pixelgenau aus" };
             case SMEAR      -> new String[]{ "~", "Verwischen (M)"  };
         };
     }
