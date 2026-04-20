@@ -2,7 +2,6 @@ package paint;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.ComponentOrientation;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -19,12 +18,16 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
-import javax.swing.JTextField;
 import javax.swing.JTextArea;
+import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
@@ -32,21 +35,18 @@ import javax.swing.event.DocumentListener;
 
 /**
  * Sidebar panel showing an editable list of TranslationMap cards.
- * Each card displays textI and textII with inline editing and per-field TTS.
  * Multiple independent instances can be created for different languages.
- * Extends BaseSidebarPanel for consistent header, scroll pane and theming.
+ * Header per card: [LangI▼][💬][▶] | [LangII▼][💬][▶] [×]
+ * LangII is stored in the section field of TranslationMap.
+ * Transliteration rows (💬) are in-memory only (not persisted).
  */
 class TranslationMapListPanel extends BaseSidebarPanel {
 
-    /** Called by owner when this panel requests removal. */
     @FunctionalInterface
     interface CloseCallback { void onClose(TranslationMapListPanel p); }
 
-    // ── State ─────────────────────────────────────────────────────────────────
-
-    private String         language;      // null/"all" = all languages
-    private String         ttsLangII;     // TTS language for textII (textI uses map.language())
-    private Color          bgColor;
+    private String          language;
+    private final Color     bgColor;
     private final CloseCallback onClose;
 
     private final JPanel      cardsContainer;
@@ -55,30 +55,22 @@ class TranslationMapListPanel extends BaseSidebarPanel {
     private List<TranslationMap> maps = new ArrayList<>();
     private MapCardWidget     selectedCard;
 
-    // ── Constructor ───────────────────────────────────────────────────────────
-
     TranslationMapListPanel(String language, Color bgColor, CloseCallback onClose) {
-        this.language  = language == null || language.isBlank() ? "de" : language;
-        this.bgColor   = bgColor;
-        this.onClose   = onClose;
-        this.ttsLangII = "en";
+        this.language = (language == null || language.isBlank()) ? "de" : language;
+        this.bgColor  = bgColor;
+        this.onClose  = onClose;
 
         setLayout(new BorderLayout(0, 0));
         setPreferredSize(new Dimension(240, 0));
         setMinimumSize(new Dimension(80, 0));
 
-        // ── Header via BaseSidebarPanel ───────────────────────────────────────
         header = buildSidebarHeader(
-                this.language,
-                this::refresh,
-                null,
-                onClose != null ? () -> onClose.onClose(this) : null
-        );
+                this.language, this::refresh, null,
+                onClose != null ? () -> onClose.onClose(this) : null);
         addAddButton(header, this::addCard);
         addQuickOpenButton(header, this::pickLanguage);
         add(header, BorderLayout.NORTH);
 
-        // ── Cards container ───────────────────────────────────────────────────
         cardsContainer = new JPanel();
         cardsContainer.setLayout(new BoxLayout(cardsContainer, BoxLayout.Y_AXIS));
         cardsContainer.setBackground(bgColor);
@@ -87,7 +79,6 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         scrollPane.getViewport().setBackground(bgColor);
         add(scrollPane, BorderLayout.CENTER);
 
-        // DEL → delete selected card (only when focus is not in a textarea)
         getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
                 .put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "del");
         getActionMap().put("del", new javax.swing.AbstractAction() {
@@ -99,11 +90,8 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             }
         });
         setFocusable(true);
-
         refresh();
     }
-
-    // ── BaseSidebarPanel ──────────────────────────────────────────────────────
 
     @Override
     public void refresh() {
@@ -121,12 +109,11 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         rebuildCards();
     }
 
-    // ── Card management ───────────────────────────────────────────────────────
-
     private void addCard() {
-        String lang = "all".equalsIgnoreCase(language) ? "de" : language;
-        TranslationMap m = new TranslationMap(
-                MapManager.generateMapId(), lang, "Neu", "", "");
+        AppSettings s = AppSettings.getInstance();
+        String langI  = "all".equalsIgnoreCase(language) ? s.getCardTtsLanguageLeft() : language;
+        String langII = s.getCardTtsLanguageRight();   // stored in section field
+        TranslationMap m = new TranslationMap(MapManager.generateMapId(), langI, langII, "", "");
         try {
             MapManager.addOrUpdateMap(m);
             maps.add(m);
@@ -159,52 +146,54 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         cardsContainer.repaint();
     }
 
-    // ── Language picker ───────────────────────────────────────────────────────
-
     private void pickLanguage() {
-        // Collect available languages
         List<String> langs = new ArrayList<>();
         langs.add("all");
-        try {
-            langs.addAll(MapManager.loadAllMaps().keySet());
-        } catch (IOException ex) { /* ignore */ }
-
-        // Add option for new language
+        try { langs.addAll(MapManager.loadAllMaps().keySet()); }
+        catch (IOException ex) { /* ignore */ }
         String newLangOpt = "[ Neue Sprache... ]";
         langs.add(newLangOpt);
 
-        javax.swing.JComboBox<String> combo = new javax.swing.JComboBox<>(langs.toArray(new String[0]));
+        javax.swing.JComboBox<String> combo =
+                new javax.swing.JComboBox<>(langs.toArray(new String[0]));
         combo.setSelectedItem(language);
 
-        int res = javax.swing.JOptionPane.showConfirmDialog(
-                this, combo, "Sprache wählen",
-                javax.swing.JOptionPane.OK_CANCEL_OPTION,
-                javax.swing.JOptionPane.PLAIN_MESSAGE);
-
-        if (res != javax.swing.JOptionPane.OK_OPTION) return;
+        int res = JOptionPane.showConfirmDialog(this, combo, "Sprache wählen",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (res != JOptionPane.OK_OPTION) return;
         String chosen = (String) combo.getSelectedItem();
         if (chosen == null) return;
 
         if (chosen.equals(newLangOpt)) {
-            String name = javax.swing.JOptionPane.showInputDialog(
-                    this, "Sprachcode (z.B. de, en, ja):", "Neue Sprache",
-                    javax.swing.JOptionPane.PLAIN_MESSAGE);
+            String name = JOptionPane.showInputDialog(this,
+                    "Sprachcode (z.B. de, en, ja):", "Neue Sprache", JOptionPane.PLAIN_MESSAGE);
             if (name == null || name.isBlank()) return;
             chosen = name.trim().toLowerCase();
         }
 
         language = chosen;
-        // Update header title label
         for (java.awt.Component c : header.getComponents()) {
-            if (c instanceof javax.swing.JLabel lbl && lbl.getText().startsWith("  ")) {
-                lbl.setText("  " + language);
-                break;
+            if (c instanceof JLabel lbl && lbl.getText().startsWith("  ")) {
+                lbl.setText("  " + language); break;
             }
         }
         refresh();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Shared helpers ────────────────────────────────────────────────────────
+
+    /** Returns a font that can display Japanese; falls back to Dialog if needed. */
+    private Font cardFont() {
+        AppSettings s = AppSettings.getInstance();
+        Font f = new Font(s.getCardFontFamily(), Font.PLAIN, s.getCardFontSize());
+        if (!f.canDisplay('\u65E5')) // '日'
+            f = new Font("Dialog", Font.PLAIN, s.getCardFontSize());
+        return f;
+    }
+
+    private Color cardFontColor() {
+        return new Color(AppSettings.getInstance().getCardFontColor());
+    }
 
     private Color cardBg() {
         int r = Math.min(255, bgColor.getRed()   + 14);
@@ -213,13 +202,13 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         return new Color(r, g, b);
     }
 
-    private Font cardFont() {
-        AppSettings s = AppSettings.getInstance();
-        return new Font(s.getCardFontFamily(), Font.PLAIN, s.getCardFontSize());
-    }
-
-    private Color cardFontColor() {
-        return new Color(AppSettings.getInstance().getCardFontColor());
+    private List<String> availableLanguages() {
+        List<String> langs = new ArrayList<>(List.of("de", "en", "ja", "fr", "es", "zh", "ko", "ru"));
+        try {
+            MapManager.loadAllMaps().keySet().stream()
+                    .filter(k -> !langs.contains(k)).forEach(langs::add);
+        } catch (IOException ex) { /* use defaults */ }
+        return langs;
     }
 
     // ── Inner: MapCardWidget ──────────────────────────────────────────────────
@@ -227,13 +216,37 @@ class TranslationMapListPanel extends BaseSidebarPanel {
     class MapCardWidget extends JPanel {
 
         private TranslationMap map;
-        private final JTextField sectionField;
-        private final JTextArea  taI, taII;
-        private final JButton    btnPlayI, btnPlayII;
+
+        // Per-card languages (langII stored in map.section())
+        private String langI;
+        private String langII;
+
+        // UI state
+        private boolean showTranslitI  = false;
+        private boolean showTranslitII = false;
+
+        // Header buttons
+        private final JButton       langIBtn, langIIBtn;
+        private final JToggleButton translitIBtn, translitIIBtn;
+        private final JButton       playIBtn, playIIBtn;
+
+        // Text areas
+        private final JTextArea taI, taII;
+        private final JTextArea taTranslitI, taTranslitII;
+
         private final javax.swing.Timer saveTimer;
 
         MapCardWidget(TranslationMap m) {
-            this.map = m;
+            this.map  = m;
+            this.langI = m.language();
+
+            // section field repurposed: if it looks like a lang code use it, else default
+            String sec = m.section();
+            this.langII = (sec != null && !sec.isBlank() && sec.length() <= 10
+                    && !sec.equals("Neu") && !sec.equals("—"))
+                    ? sec
+                    : AppSettings.getInstance().getCardTtsLanguageRight();
+
             saveTimer = new javax.swing.Timer(600, e -> doSave());
             saveTimer.setRepeats(false);
 
@@ -244,71 +257,259 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
             applyBorder(false);
 
-            // ── Top bar: [lang] section ················ [×] ─────────────────
-            JPanel topBar = new JPanel(new BorderLayout(4, 0));
-            topBar.setOpaque(false);
-            topBar.setBorder(BorderFactory.createEmptyBorder(3, 6, 2, 4));
+            // ── Compact header row ────────────────────────────────────────────
+            langIBtn = langBtn(langI);
+            langIBtn.addActionListener(e -> showLangPopup(langIBtn, true));
 
-            javax.swing.JLabel langLbl = new javax.swing.JLabel("[" + m.language() + "]");
-            langLbl.setFont(new Font("SansSerif", Font.PLAIN, 10));
-            langLbl.setForeground(AppColors.TEXT_MUTED);
+            translitIBtn = translitBtn();
+            translitIBtn.addActionListener(e -> toggleTranslit(true));
 
-            sectionField = new JTextField(m.section());
-            sectionField.setFont(new Font("SansSerif", Font.BOLD, 11));
-            sectionField.setForeground(AppColors.TEXT);
-            sectionField.setBackground(cardBg());
-            sectionField.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 0));
-            sectionField.getDocument().addDocumentListener(doc(() -> saveTimer.restart()));
+            playIBtn = playBtn();
+            playIBtn.addActionListener(e -> togglePlay(true));
 
-            JButton delBtn = smallBtn("×", AppColors.DANGER);
+            langIIBtn = langBtn(langII);
+            langIIBtn.addActionListener(e -> showLangPopup(langIIBtn, false));
+
+            translitIIBtn = translitBtn();
+            translitIIBtn.addActionListener(e -> toggleTranslit(false));
+
+            playIIBtn = playBtn();
+            playIIBtn.addActionListener(e -> togglePlay(false));
+
+            JButton delBtn = new JButton("×");
+            delBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
+            delBtn.setForeground(AppColors.DANGER);
+            delBtn.setBackground(cardBg());
+            delBtn.setBorder(null);
+            delBtn.setFocusPainted(false);
+            delBtn.setMargin(new Insets(0, 4, 0, 2));
+            delBtn.setOpaque(false);
             delBtn.addActionListener(e -> delete());
 
-            JPanel topLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
-            topLeft.setOpaque(false);
-            topLeft.add(langLbl);
-            topLeft.add(sectionField);
+            JLabel pipe = new JLabel(" | ");
+            pipe.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            pipe.setForeground(AppColors.BORDER);
 
-            topBar.add(topLeft,  BorderLayout.CENTER);
-            topBar.add(delBtn,   BorderLayout.EAST);
+            JPanel leftCluster = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+            leftCluster.setOpaque(false);
+            leftCluster.add(langIBtn); leftCluster.add(translitIBtn); leftCluster.add(playIBtn);
+            leftCluster.add(pipe);
+            leftCluster.add(langIIBtn); leftCluster.add(translitIIBtn); leftCluster.add(playIIBtn);
 
-            // ── TextI row ─────────────────────────────────────────────────────
-            taI    = makeTextArea(m.textI());
-            btnPlayI = makePlayBtn();
-            btnPlayI.addActionListener(e -> togglePlay(true));
+            JPanel compactHeader = new JPanel(new BorderLayout(0, 0));
+            compactHeader.setOpaque(false);
+            compactHeader.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 2));
+            compactHeader.add(leftCluster, BorderLayout.CENTER);
+            compactHeader.add(delBtn,      BorderLayout.EAST);
 
-            // ── TextII row ────────────────────────────────────────────────────
-            taII   = makeTextArea(m.textII());
-            btnPlayII = makePlayBtn();
-            btnPlayII.addActionListener(e -> togglePlay(false));
+            // ── Text areas ────────────────────────────────────────────────────
+            taI         = makeTA(m.textI());
+            taTranslitI = makeTranslitTA();
+            taTranslitI.setVisible(false);
 
-            // ── Layout ───────────────────────────────────────────────────────
+            taII         = makeTA(m.textII());
+            taTranslitII = makeTranslitTA();
+            taTranslitII.setVisible(false);
+
+            // ── Body layout ───────────────────────────────────────────────────
             JPanel body = new JPanel();
             body.setOpaque(false);
             body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-            body.add(topBar);
-            body.add(sep());
-            body.add(row(taI,  btnPlayI));
-            body.add(sep());
-            body.add(row(taII, btnPlayII));
+            body.add(compactHeader);
+            body.add(makeSep());
+            body.add(taI);
+            body.add(taTranslitI);
+            body.add(makeSep());
+            body.add(taII);
+            body.add(taTranslitII);
 
             add(body, BorderLayout.CENTER);
 
-            // Click → select
             addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override public void mousePressed(java.awt.event.MouseEvent e) {
                     setSelected(MapCardWidget.this);
                 }
             });
 
-            // Auto-height when width changes
             addComponentListener(new ComponentAdapter() {
                 @Override public void componentResized(ComponentEvent e) { updateHeights(); }
             });
         }
 
-        // ── Helpers ───────────────────────────────────────────────────────────
+        // ── Language popup ────────────────────────────────────────────────────
 
-        private JTextArea makeTextArea(String text) {
+        private void showLangPopup(JButton btn, boolean isI) {
+            JPopupMenu popup = new JPopupMenu();
+            for (String l : availableLanguages()) {
+                JMenuItem item = new JMenuItem(l);
+                item.setFont(new Font("SansSerif", Font.PLAIN, 11));
+                item.addActionListener(e -> { if (isI) setLangI(l); else setLangII(l); });
+                popup.add(item);
+            }
+            popup.addSeparator();
+            JMenuItem newOpt = new JMenuItem("Neue Sprache...");
+            newOpt.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            newOpt.addActionListener(e -> {
+                java.awt.Window win = SwingUtilities.getWindowAncestor(
+                        TranslationMapListPanel.this);
+                String input = JOptionPane.showInputDialog(win,
+                        "Sprachcode (z.B. de, en, ja):", "Neue Sprache",
+                        JOptionPane.PLAIN_MESSAGE);
+                if (input != null && !input.isBlank()) {
+                    if (isI) setLangI(input.trim().toLowerCase());
+                    else     setLangII(input.trim().toLowerCase());
+                }
+            });
+            popup.add(newOpt);
+            popup.show(btn, 0, btn.getHeight());
+        }
+
+        private void setLangI(String lang) {
+            langI = lang;
+            langIBtn.setText(lang);
+            saveTimer.restart();
+        }
+
+        private void setLangII(String lang) {
+            langII = lang;
+            langIIBtn.setText(lang);
+            saveTimer.restart();
+        }
+
+        // ── Transliteration toggle ─────────────────────────────────────────────
+
+        private void toggleTranslit(boolean isI) {
+            if (isI) {
+                showTranslitI = !showTranslitI;
+                taTranslitI.setVisible(showTranslitI);
+                translitIBtn.setSelected(showTranslitI);
+            } else {
+                showTranslitII = !showTranslitII;
+                taTranslitII.setVisible(showTranslitII);
+                translitIIBtn.setSelected(showTranslitII);
+            }
+            updateHeights();
+        }
+
+        // ── TTS ───────────────────────────────────────────────────────────────
+
+        private void togglePlay(boolean isI) {
+            String cardId = map.id() + (isI ? ":I" : ":II");
+            JButton btn   = isI ? playIBtn : playIIBtn;
+            if (CardTtsPlayer.isPlaying(cardId)) {
+                CardTtsPlayer.stop();
+                setPlayState(btn, false);
+            } else {
+                String text = isI ? taI.getText() : taII.getText();
+                String lang = isI ? langI : langII;
+                CardTtsPlayer.play(cardId, text, lang,
+                        () -> SwingUtilities.invokeLater(() -> setPlayState(btn, false)));
+                setPlayState(btn, true);
+            }
+        }
+
+        private void setPlayState(JButton btn, boolean playing) {
+            btn.setText(playing ? "⏹" : "▶");
+            btn.setForeground(playing ? AppColors.ACCENT : AppColors.TEXT_MUTED);
+        }
+
+        // ── Persistence ───────────────────────────────────────────────────────
+
+        private void doSave() {
+            // langII stored in section field
+            TranslationMap updated = new TranslationMap(
+                    map.id(), langI, langII, taI.getText(), taII.getText(), map.createdAt());
+            updated.setModifiedTime(System.currentTimeMillis());
+            map = updated;
+            try { MapManager.addOrUpdateMap(map); }
+            catch (IOException ex) { System.err.println("[MapCard] save: " + ex.getMessage()); }
+        }
+
+        void delete() {
+            saveTimer.stop();
+            try { MapManager.deleteMap(map.language(), map.id()); }
+            catch (IOException ex) { System.err.println("[MapCard] del: " + ex.getMessage()); }
+            maps.remove(map);
+            if (selectedCard == this) selectedCard = null;
+            rebuildCards();
+        }
+
+        // ── Auto-height ───────────────────────────────────────────────────────
+
+        private void updateHeights() {
+            int w = Math.max(1, getWidth() - 16);
+            adjustTA(taI, w);
+            adjustTA(taII, w);
+            if (showTranslitI)  adjustTA(taTranslitI,  w);
+            if (showTranslitII) adjustTA(taTranslitII, w);
+            revalidate();
+            if (getParent() != null) getParent().revalidate();
+        }
+
+        private void adjustTA(JTextArea ta, int w) {
+            ta.setSize(w, Short.MAX_VALUE);
+            int h = Math.max(ta.getPreferredSize().height, 24);
+            ta.setPreferredSize(new Dimension(0, h));
+            ta.setMaximumSize(new Dimension(Integer.MAX_VALUE, h));
+        }
+
+        // ── Selection highlight ───────────────────────────────────────────────
+
+        void setHighlight(boolean on) {
+            applyBorder(on); repaint();
+        }
+
+        private void applyBorder(boolean sel) {
+            if (sel) {
+                setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(AppColors.ACCENT, 2),
+                        BorderFactory.createEmptyBorder(2, 2, 2, 2)));
+            } else {
+                setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(AppColors.BORDER, 1),
+                        BorderFactory.createEmptyBorder(3, 3, 3, 3)));
+            }
+        }
+
+        // ── Widget factory helpers ────────────────────────────────────────────
+
+        private JButton langBtn(String lang) {
+            JButton b = new JButton(lang);
+            b.setFont(new Font("SansSerif", Font.BOLD, 10));
+            b.setForeground(AppColors.TEXT_MUTED);
+            b.setBackground(cardBg());
+            b.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
+            b.setFocusPainted(false);
+            b.setMargin(new Insets(1, 3, 1, 3));
+            b.setPreferredSize(new Dimension(30, 18));
+            return b;
+        }
+
+        private JToggleButton translitBtn() {
+            JToggleButton b = new JToggleButton("\uD83D\uDCAC"); // 💬
+            b.setFont(new Font("Dialog", Font.PLAIN, 10));
+            b.setForeground(AppColors.TEXT_MUTED);
+            b.setBackground(cardBg());
+            b.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
+            b.setFocusPainted(false);
+            b.setMargin(new Insets(1, 2, 1, 2));
+            b.setPreferredSize(new Dimension(22, 18));
+            return b;
+        }
+
+        private JButton playBtn() {
+            JButton b = new JButton("▶");
+            b.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            b.setForeground(AppColors.TEXT_MUTED);
+            b.setBackground(cardBg());
+            b.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
+            b.setFocusPainted(false);
+            b.setMargin(new Insets(1, 2, 1, 2));
+            b.setPreferredSize(new Dimension(22, 18));
+            return b;
+        }
+
+        private JTextArea makeTA(String text) {
             JTextArea ta = new JTextArea(text) {
                 @Override public boolean getScrollableTracksViewportWidth() { return true; }
             };
@@ -318,7 +519,8 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             ta.setLineWrap(true);
             ta.setWrapStyleWord(true);
             ta.setOpaque(false);
-            ta.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 4));
+            ta.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
+            ta.setAlignmentX(LEFT_ALIGNMENT);
             ta.getDocument().addDocumentListener(doc(() -> saveTimer.restart()));
             ta.addFocusListener(new java.awt.event.FocusAdapter() {
                 @Override public void focusGained(java.awt.event.FocusEvent e) {
@@ -335,126 +537,28 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             return ta;
         }
 
-        private JButton makePlayBtn() {
-            JButton b = new JButton("▶");
-            b.setFont(new Font("SansSerif", Font.PLAIN, 10));
-            b.setForeground(AppColors.TEXT_MUTED);
-            b.setBackground(cardBg());
-            b.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
-            b.setFocusPainted(false);
-            b.setPreferredSize(new Dimension(24, 24));
-            b.setMargin(new Insets(0, 0, 0, 0));
-            return b;
+        private JTextArea makeTranslitTA() {
+            JTextArea ta = new JTextArea() {
+                @Override public boolean getScrollableTracksViewportWidth() { return true; }
+            };
+            int sz = Math.max(9, AppSettings.getInstance().getCardFontSize() - 2);
+            ta.setFont(new Font("Dialog", Font.ITALIC, sz));
+            ta.setForeground(AppColors.TEXT_MUTED);
+            ta.setCaretColor(AppColors.TEXT_MUTED);
+            ta.setLineWrap(true);
+            ta.setWrapStyleWord(true);
+            ta.setOpaque(false);
+            ta.setBorder(BorderFactory.createEmptyBorder(2, 12, 2, 6));
+            ta.setAlignmentX(LEFT_ALIGNMENT);
+            return ta;
         }
 
-        private JButton smallBtn(String text, Color fg) {
-            JButton b = new JButton(text);
-            b.setFont(new Font("SansSerif", Font.BOLD, 13));
-            b.setForeground(fg);
-            b.setBackground(cardBg());
-            b.setBorder(null);
-            b.setFocusPainted(false);
-            b.setMargin(new Insets(0, 3, 0, 3));
-            b.setOpaque(false);
-            return b;
-        }
-
-        private JPanel row(JTextArea ta, JButton btn) {
-            JPanel p = new JPanel(new BorderLayout(2, 0));
-            p.setOpaque(false);
-            p.add(ta, BorderLayout.CENTER);
-            JPanel wrap = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 4));
-            wrap.setOpaque(false);
-            wrap.add(btn);
-            p.add(wrap, BorderLayout.EAST);
-            return p;
-        }
-
-        private JSeparator sep() {
+        private JSeparator makeSep() {
             JSeparator s = new JSeparator();
             s.setForeground(AppColors.BORDER);
             s.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
             return s;
         }
-
-        // ── Auto-height ───────────────────────────────────────────────────────
-
-        private void updateHeights() {
-            int w = getWidth() - 34;
-            if (w <= 0) return;
-            for (JTextArea ta : new JTextArea[]{ taI, taII }) {
-                ta.setSize(w, Short.MAX_VALUE);
-                int h = Math.max(ta.getPreferredSize().height, 28);
-                ta.setPreferredSize(new Dimension(0, h));
-            }
-            revalidate();
-            if (getParent() != null) getParent().revalidate();
-        }
-
-        // ── Persistence ───────────────────────────────────────────────────────
-
-        private void doSave() {
-            String sec = sectionField.getText().isBlank() ? "—" : sectionField.getText().trim();
-            TranslationMap updated = new TranslationMap(
-                    map.id(), map.language(), sec,
-                    taI.getText(), taII.getText(), map.createdAt());
-            updated.setModifiedTime(System.currentTimeMillis());
-            map = updated;
-            try { MapManager.addOrUpdateMap(map); }
-            catch (IOException ex) { System.err.println("[MapCard] save: " + ex.getMessage()); }
-        }
-
-        void delete() {
-            saveTimer.stop();
-            try { MapManager.deleteMap(map.language(), map.id()); }
-            catch (IOException ex) { System.err.println("[MapCard] del: " + ex.getMessage()); }
-            maps.remove(map);
-            if (selectedCard == this) selectedCard = null;
-            rebuildCards();
-        }
-
-        // ── TTS ───────────────────────────────────────────────────────────────
-
-        private void togglePlay(boolean isI) {
-            String cardId = map.id() + (isI ? ":I" : ":II");
-            JButton btn   = isI ? btnPlayI : btnPlayII;
-            if (CardTtsPlayer.isPlaying(cardId)) {
-                CardTtsPlayer.stop();
-                setPlayState(btn, false);
-            } else {
-                String text = isI ? taI.getText() : taII.getText();
-                String lang = isI ? map.language() : ttsLangII;
-                CardTtsPlayer.play(cardId, text, lang,
-                        () -> SwingUtilities.invokeLater(() -> setPlayState(btn, false)));
-                setPlayState(btn, true);
-            }
-        }
-
-        private void setPlayState(JButton btn, boolean playing) {
-            btn.setText(playing ? "⏹" : "▶");
-            btn.setForeground(playing ? AppColors.ACCENT : AppColors.TEXT_MUTED);
-        }
-
-        // ── Selection highlight ───────────────────────────────────────────────
-
-        void setHighlight(boolean on) {
-            applyBorder(on);
-            repaint();
-        }
-
-        private void applyBorder(boolean selected) {
-            if (selected) {
-                setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(AppColors.ACCENT, 2),
-                        BorderFactory.createEmptyBorder(2, 2, 2, 2)));
-            } else {
-                setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(AppColors.BORDER, 1),
-                        BorderFactory.createEmptyBorder(3, 3, 3, 3)));
-            }
-        }
-
-        // ── Document helper ───────────────────────────────────────────────────
 
         private DocumentListener doc(Runnable r) {
             return new DocumentListener() {
