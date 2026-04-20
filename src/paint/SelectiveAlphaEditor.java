@@ -130,6 +130,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 	JFrame secWin;
 	SecondaryPanel secPanel;
+	SecondaryControlBar secControlBar;
 	PreviewMode secMode = PreviewMode.LIVE_ALL;
 	CanvasDisplayMode secCanvasMode = CanvasDisplayMode.SHOW_CANVAS_I_ONLY;
 	BufferedImage secSnapshot;

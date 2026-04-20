@@ -69,6 +69,22 @@ public class AppSettings {
     private String gallery2Dir0 = "";
     private String gallery2Dir1 = "";
 
+    // Card list panels (secondary window)
+    private int  cardListBgLeft  = new java.awt.Color(38, 38, 50).getRGB();
+    private int  cardListBgRight = new java.awt.Color(38, 50, 38).getRGB();
+    private boolean cardListLeftVisible  = false;
+    private boolean cardListRightVisible = false;
+
+    // Card text display / TTS options
+    private String  cardFontFamily      = "SansSerif";
+    private int     cardFontSize        = 13;
+    private int     cardFontColor       = java.awt.Color.WHITE.getRGB();
+    private String  cardTtsLanguageLeft  = "ja";
+    private String  cardTtsLanguageRight = "de";
+    private String  cardCurrentFolder   = "default";
+    private int     cardPanelLeftWidth  = 240;
+    private int     cardPanelRightWidth = 240;
+
     // Recent Files/Projects
     private List<String> recentProjects = new ArrayList<>();
     private List<String> recentFiles = new ArrayList<>();
@@ -168,6 +184,20 @@ public class AppSettings {
         if (data.containsKey("gallery2Dir0")) gallery2Dir0 = data.get("gallery2Dir0");
         if (data.containsKey("gallery2Dir1")) gallery2Dir1 = data.get("gallery2Dir1");
 
+        if (data.containsKey("cardListBgLeft"))      cardListBgLeft      = parseInt(data.get("cardListBgLeft"));
+        if (data.containsKey("cardListBgRight"))     cardListBgRight     = parseInt(data.get("cardListBgRight"));
+        if (data.containsKey("cardListLeftVisible")) cardListLeftVisible  = parseBoolean(data.get("cardListLeftVisible"));
+        if (data.containsKey("cardListRightVisible"))cardListRightVisible = parseBoolean(data.get("cardListRightVisible"));
+
+        if (data.containsKey("cardFontFamily"))       cardFontFamily       = data.get("cardFontFamily");
+        if (data.containsKey("cardFontSize"))         cardFontSize         = parseInt(data.get("cardFontSize"));
+        if (data.containsKey("cardFontColor"))        cardFontColor        = parseInt(data.get("cardFontColor"));
+        if (data.containsKey("cardTtsLanguageLeft"))  cardTtsLanguageLeft  = data.get("cardTtsLanguageLeft");
+        if (data.containsKey("cardTtsLanguageRight")) cardTtsLanguageRight = data.get("cardTtsLanguageRight");
+        if (data.containsKey("cardCurrentFolder"))    cardCurrentFolder    = data.get("cardCurrentFolder");
+        if (data.containsKey("cardPanelLeftWidth"))   cardPanelLeftWidth   = parseInt(data.get("cardPanelLeftWidth"));
+        if (data.containsKey("cardPanelRightWidth"))  cardPanelRightWidth  = parseInt(data.get("cardPanelRightWidth"));
+
         // Parse recentProjects array
         if (data.containsKey("recentProjects")) {
             String arrStr = data.get("recentProjects");
@@ -262,6 +292,19 @@ public class AppSettings {
 
             writeField(writer, "gallery2Dir0", gallery2Dir0, true);
             writeField(writer, "gallery2Dir1", gallery2Dir1, true);
+
+            writeField(writer, "cardListBgLeft",       cardListBgLeft,       true);
+            writeField(writer, "cardListBgRight",      cardListBgRight,      true);
+            writeField(writer, "cardListLeftVisible",  cardListLeftVisible,  true);
+            writeField(writer, "cardListRightVisible", cardListRightVisible, true);
+            writeField(writer, "cardFontFamily",        cardFontFamily,        true);
+            writeField(writer, "cardFontSize",          cardFontSize,          true);
+            writeField(writer, "cardFontColor",         cardFontColor,         true);
+            writeField(writer, "cardTtsLanguageLeft",   cardTtsLanguageLeft,   true);
+            writeField(writer, "cardTtsLanguageRight",  cardTtsLanguageRight,  true);
+            writeField(writer, "cardCurrentFolder",     cardCurrentFolder,     true);
+            writeField(writer, "cardPanelLeftWidth",    cardPanelLeftWidth,    true);
+            writeField(writer, "cardPanelRightWidth",   cardPanelRightWidth,   true);
 
             // recentProjects as JSON array
             writer.write("  \"recentProjects\": [");
@@ -423,6 +466,32 @@ public class AppSettings {
 
     public String getGallery2Dir1() { return gallery2Dir1; }
     public void setGallery2Dir1(String d) { gallery2Dir1 = d != null ? d : ""; }
+
+    public int  getCardListBgLeft()           { return cardListBgLeft; }
+    public void setCardListBgLeft(int c)      { cardListBgLeft = c; }
+    public int  getCardListBgRight()          { return cardListBgRight; }
+    public void setCardListBgRight(int c)     { cardListBgRight = c; }
+    public boolean isCardListLeftVisible()            { return cardListLeftVisible; }
+    public void    setCardListLeftVisible(boolean v)  { cardListLeftVisible = v; }
+    public boolean isCardListRightVisible()           { return cardListRightVisible; }
+    public void    setCardListRightVisible(boolean v) { cardListRightVisible = v; }
+
+    public String getCardFontFamily()              { return cardFontFamily; }
+    public void   setCardFontFamily(String f)      { cardFontFamily = f != null ? f : "SansSerif"; }
+    public int    getCardFontSize()                { return cardFontSize; }
+    public void   setCardFontSize(int s)           { cardFontSize = Math.max(6, Math.min(72, s)); }
+    public int    getCardFontColor()               { return cardFontColor; }
+    public void   setCardFontColor(int c)          { cardFontColor = c; }
+    public String getCardTtsLanguageLeft()         { return cardTtsLanguageLeft; }
+    public void   setCardTtsLanguageLeft(String l) { cardTtsLanguageLeft  = l != null ? l : "ja"; }
+    public String getCardTtsLanguageRight()        { return cardTtsLanguageRight; }
+    public void   setCardTtsLanguageRight(String l){ cardTtsLanguageRight = l != null ? l : "de"; }
+    public String getCardCurrentFolder()           { return cardCurrentFolder; }
+    public void   setCardCurrentFolder(String f)   { cardCurrentFolder = f != null ? f : "default"; }
+    public int    getCardPanelLeftWidth()          { return cardPanelLeftWidth; }
+    public void   setCardPanelLeftWidth(int w)     { cardPanelLeftWidth  = Math.max(80, w); }
+    public int    getCardPanelRightWidth()         { return cardPanelRightWidth; }
+    public void   setCardPanelRightWidth(int w)    { cardPanelRightWidth = Math.max(80, w); }
 
     public List<String> getRecentFiles() { return new ArrayList<>(recentFiles); }
     public void setRecentFiles(List<String> l) { recentFiles = new ArrayList<>(l); }

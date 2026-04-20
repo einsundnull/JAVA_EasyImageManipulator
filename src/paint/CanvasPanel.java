@@ -318,6 +318,9 @@ public class CanvasPanel extends JPanel {
 								|| t == PaintEngine.Tool.ERASER
 								|| t == PaintEngine.Tool.ERASER_BG
 								|| t == PaintEngine.Tool.ERASER_COLOR
+								|| t == PaintEngine.Tool.LINE
+								|| t == PaintEngine.Tool.CIRCLE
+								|| t == PaintEngine.Tool.RECT
 								|| t == PaintEngine.Tool.SMEAR
 								|| t == PaintEngine.Tool.FLOODFILL
 								|| t == PaintEngine.Tool.EYEDROPPER;
@@ -1743,14 +1746,16 @@ public class CanvasPanel extends JPanel {
 		boolean aa = callbacks.getPaintToolbar().isAntialiasing();
 		Color primary   = callbacks.getPaintToolbar().getPrimaryColor();
 		Color secondary = callbacks.getPaintToolbar().getSecondaryColor();
+		Color stroke = rightClickStroke ? secondary : primary;
+		Color fill2  = rightClickStroke ? primary   : secondary;
 		int   sw        = callbacks.getPaintToolbar().getStrokeWidth();
 		PaintEngine.FillMode fill = callbacks.getPaintToolbar().getFillMode();
 		if (tool == PaintEngine.Tool.LINE) {
-			PaintEngine.drawLine(canvasDrawOverlay, from, to, primary, sw, aa);
+			PaintEngine.drawLine(canvasDrawOverlay, from, to, stroke, sw, aa);
 		} else if (tool == PaintEngine.Tool.CIRCLE) {
-			PaintEngine.drawCircle(canvasDrawOverlay, from, to, primary, sw, fill, secondary, aa);
+			PaintEngine.drawCircle(canvasDrawOverlay, from, to, stroke, sw, fill, fill2, aa);
 		} else if (tool == PaintEngine.Tool.RECT) {
-			PaintEngine.drawRect(canvasDrawOverlay, from, to, primary, sw, fill, secondary, aa);
+			PaintEngine.drawRect(canvasDrawOverlay, from, to, stroke, sw, fill, fill2, aa);
 		}
 	}
 
@@ -1764,17 +1769,21 @@ public class CanvasPanel extends JPanel {
 		int h = Math.abs(to.y - from.y);
 
 		boolean aa = callbacks.getPaintToolbar().isAntialiasing();
+		Color primary   = callbacks.getPaintToolbar().getPrimaryColor();
+		Color secondary = callbacks.getPaintToolbar().getSecondaryColor();
+		Color stroke = rightClickStroke ? secondary : primary;
+		Color fill2  = rightClickStroke ? primary   : secondary;
 		if (tool == PaintEngine.Tool.LINE) {
-			PaintEngine.drawLine(callbacks.getWorkingImage(), from, to, callbacks.getPaintToolbar().getPrimaryColor(),
+			PaintEngine.drawLine(callbacks.getWorkingImage(), from, to, stroke,
 					callbacks.getPaintToolbar().getStrokeWidth(), aa);
 		} else if (tool == PaintEngine.Tool.CIRCLE) {
-			PaintEngine.drawCircle(callbacks.getWorkingImage(), from, to, callbacks.getPaintToolbar().getPrimaryColor(),
+			PaintEngine.drawCircle(callbacks.getWorkingImage(), from, to, stroke,
 					callbacks.getPaintToolbar().getStrokeWidth(), callbacks.getPaintToolbar().getFillMode(),
-					callbacks.getPaintToolbar().getSecondaryColor(), aa);
+					fill2, aa);
 		} else if (tool == PaintEngine.Tool.RECT) {
-			PaintEngine.drawRect(callbacks.getWorkingImage(), from, to, callbacks.getPaintToolbar().getPrimaryColor(),
+			PaintEngine.drawRect(callbacks.getWorkingImage(), from, to, stroke,
 					callbacks.getPaintToolbar().getStrokeWidth(), callbacks.getPaintToolbar().getFillMode(),
-					callbacks.getPaintToolbar().getSecondaryColor(), aa);
+					fill2, aa);
 		}
 	}
 
@@ -2546,7 +2555,11 @@ public class CanvasPanel extends JPanel {
 		callbacks.addElement(layer);
 		callbacks.setSelectedElement(layer);
 		callbacks.markDirty();
-		javax.swing.SwingUtilities.invokeLater(() -> callbacks.repaintCanvas());
+		javax.swing.SwingUtilities.invokeLater(() -> {
+			callbacks.repaintCanvas();
+			if (callbacks.getPaintToolbar() != null)
+				callbacks.getPaintToolbar().setActiveTool(PaintEngine.Tool.SELECT);
+		});
 	}
 
 	private java.awt.Color resolveWandColor(BufferedImage img, Point imgPt,
