@@ -286,6 +286,7 @@ public class CanvasPanel extends JPanel {
 							callbacks.getScrollPane().getViewport());
 					rightZoomStartZoom = callbacks.getZoom();
 					isRightZooming     = false;
+					return; // suppress all paint/snap-drag logic for CTRL+right
 				}
 
 				boolean isMiddle = (e.getButton() == MouseEvent.BUTTON2);
@@ -312,7 +313,8 @@ public class CanvasPanel extends JPanel {
 						isPaintDrawTool = t == PaintEngine.Tool.PENCIL
 								|| t == PaintEngine.Tool.ERASER
 								|| t == PaintEngine.Tool.SMEAR
-								|| t == PaintEngine.Tool.FLOODFILL;
+								|| t == PaintEngine.Tool.FLOODFILL
+								|| t == PaintEngine.Tool.EYEDROPPER;
 					}
 					if (!isPaintDrawTool) {
 						// Snap-drag mode (non-paint tools)
