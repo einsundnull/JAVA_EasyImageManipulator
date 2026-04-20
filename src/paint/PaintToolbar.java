@@ -121,6 +121,13 @@ public class PaintToolbar extends JPanel {
     private JToggleButton aaBtn;
     private JSlider       wandTolSlider;
     private JLabel        wandTolLabel;
+    private JSlider       replaceBandSlider;
+    private JLabel        replaceBandLabel;
+    private JToggleButton replaceClosedBtn;
+
+    // ── Replace-wand config state ─────────────────────────────────────────────
+    private int     replaceBandWidth = 1;    // pixels
+    private boolean replaceBandClosed = true;
 
     // =========================================================================
     // Constructor
@@ -252,6 +259,25 @@ public class PaintToolbar extends JPanel {
 
     public int getWandTolerancePct() { return wandTolerance; }
 
+    public int     getReplaceBandWidth()  { return replaceBandWidth; }
+    public boolean isReplaceBandClosed()  { return replaceBandClosed; }
+
+    public void setReplaceBandWidth(int w) {
+        replaceBandWidth = Math.max(1, Math.min(50, w));
+        if (replaceBandSlider != null) {
+            replaceBandSlider.setValue(replaceBandWidth);
+            replaceBandLabel.setText(replaceBandWidth + "px");
+        }
+    }
+
+    public void setReplaceBandClosed(boolean closed) {
+        replaceBandClosed = closed;
+        if (replaceClosedBtn != null) {
+            replaceClosedBtn.setSelected(closed);
+            replaceClosedBtn.setText(closed ? "◯ Closed" : "◯ Open");
+        }
+    }
+
     public void setRulerSelected(boolean selected) { if (rulerBtn != null) rulerBtn.setSelected(selected); }
     public boolean isRulerSelected() { return rulerBtn != null && rulerBtn.isSelected(); }
 
@@ -282,6 +308,8 @@ public class PaintToolbar extends JPanel {
         strip.add(buildAntialias());
         strip.add(vSep());
         strip.add(buildWandTolerance());
+        strip.add(vSep());
+        strip.add(buildReplaceWandConfig());
         strip.add(vSep());
         strip.add(buildTransforms());
         strip.add(vSep());
@@ -494,6 +522,43 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
+    // ── Replace-wand config (band width + closed/open toggle) ─────────────────
+    private JPanel buildReplaceWandConfig() {
+        JPanel p = new JPanel(new GridLayout(2, 3, 4, 2));
+        p.setOpaque(false);
+        p.setPreferredSize(new Dimension(170, BTN_SIZE));
+        p.setMaximumSize(new Dimension(170, BTN_SIZE));
+        p.setMinimumSize(new Dimension(170, BTN_SIZE));
+
+        replaceBandSlider = styledSlider(1, 50, replaceBandWidth, 90);
+        replaceBandSlider.setToolTipText("Ringbreite für Replace-Outer/Inner (Pixel)");
+        replaceBandLabel  = miniLabel(replaceBandWidth + "px");
+        replaceBandSlider.addChangeListener(e -> {
+            replaceBandWidth = replaceBandSlider.getValue();
+            replaceBandLabel.setText(replaceBandWidth + "px");
+        });
+
+        JLabel legend = miniLabel("Band");
+        legend.setToolTipText("Breite des Ring-Bands, das Replace-Outer / Replace-Inner überschreibt");
+
+        replaceClosedBtn = toggleBtn("◯ Closed",
+                "Closed: geschlossener Ring (floodfill-dicht). Open: 4-Nachbarn (n-Pixel Überlapp, Diagonalen offen).");
+        replaceClosedBtn.setFont(new Font("SansSerif", Font.BOLD, 10));
+        replaceClosedBtn.setSelected(replaceBandClosed);
+        replaceClosedBtn.addActionListener(e -> {
+            replaceBandClosed = replaceClosedBtn.isSelected();
+            replaceClosedBtn.setText(replaceBandClosed ? "◯ Closed" : "◯ Open");
+        });
+
+        p.add(legend);
+        p.add(replaceBandSlider);
+        p.add(replaceBandLabel);
+        p.add(new JLabel());
+        p.add(replaceClosedBtn);
+        p.add(new JLabel());
+        return p;
+    }
+
     // ── Transform buttons ─────────────────────────────────────────────────────
     private JPanel buildTransforms() {
         JPanel p = hBox();
@@ -600,10 +665,18 @@ public class PaintToolbar extends JPanel {
             case TEXT       -> new String[]{ "A", "Text (T)"       };
             case PATH       -> new String[]{ "≈", "Pfad (K)"       };
             case FREE_PATH  -> new String[]{ "✏", "Freihand-Pfad (J)"  };
-            case WAND_I     -> new String[]{ "⚡", "Zauberstab I – andere Farbe (1)" };
-            case WAND_II    -> new String[]{ "⚡", "Zauberstab II – Zielfarbe (2)"   };
-            case WAND_III   -> new String[]{ "⚡", "Zauberstab III – Transparent (3)" };
-            case WAND_IV    -> new String[]{ "⚡", "Zauberstab IV – Inwards Collapse (4)" };
+            case WAND_I     -> new String[]{ "⚡",
+                "Zauberstab I – Region anderer Farbe (1) · Klick → Pfad um den flutgefüllten Bereich bis zur nächsten Farbgrenze" };
+            case WAND_II    -> new String[]{ "⚡",
+                "Zauberstab II – bis Zielfarbe (2) · Klick → Pfad, stoppt bei Sekundärfarbe" };
+            case WAND_III   -> new String[]{ "⚡",
+                "Zauberstab III – Transparent (3) · Klick → flutgefüllte Region wird alpha=0" };
+            case WAND_IV    -> new String[]{ "⚡",
+                "Zauberstab IV – Inwards Collapse (4) · Freihand-Polygon zeichnen, engt sich bis auf Inhalt zusammen" };
+            case WAND_REPLACE_OUTER -> new String[]{ "⚡",
+                "Zauberstab Replace Outer (5) · Klick → n-Pixel-Ring AUSSERHALB der angeklickten Fläche wird mit Sekundärfarbe überschrieben" };
+            case WAND_REPLACE_INNER -> new String[]{ "⚡",
+                "Zauberstab Replace Inner (6) · Klick → n-Pixel-Ring INNERHALB der angeklickten Fläche wird mit Sekundärfarbe überschrieben" };
             case SMEAR      -> new String[]{ "~", "Verwischen (M)"  };
         };
     }

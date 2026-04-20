@@ -708,6 +708,8 @@ public class CanvasPanel extends JPanel {
 					case WAND_I -> handleWandI(imgPt);
 					case WAND_II -> handleWandII(imgPt);
 					case WAND_III -> handleWandIII(imgPt);
+					case WAND_REPLACE_OUTER -> handleWandReplaceOuter(imgPt);
+					case WAND_REPLACE_INNER -> handleWandReplaceInner(imgPt);
 					}
 				} else {
 					if (callbacks.isFloodfillMode()) {
@@ -2297,6 +2299,38 @@ public class CanvasPanel extends JPanel {
 		callbacks.pushUndo();
 		boolean[][] region = PaintEngine.floodFillRegion(img, imgPt.x, imgPt.y, WAND_TOLERANCE);
 		PaintEngine.clearRegionMask(img, region);
+		callbacks.markDirty();
+		repaint();
+	}
+
+	/**
+	 * Replace Outer: flood-fills from click, then paints an N-pixel ring OUTSIDE
+	 * the region boundary with the secondary color. Width / closed-open read from toolbar.
+	 */
+	private void handleWandReplaceOuter(Point imgPt) {
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		PaintToolbar tb = callbacks.getPaintToolbar();
+		callbacks.pushUndo();
+		PaintEngine.replaceOuter(img, imgPt.x, imgPt.y,
+				tb.getSecondaryColor(), tb.getWandTolerance(),
+				tb.getReplaceBandWidth(), tb.isReplaceBandClosed());
+		callbacks.markDirty();
+		repaint();
+	}
+
+	/**
+	 * Replace Inner: flood-fills from click, then paints an N-pixel ring INSIDE
+	 * the region boundary with the secondary color. Width / closed-open read from toolbar.
+	 */
+	private void handleWandReplaceInner(Point imgPt) {
+		BufferedImage img = callbacks.getWorkingImage();
+		if (img == null) return;
+		PaintToolbar tb = callbacks.getPaintToolbar();
+		callbacks.pushUndo();
+		PaintEngine.replaceInner(img, imgPt.x, imgPt.y,
+				tb.getSecondaryColor(), tb.getWandTolerance(),
+				tb.getReplaceBandWidth(), tb.isReplaceBandClosed());
 		callbacks.markDirty();
 		repaint();
 	}

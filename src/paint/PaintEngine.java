@@ -26,7 +26,8 @@ public class PaintEngine {
     // ── Tool enum ─────────────────────────────────────────────────────────────
     public enum Tool {
         PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT, TEXT, PATH,
-        FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV, SMEAR
+        FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV,
+        WAND_REPLACE_OUTER, WAND_REPLACE_INNER, SMEAR
     }
 
     // ── Fill mode enum ────────────────────────────────────────────────────────
@@ -569,6 +570,122 @@ public class PaintEngine {
             if (flat[i]) region[i % w][i / w] = true;
         }
         return region;
+    }
+
+    /**
+     * Computes an N-pixel-wide band along the boundary of a region mask.
+     *
+     * <p>outer=true  → band = pixels OUTSIDE region, within {@code width} steps of the region.<br>
+     * outer=false → band = pixels INSIDE region,  within {@code width} steps of the complement.</p>
+     *
+     * <p>closed=true  → 8-connected morphology (Chebyshev distance): watertight ring,
+     *                    guaranteed to block 4-connected flood-fill on every side.<br>
+     * closed=false → 4-connected morphology (Manhattan distance): may have diagonal
+     *                    "overlap" gaps of {@code width} pixels.</p>
+     */
+    public static boolean[][] boundaryBand(boolean[][] region, int w, int h,
+            int width, boolean outer, boolean closed) {
+        boolean[][] band = new boolean[w][h];
+        if (region == null || width <= 0) return band;
+        int W = Math.max(1, width);
+
+        int[][] dirs = closed
+                ? new int[][]{{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}}
+                : new int[][]{{1,0},{-1,0},{0,1},{0,-1}};
+
+        int[][] dist = new int[w][h];
+        for (int[] r : dist) java.util.Arrays.fill(r, Integer.MAX_VALUE);
+        ArrayDeque<int[]> queue = new ArrayDeque<>();
+
+        // Seed: pixels on the target side that touch the opposite side (distance 1).
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                boolean in = inRegion(region, x, y, w, h);
+                boolean target = outer ? !in : in;
+                if (!target) continue;
+                boolean onBoundary = false;
+                for (int[] d : dirs) {
+                    int nx = x + d[0], ny = y + d[1];
+                    boolean nIn;
+                    if (nx < 0 || ny < 0 || nx >= w || ny >= h) {
+                        // Image edge: for inner bands, the missing neighbor is treated
+                        // as "outside", so region-pixels at the edge become boundary seeds.
+                        nIn = false;
+                    } else {
+                        nIn = inRegion(region, nx, ny, w, h);
+                    }
+                    boolean nOpposite = outer ? nIn : !nIn;
+                    if (nOpposite) { onBoundary = true; break; }
+                }
+                if (onBoundary) {
+                    dist[x][y] = 1;
+                    band[x][y] = true;
+                    queue.add(new int[]{x, y});
+                }
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            int[] p = queue.poll();
+            int px = p[0], py = p[1];
+            int d = dist[px][py];
+            if (d >= W) continue;
+            for (int[] dir : dirs) {
+                int nx = px + dir[0], ny = py + dir[1];
+                if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                boolean nIn = inRegion(region, nx, ny, w, h);
+                boolean nTarget = outer ? !nIn : nIn;
+                if (!nTarget) continue;
+                if (dist[nx][ny] <= d + 1) continue;
+                dist[nx][ny] = d + 1;
+                band[nx][ny] = true;
+                queue.add(new int[]{nx, ny});
+            }
+        }
+        return band;
+    }
+
+    /**
+     * Wand REPLACE_OUTER: flood-fill region from click, then paint an N-pixel band
+     * OUTSIDE the region (along the outer boundary) with {@code replacement}.
+     */
+    public static void replaceOuter(BufferedImage img, int x, int y, Color replacement,
+            int tolerance, int bandWidth, boolean closed) {
+        int w = img.getWidth(), h = img.getHeight();
+        boolean[][] region = floodFillRegion(img, x, y, tolerance);
+        boolean[][] band   = boundaryBand(region, w, h, bandWidth, true, closed);
+        fillMaskARGB(img, band, replacement.getRGB());
+    }
+
+    /**
+     * Wand REPLACE_INNER: flood-fill region from click, then paint an N-pixel band
+     * INSIDE the region (along the inner boundary) with {@code replacement}.
+     */
+    public static void replaceInner(BufferedImage img, int x, int y, Color replacement,
+            int tolerance, int bandWidth, boolean closed) {
+        int w = img.getWidth(), h = img.getHeight();
+        boolean[][] region = floodFillRegion(img, x, y, tolerance);
+        boolean[][] band   = boundaryBand(region, w, h, bandWidth, false, closed);
+        fillMaskARGB(img, band, replacement.getRGB());
+    }
+
+    private static void fillMaskARGB(BufferedImage img, boolean[][] mask, int argb) {
+        int w = img.getWidth(), h = img.getHeight();
+        int[] px = rawPixels(img);
+        if (px != null) {
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w && x < mask.length; x++) {
+                    if (y < mask[x].length && mask[x][y]) px[y * w + x] = argb;
+                }
+            }
+        } else {
+            for (int x = 0; x < w && x < mask.length; x++) {
+                int rh = Math.min(h, mask[x].length);
+                for (int y = 0; y < rh; y++) {
+                    if (mask[x][y]) img.setRGB(x, y, argb);
+                }
+            }
+        }
     }
 
     /**
