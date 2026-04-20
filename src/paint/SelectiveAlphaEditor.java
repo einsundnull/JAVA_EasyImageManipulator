@@ -394,6 +394,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			// ── Dock back ──────────────────────────────────────────────────────
 			paintBarFloat.setVisible(false);
 			paintBarFloat.getContentPane().remove(paintToolbar);
+			// Restore docked prefSize so BorderLayout.SOUTH can stretch it again.
+			paintToolbar.setPreferredSize(new java.awt.Dimension(0, PaintToolbar.TOOLBAR_H));
 			toolbarDockPanel.add(paintToolbar, java.awt.BorderLayout.SOUTH);
 			toolbarDockPanel.revalidate();
 			toolbarDockPanel.repaint();
@@ -443,6 +445,14 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			paintBarFloat.getContentPane().removeAll();
 			paintBarFloat.getContentPane().add(paintToolbar);
 			paintToolbar.setVisible(true);
+
+			// Docked prefSize is (0, TOOLBAR_H) — width 0 is fine when stretched by
+			// BorderLayout, but pack() on a standalone window would yield a 0-px-wide
+			// frame. Pick a sensible width: natural content up to the screen width.
+			java.awt.Dimension screen = java.awt.Toolkit.getDefaultToolkit().getScreenSize();
+			int naturalW = paintToolbar.getLayout().preferredLayoutSize(paintToolbar).width;
+			int floatW   = Math.max(640, Math.min(naturalW + 16, screen.width - 80));
+			paintToolbar.setPreferredSize(new java.awt.Dimension(floatW, PaintToolbar.TOOLBAR_H));
 			paintBarFloat.pack();
 
 			// Center on main window first time; remember position on reopen
