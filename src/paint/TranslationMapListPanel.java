@@ -381,7 +381,12 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             });
 
             addComponentListener(new ComponentAdapter() {
-                @Override public void componentResized(ComponentEvent e) { updateHeights(); }
+                @Override public void componentResized(ComponentEvent e) {
+                    // Invalidate TAs so getPreferredSize() re-measures at new width
+                    taI.invalidate(); taII.invalidate();
+                    taTranslitI.invalidate(); taTranslitII.invalidate();
+                    // No extra revalidate needed — the resize itself triggers a full re-layout
+                }
             });
         }
 
@@ -486,20 +491,13 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         // ── Auto-height ───────────────────────────────────────────────────────
 
         private void updateHeights() {
-            int w = Math.max(1, getWidth() - 16);
-            adjustTA(taI, w);
-            adjustTA(taII, w);
-            if (showTranslitI)  adjustTA(taTranslitI,  w);
-            if (showTranslitII) adjustTA(taTranslitII, w);
-            revalidate();
-            if (getParent() != null) getParent().revalidate();
-        }
-
-        private void adjustTA(JTextArea ta, int w) {
-            ta.setSize(w, Short.MAX_VALUE);
-            int h = Math.max(ta.getPreferredSize().height, 24);
-            ta.setPreferredSize(new Dimension(0, h));
-            ta.setMaximumSize(new Dimension(Integer.MAX_VALUE, h));
+            // Invalidate all TAs so their overridden getPreferredSize() is re-queried
+            for (JTextArea ta : new JTextArea[]{ taI, taII, taTranslitI, taTranslitII }) {
+                ta.invalidate();
+            }
+            // Revalidate up to cardsContainer (BoxLayout parent) — this is the key level
+            cardsContainer.revalidate();
+            cardsContainer.repaint();
         }
 
         // ── Selection highlight ───────────────────────────────────────────────
@@ -559,8 +557,24 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         }
 
         private JTextArea makeTA(String text) {
+            // Override getPreferredSize to always compute height from actual rendered width.
+            // This is the only reliable way to auto-size a line-wrapping JTextArea in BoxLayout.
             JTextArea ta = new JTextArea(text) {
-                @Override public boolean getScrollableTracksViewportWidth() { return true; }
+                @Override
+                public Dimension getPreferredSize() {
+                    int w = getWidth();
+                    if (w <= 0) return new Dimension(100, 40);
+                    // Force the internal text view to re-measure at width w
+                    setSize(w, Short.MAX_VALUE);
+                    Dimension d = super.getPreferredSize();
+                    return new Dimension(w, Math.max(d.height, 24));
+                }
+                @Override
+                public Dimension getMaximumSize() {
+                    return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+                }
+                @Override
+                public boolean getScrollableTracksViewportWidth() { return true; }
             };
             ta.setFont(cardFont());
             ta.setForeground(cardFontColor());
@@ -575,6 +589,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             ta.setAlignmentX(LEFT_ALIGNMENT);
             ta.getDocument().addDocumentListener(doc(() -> {
                 saveTimer.restart();
+                ta.invalidate();
                 SwingUtilities.invokeLater(() -> updateHeights());
             }));
             ta.addFocusListener(new java.awt.event.FocusAdapter() {
