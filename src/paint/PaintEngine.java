@@ -908,6 +908,25 @@ public class PaintEngine {
     }
 
     /**
+     * Returns a boolean[w][h] mask of all pixels that match {@code targetColor}
+     * within {@code tolerancePct} (0-100). Used by CUT_COLOR to build a layer.
+     */
+    public static boolean[][] colorMask(BufferedImage img, Color targetColor, int tolerancePct) {
+        int w = img.getWidth(), h = img.getHeight();
+        int targetARGB = targetColor.getRGB();
+        int tol = tolerancePct * 255 / 100;
+        int[] px = rawPixels(img);
+        boolean[][] mask = new boolean[w][h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int argb = px != null ? px[y * w + x] : img.getRGB(x, y);
+                if (colorsMatch(argb, targetARGB, tol)) mask[x][y] = true;
+            }
+        }
+        return mask;
+    }
+
+    /**
      * CUT_COLOR: makes every pixel in {@code img} that matches {@code targetColor}
      * within {@code tolerancePct} (0-100) fully transparent.
      * Operates globally on the entire image — no flood fill, purely pixel-exact.

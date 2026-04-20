@@ -805,7 +805,7 @@ public class CanvasPanel extends JPanel {
 					int dx = curVp.x - rightZoomVpStart.x;
 					if (!isRightZooming
 							&& Math.max(Math.abs(dx), Math.abs(dy)) < RIGHT_ZOOM_THRESHOLD_PX) {
-						// Below threshold: let normal right-click behavior keep running.
+						return; // below threshold but CTRL+right armed → suppress all paint actions
 					} else {
 						if (!isRightZooming) {
 							isRightZooming = true;
@@ -2480,43 +2480,73 @@ public class CanvasPanel extends JPanel {
 		repaint();
 	}
 
-	/**
-	 * CUT_COLOR: removes all pixels matching the secondary color (global, pixel-exact).
-	 */
+	/** CUT_COLOR: extracts all pixels matching secondary color into a new ImageLayer. */
 	private void handleCutColor() {
 		BufferedImage img = callbacks.getWorkingImage();
 		if (img == null) return;
 		PaintToolbar tb = callbacks.getPaintToolbar();
-		callbacks.pushUndo();
-		PaintEngine.cutByColor(img, tb.getSecondaryColor(), tb.getWandTolerance());
-		callbacks.markDirty();
-		repaint();
+		boolean[][] mask = PaintEngine.colorMask(img, tb.getSecondaryColor(), tb.getWandTolerance());
+		cutMaskToLayer(img, mask);
 	}
 
-	/**
-	 * CUT_UNTIL_COLOR: flood-fills from click, stops at secondary color, cuts the
-	 * enclosed region to transparent (pixel-exact).
-	 */
+	/** CUT_UNTIL_COLOR: flood-fill from click stopping at secondary color → new ImageLayer. */
 	private void handleCutUntilColor(Point imgPt) {
 		BufferedImage img = callbacks.getWorkingImage();
 		if (img == null) return;
 		PaintToolbar tb = callbacks.getPaintToolbar();
-		callbacks.pushUndo();
-		PaintEngine.cutUntilColor(img, imgPt.x, imgPt.y,
-				tb.getSecondaryColor(), tb.getWandTolerance());
-		callbacks.markDirty();
-		repaint();
+		int tol = tb.getWandTolerance() * 255 / 100;
+		boolean[][] mask = PaintEngine.floodFillRegionUntilColor(
+				img, imgPt.x, imgPt.y, tb.getSecondaryColor(), tol);
+		cutMaskToLayer(img, mask);
 	}
 
-	/** CUT_SAME_COLOR: flood-fill from click, stop at any other color, cut to transparent. */
+	/** CUT_SAME_COLOR: flood-fill from click, stop at any other color → new ImageLayer. */
 	private void handleCutSameColor(Point imgPt) {
 		BufferedImage img = callbacks.getWorkingImage();
 		if (img == null) return;
+		int tol = callbacks.getPaintToolbar().getWandTolerance() * 255 / 100;
+		boolean[][] mask = PaintEngine.floodFillRegion(img, imgPt.x, imgPt.y, tol);
+		cutMaskToLayer(img, mask);
+	}
+
+	/**
+	 * Shared: copies masked pixels into a bounding-box-cropped ImageLayer, clears
+	 * them from the canvas, and adds the layer to the active element list.
+	 */
+	private void cutMaskToLayer(BufferedImage img, boolean[][] mask) {
+		int w = img.getWidth(), h = img.getHeight();
+
+		int minX = w, minY = h, maxX = -1, maxY = -1;
+		for (int x = 0; x < w && x < mask.length; x++) {
+			for (int y = 0; y < h && y < mask[x].length; y++) {
+				if (!mask[x][y]) continue;
+				if (x < minX) minX = x;
+				if (y < minY) minY = y;
+				if (x > maxX) maxX = x;
+				if (y > maxY) maxY = y;
+			}
+		}
+		if (maxX < 0) return;
+
+		int lw = maxX - minX + 1;
+		int lh = maxY - minY + 1;
+		BufferedImage layerImg = new BufferedImage(lw, lh, BufferedImage.TYPE_INT_ARGB);
+		for (int x = minX; x <= maxX; x++) {
+			for (int y = minY; y <= maxY; y++) {
+				if (x < mask.length && y < mask[x].length && mask[x][y])
+					layerImg.setRGB(x - minX, y - minY, img.getRGB(x, y));
+			}
+		}
+
 		callbacks.pushUndo();
-		PaintEngine.cutSameColor(img, imgPt.x, imgPt.y,
-				callbacks.getPaintToolbar().getWandTolerance());
+		PaintEngine.clearRegionMask(img, mask);
+
+		ImageLayer layer = new ImageLayer(callbacks.getNextElementId(),
+				layerImg, minX, minY, lw, lh);
+		callbacks.addElement(layer);
+		callbacks.setSelectedElement(layer);
 		callbacks.markDirty();
-		repaint();
+		javax.swing.SwingUtilities.invokeLater(() -> callbacks.repaintCanvas());
 	}
 
 	private java.awt.Color resolveWandColor(BufferedImage img, Point imgPt,
