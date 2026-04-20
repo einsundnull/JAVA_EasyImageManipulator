@@ -5,7 +5,9 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.List;
 
+import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
@@ -14,18 +16,19 @@ import javax.swing.SwingUtilities;
 /**
  * Controls the secondary preview window (F1–F7): initialization, show/hide,
  * fullscreen, preview mode cycling, canvas display mode, snapshot, and
- * apply-to-canvas. Extracted from SelectiveAlphaEditor.
+ * apply-to-canvas. Card list panels are dynamically added/removed per zone.
  */
 class SecondaryWindowController {
 
 	private final SelectiveAlphaEditor ed;
 
-	private LeftCardListPanel  leftPanel;
-	private RightCardListPanel rightPanel;
-	private JSplitPane leftSplit;    // leftPanel | centerWrap
-	private JSplitPane outerSplit;   // leftSplit | rightPanel
-	private boolean leftVisible  = false;
-	private boolean rightVisible = false;
+	// Dynamic card-list zones – any number of TranslationMapListPanel per side
+	private final List<TranslationMapListPanel> leftPanels  = new ArrayList<>();
+	private final List<TranslationMapListPanel> rightPanels = new ArrayList<>();
+	private JPanel     leftZone;
+	private JPanel     rightZone;
+	private JSplitPane leftSplit;    // leftZone | centerWrap
+	private JSplitPane outerSplit;   // leftSplit | rightZone
 	private int savedLeftDivider  = -1;
 	private int savedRightDivider = -1;
 
@@ -42,23 +45,26 @@ class SecondaryWindowController {
 		ed.secWin.setSize(900, 600);
 		ed.secWin.setLocationRelativeTo(ed);
 
-		// Card panels
-		leftPanel  = new LeftCardListPanel();
-		rightPanel = new RightCardListPanel();
-		leftPanel.setMinimumSize(new java.awt.Dimension(0, 0));
-		rightPanel.setMinimumSize(new java.awt.Dimension(0, 0));
+		// Zones for dynamic card-list panels
+		leftZone = new JPanel();
+		leftZone.setLayout(new BoxLayout(leftZone, BoxLayout.X_AXIS));
+		leftZone.setMinimumSize(new java.awt.Dimension(0, 0));
 
-		// Split panes: leftPanel | secPanel | rightPanel
+		rightZone = new JPanel();
+		rightZone.setLayout(new BoxLayout(rightZone, BoxLayout.X_AXIS));
+		rightZone.setMinimumSize(new java.awt.Dimension(0, 0));
+
+		// Split panes: leftZone | secPanel | rightZone
 		JPanel centerWrap = new JPanel(new BorderLayout());
 		centerWrap.add(ed.secPanel, BorderLayout.CENTER);
 		centerWrap.setMinimumSize(new java.awt.Dimension(100, 0));
 
-		leftSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, centerWrap);
+		leftSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftZone, centerWrap);
 		leftSplit.setResizeWeight(0.0);       // center gets all extra space
 		leftSplit.setContinuousLayout(true);
 		leftSplit.setBorder(null);
 
-		outerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftSplit, rightPanel);
+		outerSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftSplit, rightZone);
 		outerSplit.setResizeWeight(1.0);      // center gets all extra space
 		outerSplit.setContinuousLayout(true);
 		outerSplit.setBorder(null);
@@ -76,20 +82,17 @@ class SecondaryWindowController {
 		ed.secWin.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
 		ed.secTimer = new javax.swing.Timer(16, e -> ed.secPanel.repaint());
 
-		// Restore divider positions after layout (sizes are 0 until packed/shown)
+		// Restore saved divider widths
 		AppSettings s = AppSettings.getInstance();
-		leftVisible   = s.isCardListLeftVisible();
-		rightVisible  = s.isCardListRightVisible();
 		savedLeftDivider  = s.getCardPanelLeftWidth();
 		savedRightDivider = s.getCardPanelRightWidth();
 
-		// Apply initial dividers once the window is visible
+		// Apply dividers and attach listeners once the window is shown
 		ed.secWin.addWindowListener(new java.awt.event.WindowAdapter() {
 			@Override public void windowOpened(java.awt.event.WindowEvent e) {
 				applyDividers();
-				// Save divider positions on resize
 				leftSplit.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, ev -> {
-					if (leftVisible) {
+					if (!leftPanels.isEmpty()) {
 						int loc = leftSplit.getDividerLocation();
 						if (loc > 10) {
 							AppSettings.getInstance().setCardPanelLeftWidth(loc);
@@ -98,10 +101,10 @@ class SecondaryWindowController {
 					}
 				});
 				outerSplit.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, ev -> {
-					if (rightVisible) {
-						int w = outerSplit.getWidth();
+					if (!rightPanels.isEmpty()) {
+						int w   = outerSplit.getWidth();
 						int loc = outerSplit.getDividerLocation();
-						int rw = w - loc - outerSplit.getDividerSize();
+						int rw  = w - loc - outerSplit.getDividerSize();
 						if (rw > 10) {
 							AppSettings.getInstance().setCardPanelRightWidth(rw);
 							savedRightDivider = rw;
@@ -113,11 +116,9 @@ class SecondaryWindowController {
 	}
 
 	private void applyDividers() {
-		// left: hide by setting divider to 0, show by restoring saved width
-		leftSplit.setDividerLocation(leftVisible ? Math.max(80, savedLeftDivider) : 0);
-		// right: hide by pushing divider to full width, show by restoring saved width
+		leftSplit.setDividerLocation(!leftPanels.isEmpty() ? Math.max(80, savedLeftDivider) : 0);
 		int totalW = outerSplit.getWidth();
-		if (rightVisible) {
+		if (!rightPanels.isEmpty()) {
 			int rw = Math.max(80, savedRightDivider);
 			outerSplit.setDividerLocation(Math.max(0, totalW - rw - outerSplit.getDividerSize()));
 		} else {
@@ -125,40 +126,66 @@ class SecondaryWindowController {
 		}
 	}
 
-	boolean isLeftVisible()  { return leftVisible; }
-	boolean isRightVisible() { return rightVisible; }
+	// ── Dynamic panel management ──────────────────────────────────────────────
 
-	void toggleLeftPanel() {
+	/** Add a new TranslationMapListPanel to the left or right zone. */
+	void addPanel(String language, boolean leftSide) {
 		if (ed.secWin == null) initSecondaryWindow();
-		leftVisible = !leftVisible;
-		if (leftVisible) {
-			leftSplit.setDividerLocation(Math.max(80, savedLeftDivider));
-		} else {
-			savedLeftDivider = Math.max(80, leftSplit.getDividerLocation());
-			leftSplit.setDividerLocation(0);
-		}
-		AppSettings s = AppSettings.getInstance();
-		s.setCardListLeftVisible(leftVisible);
-		try { s.save(); } catch (Exception ex) { /* ignore */ }
+		List<TranslationMapListPanel> zone      = leftSide ? leftPanels : rightPanels;
+		JPanel                        zonePanel = leftSide ? leftZone   : rightZone;
+
+		TranslationMapListPanel p = new TranslationMapListPanel(
+				language, AppColors.BG_PANEL, this::removePanelFromZone);
+		zone.add(p);
+		zonePanel.add(p);
+		zonePanel.revalidate();
+		zonePanel.repaint();
+
+		if (zone.size() == 1) showZone(leftSide);
 		syncControlBar();
 	}
 
-	void toggleRightPanel() {
-		if (ed.secWin == null) initSecondaryWindow();
-		rightVisible = !rightVisible;
-		int totalW = outerSplit.getWidth();
-		if (rightVisible) {
+	private void removePanelFromZone(TranslationMapListPanel p) {
+		if (leftPanels.remove(p)) {
+			leftZone.remove(p);
+			leftZone.revalidate();
+			leftZone.repaint();
+			if (leftPanels.isEmpty()) hideZone(true);
+		} else if (rightPanels.remove(p)) {
+			rightZone.remove(p);
+			rightZone.revalidate();
+			rightZone.repaint();
+			if (rightPanels.isEmpty()) hideZone(false);
+		}
+		syncControlBar();
+	}
+
+	private void showZone(boolean leftSide) {
+		if (leftSide) {
+			leftSplit.setDividerLocation(Math.max(80, savedLeftDivider));
+		} else {
+			int totalW = outerSplit.getWidth();
 			int rw = Math.max(80, savedRightDivider);
 			outerSplit.setDividerLocation(Math.max(0, totalW - rw - outerSplit.getDividerSize()));
+		}
+	}
+
+	private void hideZone(boolean leftSide) {
+		if (leftSide) {
+			savedLeftDivider = Math.max(80, leftSplit.getDividerLocation());
+			leftSplit.setDividerLocation(0);
 		} else {
+			int totalW = outerSplit.getWidth();
 			int loc = outerSplit.getDividerLocation();
 			savedRightDivider = Math.max(80, totalW - loc - outerSplit.getDividerSize());
 			outerSplit.setDividerLocation(totalW > 0 ? totalW : 9999);
 		}
-		AppSettings s = AppSettings.getInstance();
-		s.setCardListRightVisible(rightVisible);
-		try { s.save(); } catch (Exception ex) { /* ignore */ }
-		syncControlBar();
+		try { AppSettings.getInstance().save(); } catch (Exception ex) { /* ignore */ }
+	}
+
+	void applyCardDisplaySettings() {
+		leftPanels.forEach(TranslationMapListPanel::refresh);
+		rightPanels.forEach(TranslationMapListPanel::refresh);
 	}
 
 	private void syncControlBar() {
@@ -166,10 +193,7 @@ class SecondaryWindowController {
 			ed.secControlBar.syncState();
 	}
 
-	void applyCardDisplaySettings() {
-		if (leftPanel  != null) leftPanel.applyDisplaySettings();
-		if (rightPanel != null) rightPanel.applyDisplaySettings();
-	}
+	// ── Secondary window lifecycle ────────────────────────────────────────────
 
 	void toggleSecondaryWindow() {
 		if (ed.secWin == null)
@@ -189,8 +213,8 @@ class SecondaryWindowController {
 		if (ed.secWin == null)
 			initSecondaryWindow();
 		ed.secMode = switch (ed.secMode) {
-		case SNAPSHOT -> PreviewMode.LIVE_ALL;
-		case LIVE_ALL -> PreviewMode.LIVE_ALL_EDIT;
+		case SNAPSHOT      -> PreviewMode.LIVE_ALL;
+		case LIVE_ALL      -> PreviewMode.LIVE_ALL_EDIT;
 		case LIVE_ALL_EDIT -> PreviewMode.SNAPSHOT;
 		};
 		if (ed.secWin.isVisible()) {
@@ -254,8 +278,8 @@ class SecondaryWindowController {
 			ed.secWin.setVisible(true);
 
 		ed.secAlwaysOnTop = switch (ed.secAlwaysOnTop) {
-		case TO_FRONT -> AlwaysOnTopMode.NORMAL;
-		case NORMAL -> AlwaysOnTopMode.TO_BACKGROUND;
+		case TO_FRONT      -> AlwaysOnTopMode.NORMAL;
+		case NORMAL        -> AlwaysOnTopMode.TO_BACKGROUND;
 		case TO_BACKGROUND -> AlwaysOnTopMode.TO_FRONT;
 		};
 
@@ -283,15 +307,15 @@ class SecondaryWindowController {
 			ed.secWin.setVisible(true);
 
 		ed.secCanvasMode = switch (ed.secCanvasMode) {
-		case SHOW_CANVAS_I_ONLY -> CanvasDisplayMode.SHOW_CANVAS_II_ONLY;
+		case SHOW_CANVAS_I_ONLY  -> CanvasDisplayMode.SHOW_CANVAS_II_ONLY;
 		case SHOW_CANVAS_II_ONLY -> CanvasDisplayMode.SHOW_ACTIVE_CANVAS;
-		case SHOW_ACTIVE_CANVAS -> CanvasDisplayMode.SHOW_CANVAS_I_ONLY;
+		case SHOW_ACTIVE_CANVAS  -> CanvasDisplayMode.SHOW_CANVAS_I_ONLY;
 		};
 
 		String msg = switch (ed.secCanvasMode) {
-		case SHOW_CANVAS_I_ONLY -> "Display: Canvas I Only";
+		case SHOW_CANVAS_I_ONLY  -> "Display: Canvas I Only";
 		case SHOW_CANVAS_II_ONLY -> "Display: Canvas II Only";
-		case SHOW_ACTIVE_CANVAS -> "Display: Active Canvas";
+		case SHOW_ACTIVE_CANVAS  -> "Display: Active Canvas";
 		};
 		ToastNotification.show(toastOwner(), msg);
 		if (ed.secPanel != null)
@@ -334,7 +358,6 @@ class SecondaryWindowController {
 			if (c.canvasPanel != null) c.canvasPanel.repaint();
 		});
 		if (ed.secPanel != null) ed.secPanel.repaint();
-		// Toast auf dem Sekundärfenster anzeigen – vermeidet Focus-Wechsel zum Hauptfenster
 		ToastNotification.show(ed.secWin != null ? ed.secWin : ed, "Text hinzugefügt");
 	}
 

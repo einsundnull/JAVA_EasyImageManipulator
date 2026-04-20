@@ -5,12 +5,18 @@ import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.Insets;
+import java.awt.GridLayout;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.JToggleButton;
@@ -21,22 +27,20 @@ import javax.swing.JToggleButton;
  */
 class SecondaryControlBar extends JPanel {
 
-    private final SelectiveAlphaEditor        ed;
-    private final SecondaryWindowController   ctrl;
+    private final SelectiveAlphaEditor      ed;
+    private final SecondaryWindowController ctrl;
 
     private JButton       previewModeBtn;
     private JButton       canvasModeBtn;
     private JButton       alwaysOnTopBtn;
     private JToggleButton fullscreenBtn;
-    private JToggleButton leftPanelBtn;
-    private JToggleButton rightPanelBtn;
     private JToggleButton floatBtn;
     private CardTextOptionsPopup textOptionsPopup;
 
     /** Wrapper panel inside secWin that holds this bar when docked. */
-    private JPanel    barHolder;
-    private JDialog   floatDialog;
-    private boolean   floating = false;
+    private JPanel  barHolder;
+    private JDialog floatDialog;
+    private boolean floating = false;
 
     SecondaryControlBar(SelectiveAlphaEditor ed, SecondaryWindowController ctrl) {
         this.ed   = ed;
@@ -103,20 +107,14 @@ class SecondaryControlBar extends JPanel {
 
         add(vSep());
 
-        // Card list panels toggle
-        leftPanelBtn = new JToggleButton("< Text I");
-        style(leftPanelBtn, "Linke Kartenliste ein-/ausblenden");
-        leftPanelBtn.addActionListener(e -> ctrl.toggleLeftPanel());
-        add(leftPanelBtn);
-
-        rightPanelBtn = new JToggleButton("Text II >");
-        style(rightPanelBtn, "Rechte Kartenliste ein-/ausblenden");
-        rightPanelBtn.addActionListener(e -> ctrl.toggleRightPanel());
-        add(rightPanelBtn);
+        // Add a new card-list panel (left or right zone)
+        JButton addListBtn = btn("Liste +", "Neue Kartenliste öffnen");
+        addListBtn.addActionListener(e -> showAddPanelDialog());
+        add(addListBtn);
 
         add(vSep());
 
-        // Float / dock toggle (pin icon)
+        // Float / dock toggle
         floatBtn = new JToggleButton("Float");
         style(floatBtn, "Toolbar freistellen / andocken");
         floatBtn.addActionListener(e -> setFloating(floatBtn.isSelected()));
@@ -145,8 +143,6 @@ class SecondaryControlBar extends JPanel {
         });
         fullscreenBtn.setSelected(ed.secFullscreen);
         fullscreenBtn.setText(ed.secFullscreen ? "Fenster" : "Vollbild");
-        if (leftPanelBtn  != null) leftPanelBtn.setSelected(ctrl.isLeftVisible());
-        if (rightPanelBtn != null) rightPanelBtn.setSelected(ctrl.isRightVisible());
         floatBtn.setSelected(floating);
         floatBtn.setText(floating ? "Dock" : "Float");
     }
@@ -162,6 +158,53 @@ class SecondaryControlBar extends JPanel {
         textOptionsPopup.toFront();
     }
 
+    // ── Add panel dialog ──────────────────────────────────────────────────────
+
+    private void showAddPanelDialog() {
+        // Collect available language codes from MapManager
+        List<String> langs = new ArrayList<>();
+        langs.add("de");
+        langs.add("en");
+        langs.add("ja");
+        langs.add("all");
+        try {
+            MapManager.loadAllMaps().keySet().stream()
+                    .filter(k -> !langs.contains(k))
+                    .forEach(langs::add);
+        } catch (IOException ex) { /* use defaults */ }
+        langs.add("[ Neue... ]");
+
+        JComboBox<String> langCombo = new JComboBox<>(langs.toArray(new String[0]));
+        langCombo.setSelectedItem("de");
+
+        String[] sides = { "Links", "Rechts" };
+        JComboBox<String> sideCombo = new JComboBox<>(sides);
+
+        JPanel grid = new JPanel(new GridLayout(0, 2, 8, 6));
+        grid.add(new JLabel("Sprache:")); grid.add(langCombo);
+        grid.add(new JLabel("Seite:"));   grid.add(sideCombo);
+
+        java.awt.Window owner = javax.swing.SwingUtilities.getWindowAncestor(this);
+        int res = JOptionPane.showConfirmDialog(
+                owner, grid, "Neue Kartenliste",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+        if (res != JOptionPane.OK_OPTION) return;
+
+        String lang = (String) langCombo.getSelectedItem();
+        if (lang == null) return;
+        if (lang.equals("[ Neue... ]")) {
+            lang = JOptionPane.showInputDialog(
+                    owner, "Sprachcode (z.B. de, en, ja):", "Neue Sprache",
+                    JOptionPane.PLAIN_MESSAGE);
+            if (lang == null || lang.isBlank()) return;
+            lang = lang.trim().toLowerCase();
+        }
+
+        boolean leftSide = sideCombo.getSelectedIndex() == 0;
+        ctrl.addPanel(lang, leftSide);
+    }
+
     // ── Float / dock ──────────────────────────────────────────────────────────
 
     private void setFloating(boolean nowFloating) {
@@ -169,13 +212,11 @@ class SecondaryControlBar extends JPanel {
         floating = nowFloating;
 
         if (nowFloating) {
-            // Remove from docked holder
             if (barHolder != null) {
                 barHolder.remove(this);
                 barHolder.revalidate();
                 barHolder.repaint();
             }
-            // Move into float dialog
             if (floatDialog == null) createFloatDialog();
             floatDialog.getContentPane().removeAll();
             floatDialog.getContentPane().add(this, BorderLayout.CENTER);
@@ -183,12 +224,10 @@ class SecondaryControlBar extends JPanel {
             floatDialog.setLocationRelativeTo(ed.secWin);
             floatDialog.setVisible(true);
         } else {
-            // Remove from float dialog
             if (floatDialog != null) {
                 floatDialog.getContentPane().remove(this);
                 floatDialog.setVisible(false);
             }
-            // Move back into docked holder
             if (barHolder != null) {
                 barHolder.add(this);
                 barHolder.revalidate();
@@ -206,7 +245,6 @@ class SecondaryControlBar extends JPanel {
         floatDialog.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
-                // Closing the float dialog → re-dock
                 floating = true; // trick setFloating into acting
                 setFloating(false);
             }
