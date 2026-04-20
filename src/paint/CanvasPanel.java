@@ -68,6 +68,16 @@ public class CanvasPanel extends JPanel {
 	// True when the current stroke was started with right-click (paint with secondary color)
 	private boolean rightClickStroke = false;
 
+	// ── Right-mouse-drag zoom state ───────────────────────────────────────────
+	/** Screen-space anchor captured on right-button press (CanvasPanel coords). */
+	private Point   rightZoomAnchor    = null;
+	/** Zoom level at right-button press, used as the base for the exponential ramp. */
+	private double  rightZoomStartZoom = 1.0;
+	/** True once the right-drag has crossed the threshold and taken over as a zoom gesture. */
+	private boolean isRightZooming     = false;
+	private static final int    RIGHT_ZOOM_THRESHOLD_PX  = 5;
+	private static final double RIGHT_ZOOM_FACTOR_PER_PX = 1.01;  // 1 % per pixel of vertical drag
+
 	// ── Text tool state ───────────────────────────────────────────────────────
 	private static final int TEXT_PADDING = 4;
 
@@ -262,6 +272,15 @@ public class CanvasPanel extends JPanel {
 			@Override
 			public void mousePressed(MouseEvent e) {
 				requestFocusInWindow();
+
+				// Arm right-mouse-drag zoom. The zoom only engages once the drag
+				// exceeds the threshold; until then the existing right-click logic
+				// (snap-drag, secondary-color paint, etc.) still runs below.
+				if (SwingUtilities.isRightMouseButton(e)) {
+					rightZoomAnchor    = e.getPoint();
+					rightZoomStartZoom = callbacks.getZoom();
+					isRightZooming     = false;
+				}
 
 				boolean isMiddle = (e.getButton() == MouseEvent.BUTTON2);
 				boolean isCtrlDrg = SwingUtilities.isLeftMouseButton(e)
@@ -728,6 +747,30 @@ public class CanvasPanel extends JPanel {
 
 			@Override
 			public void mouseDragged(MouseEvent e) {
+				// ── Right-mouse-drag zoom (intercepts everything once engaged) ──
+				if (SwingUtilities.isRightMouseButton(e) && rightZoomAnchor != null) {
+					int dy = rightZoomAnchor.y - e.getY();     // drag up  → positive → zoom in
+					int dx = e.getX() - rightZoomAnchor.x;
+					if (!isRightZooming
+							&& Math.max(Math.abs(dx), Math.abs(dy)) < RIGHT_ZOOM_THRESHOLD_PX) {
+						// Below threshold: let normal right-click behavior keep running.
+					} else {
+						if (!isRightZooming) {
+							isRightZooming = true;
+							// Cancel any conflicting press-time state so release doesn't finalize it.
+							isSnapDragging     = false;
+							rightClickStroke   = false;
+							panStart           = null;
+							pendingUndo        = false;
+							setCursor(Cursor.getPredefinedCursor(Cursor.N_RESIZE_CURSOR));
+						}
+						double newZoom = rightZoomStartZoom
+								* Math.pow(RIGHT_ZOOM_FACTOR_PER_PX, dy);
+						callbacks.setZoom(newZoom, rightZoomAnchor);
+						return;
+					}
+				}
+
 				if (panStart != null) {
 					Point curVp = SwingUtilities.convertPoint(CanvasPanel.this, e.getPoint(),
 							callbacks.getScrollPane().getViewport());
@@ -1006,6 +1049,15 @@ public class CanvasPanel extends JPanel {
 
 			@Override
 			public void mouseReleased(MouseEvent e) {
+				// Right-mouse-drag zoom: if we engaged, consume the release.
+				if (isRightZooming) {
+					isRightZooming  = false;
+					rightZoomAnchor = null;
+					setCursor(Cursor.getDefaultCursor());
+					return;
+				}
+				rightZoomAnchor = null;
+
 				panStart = null;
 				panViewPos = null;
 				elemLastImgPt = null;
