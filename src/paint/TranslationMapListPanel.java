@@ -5,14 +5,18 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -46,7 +50,6 @@ class TranslationMapListPanel extends BaseSidebarPanel {
     interface CloseCallback { void onClose(TranslationMapListPanel p); }
 
     private String          language;
-    private final Color     bgColor;
     private final CloseCallback onClose;
 
     private final JPanel      cardsContainer;
@@ -57,7 +60,6 @@ class TranslationMapListPanel extends BaseSidebarPanel {
 
     TranslationMapListPanel(String language, Color bgColor, CloseCallback onClose) {
         this.language = (language == null || language.isBlank()) ? "de" : language;
-        this.bgColor  = bgColor;
         this.onClose  = onClose;
 
         setLayout(new BorderLayout(0, 0));
@@ -73,10 +75,10 @@ class TranslationMapListPanel extends BaseSidebarPanel {
 
         cardsContainer = new JPanel();
         cardsContainer.setLayout(new BoxLayout(cardsContainer, BoxLayout.Y_AXIS));
-        cardsContainer.setBackground(bgColor);
+        cardsContainer.setBackground(panelBg());
 
         scrollPane = buildSidebarScrollPane(cardsContainer);
-        scrollPane.getViewport().setBackground(bgColor);
+        scrollPane.getViewport().setBackground(panelBg());
         add(scrollPane, BorderLayout.CENTER);
 
         getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
@@ -147,31 +149,55 @@ class TranslationMapListPanel extends BaseSidebarPanel {
     }
 
     private void pickLanguage() {
+        // Use the standard recent-projects dialog, filtered to the maps category
+        java.awt.Window win = SwingUtilities.getWindowAncestor(this);
+        javax.swing.JFrame owner = (win instanceof javax.swing.JFrame jf) ? jf : null;
+        if (owner == null) { pickLanguageFallback(); return; }
+        try {
+            Map<String, List<String>> recent = LastProjectsManager.loadAll();
+            StartupDialog dlg = new StartupDialog(owner, recent,
+                    StartupDialog.Mode.QUICK_OPEN, 0, LastProjectsManager.CAT_MAPS);
+            dlg.setVisible(true);
+            File chosen = dlg.getSelectedPath();
+            if (chosen == null) return;
+            // Interpret the chosen file: if it's a .json in the maps dir, its basename = language
+            if (chosen.isFile() && chosen.getName().endsWith(".json")) {
+                String lang = chosen.getName().replace(".json", "");
+                setLanguage(lang);
+            } else if (chosen.isDirectory()) {
+                // directory selected — use folder name as language code hint
+                setLanguage(chosen.getName().toLowerCase());
+            }
+        } catch (IOException ex) {
+            pickLanguageFallback();
+        }
+    }
+
+    private void pickLanguageFallback() {
         List<String> langs = new ArrayList<>();
         langs.add("all");
         try { langs.addAll(MapManager.loadAllMaps().keySet()); }
         catch (IOException ex) { /* ignore */ }
-        String newLangOpt = "[ Neue Sprache... ]";
-        langs.add(newLangOpt);
-
+        langs.add("[ Neue Sprache... ]");
         javax.swing.JComboBox<String> combo =
                 new javax.swing.JComboBox<>(langs.toArray(new String[0]));
         combo.setSelectedItem(language);
-
         int res = JOptionPane.showConfirmDialog(this, combo, "Sprache wählen",
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (res != JOptionPane.OK_OPTION) return;
         String chosen = (String) combo.getSelectedItem();
         if (chosen == null) return;
-
-        if (chosen.equals(newLangOpt)) {
+        if (chosen.equals("[ Neue Sprache... ]")) {
             String name = JOptionPane.showInputDialog(this,
                     "Sprachcode (z.B. de, en, ja):", "Neue Sprache", JOptionPane.PLAIN_MESSAGE);
             if (name == null || name.isBlank()) return;
             chosen = name.trim().toLowerCase();
         }
+        setLanguage(chosen);
+    }
 
-        language = chosen;
+    private void setLanguage(String lang) {
+        language = lang;
         for (java.awt.Component c : header.getComponents()) {
             if (c instanceof JLabel lbl && lbl.getText().startsWith("  ")) {
                 lbl.setText("  " + language); break;
@@ -182,24 +208,47 @@ class TranslationMapListPanel extends BaseSidebarPanel {
 
     // ── Shared helpers ────────────────────────────────────────────────────────
 
-    /** Returns a font that can display Japanese; falls back to Dialog if needed. */
+    private Color panelBg() {
+        return new Color(AppSettings.getInstance().getCardBgColor());
+    }
+
+    private Color cardBg() {
+        Color base = panelBg();
+        int r = Math.min(255, base.getRed()   + 14);
+        int g = Math.min(255, base.getGreen() + 14);
+        int b = Math.min(255, base.getBlue()  + 14);
+        return new Color(r, g, b);
+    }
+
+    /**
+     * Returns a font for card text that is guaranteed to display Japanese (and other CJK).
+     * Tries the user-configured family first; if it cannot display U+65E5 ('日') we walk
+     * through known CJK-capable families before falling back to the logical "Dialog" font
+     * which always maps to a system Unicode font on Windows/Mac/Linux.
+     */
+    private static Font cjkCapableFont(String family, int size) {
+        Font f = new Font(family, Font.PLAIN, size);
+        if (f.canDisplay('\u65E5')) return f;           // configured font works
+        // Try common CJK families available on Windows / macOS / Linux
+        for (String cjk : new String[]{
+                "MS Gothic", "Meiryo", "Yu Gothic", "MS Mincho",
+                "Noto Sans CJK JP", "Noto Sans JP", "IPAGothic",
+                "Hiragino Kaku Gothic ProN", "Hiragino Sans",
+                "SimSun", "NSimSun", "DengXian", "FangSong"}) {
+            Font candidate = new Font(cjk, Font.PLAIN, size);
+            if (!candidate.getFamily().equals("Dialog") && candidate.canDisplay('\u65E5'))
+                return candidate;
+        }
+        return new Font("Dialog", Font.PLAIN, size);   // logical font = always works
+    }
+
     private Font cardFont() {
         AppSettings s = AppSettings.getInstance();
-        Font f = new Font(s.getCardFontFamily(), Font.PLAIN, s.getCardFontSize());
-        if (!f.canDisplay('\u65E5')) // '日'
-            f = new Font("Dialog", Font.PLAIN, s.getCardFontSize());
-        return f;
+        return cjkCapableFont(s.getCardFontFamily(), s.getCardFontSize());
     }
 
     private Color cardFontColor() {
         return new Color(AppSettings.getInstance().getCardFontColor());
-    }
-
-    private Color cardBg() {
-        int r = Math.min(255, bgColor.getRed()   + 14);
-        int g = Math.min(255, bgColor.getGreen() + 14);
-        int b = Math.min(255, bgColor.getBlue()  + 14);
-        return new Color(r, g, b);
     }
 
     private List<String> availableLanguages() {

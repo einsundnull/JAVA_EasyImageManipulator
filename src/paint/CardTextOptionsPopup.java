@@ -28,6 +28,7 @@ class CardTextOptionsPopup extends JDialog {
 
     private final Runnable onChanged;
     private JButton colorSwatch;
+    private JButton bgSwatch;
 
     CardTextOptionsPopup(Window owner, Runnable onChanged) {
         super(owner, "Textoptionen – Karten", Dialog.ModalityType.MODELESS);
@@ -85,6 +86,21 @@ class CardTextOptionsPopup extends JDialog {
         });
         grid.add(lbl("Schriftfarbe")); grid.add(colorSwatch);
 
+        // ── Card background color ─────────────────────────────────────────────
+        bgSwatch = new JButton();
+        bgSwatch.setPreferredSize(new java.awt.Dimension(70, 24));
+        refreshBgSwatch(new Color(s.getCardBgColor()));
+        bgSwatch.addActionListener(e -> {
+            Color chosen = JColorChooser.showDialog(this, "Kartenhintergrund",
+                    new Color(AppSettings.getInstance().getCardBgColor()));
+            if (chosen != null) {
+                AppSettings.getInstance().setCardBgColor(chosen.getRGB());
+                refreshBgSwatch(chosen);
+                saveAndNotify();
+            }
+        });
+        grid.add(lbl("Kartenhintergrund")); grid.add(bgSwatch);
+
         // ── Separator ─────────────────────────────────────────────────────────
         grid.add(sep()); grid.add(sep());
 
@@ -129,6 +145,14 @@ class CardTextOptionsPopup extends JDialog {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void refreshBgSwatch(Color c) {
+        bgSwatch.setBackground(c);
+        bgSwatch.setForeground(c.getRed() + c.getGreen() + c.getBlue() > 382
+                ? Color.BLACK : Color.WHITE);
+        bgSwatch.setText(c.getRed() + ", " + c.getGreen() + ", " + c.getBlue());
+        bgSwatch.setOpaque(true);
+    }
 
     private void refreshSwatch(Color c) {
         colorSwatch.setBackground(c);

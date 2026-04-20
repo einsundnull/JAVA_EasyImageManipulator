@@ -302,6 +302,7 @@ public class AppSettings {
             writeField(writer, "cardFontFamily",        cardFontFamily,        true);
             writeField(writer, "cardFontSize",          cardFontSize,          true);
             writeField(writer, "cardFontColor",         cardFontColor,         true);
+            writeField(writer, "cardBgColor",           cardBgColor,           true);
             writeField(writer, "cardTtsLanguageLeft",   cardTtsLanguageLeft,   true);
             writeField(writer, "cardTtsLanguageRight",  cardTtsLanguageRight,  true);
             writeField(writer, "cardCurrentFolder",     cardCurrentFolder,     true);
@@ -484,6 +485,8 @@ public class AppSettings {
     public void   setCardFontSize(int s)           { cardFontSize = Math.max(6, Math.min(72, s)); }
     public int    getCardFontColor()               { return cardFontColor; }
     public void   setCardFontColor(int c)          { cardFontColor = c; }
+    public int    getCardBgColor()                 { return cardBgColor; }
+    public void   setCardBgColor(int c)            { cardBgColor = c; }
     public String getCardTtsLanguageLeft()         { return cardTtsLanguageLeft; }
     public void   setCardTtsLanguageLeft(String l) { cardTtsLanguageLeft  = l != null ? l : "ja"; }
     public String getCardTtsLanguageRight()        { return cardTtsLanguageRight; }
