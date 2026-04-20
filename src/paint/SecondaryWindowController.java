@@ -3,14 +3,19 @@ package paint;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.AbstractAction;
 import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 
 /**
@@ -31,6 +36,10 @@ class SecondaryWindowController {
 	private JSplitPane outerSplit;   // leftSplit | rightZone
 	private int savedLeftDivider  = -1;
 	private int savedRightDivider = -1;
+
+	// Paint mode
+	private SecondaryPaintBar paintBar;
+	private JPanel            centerWrap;   // kept for paint bar insertion
 
 	SecondaryWindowController(SelectiveAlphaEditor ed) {
 		this.ed = ed;
@@ -55,7 +64,7 @@ class SecondaryWindowController {
 		rightZone.setMinimumSize(new java.awt.Dimension(0, 0));
 
 		// Split panes: leftZone | secPanel | rightZone
-		JPanel centerWrap = new JPanel(new BorderLayout());
+		centerWrap = new JPanel(new BorderLayout());
 		centerWrap.add(ed.secPanel, BorderLayout.CENTER);
 		centerWrap.setMinimumSize(new java.awt.Dimension(100, 0));
 
@@ -81,6 +90,14 @@ class SecondaryWindowController {
 
 		ed.secWin.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
 		ed.secTimer = new javax.swing.Timer(16, e -> ed.secPanel.repaint());
+
+		// Alt+P → toggle paint mode
+		ed.secWin.getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+				.put(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK), "togglePaint");
+		ed.secWin.getRootPane().getActionMap()
+				.put("togglePaint", new AbstractAction() {
+					public void actionPerformed(ActionEvent e) { togglePaintMode(); }
+				});
 
 		// Restore saved divider widths
 		AppSettings s = AppSettings.getInstance();
@@ -191,6 +208,30 @@ class SecondaryWindowController {
 	private void syncControlBar() {
 		if (ed.secControlBar != null)
 			ed.secControlBar.syncState();
+	}
+
+	// ── Paint mode ────────────────────────────────────────────────────────────
+
+	void togglePaintMode() {
+		if (ed.secPanel == null) return;
+		ed.secPanel.paintMode = !ed.secPanel.paintMode;
+		if (ed.secPanel.paintMode) {
+			if (paintBar == null) paintBar = new SecondaryPaintBar(ed);
+			centerWrap.add(paintBar, BorderLayout.SOUTH);
+			paintBar.syncState();
+		} else {
+			if (paintBar != null) centerWrap.remove(paintBar);
+			ed.secPanel.setCursor(java.awt.Cursor.getDefaultCursor());
+		}
+		centerWrap.revalidate();
+		centerWrap.repaint();
+		ToastNotification.show(toastOwner(),
+				"Paint-Modus: " + (ed.secPanel.paintMode ? "AN" : "AUS"));
+		syncControlBar();
+	}
+
+	void syncPaintBar() {
+		if (paintBar != null && ed.secPanel.paintMode) paintBar.syncState();
 	}
 
 	// ── Secondary window lifecycle ────────────────────────────────────────────

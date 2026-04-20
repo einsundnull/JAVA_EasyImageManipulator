@@ -31,6 +31,14 @@ class SecondaryPanel extends JPanel {
 
 	private final SelectiveAlphaEditor editor;
 	private JTextField textInput;
+
+	// ── Paint mode ────────────────────────────────────────────────────────────
+	boolean paintMode = false;
+	private boolean brushing   = false;
+	private boolean undoPushed = false;
+	private int     lastPX, lastPY;   // previous image-space coords
+	private int     startPX, startPY; // start image-space coords (for shapes)
+	private java.awt.image.BufferedImage shapeOverlay;
 	private int textDragOffsetX, textDragOffsetY;
 	private String textResizeMode = null; // null=move, "r","b","br","l","t","tl","tr","bl"
 	private static final int TF_HANDLE = 10;
@@ -120,49 +128,64 @@ class SecondaryPanel extends JPanel {
 		addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
-				dragStartX = e.getXOnScreen();
-				dragStartY = e.getYOnScreen();
+				if (paintMode && e.getButton() == MouseEvent.BUTTON1) {
+					brushing   = false;
+					undoPushed = false;
+					shapeOverlay = null;
+					java.awt.Point ip = toImageCoords(e.getX(), e.getY());
+					lastPX = ip.x; lastPY = ip.y;
+					startPX = ip.x; startPY = ip.y;
+					beginPaint(ip.x, ip.y, e.isControlDown());
+					return;
+				}
+				dragStartX    = e.getXOnScreen();
+				dragStartY    = e.getYOnScreen();
 				dragStartWinX = editor.secWin.getX();
 				dragStartWinY = editor.secWin.getY();
 				dragStartWinW = editor.secWin.getWidth();
 				dragStartWinH = editor.secWin.getHeight();
-				resizeEdge = getResizeEdgeAt(e.getX(), e.getY());
+				resizeEdge    = getResizeEdgeAt(e.getX(), e.getY());
+			}
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				if (paintMode && brushing) {
+					java.awt.Point ip = toImageCoords(e.getX(), e.getY());
+					commitShape(startPX, startPY, ip.x, ip.y);
+					brushing = false;
+					shapeOverlay = null;
+					repaint();
+				}
 			}
 		});
 		addMouseMotionListener(new MouseAdapter() {
 			@Override
 			public void mouseMoved(MouseEvent e) {
-				String edge = getResizeEdgeAt(e.getX(), e.getY());
-				updateCursor(edge);
+				if (!paintMode) updateCursor(getResizeEdgeAt(e.getX(), e.getY()));
 			}
 
 			@Override
 			public void mouseDragged(MouseEvent e) {
+				if (paintMode && brushing) {
+					java.awt.Point ip = toImageCoords(e.getX(), e.getY());
+					continuePaint(lastPX, lastPY, ip.x, ip.y);
+					lastPX = ip.x; lastPY = ip.y;
+					return;
+				}
 				if (editor.secWin == null || editor.secFullscreen)
 					return;
 				int dx = e.getXOnScreen() - dragStartX;
 				int dy = e.getYOnScreen() - dragStartY;
-
 				if (resizeEdge == null) {
-					// Window drag
 					editor.secWin.setLocation(dragStartWinX + dx, dragStartWinY + dy);
 				} else {
-					// Window resize
 					int newX = dragStartWinX, newY = dragStartWinY;
 					int newW = dragStartWinW, newH = dragStartWinH;
-
-					if (resizeEdge.contains("l"))
-						newX += dx;
-					if (resizeEdge.contains("r"))
-						newW += dx;
-					if (resizeEdge.contains("t"))
-						newY += dy;
-					if (resizeEdge.contains("b"))
-						newH += dy;
-
+					if (resizeEdge.contains("l")) newX += dx;
+					if (resizeEdge.contains("r")) newW += dx;
+					if (resizeEdge.contains("t")) newY += dy;
+					if (resizeEdge.contains("b")) newH += dy;
 					newW = Math.max(200, newW);
 					newH = Math.max(150, newH);
-
 					editor.secWin.setBounds(newX, newY, newW, newH);
 				}
 			}
@@ -350,6 +373,11 @@ class SecondaryPanel extends JPanel {
 			}
 		}
 
+		// Shape overlay (paint mode, shape tools during drag)
+		if (paintMode && shapeOverlay != null) {
+			g2.drawImage(shapeOverlay, ox, oy, dw, dh, null);
+		}
+
 		// Element borders only in LIVE_ALL_EDIT
 		if (editor.secMode == PreviewMode.LIVE_ALL_EDIT) {
 			g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10,
@@ -363,6 +391,116 @@ class SecondaryPanel extends JPanel {
 				g2.drawRect(ex, ey, ew, eh);
 			}
 		}
+	}
+
+	// ── Paint mode helpers ────────────────────────────────────────────────────
+
+	/** Convert panel pixel → image pixel (clamped). */
+	private java.awt.Point toImageCoords(int px, int py) {
+		CanvasInstance ci = editor.ci();
+		if (ci.workingImage == null) return new java.awt.Point(0, 0);
+		int pw = getWidth(), ph = getHeight();
+		int iw = ci.workingImage.getWidth(), ih = ci.workingImage.getHeight();
+		double scale = Math.min((double) pw / iw, (double) ph / ih);
+		int ox = (pw - (int)(iw * scale)) / 2;
+		int oy = (ph - (int)(ih * scale)) / 2;
+		int ix = (int) ((px - ox) / scale);
+		int iy = (int) ((py - oy) / scale);
+		return new java.awt.Point(
+				Math.max(0, Math.min(iw - 1, ix)),
+				Math.max(0, Math.min(ih - 1, iy)));
+	}
+
+	private PaintEngine.Tool currentTool() {
+		return editor.paintToolbar != null ? editor.paintToolbar.getActiveTool() : PaintEngine.Tool.PENCIL;
+	}
+	private Color primaryColor() {
+		return editor.paintToolbar != null ? editor.paintToolbar.getPrimaryColor() : Color.BLACK;
+	}
+	private int strokeWidth() {
+		return editor.paintToolbar != null ? editor.paintToolbar.getStrokeWidth() : 3;
+	}
+
+	private boolean isShapeTool(PaintEngine.Tool t) {
+		return t == PaintEngine.Tool.LINE || t == PaintEngine.Tool.RECT || t == PaintEngine.Tool.CIRCLE;
+	}
+
+	private void beginPaint(int ix, int iy, boolean ctrl) {
+		CanvasInstance ci = editor.ci();
+		if (ci.workingImage == null) return;
+		brushing = true;
+		// push undo once per stroke
+		if (!undoPushed) {
+			ci.undoStack.push(editor.deepCopy(ci.workingImage));
+			if (ci.undoStack.size() > 50) ci.undoStack.pollLast();
+			ci.redoStack.clear();
+			undoPushed = true;
+		}
+		PaintEngine.Tool tool = currentTool();
+		if (tool == PaintEngine.Tool.FLOODFILL) {
+			PaintEngine.floodFill(ci.workingImage, ix, iy, primaryColor(), 20);
+			finishStroke(ci);
+		} else if (isShapeTool(tool)) {
+			shapeOverlay = editor.deepCopy(ci.workingImage);
+		} else {
+			java.awt.Point p = new java.awt.Point(ix, iy);
+			applyBrush(ci, tool, p, p);
+			finishStroke(ci);
+		}
+	}
+
+	private void continuePaint(int fromX, int fromY, int toX, int toY) {
+		CanvasInstance ci = editor.ci();
+		if (ci.workingImage == null) return;
+		PaintEngine.Tool tool = currentTool();
+		if (isShapeTool(tool)) {
+			// Redraw overlay on a fresh copy for live preview
+			shapeOverlay = editor.deepCopy(ci.workingImage);
+			java.awt.Point s = new java.awt.Point(startPX, startPY);
+			java.awt.Point e = new java.awt.Point(toX, toY);
+			applyBrush(shapeOverlay, tool, s, e);
+			repaint();
+		} else {
+			java.awt.Point from = new java.awt.Point(fromX, fromY);
+			java.awt.Point to   = new java.awt.Point(toX, toY);
+			applyBrush(ci, tool, from, to);
+			finishStroke(ci);
+		}
+	}
+
+	private void commitShape(int sx, int sy, int ex, int ey) {
+		CanvasInstance ci = editor.ci();
+		if (ci.workingImage == null) return;
+		PaintEngine.Tool tool = currentTool();
+		if (isShapeTool(tool)) {
+			applyBrush(ci, tool, new java.awt.Point(sx, sy), new java.awt.Point(ex, ey));
+			finishStroke(ci);
+		}
+	}
+
+	private void applyBrush(CanvasInstance ci, PaintEngine.Tool tool, java.awt.Point from, java.awt.Point to) {
+		applyBrush(ci.workingImage, tool, from, to);
+	}
+
+	private void applyBrush(java.awt.image.BufferedImage img, PaintEngine.Tool tool,
+			java.awt.Point from, java.awt.Point to) {
+		Color c = primaryColor();
+		int sw = strokeWidth();
+		switch (tool) {
+		case PENCIL -> PaintEngine.drawPencil(img, from, to, c, sw, PaintEngine.BrushShape.ROUND, false);
+		case ERASER -> PaintEngine.drawEraser(img, from, to, sw, false);
+		case LINE   -> PaintEngine.drawLine(img, from, to, c, sw, false);
+		case RECT   -> PaintEngine.drawRect(img, from, to, c, sw, PaintEngine.FillMode.OUTLINE_ONLY, c, false);
+		case CIRCLE -> PaintEngine.drawCircle(img, from, to, c, sw, PaintEngine.FillMode.OUTLINE_ONLY, c, false);
+		default     -> PaintEngine.drawPencil(img, from, to, c, sw, PaintEngine.BrushShape.ROUND, false);
+		}
+	}
+
+	private void finishStroke(CanvasInstance ci) {
+		editor.markDirty();
+		repaint();
+		if (ci.canvasPanel != null) ci.canvasPanel.repaint();
+		if (editor.secWinController != null) editor.secWinController.syncPaintBar();
 	}
 
 	private void renderPathLayerPreview(Graphics2D g2, PathLayer pl, int ox, int oy, double scale) {

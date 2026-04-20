@@ -568,9 +568,15 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             ta.setLineWrap(true);
             ta.setWrapStyleWord(true);
             ta.setOpaque(false);
-            ta.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
+            AppSettings _s = AppSettings.getInstance();
+            ta.setBorder(BorderFactory.createEmptyBorder(
+                    _s.getCardPaddingTop(), _s.getCardPaddingLeft(),
+                    _s.getCardPaddingBottom(), _s.getCardPaddingRight()));
             ta.setAlignmentX(LEFT_ALIGNMENT);
-            ta.getDocument().addDocumentListener(doc(() -> saveTimer.restart()));
+            ta.getDocument().addDocumentListener(doc(() -> {
+                saveTimer.restart();
+                SwingUtilities.invokeLater(() -> updateHeights());
+            }));
             ta.addFocusListener(new java.awt.event.FocusAdapter() {
                 @Override public void focusGained(java.awt.event.FocusEvent e) {
                     setSelected(MapCardWidget.this);

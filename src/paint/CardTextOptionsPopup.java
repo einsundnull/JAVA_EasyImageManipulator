@@ -113,6 +113,7 @@ class CardTextOptionsPopup extends JDialog {
         });
         grid.add(lbl("TTS-Sprache (Text I)")); grid.add(langLeft);
 
+
         // ── TTS language right (Text II) ──────────────────────────────────────
         JComboBox<String> langRight = combo(TTS_LANGS);
         langRight.setSelectedItem(s.getCardTtsLanguageRight());
@@ -121,6 +122,26 @@ class CardTextOptionsPopup extends JDialog {
             saveAndNotify();
         });
         grid.add(lbl("TTS-Sprache (Text II)")); grid.add(langRight);
+
+        // ── Separator ─────────────────────────────────────────────────────────
+        grid.add(sep()); grid.add(sep());
+
+        // ── Padding ───────────────────────────────────────────────────────────
+        JSpinner padTop = padSpinner(s.getCardPaddingTop());
+        padTop.addChangeListener(e -> { s.setCardPaddingTop((Integer) padTop.getValue()); saveAndNotify(); });
+        grid.add(lbl("Abstand oben")); grid.add(padTop);
+
+        JSpinner padBottom = padSpinner(s.getCardPaddingBottom());
+        padBottom.addChangeListener(e -> { s.setCardPaddingBottom((Integer) padBottom.getValue()); saveAndNotify(); });
+        grid.add(lbl("Abstand unten")); grid.add(padBottom);
+
+        JSpinner padLeft = padSpinner(s.getCardPaddingLeft());
+        padLeft.addChangeListener(e -> { s.setCardPaddingLeft((Integer) padLeft.getValue()); saveAndNotify(); });
+        grid.add(lbl("Abstand links")); grid.add(padLeft);
+
+        JSpinner padRight = padSpinner(s.getCardPaddingRight());
+        padRight.addChangeListener(e -> { s.setCardPaddingRight((Integer) padRight.getValue()); saveAndNotify(); });
+        grid.add(lbl("Abstand rechts")); grid.add(padRight);
 
         root.add(grid, BorderLayout.CENTER);
 
@@ -168,6 +189,12 @@ class CardTextOptionsPopup extends JDialog {
         cb.setForeground(AppColors.TEXT);
         cb.setFont(new Font("SansSerif", Font.PLAIN, 12));
         return cb;
+    }
+
+    private JSpinner padSpinner(int val) {
+        JSpinner sp = new JSpinner(new SpinnerNumberModel(val, 0, 40, 1));
+        styleSpinner(sp);
+        return sp;
     }
 
     private void styleSpinner(JSpinner sp) {

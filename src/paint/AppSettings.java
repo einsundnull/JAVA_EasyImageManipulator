@@ -80,6 +80,10 @@ public class AppSettings {
     private int     cardFontSize        = 13;
     private int     cardFontColor       = java.awt.Color.WHITE.getRGB();
     private int     cardBgColor         = new java.awt.Color(59, 59, 59).getRGB();
+    private int     cardPaddingTop      = 4;
+    private int     cardPaddingBottom   = 4;
+    private int     cardPaddingLeft     = 6;
+    private int     cardPaddingRight    = 6;
     private String  cardTtsLanguageLeft  = "ja";
     private String  cardTtsLanguageRight = "de";
     private String  cardCurrentFolder   = "default";
@@ -194,6 +198,10 @@ public class AppSettings {
         if (data.containsKey("cardFontSize"))         cardFontSize         = parseInt(data.get("cardFontSize"));
         if (data.containsKey("cardFontColor"))        cardFontColor        = parseInt(data.get("cardFontColor"));
         if (data.containsKey("cardBgColor"))          cardBgColor          = parseInt(data.get("cardBgColor"));
+        if (data.containsKey("cardPaddingTop"))       cardPaddingTop       = parseInt(data.get("cardPaddingTop"));
+        if (data.containsKey("cardPaddingBottom"))    cardPaddingBottom    = parseInt(data.get("cardPaddingBottom"));
+        if (data.containsKey("cardPaddingLeft"))      cardPaddingLeft      = parseInt(data.get("cardPaddingLeft"));
+        if (data.containsKey("cardPaddingRight"))     cardPaddingRight     = parseInt(data.get("cardPaddingRight"));
         if (data.containsKey("cardTtsLanguageLeft"))  cardTtsLanguageLeft  = data.get("cardTtsLanguageLeft");
         if (data.containsKey("cardTtsLanguageRight")) cardTtsLanguageRight = data.get("cardTtsLanguageRight");
         if (data.containsKey("cardCurrentFolder"))    cardCurrentFolder    = data.get("cardCurrentFolder");
@@ -303,6 +311,10 @@ public class AppSettings {
             writeField(writer, "cardFontSize",          cardFontSize,          true);
             writeField(writer, "cardFontColor",         cardFontColor,         true);
             writeField(writer, "cardBgColor",           cardBgColor,           true);
+            writeField(writer, "cardPaddingTop",        cardPaddingTop,        true);
+            writeField(writer, "cardPaddingBottom",     cardPaddingBottom,     true);
+            writeField(writer, "cardPaddingLeft",       cardPaddingLeft,       true);
+            writeField(writer, "cardPaddingRight",      cardPaddingRight,      true);
             writeField(writer, "cardTtsLanguageLeft",   cardTtsLanguageLeft,   true);
             writeField(writer, "cardTtsLanguageRight",  cardTtsLanguageRight,  true);
             writeField(writer, "cardCurrentFolder",     cardCurrentFolder,     true);
@@ -487,6 +499,14 @@ public class AppSettings {
     public void   setCardFontColor(int c)          { cardFontColor = c; }
     public int    getCardBgColor()                 { return cardBgColor; }
     public void   setCardBgColor(int c)            { cardBgColor = c; }
+    public int    getCardPaddingTop()              { return cardPaddingTop; }
+    public void   setCardPaddingTop(int v)         { cardPaddingTop    = Math.max(0, Math.min(40, v)); }
+    public int    getCardPaddingBottom()           { return cardPaddingBottom; }
+    public void   setCardPaddingBottom(int v)      { cardPaddingBottom = Math.max(0, Math.min(40, v)); }
+    public int    getCardPaddingLeft()             { return cardPaddingLeft; }
+    public void   setCardPaddingLeft(int v)        { cardPaddingLeft   = Math.max(0, Math.min(40, v)); }
+    public int    getCardPaddingRight()            { return cardPaddingRight; }
+    public void   setCardPaddingRight(int v)       { cardPaddingRight  = Math.max(0, Math.min(40, v)); }
     public String getCardTtsLanguageLeft()         { return cardTtsLanguageLeft; }
     public void   setCardTtsLanguageLeft(String l) { cardTtsLanguageLeft  = l != null ? l : "ja"; }
     public String getCardTtsLanguageRight()        { return cardTtsLanguageRight; }
