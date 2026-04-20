@@ -128,6 +128,10 @@ public class PaintToolbar extends JPanel {
     // ── Replace-wand config state ─────────────────────────────────────────────
     private int     replaceBandWidth = 1;    // pixels
     private boolean replaceBandClosed = true;
+    private PaintEngine.WandColorSource wandColorSource = PaintEngine.WandColorSource.SECONDARY;
+
+    // ── Wand panel (floating window) ──────────────────────────────────────────
+    private WandPanel wandPanel;
 
     // =========================================================================
     // Constructor
@@ -261,6 +265,7 @@ public class PaintToolbar extends JPanel {
 
     public int     getReplaceBandWidth()  { return replaceBandWidth; }
     public boolean isReplaceBandClosed()  { return replaceBandClosed; }
+    public PaintEngine.WandColorSource getWandColorSource() { return wandColorSource; }
 
     public void setReplaceBandWidth(int w) {
         replaceBandWidth = Math.max(1, Math.min(50, w));
@@ -268,6 +273,7 @@ public class PaintToolbar extends JPanel {
             replaceBandSlider.setValue(replaceBandWidth);
             replaceBandLabel.setText(replaceBandWidth + "px");
         }
+        if (wandPanel != null) wandPanel.syncFromToolbar();
     }
 
     public void setReplaceBandClosed(boolean closed) {
@@ -275,6 +281,28 @@ public class PaintToolbar extends JPanel {
         if (replaceClosedBtn != null) {
             replaceClosedBtn.setSelected(closed);
             replaceClosedBtn.setText(closed ? "◯ Closed" : "◯ Open");
+        }
+        if (wandPanel != null) wandPanel.syncFromToolbar();
+    }
+
+    public void setWandColorSource(PaintEngine.WandColorSource src) {
+        if (src == null) return;
+        wandColorSource = src;
+        if (wandPanel != null) wandPanel.syncFromToolbar();
+    }
+
+    // ── Wand panel show/hide ─────────────────────────────────────────────────
+    public WandPanel getWandPanel() {
+        if (wandPanel == null) wandPanel = new WandPanel(SwingUtilities.getWindowAncestor(this), this);
+        return wandPanel;
+    }
+
+    public void toggleWandPanel() {
+        WandPanel p = getWandPanel();
+        if (p.isVisible()) p.setVisible(false);
+        else {
+            p.syncFromToolbar();
+            p.setVisible(true);
         }
     }
 
@@ -307,9 +335,7 @@ public class PaintToolbar extends JPanel {
         strip.add(vSep());
         strip.add(buildAntialias());
         strip.add(vSep());
-        strip.add(buildWandTolerance());
-        strip.add(vSep());
-        strip.add(buildReplaceWandConfig());
+        strip.add(buildWandPanelToggle());
         strip.add(vSep());
         strip.add(buildTransforms());
         strip.add(vSep());
@@ -338,26 +364,40 @@ public class PaintToolbar extends JPanel {
     private JPanel buildToolButtons() {
         JPanel p = hBox();
         for (PaintEngine.Tool tool : PaintEngine.Tool.values()) {
-            String[] st = symbolAndTip(tool);
-            JToggleButton btn = toolBtn(st[0], st[1]);
-            btn.addActionListener(e -> {
-                if (activeTool == tool) {
-                    activeTool = null;
-                    btn.setSelected(false);
-                    cb.onToolChanged(null);
-                } else {
-                    toolButtons.forEach((t, b) -> { if (t != tool) b.setSelected(false); });
-                    activeTool = tool;
-                    btn.setSelected(true);
-                    cb.onToolChanged(tool);
-                }
-            });
-            toolButtons.put(tool, btn);
+            if (isWandTool(tool)) continue;   // wand tools live in the floating WandPanel
+            JToggleButton btn = buildToolButton(tool);
             p.add(btn);
             p.add(Box.createHorizontalStrut(GAP));
             if (tool == PaintEngine.Tool.PENCIL) btn.setSelected(true);
         }
         return p;
+    }
+
+    /** Public so WandPanel can create identical tool buttons in its own container. */
+    JToggleButton buildToolButton(PaintEngine.Tool tool) {
+        String[] st = symbolAndTip(tool);
+        JToggleButton btn = toolBtn(st[0], st[1]);
+        btn.addActionListener(e -> {
+            if (activeTool == tool) {
+                activeTool = null;
+                btn.setSelected(false);
+                cb.onToolChanged(null);
+                toolButtons.forEach((t, b) -> b.setSelected(false));
+            } else {
+                activeTool = tool;
+                cb.onToolChanged(tool);
+                toolButtons.forEach((t, b) -> b.setSelected(t == tool));
+            }
+        });
+        toolButtons.put(tool, btn);
+        return btn;
+    }
+
+    static boolean isWandTool(PaintEngine.Tool t) {
+        return t == PaintEngine.Tool.WAND_I || t == PaintEngine.Tool.WAND_II
+            || t == PaintEngine.Tool.WAND_III || t == PaintEngine.Tool.WAND_IV
+            || t == PaintEngine.Tool.WAND_REPLACE_OUTER || t == PaintEngine.Tool.WAND_REPLACE_INNER
+            || t == PaintEngine.Tool.WAND_AA_OUTER || t == PaintEngine.Tool.WAND_AA_INNER;
     }
 
     // ── Color swatches ────────────────────────────────────────────────────────
@@ -500,6 +540,7 @@ public class PaintToolbar extends JPanel {
     }
 
     // ── Wand tolerance slider (0-100 %) ──────────────────────────────────────
+    @SuppressWarnings("unused")
     private JPanel buildWandTolerance() {
         JPanel p = new JPanel(new java.awt.GridLayout(2, 3, 4, 2));
         p.setOpaque(false);
@@ -522,7 +563,21 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
+    // ── Wand panel toggle (opens the floating WandPanel) ─────────────────────
+    private JPanel buildWandPanelToggle() {
+        JPanel p = hBox();
+        JToggleButton btn = toggleBtn("⚡",
+                "Zauberstab-Panel ein-/ausblenden · alle Zauberstäbe, Toleranz, Band-Breite, Farbquelle");
+        btn.addActionListener(e -> {
+            toggleWandPanel();
+            btn.setSelected(wandPanel != null && wandPanel.isVisible());
+        });
+        p.add(btn);
+        return p;
+    }
+
     // ── Replace-wand config (band width + closed/open toggle) ─────────────────
+    @SuppressWarnings("unused")
     private JPanel buildReplaceWandConfig() {
         JPanel p = new JPanel(new GridLayout(2, 3, 4, 2));
         p.setOpaque(false);
@@ -674,16 +729,20 @@ public class PaintToolbar extends JPanel {
             case WAND_IV    -> new String[]{ "⚡",
                 "Zauberstab IV – Inwards Collapse (4) · Freihand-Polygon zeichnen, engt sich bis auf Inhalt zusammen" };
             case WAND_REPLACE_OUTER -> new String[]{ "⚡",
-                "Zauberstab Replace Outer (5) · Klick → n-Pixel-Ring AUSSERHALB der angeklickten Fläche wird mit Sekundärfarbe überschrieben" };
+                "Zauberstab Replace Outer · n-Pixel-Ring AUSSERHALB der angeklickten Fläche wird überschrieben" };
             case WAND_REPLACE_INNER -> new String[]{ "⚡",
-                "Zauberstab Replace Inner (6) · Klick → n-Pixel-Ring INNERHALB der angeklickten Fläche wird mit Sekundärfarbe überschrieben" };
+                "Zauberstab Replace Inner · n-Pixel-Ring INNERHALB der angeklickten Fläche wird überschrieben" };
+            case WAND_AA_OUTER -> new String[]{ "◠",
+                "Zauberstab AA Outer · n-Pixel-Ring AUSSERHALB wird antialiased eingeblendet (weiche Kante)" };
+            case WAND_AA_INNER -> new String[]{ "◡",
+                "Zauberstab AA Inner · n-Pixel-Ring INNERHALB wird antialiased eingeblendet (weiche Kante)" };
             case SMEAR      -> new String[]{ "~", "Verwischen (M)"  };
         };
     }
 
     // ── Widget factories ──────────────────────────────────────────────────────
 
-    private JToggleButton toolBtn(String symbol, String tooltip) {
+    JToggleButton toolBtn(String symbol, String tooltip) {
         JToggleButton btn = new JToggleButton(symbol) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
@@ -705,7 +764,7 @@ public class PaintToolbar extends JPanel {
         return btn;
     }
 
-    private JToggleButton toggleBtn(String symbol, String tooltip) {
+    JToggleButton toggleBtn(String symbol, String tooltip) {
         JToggleButton btn = new JToggleButton(symbol) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
@@ -773,7 +832,7 @@ public class PaintToolbar extends JPanel {
         return w;
     }
 
-    private JPanel hBox() {
+    JPanel hBox() {
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.X_AXIS));
         p.setOpaque(false);
@@ -781,14 +840,14 @@ public class PaintToolbar extends JPanel {
         return p;
     }
 
-    private JLabel miniLabel(String text) {
+    JLabel miniLabel(String text) {
         JLabel l = new JLabel(text);
         l.setForeground(AppColors.TEXT_MUTED);
         l.setFont(new Font("SansSerif", Font.PLAIN, 10));
         return l;
     }
 
-    private JSlider styledSlider(int min, int max, int val, int width) {
+    JSlider styledSlider(int min, int max, int val, int width) {
         JSlider s = new JSlider(min, max, val);
         s.setOpaque(false);
         s.setForeground(AppColors.TEXT_MUTED);

@@ -27,8 +27,12 @@ public class PaintEngine {
     public enum Tool {
         PENCIL, FLOODFILL, LINE, CIRCLE, RECT, ERASER, EYEDROPPER, SELECT, TEXT, PATH,
         FREE_PATH, WAND_I, WAND_II, WAND_III, WAND_IV,
-        WAND_REPLACE_OUTER, WAND_REPLACE_INNER, SMEAR
+        WAND_REPLACE_OUTER, WAND_REPLACE_INNER,
+        WAND_AA_OUTER, WAND_AA_INNER, SMEAR
     }
+
+    /** Which color the Replace / AA wands write. */
+    public enum WandColorSource { SECONDARY, CLICKED, SURROUNDING }
 
     // ── Fill mode enum ────────────────────────────────────────────────────────
     public enum FillMode {
@@ -646,6 +650,66 @@ public class PaintEngine {
     }
 
     /**
+     * Computes the distance field for pixels in the N-pixel boundary band.
+     * Returns int[w][h] where dist[x][y] in 1..width means "pixel is in the band,
+     * d steps from the opposite side"; 0 means "not in band".
+     */
+    public static int[][] boundaryDistanceField(boolean[][] region, int w, int h,
+            int width, boolean outer, boolean closed) {
+        int[][] dist = new int[w][h];
+        if (region == null || width <= 0) return dist;
+        int W = Math.max(1, width);
+
+        int[][] dirs = closed
+                ? new int[][]{{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}}
+                : new int[][]{{1,0},{-1,0},{0,1},{0,-1}};
+
+        int[][] work = new int[w][h];
+        for (int[] r : work) java.util.Arrays.fill(r, Integer.MAX_VALUE);
+        ArrayDeque<int[]> queue = new ArrayDeque<>();
+
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                boolean in = inRegion(region, x, y, w, h);
+                boolean target = outer ? !in : in;
+                if (!target) continue;
+                boolean onBoundary = false;
+                for (int[] d : dirs) {
+                    int nx = x + d[0], ny = y + d[1];
+                    boolean nIn;
+                    if (nx < 0 || ny < 0 || nx >= w || ny >= h) nIn = false;
+                    else nIn = inRegion(region, nx, ny, w, h);
+                    boolean nOpposite = outer ? nIn : !nIn;
+                    if (nOpposite) { onBoundary = true; break; }
+                }
+                if (onBoundary) {
+                    work[x][y] = 1;
+                    dist[x][y] = 1;
+                    queue.add(new int[]{x, y});
+                }
+            }
+        }
+        while (!queue.isEmpty()) {
+            int[] p = queue.poll();
+            int px = p[0], py = p[1];
+            int d = work[px][py];
+            if (d >= W) continue;
+            for (int[] dir : dirs) {
+                int nx = px + dir[0], ny = py + dir[1];
+                if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                boolean nIn = inRegion(region, nx, ny, w, h);
+                boolean nTarget = outer ? !nIn : nIn;
+                if (!nTarget) continue;
+                if (work[nx][ny] <= d + 1) continue;
+                work[nx][ny] = d + 1;
+                dist[nx][ny] = d + 1;
+                queue.add(new int[]{nx, ny});
+            }
+        }
+        return dist;
+    }
+
+    /**
      * Wand REPLACE_OUTER: flood-fill region from click, then paint an N-pixel band
      * OUTSIDE the region (along the outer boundary) with {@code replacement}.
      */
@@ -667,6 +731,91 @@ public class PaintEngine {
         boolean[][] region = floodFillRegion(img, x, y, tolerance);
         boolean[][] band   = boundaryBand(region, w, h, bandWidth, false, closed);
         fillMaskARGB(img, band, replacement.getRGB());
+    }
+
+    /**
+     * Wand AA_OUTER: flood-fill region, then blend an N-pixel AA band OUTSIDE the
+     * region with the given color. Alpha fades linearly from opaque at distance=1
+     * (touching the boundary) to transparent at distance=width+1.
+     */
+    public static void antiAliasOuter(BufferedImage img, int x, int y, Color blendColor,
+            int tolerance, int bandWidth, boolean closed) {
+        int w = img.getWidth(), h = img.getHeight();
+        boolean[][] region = floodFillRegion(img, x, y, tolerance);
+        int[][] dist = boundaryDistanceField(region, w, h, bandWidth, true, closed);
+        blendDistanceField(img, dist, bandWidth, blendColor);
+    }
+
+    /**
+     * Wand AA_INNER: flood-fill region, then blend an N-pixel AA band INSIDE the
+     * region with the given color. Alpha fades from opaque at the boundary to
+     * transparent at depth=width+1.
+     */
+    public static void antiAliasInner(BufferedImage img, int x, int y, Color blendColor,
+            int tolerance, int bandWidth, boolean closed) {
+        int w = img.getWidth(), h = img.getHeight();
+        boolean[][] region = floodFillRegion(img, x, y, tolerance);
+        int[][] dist = boundaryDistanceField(region, w, h, bandWidth, false, closed);
+        blendDistanceField(img, dist, bandWidth, blendColor);
+    }
+
+    /**
+     * Average color of all pixels in {@code mask}.  Returns {@code fallback} if mask is empty.
+     */
+    public static Color averageMaskColor(BufferedImage img, boolean[][] mask, Color fallback) {
+        int w = img.getWidth(), h = img.getHeight();
+        int[] px = rawPixels(img);
+        long sumR = 0, sumG = 0, sumB = 0, n = 0;
+        for (int x = 0; x < w && x < mask.length; x++) {
+            int mh = Math.min(h, mask[x].length);
+            for (int y = 0; y < mh; y++) {
+                if (!mask[x][y]) continue;
+                int rgb = px != null ? px[y * w + x] : img.getRGB(x, y);
+                int a = (rgb >>> 24) & 0xFF;
+                if (a == 0) continue;
+                sumR += (rgb >> 16) & 0xFF;
+                sumG += (rgb >>  8) & 0xFF;
+                sumB +=  rgb        & 0xFF;
+                n++;
+            }
+        }
+        if (n == 0) return fallback;
+        return new Color((int)(sumR / n), (int)(sumG / n), (int)(sumB / n));
+    }
+
+    /** Returns the RGB color of a single pixel, or {@code fallback} if out of bounds. */
+    public static Color pixelColor(BufferedImage img, int x, int y, Color fallback) {
+        if (x < 0 || y < 0 || x >= img.getWidth() || y >= img.getHeight()) return fallback;
+        int rgb = img.getRGB(x, y);
+        return new Color((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+    }
+
+    private static void blendDistanceField(BufferedImage img, int[][] dist, int width, Color blend) {
+        int w = img.getWidth(), h = img.getHeight();
+        int W = Math.max(1, width);
+        int br = blend.getRed(), bg = blend.getGreen(), bb = blend.getBlue();
+        int[] px = rawPixels(img);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w && x < dist.length; x++) {
+                if (y >= dist[x].length) continue;
+                int d = dist[x][y];
+                if (d <= 0) continue;
+                // alpha: d=1 → 1.0   d=W → 1/W-ish   d=W+1 → 0
+                double a = Math.max(0.0, Math.min(1.0, (double)(W - d + 1) / (W + 1)));
+                int src = px != null ? px[y * w + x] : img.getRGB(x, y);
+                int sa = (src >>> 24) & 0xFF;
+                int sr = (src >> 16) & 0xFF;
+                int sg = (src >>  8) & 0xFF;
+                int sb =  src        & 0xFF;
+                int nr = (int) Math.round(sr * (1 - a) + br * a);
+                int ng = (int) Math.round(sg * (1 - a) + bg * a);
+                int nb = (int) Math.round(sb * (1 - a) + bb * a);
+                int na = Math.min(255, (int) Math.round(sa + (255 - sa) * a));
+                int out = (na << 24) | (nr << 16) | (ng << 8) | nb;
+                if (px != null) px[y * w + x] = out;
+                else img.setRGB(x, y, out);
+            }
+        }
     }
 
     private static void fillMaskARGB(BufferedImage img, boolean[][] mask, int argb) {

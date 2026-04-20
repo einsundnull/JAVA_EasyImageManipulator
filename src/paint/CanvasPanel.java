@@ -708,8 +708,10 @@ public class CanvasPanel extends JPanel {
 					case WAND_I -> handleWandI(imgPt);
 					case WAND_II -> handleWandII(imgPt);
 					case WAND_III -> handleWandIII(imgPt);
-					case WAND_REPLACE_OUTER -> handleWandReplaceOuter(imgPt);
-					case WAND_REPLACE_INNER -> handleWandReplaceInner(imgPt);
+					case WAND_REPLACE_OUTER -> handleWandReplace(imgPt, true);
+					case WAND_REPLACE_INNER -> handleWandReplace(imgPt, false);
+					case WAND_AA_OUTER -> handleWandAA(imgPt, true);
+					case WAND_AA_INNER -> handleWandAA(imgPt, false);
 					}
 				} else {
 					if (callbacks.isFloodfillMode()) {
@@ -2304,35 +2306,63 @@ public class CanvasPanel extends JPanel {
 	}
 
 	/**
-	 * Replace Outer: flood-fills from click, then paints an N-pixel ring OUTSIDE
-	 * the region boundary with the secondary color. Width / closed-open read from toolbar.
+	 * Replace (outer or inner): solid fill of the boundary band with the color
+	 * resolved from the current WandColorSource (secondary / clicked / surrounding).
 	 */
-	private void handleWandReplaceOuter(Point imgPt) {
+	private void handleWandReplace(Point imgPt, boolean outer) {
 		BufferedImage img = callbacks.getWorkingImage();
 		if (img == null) return;
 		PaintToolbar tb = callbacks.getPaintToolbar();
+		int tol = tb.getWandTolerance();
+		int bw  = tb.getReplaceBandWidth();
+		boolean closed = tb.isReplaceBandClosed();
+		java.awt.Color col = resolveWandColor(img, imgPt, tb.getWandColorSource(),
+				tb.getSecondaryColor(), tol, bw, closed, outer);
 		callbacks.pushUndo();
-		PaintEngine.replaceOuter(img, imgPt.x, imgPt.y,
-				tb.getSecondaryColor(), tb.getWandTolerance(),
-				tb.getReplaceBandWidth(), tb.isReplaceBandClosed());
+		if (outer) PaintEngine.replaceOuter(img, imgPt.x, imgPt.y, col, tol, bw, closed);
+		else       PaintEngine.replaceInner(img, imgPt.x, imgPt.y, col, tol, bw, closed);
 		callbacks.markDirty();
 		repaint();
 	}
 
 	/**
-	 * Replace Inner: flood-fills from click, then paints an N-pixel ring INSIDE
-	 * the region boundary with the secondary color. Width / closed-open read from toolbar.
+	 * Anti-alias (outer or inner): distance-weighted blend of the boundary band
+	 * with the color resolved from the current WandColorSource.
 	 */
-	private void handleWandReplaceInner(Point imgPt) {
+	private void handleWandAA(Point imgPt, boolean outer) {
 		BufferedImage img = callbacks.getWorkingImage();
 		if (img == null) return;
 		PaintToolbar tb = callbacks.getPaintToolbar();
+		int tol = tb.getWandTolerance();
+		int bw  = tb.getReplaceBandWidth();
+		boolean closed = tb.isReplaceBandClosed();
+		java.awt.Color col = resolveWandColor(img, imgPt, tb.getWandColorSource(),
+				tb.getSecondaryColor(), tol, bw, closed, outer);
 		callbacks.pushUndo();
-		PaintEngine.replaceInner(img, imgPt.x, imgPt.y,
-				tb.getSecondaryColor(), tb.getWandTolerance(),
-				tb.getReplaceBandWidth(), tb.isReplaceBandClosed());
+		if (outer) PaintEngine.antiAliasOuter(img, imgPt.x, imgPt.y, col, tol, bw, closed);
+		else       PaintEngine.antiAliasInner(img, imgPt.x, imgPt.y, col, tol, bw, closed);
 		callbacks.markDirty();
 		repaint();
+	}
+
+	private java.awt.Color resolveWandColor(BufferedImage img, Point imgPt,
+			PaintEngine.WandColorSource src, java.awt.Color secondary,
+			int tol, int bandWidth, boolean closed, boolean outer) {
+		return switch (src) {
+			case SECONDARY -> secondary;
+			case CLICKED   -> PaintEngine.pixelColor(img, imgPt.x, imgPt.y, secondary);
+			case SURROUNDING -> {
+				// "Surrounding" = average on the OPPOSITE side of the boundary from the band.
+				// For outer bands: sample inside the clicked region.
+				// For inner bands: sample outside the clicked region.
+				boolean[][] region = PaintEngine.floodFillRegion(img, imgPt.x, imgPt.y, tol);
+				boolean[][] opp = PaintEngine.boundaryBand(region,
+						img.getWidth(), img.getHeight(),
+						Math.max(3, bandWidth),
+						/*outer=*/!outer, closed);
+				yield PaintEngine.averageMaskColor(img, opp, secondary);
+			}
+		};
 	}
 
 	/** Shared: trace contour of region mask and create a PathLayer element. */
