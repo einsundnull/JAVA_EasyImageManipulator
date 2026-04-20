@@ -146,6 +146,7 @@ public class PaintToolbar extends JPanel {
             JScrollBar bar = scroll.getHorizontalScrollBar();
             bar.setValue(bar.getValue() + e.getUnitsToScroll() * 20);
         });
+        installMiddleMouseDragPan(scroll, strip);
         add(scroll, BorderLayout.CENTER);
 
         colorPicker = new ColorPickerPopup(owner);
@@ -734,5 +735,55 @@ public class PaintToolbar extends JPanel {
         box.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
         box.setFocusable(false);
         return box;
+    }
+
+    // =========================================================================
+    // Middle-mouse-drag pan (fallback for broken mouse wheels)
+    // =========================================================================
+
+    /**
+     * Installs a middle-mouse-button drag listener on the strip (and all its
+     * descendants) that horizontally scrolls the enclosing JScrollPane.
+     * Child buttons/sliders only react to the left mouse button, so middle-
+     * click doesn't conflict with their own listeners.
+     */
+    private void installMiddleMouseDragPan(JScrollPane scroll, Component strip) {
+        final Point[] dragStartInScroll = { null };
+        final int[]   startValue        = { 0 };
+        final Cursor  panCursor         = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR);
+
+        MouseAdapter panAdapter = new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                if (!SwingUtilities.isMiddleMouseButton(e)) return;
+                Component src = (Component) e.getSource();
+                dragStartInScroll[0] = SwingUtilities.convertPoint(src, e.getPoint(), scroll);
+                startValue[0]        = scroll.getHorizontalScrollBar().getValue();
+                scroll.setCursor(panCursor);
+                e.consume();
+            }
+            @Override public void mouseDragged(MouseEvent e) {
+                if (dragStartInScroll[0] == null) return;
+                Component src = (Component) e.getSource();
+                Point cur = SwingUtilities.convertPoint(src, e.getPoint(), scroll);
+                int dx = dragStartInScroll[0].x - cur.x;
+                JScrollBar bar = scroll.getHorizontalScrollBar();
+                bar.setValue(startValue[0] + dx);
+                e.consume();
+            }
+            @Override public void mouseReleased(MouseEvent e) {
+                if (!SwingUtilities.isMiddleMouseButton(e)) return;
+                dragStartInScroll[0] = null;
+                scroll.setCursor(Cursor.getDefaultCursor());
+            }
+        };
+        attachRecursive(strip, panAdapter);
+    }
+
+    private static void attachRecursive(Component c, MouseAdapter a) {
+        c.addMouseListener(a);
+        c.addMouseMotionListener(a);
+        if (c instanceof java.awt.Container parent) {
+            for (Component child : parent.getComponents()) attachRecursive(child, a);
+        }
     }
 }
