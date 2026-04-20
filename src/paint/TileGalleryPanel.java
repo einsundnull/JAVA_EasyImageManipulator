@@ -238,6 +238,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         galleryScroll.getViewport().setBackground(new Color(36, 36, 36));
         galleryScroll.getVerticalScrollBar().setUnitIncrement(14);
         applyDarkScrollBar(galleryScroll.getVerticalScrollBar());
+        BaseSidebarPanel.installMiddleMouseDragPan(galleryScroll, tilesContainer);
         add(galleryScroll, BorderLayout.CENTER);
 
         // ── Viewport drop target: catches drops in empty space below tiles ───

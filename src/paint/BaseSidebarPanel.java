@@ -296,7 +296,76 @@ public abstract class BaseSidebarPanel extends JPanel {
         sp.setBackground(new Color(36, 36, 36));
         sp.getVerticalScrollBar().setUnitIncrement(14);
         TileGalleryPanel.applyDarkScrollBar(sp.getVerticalScrollBar());
+        installMiddleMouseDragPan(sp, container);
         return sp;
+    }
+
+    // ── Middle-Mouse-Drag Pan (fallback for broken mouse wheels) ───────────────
+
+    /**
+     * Installs a middle-mouse-button drag listener on {@code content} and all its
+     * descendants (now and in the future) that pans the enclosing JScrollPane.
+     * Works both axes; sidebar scroll panes only have vertical so horizontal is a no-op.
+     * Child buttons/labels only react to the left mouse button, so middle-click
+     * doesn't conflict with their own listeners.
+     */
+    static void installMiddleMouseDragPan(JScrollPane scroll, Component content) {
+        PanAdapter adapter = new PanAdapter(scroll);
+        adapter.attach(content);
+    }
+
+    /**
+     * Mouse + container listener: captures middle-button drags on any descendant
+     * and translates them into scrollbar movement. Re-attaches itself to newly
+     * added descendants via ContainerListener so dynamic list refreshes keep working.
+     */
+    private static final class PanAdapter extends MouseAdapter
+            implements java.awt.event.ContainerListener {
+        private final JScrollPane scroll;
+        private Point dragStartInScroll;
+        private int startH;
+        private int startV;
+
+        PanAdapter(JScrollPane scroll) { this.scroll = scroll; }
+
+        @Override public void mousePressed(MouseEvent e) {
+            if (!SwingUtilities.isMiddleMouseButton(e)) return;
+            Component src = (Component) e.getSource();
+            dragStartInScroll = SwingUtilities.convertPoint(src, e.getPoint(), scroll);
+            startH = scroll.getHorizontalScrollBar().getValue();
+            startV = scroll.getVerticalScrollBar().getValue();
+            scroll.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+            e.consume();
+        }
+        @Override public void mouseDragged(MouseEvent e) {
+            if (dragStartInScroll == null) return;
+            Component src = (Component) e.getSource();
+            Point cur = SwingUtilities.convertPoint(src, e.getPoint(), scroll);
+            int dx = dragStartInScroll.x - cur.x;
+            int dy = dragStartInScroll.y - cur.y;
+            scroll.getHorizontalScrollBar().setValue(startH + dx);
+            scroll.getVerticalScrollBar().setValue(startV + dy);
+            e.consume();
+        }
+        @Override public void mouseReleased(MouseEvent e) {
+            if (!SwingUtilities.isMiddleMouseButton(e)) return;
+            dragStartInScroll = null;
+            scroll.setCursor(Cursor.getDefaultCursor());
+        }
+
+        void attach(Component c) {
+            // Avoid double-attach if called on a subtree we already wired
+            for (java.awt.event.MouseListener l : c.getMouseListeners()) if (l == this) return;
+            c.addMouseListener(this);
+            c.addMouseMotionListener(this);
+            if (c instanceof java.awt.Container parent) {
+                parent.addContainerListener(this);
+                for (Component child : parent.getComponents()) attach(child);
+            }
+        }
+
+        @Override public void componentAdded(java.awt.event.ContainerEvent e)   { attach(e.getChild()); }
+        @Override public void componentRemoved(java.awt.event.ContainerEvent e) { /* listeners die with the component */ }
     }
 
     // ── DragToCopy-Utilities ───────────────────────────────────────────────────
