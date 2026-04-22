@@ -49,14 +49,28 @@ class TranslationMapListPanel extends BaseSidebarPanel {
     @FunctionalInterface
     interface CloseCallback { void onClose(TranslationMapListPanel p); }
 
+    /** Per-card style overrides (in-memory, keyed by map ID). */
+    static class CardStyle {
+        String  fontFamilyI, fontFamilyII;
+        Integer fontSizeI, fontSizeII;       // null = global
+        Integer fontColorI, fontColorII;     // null = global
+        Integer bgColor;                     // null = global
+    }
+
     private String          language;
     private final CloseCallback onClose;
 
     private final JPanel      cardsContainer;
     private final JScrollPane scrollPane;
     private final JPanel      header;
-    private List<TranslationMap> maps = new ArrayList<>();
+    private List<TranslationMap>   maps        = new ArrayList<>();
+    private List<MapCardWidget>    cardWidgets = new ArrayList<>();
+    private final java.util.Map<String, CardStyle> cardStyles = new java.util.HashMap<>();
     private MapCardWidget     selectedCard;
+
+    // Auto-font-size
+    private boolean autoFontSize = false;
+    private int     lastPanelWidth = 240;
 
     TranslationMapListPanel(String language, Color bgColor, CloseCallback onClose) {
         this.language = (language == null || language.isBlank()) ? "de" : language;
@@ -71,7 +85,19 @@ class TranslationMapListPanel extends BaseSidebarPanel {
                 onClose != null ? () -> onClose.onClose(this) : null);
         addAddButton(header, this::addCard);
         addQuickOpenButton(header, this::pickLanguage);
+        addAutoFontToggle(header);
         add(header, BorderLayout.NORTH);
+
+        // Auto-font: recompute when panel width changes
+        addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                int w = getWidth();
+                if (w > 0 && w != lastPanelWidth) {
+                    lastPanelWidth = w;
+                    if (autoFontSize) refreshAllFonts();
+                }
+            }
+        });
 
         cardsContainer = new JPanel();
         cardsContainer.setLayout(new BoxLayout(cardsContainer, BoxLayout.Y_AXIS));
@@ -137,9 +163,11 @@ class TranslationMapListPanel extends BaseSidebarPanel {
 
     private void rebuildCards() {
         cardsContainer.removeAll();
+        cardWidgets.clear();
         cardsContainer.add(Box.createRigidArea(new Dimension(0, 4)));
         for (TranslationMap m : maps) {
             MapCardWidget w = new MapCardWidget(m);
+            cardWidgets.add(w);
             cardsContainer.add(w);
             cardsContainer.add(Box.createRigidArea(new Dimension(0, 4)));
         }
@@ -204,6 +232,63 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             }
         }
         refresh();
+    }
+
+    // ── Auto-font toggle (added to header east panel) ─────────────────────────
+
+    private void addAutoFontToggle(JPanel hdr) {
+        Object prop = hdr.getClientProperty("eastPanel");
+        if (!(prop instanceof JPanel east)) return;
+        javax.swing.JToggleButton btn = new javax.swing.JToggleButton("A");
+        btn.setFont(new Font("SansSerif", Font.BOLD, 10));
+        btn.setForeground(AppColors.TEXT_MUTED);
+        btn.setBackground(new java.awt.Color(42, 42, 42));
+        btn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
+        btn.setFocusPainted(false);
+        btn.setMargin(new Insets(1, 3, 1, 3));
+        btn.setPreferredSize(new Dimension(20, 16));
+        btn.setToolTipText("Schriftgröße automatisch an Kartenbreite anpassen");
+        btn.addActionListener(e -> {
+            autoFontSize = btn.isSelected();
+            btn.setForeground(autoFontSize ? AppColors.ACCENT : AppColors.TEXT_MUTED);
+            if (autoFontSize) refreshAllFonts();
+            else              refreshAllFonts(); // reset to global too
+        });
+        east.add(btn, 0);
+        east.revalidate();
+        east.repaint();
+    }
+
+    /** Recompute font size for auto-mode or revert to global, apply to all live cards. */
+    private void refreshAllFonts() {
+        for (MapCardWidget w : cardWidgets) w.refreshFonts();
+    }
+
+    int computeAutoFontSize() {
+        if (!autoFontSize || lastPanelWidth <= 0) return AppSettings.getInstance().getCardFontSize();
+        int base = AppSettings.getInstance().getCardFontSize();
+        float scale = Math.max(0.35f, Math.min(3.0f, lastPanelWidth / 240f));
+        return Math.max(6, Math.min(72, Math.round(base * scale)));
+    }
+
+    // ── Per-card style resolution ─────────────────────────────────────────────
+
+    Font effectiveFont(CardStyle st, boolean isI) {
+        String family = (st != null && (isI ? st.fontFamilyI : st.fontFamilyII) != null)
+                ? (isI ? st.fontFamilyI : st.fontFamilyII)
+                : AppSettings.getInstance().getCardFontFamily();
+        Integer overSz = st != null ? (isI ? st.fontSizeI : st.fontSizeII) : null;
+        int size = overSz != null ? overSz : computeAutoFontSize();
+        return cjkCapableFont(family, size);
+    }
+
+    Color effectiveColor(CardStyle st, boolean isI) {
+        Integer c = st != null ? (isI ? st.fontColorI : st.fontColorII) : null;
+        return c != null ? new Color(c) : new Color(AppSettings.getInstance().getCardFontColor());
+    }
+
+    Color effectiveBg(CardStyle st) {
+        return (st != null && st.bgColor != null) ? new Color(st.bgColor) : cardBg();
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────────
@@ -325,13 +410,24 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             playIIBtn = playBtn();
             playIIBtn.addActionListener(e -> togglePlay(false));
 
+            JButton editBtn = new JButton("✎");
+            editBtn.setFont(new Font("Dialog", Font.PLAIN, 11));
+            editBtn.setForeground(AppColors.TEXT_MUTED);
+            editBtn.setBackground(cardBg());
+            editBtn.setBorder(null);
+            editBtn.setFocusPainted(false);
+            editBtn.setMargin(new Insets(0, 3, 0, 1));
+            editBtn.setOpaque(false);
+            editBtn.setToolTipText("Texteigenschaften dieser Karte bearbeiten");
+            editBtn.addActionListener(e -> showEditPopup());
+
             JButton delBtn = new JButton("×");
             delBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
             delBtn.setForeground(AppColors.DANGER);
             delBtn.setBackground(cardBg());
             delBtn.setBorder(null);
             delBtn.setFocusPainted(false);
-            delBtn.setMargin(new Insets(0, 4, 0, 2));
+            delBtn.setMargin(new Insets(0, 3, 0, 2));
             delBtn.setOpaque(false);
             delBtn.addActionListener(e -> delete());
 
@@ -345,18 +441,23 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             leftCluster.add(pipe);
             leftCluster.add(langIIBtn); leftCluster.add(translitIIBtn); leftCluster.add(playIIBtn);
 
+            JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+            rightBtns.setOpaque(false);
+            rightBtns.add(editBtn);
+            rightBtns.add(delBtn);
+
             JPanel compactHeader = new JPanel(new BorderLayout(0, 0));
             compactHeader.setOpaque(false);
             compactHeader.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 2));
             compactHeader.add(leftCluster, BorderLayout.CENTER);
-            compactHeader.add(delBtn,      BorderLayout.EAST);
+            compactHeader.add(rightBtns,   BorderLayout.EAST);
 
             // ── Text areas ────────────────────────────────────────────────────
-            taI         = makeTA(m.textI());
+            taI         = makeTA(m.textI(), true);
             taTranslitI = makeTranslitTA();
             taTranslitI.setVisible(false);
 
-            taII         = makeTA(m.textII());
+            taII         = makeTA(m.textII(), false);
             taTranslitII = makeTranslitTA();
             taTranslitII.setVisible(false);
 
@@ -491,13 +592,187 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         // ── Auto-height ───────────────────────────────────────────────────────
 
         private void updateHeights() {
-            // Invalidate all TAs so their overridden getPreferredSize() is re-queried
-            for (JTextArea ta : new JTextArea[]{ taI, taII, taTranslitI, taTranslitII }) {
-                ta.invalidate();
-            }
-            // Revalidate up to cardsContainer (BoxLayout parent) — this is the key level
-            cardsContainer.revalidate();
+            taI.invalidate(); taII.invalidate();
+            taTranslitI.invalidate(); taTranslitII.invalidate();
+            invalidate();
+            cardsContainer.validate();
             cardsContainer.repaint();
+        }
+
+        // ── Font refresh (called on auto-size change or after edit popup) ────────
+
+        void refreshFonts() {
+            CardStyle st = cardStyles.get(map.id());
+            Font fI  = effectiveFont(st, true);
+            Font fII = effectiveFont(st, false);
+            Color cI  = effectiveColor(st, true);
+            Color cII = effectiveColor(st, false);
+            taI.setFont(fI);   taI.setForeground(cI);   taI.setCaretColor(cI);
+            taII.setFont(fII); taII.setForeground(cII); taII.setCaretColor(cII);
+            int transSize = Math.max(6, fI.getSize() - 2);
+            taTranslitI.setFont(new Font("Dialog", Font.ITALIC, transSize));
+            taTranslitII.setFont(new Font("Dialog", Font.ITALIC, transSize));
+            setBackground(effectiveBg(st));
+            // After setFont the View's cached metrics are stale — invalidate explicitly,
+            // then use synchronous validate() so the new preferred sizes are applied
+            // before the next repaint rather than after the next EDT round-trip.
+            taI.invalidate(); taII.invalidate();
+            taTranslitI.invalidate(); taTranslitII.invalidate();
+            invalidate();
+            cardsContainer.validate();   // synchronous — applies new preferred sizes immediately
+            cardsContainer.repaint();
+        }
+
+        // ── Per-card edit popup ───────────────────────────────────────────────
+
+        private void showEditPopup() {
+            CardStyle st = cardStyles.computeIfAbsent(map.id(), k -> new CardStyle());
+            java.awt.Window win = SwingUtilities.getWindowAncestor(TranslationMapListPanel.this);
+            javax.swing.JFrame owner = (win instanceof javax.swing.JFrame jf) ? jf
+                    : (win instanceof javax.swing.JDialog jd && jd.getOwner() instanceof javax.swing.JFrame f) ? f : null;
+
+            javax.swing.JDialog dlg = new javax.swing.JDialog(owner,
+                    "Karte – Texteigenschaften", false);
+            dlg.setDefaultCloseOperation(javax.swing.JDialog.DISPOSE_ON_CLOSE);
+
+            String[] allFonts = java.awt.GraphicsEnvironment
+                    .getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+            String[] ttsLangs = CardTtsPlayer.availableLanguages();
+
+            AppSettings s = AppSettings.getInstance();
+
+            JPanel root = new JPanel(new BorderLayout(0, 8));
+            root.setBackground(AppColors.BG_PANEL);
+            root.setBorder(BorderFactory.createEmptyBorder(10, 12, 8, 12));
+
+            JPanel grid = new JPanel(new java.awt.GridLayout(0, 3, 8, 6));
+            grid.setOpaque(false);
+
+            // Header row
+            addGridLbl(grid, "");
+            addGridLbl(grid, "Seite I");
+            addGridLbl(grid, "Seite II");
+
+            // Font family
+            addGridLbl(grid, "Schriftart");
+            javax.swing.JComboBox<String> famI  = fontCombo(allFonts, st.fontFamilyI,  s.getCardFontFamily());
+            javax.swing.JComboBox<String> famII = fontCombo(allFonts, st.fontFamilyII, s.getCardFontFamily());
+            grid.add(famI); grid.add(famII);
+
+            // Font size
+            addGridLbl(grid, "Schriftgröße");
+            javax.swing.JSpinner szI  = sizeSpinner(st.fontSizeI  != null ? st.fontSizeI  : s.getCardFontSize());
+            javax.swing.JSpinner szII = sizeSpinner(st.fontSizeII != null ? st.fontSizeII : s.getCardFontSize());
+            grid.add(szI); grid.add(szII);
+
+            // Font color
+            addGridLbl(grid, "Schriftfarbe");
+            Color defC = new Color(s.getCardFontColor());
+            JButton colI  = colorSwatch(st.fontColorI  != null ? new Color(st.fontColorI)  : defC);
+            JButton colII = colorSwatch(st.fontColorII != null ? new Color(st.fontColorII) : defC);
+            colI.addActionListener(e -> {
+                Color c = javax.swing.JColorChooser.showDialog(dlg, "Schriftfarbe I", colI.getBackground());
+                if (c != null) refreshSwatch(colI, c);
+            });
+            colII.addActionListener(e -> {
+                Color c = javax.swing.JColorChooser.showDialog(dlg, "Schriftfarbe II", colII.getBackground());
+                if (c != null) refreshSwatch(colII, c);
+            });
+            grid.add(colI); grid.add(colII);
+
+            // Background color (shared)
+            addGridLbl(grid, "Kartenhintergrund");
+            Color defBg = effectiveBg(null);
+            JButton bgBtn = colorSwatch(st.bgColor != null ? new Color(st.bgColor) : defBg);
+            bgBtn.addActionListener(e -> {
+                Color c = javax.swing.JColorChooser.showDialog(dlg, "Kartenhintergrund", bgBtn.getBackground());
+                if (c != null) refreshSwatch(bgBtn, c);
+            });
+            JPanel bgRow = new JPanel(new BorderLayout());
+            bgRow.setOpaque(false);
+            bgRow.add(bgBtn, BorderLayout.WEST);
+            grid.add(bgRow); grid.add(new JPanel()); // span 2 cols
+
+            root.add(grid, BorderLayout.CENTER);
+
+            // Buttons
+            JPanel foot = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+            foot.setOpaque(false);
+
+            JButton resetBtn = footBtn("Zurücksetzen");
+            resetBtn.addActionListener(e -> {
+                cardStyles.remove(map.id());
+                refreshFonts();
+                dlg.dispose();
+            });
+
+            JButton okBtn = footBtn("OK");
+            okBtn.addActionListener(e -> {
+                st.fontFamilyI  = (String) famI.getSelectedItem();
+                st.fontFamilyII = (String) famII.getSelectedItem();
+                st.fontSizeI    = (Integer) szI.getValue();
+                st.fontSizeII   = (Integer) szII.getValue();
+                st.fontColorI   = colI.getBackground().getRGB();
+                st.fontColorII  = colII.getBackground().getRGB();
+                st.bgColor      = bgBtn.getBackground().getRGB();
+                cardStyles.put(map.id(), st);
+                refreshFonts();
+                dlg.dispose();
+            });
+
+            foot.add(resetBtn);
+            foot.add(okBtn);
+            root.add(foot, BorderLayout.SOUTH);
+
+            dlg.setContentPane(root);
+            dlg.pack();
+            dlg.setLocationRelativeTo(TranslationMapListPanel.this);
+            dlg.setVisible(true);
+        }
+
+        private void addGridLbl(JPanel p, String txt) {
+            JLabel l = new JLabel(txt);
+            l.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            l.setForeground(AppColors.TEXT_MUTED);
+            p.add(l);
+        }
+        private javax.swing.JComboBox<String> fontCombo(String[] items, String override, String def) {
+            javax.swing.JComboBox<String> cb = new javax.swing.JComboBox<>(items);
+            cb.setSelectedItem(override != null ? override : def);
+            cb.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            cb.setBackground(AppColors.BTN_BG);
+            cb.setForeground(AppColors.TEXT);
+            return cb;
+        }
+        private javax.swing.JSpinner sizeSpinner(int val) {
+            javax.swing.JSpinner sp = new javax.swing.JSpinner(
+                    new javax.swing.SpinnerNumberModel(val, 6, 72, 1));
+            sp.setBackground(AppColors.BTN_BG);
+            sp.getEditor().getComponent(0).setBackground(AppColors.BTN_BG);
+            ((javax.swing.JSpinner.DefaultEditor) sp.getEditor())
+                    .getTextField().setForeground(AppColors.TEXT);
+            return sp;
+        }
+        private JButton colorSwatch(Color c) {
+            JButton b = new JButton();
+            b.setPreferredSize(new Dimension(60, 20));
+            b.setOpaque(true); b.setFocusPainted(false);
+            b.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
+            refreshSwatch(b, c);
+            return b;
+        }
+        private void refreshSwatch(JButton b, Color c) {
+            b.setBackground(c);
+            b.setForeground(c.getRed() + c.getGreen() + c.getBlue() > 382 ? Color.BLACK : Color.WHITE);
+            b.setText(c.getRed() + "," + c.getGreen() + "," + c.getBlue());
+        }
+        private JButton footBtn(String text) {
+            JButton b = new JButton(text);
+            b.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            b.setBackground(AppColors.BTN_BG);
+            b.setForeground(AppColors.TEXT);
+            b.setFocusPainted(false);
+            return b;
         }
 
         // ── Selection highlight ───────────────────────────────────────────────
@@ -556,7 +831,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             return b;
         }
 
-        private JTextArea makeTA(String text) {
+        private JTextArea makeTA(String text, boolean isI) {
             // Override getPreferredSize to always compute height from actual rendered width.
             // This is the only reliable way to auto-size a line-wrapping JTextArea in BoxLayout.
             JTextArea ta = new JTextArea(text) {
@@ -564,10 +839,18 @@ class TranslationMapListPanel extends BaseSidebarPanel {
                 public Dimension getPreferredSize() {
                     int w = getWidth();
                     if (w <= 0) return new Dimension(100, 40);
-                    // Force the internal text view to re-measure at width w
-                    setSize(w, Short.MAX_VALUE);
-                    Dimension d = super.getPreferredSize();
-                    return new Dimension(w, Math.max(d.height, 24));
+                    // Use the View hierarchy directly — bypasses Swing's component-size cache
+                    // and always picks up the currently set font metrics.
+                    try {
+                        javax.swing.text.View v = getUI().getRootView(this);
+                        v.setSize(w, Short.MAX_VALUE);
+                        int h = (int) Math.ceil(v.getPreferredSpan(javax.swing.text.View.Y_AXIS));
+                        java.awt.Insets ins = getInsets();
+                        return new Dimension(w, Math.max(h + ins.top + ins.bottom, 24));
+                    } catch (Exception ex) {
+                        setSize(w, Short.MAX_VALUE);
+                        return new Dimension(w, Math.max(super.getPreferredSize().height, 24));
+                    }
                 }
                 @Override
                 public Dimension getMaximumSize() {
@@ -576,9 +859,12 @@ class TranslationMapListPanel extends BaseSidebarPanel {
                 @Override
                 public boolean getScrollableTracksViewportWidth() { return true; }
             };
-            ta.setFont(cardFont());
-            ta.setForeground(cardFontColor());
-            ta.setCaretColor(cardFontColor());
+            CardStyle st = cardStyles.get(map.id());
+            Font ef = effectiveFont(st, isI);
+            Color ec = effectiveColor(st, isI);
+            ta.setFont(ef);
+            ta.setForeground(ec);
+            ta.setCaretColor(ec);
             ta.setLineWrap(true);
             ta.setWrapStyleWord(true);
             ta.setOpaque(false);
