@@ -1,0 +1,120 @@
+==============================================================================
+progress_2026-07-30_apppaths-books.txt
+Aufgabentyp: [ST] — Schritt [7] der Liste im WEITERMACHEN_PROMPT
+Risiko:      [B] — Pfadbildung verlagert, Ablageort NACHWEISLICH unveraendert
+==============================================================================
+
+PROMPT: "weiter" -> Schritt [7]: BOOKS_ROOT + cardfolders auf AppPaths ziehen
+        (§31, Befund S13)
+
+
+DAS PROBLEM
+--------------------------------------------------------------------------
+BookController trug den Pfad hartkodiert:
+
+    private static final String BOOKS_ROOT =
+        System.getProperty("user.home")
+        + File.separator + "AppData"
+        + File.separator + "Roaming"
+        + File.separator + "TransparencyTool"
+        + File.separator + "books";
+
+*** Das liest %APPDATA% NICHT. Es setzt voraus, dass das Roaming-Profil
+    genau unter user.home\AppData\Roaming liegt und dass die Ordner
+    englisch heissen. Bei umgeleitetem Profil (Firmen-Roaming,
+    OneDrive-Umleitung, lokalisierte Ordnernamen) zeigt der Pfad ins
+    Leere — und der Fallback von AppPaths greift nicht, weil AppPaths
+    ueberhaupt nicht beteiligt war. ***
+
+CardListStore war der harmlosere Fall: der CODE lag immer richtig
+(AppPaths.getSettingsDir() + "cardfolders"), nur das Javadoc behauptete
+%APPDATA%/TransparencyTool/cardfolders/ — OHNE das settings/ dazwischen.
+Wer danach im Dateisystem sucht, findet nichts.
+
+
+DIE VORSICHTSREGEL, DIE HIER GEZOGEN HAT
+--------------------------------------------------------------------------
+Aus dem WEITERMACHEN_PROMPT: "die PFADBILDUNG verlagern ist [B]. Den
+ABLAGEORT aendern ist es nicht — dort liegen Buecher der User."
+
+Deshalb VOR der Aenderung geprueft, nicht danach:
+  APPDATA          = C:\Users\pc\AppData\Roaming
+  user.home        = C:\Users\pc
+  -> beide Konstruktionen ergeben denselben Ordner
+  books/           existiert, 5 Eintraege        <- ECHTE USER-DATEN
+  settings/cardfolders/ existiert, 2 Eintraege
+
+NACH der Aenderung mit einem Wegwerf-Programm gegen die kompilierten
+Klassen NACHGEWIESEN (getCanonicalPath-Vergleich, nicht String-Vergleich):
+
+  BOOKS  alt: C:\Users\pc\AppData\Roaming\TransparencyTool\books
+  BOOKS  neu: C:\Users\pc\AppData\Roaming\TransparencyTool\books
+    gleich? true      Inhalt: 5 Eintraege
+  CARDS  alt: C:\Users\pc\AppData\Roaming\TransparencyTool\settings\cardfolders
+  CARDS  neu: C:\Users\pc\AppData\Roaming\TransparencyTool\settings\cardfolders
+    gleich? true      Inhalt: 2 Eintraege
+
+*** Auf diesem Rechner ist die Aenderung ablageort-erhaltend. Sie behebt
+    ausschliesslich den Fall des umgeleiteten Profils. ***
+
+*** RESTRISIKO, EHRLICH BENANNT: Haette jemand ein umgeleitetes Profil UND
+    dort bereits Buecher unter dem alten (falschen) Pfad, wuerde die App
+    nach dem Fix am richtigen Ort suchen und die Buecher nicht mehr finden.
+    Auf diesem Rechner trifft das nicht zu (beide Pfade sind identisch).
+    Bei einer Weitergabe an andere Rechner waere das zu pruefen. ***
+
+
+GEAENDERT
+--------------------------------------------------------------------------
+AppPaths.java      NEU getBooksDir() + getCardFoldersDir(), je mit Javadoc,
+                   das die Herkunft und den Grund nennt.
+                   NEU Felder booksDir / cardFoldersDir.
+                   *** In initializePaths werden sie nur BERECHNET, nicht
+                       angelegt. Alle anderen Verzeichnisse legt AppPaths
+                       beim Start an — books/ und cardfolders/ entstanden
+                       bisher aber erst beim ERSTEN ZUGRIFF. Eager anlegen
+                       waere eine Verhaltensaenderung ohne Nutzen: Nutzer
+                       ohne Buecher/Karten bekaemen leere Ordner. Das
+                       mkdirs steht in den Gettern. ***
+BookController.java  BOOKS_ROOT geloescht. getBooksRoot() delegiert an
+                   AppPaths.getBooksDir(). *** Die 3 Aufrufstellen
+                   (getBooksRoot@81, @132, NewFolderDialog:114) blieben
+                   UNBERUEHRT — der Pfad war sauber hinter einer Methode
+                   gekapselt. ***
+CardListStore.java foldersRoot() delegiert an AppPaths.getCardFoldersDir();
+                   Javadoc korrigiert (settings/ ergaenzt).
+
+Build: exit 0, 329 .class — unveraendert.
+
+
+DOKU NACHGEZOGEN
+--------------------------------------------------------------------------
+doc/GUIDELINES.md  §31: die zwei Verstoesse sind jetzt als BEHOBEN
+                   beschrieben, samt der Trennung Pfadbildung/Ablageort und
+                   der Regel zur verzoegerten Verzeichnis-Erzeugung.
+CLAUDE.md          Persistenz-Abschnitt: getBooksDir/getCardFoldersDir
+                   ergaenzt, der Altlasten-Eintrag S13 entfaellt.
+
+
+RUNTIME-VERIFY (GUI, User)
+--------------------------------------------------------------------------
+  B1  Buch-Modus oeffnen -> die 5 vorhandenen Buecher erscheinen wie bisher
+  B2  Neues Buch anlegen -> landet unter
+      %APPDATA%\TransparencyTool\books\<Name>\
+  B3  Karten-Panel oeffnen -> die 2 vorhandenen Ordner erscheinen
+  B4  Neuen Kartenordner anlegen -> landet unter
+      %APPDATA%\TransparencyTool\settings\cardfolders\<Name>\cards.txt
+  *** B1 und B3 sind die wichtigen: sie zeigen, dass keine Daten
+      "verschwunden" sind. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja ([7] erledigt)
+# Die Aufgabe "Schritt [7] AppPaths" wurde vollstaendig abgeschlossen: ja
+# Naechster Schritt: [8] KeyBindings-Registry + Hilfe-Dialog [B].
+#   ACHTUNG Reihenfolge: Univ. §9 verlangt MOCKUP ZUERST ->
+#   doc/Schema_KeyBindings_Dialog.txt -> FREIGABE -> dann Code.
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

@@ -227,14 +227,14 @@ Zweitfenster: `PreviewMode` (SNAPSHOT / LIVE_ALL / LIVE_ALL_EDIT),
 `settings/lastProjects/`, `assets/`, `maps/`. Neue Pfade gehören dorthin —
 kein `%APPDATA%`-Lesen und kein Pfad-Zusammenbau woanders.
 
-> **Zwei Ausreißer, die das heute verletzen:**
-> `CardListStore` legt `cardfolders/` unter **`settings/`** ab (`settings/
-> cardfolders/<name>/cards.txt`) — sein eigenes Javadoc behauptet
-> fälschlich `%APPDATA%/TransparencyTool/cardfolders/`.
-> `BookController.BOOKS_ROOT` baut den Pfad **hartkodiert** aus
-> `user.home + "AppData/Roaming/TransparencyTool/books"` zusammen und liest
-> `%APPDATA%` gar nicht — bei umgeleitetem oder nicht-englischem Profil zeigt
-> das ins Leere, und der `AppPaths`-Fallback greift nicht.
+Ebenfalls über `AppPaths`: `getBooksDir()` (`books/`) und
+`getCardFoldersDir()` (`settings/cardfolders/`). Beide waren bis 2026-07-30
+Ausreißer — `BookController` baute den Pfad hartkodiert aus `user.home` und
+las `%APPDATA%` nicht (brach bei umgeleitetem Profil), `CardListStore`
+beschrieb im Javadoc einen Pfad ohne `settings/`.
+
+> `books/` und `settings/cardfolders/` entstehen **erst beim ersten Zugriff**,
+> nicht beim Start — alle anderen Verzeichnisse legt `AppPaths` sofort an.
 
 > **Das Szenenformat ist ein Vertrag mit GameII** (§23), kein internes Format.
 > `#Sektion:` / `-key: value`, UTF-8, Szene = Verzeichnis, erster
@@ -304,10 +304,6 @@ Vollständige Liste mit Risiko: `doc/WEITERMACHEN_PROMPT.txt`.
 - **`AppSettings` liest/schreibt ohne Encoding** (Plattform statt UTF-8) —
   betrifft Umlaute in `recentFiles`/`recentProjects`.
 - **`TextWriter` schreibt jede Datei zweimal** (Original + `src/`→`bin/`-Kopie).
-- **`BookController.BOOKS_ROOT` ist hartkodiert** (`user.home` +
-  `AppData/Roaming/…`) statt über `AppPaths` — bricht bei umgeleitetem
-  Profil. `CardListStore` legt `cardfolders/` unter `settings/` ab, sein
-  Javadoc sagt etwas anderes.
 - **Keine Fenster-Basisklasse:** 12 Klassen erben direkt von
   `JFrame`/`JDialog`/`JWindow`; `JOptionPane` in 16 Dateien. `JOptionPane` ist
   Altlast, **kein Vorbild** — in neuem Code nicht verwenden (§20).

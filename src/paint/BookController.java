@@ -50,13 +50,6 @@ import book.PaperFormat;
  */
 class BookController {
 
-	private static final String BOOKS_ROOT =
-			System.getProperty("user.home")
-			+ File.separator + "AppData"
-			+ File.separator + "Roaming"
-			+ File.separator + "TransparencyTool"
-			+ File.separator + "books";
-
 	private final SelectiveAlphaEditor ed;
 
 	BookController(SelectiveAlphaEditor ed) {
@@ -65,10 +58,19 @@ class BookController {
 
 	// ── Storage helpers ───────────────────────────────────────────────────────
 
+	/**
+	 * Wurzelverzeichnis aller Bücher.
+	 *
+	 * <p>Der Pfad kommt seit 2026-07-30 aus {@link AppPaths#getBooksDir()}.
+	 * Vorher stand er hier hartkodiert als
+	 * {@code user.home + "AppData/Roaming/TransparencyTool/books"} — das las
+	 * {@code %APPDATA%} nicht und umging den Fallback von {@link AppPaths};
+	 * bei umgeleitetem oder nicht-englischem Windows-Profil zeigte es ins
+	 * Leere. Auf einem Standard-Profil ist der Pfad <b>unverändert</b>
+	 * (§31, Befund S13).
+	 */
 	static File getBooksRoot() {
-		File f = new File(BOOKS_ROOT);
-		f.mkdirs();
-		return f;
+		return AppPaths.getBooksDir();
 	}
 
 	static File getPagesDir(File bookDir) {

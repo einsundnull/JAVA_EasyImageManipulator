@@ -12,7 +12,14 @@ import java.util.List;
 
 /**
  * Singleton store for CardEntry objects with folder-based persistence.
- * Folders live under %APPDATA%/TransparencyTool/cardfolders/<name>/cards.txt
+ *
+ * <p>Ablage: {@code %APPDATA%\TransparencyTool\settings\cardfolders\<name>\cards.txt}
+ * — geliefert von {@link AppPaths#getCardFoldersDir()}.
+ *
+ * <p><b>Korrigiert 2026-07-30:</b> Dieses Javadoc nannte bis dahin
+ * {@code %APPDATA%/TransparencyTool/cardfolders/} — <b>ohne</b> das
+ * {@code settings/} dazwischen. Der Code lag immer schon richtig; die
+ * Beschreibung war falsch (§31, Befund S13).
  */
 class CardListStore {
 
@@ -115,9 +122,7 @@ class CardListStore {
     // ── Path helpers ──────────────────────────────────────────────────────────
 
     private static File foldersRoot() {
-        File f = new File(AppPaths.getSettingsDir(), "cardfolders");
-        f.mkdirs();
-        return f;
+        return AppPaths.getCardFoldersDir();
     }
 
     private static File cardsFile(String folder) {

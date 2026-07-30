@@ -15,6 +15,8 @@ public class AppPaths {
     private static File lastProjectsDir;
     private static File assetsDir;
     private static File mapsDir;
+    private static File booksDir;
+    private static File cardFoldersDir;
     private static File settingsFile;
 
     static {
@@ -35,6 +37,15 @@ public class AppPaths {
         assetsDir = new File(appDataDir, "assets");
         mapsDir = new File(appDataDir, "maps");
         settingsFile = new File(settingsDir, "default.txt");
+
+        // books/ und settings/cardfolders/ werden hier NUR berechnet, nicht
+        // angelegt: beide entstanden bisher erst beim ersten Zugriff
+        // (BookController.getBooksRoot / CardListStore.foldersRoot). Sie hier
+        // eager anzulegen wuerde bei Nutzern, die weder Buecher noch Karten
+        // verwenden, leere Verzeichnisse erzeugen - eine Verhaltensaenderung
+        // ohne Nutzen. Das mkdirs steht in den Gettern.
+        booksDir = new File(appDataDir, "books");
+        cardFoldersDir = new File(settingsDir, "cardfolders");
 
         // Verzeichnisse anlegen wenn nicht vorhanden
         if (!appDataDir.exists()) appDataDir.mkdirs();
@@ -147,6 +158,39 @@ public class AppPaths {
      */
     public static File getMapsDir() {
         return mapsDir;
+    }
+
+    /**
+     * Gibt das books/-Verzeichnis zurück: {@code %APPDATA%\TransparencyTool\books\}
+     *
+     * <p>Struktur darunter: {@code <BuchName>\<BuchName>.txt} (Manifest) +
+     * {@code <BuchName>\pages\page_001.png}.
+     *
+     * <p><b>Seit 2026-07-30 hier statt in {@code BookController}.</b> Dort war
+     * der Pfad hartkodiert aus {@code user.home + "AppData/Roaming/..."}
+     * zusammengesetzt und las {@code %APPDATA%} nicht — bei umgeleitetem oder
+     * nicht-englischem Windows-Profil zeigte er ins Leere und umging den
+     * Fallback dieser Klasse. Auf einem Standard-Profil ist das Ergebnis
+     * <b>identisch</b>, es wandern also keine Daten (Befund S13, §31).
+     */
+    public static File getBooksDir() {
+        if (!booksDir.exists()) booksDir.mkdirs();
+        return booksDir;
+    }
+
+    /**
+     * Gibt das Verzeichnis der Karten-Ordner zurück:
+     * {@code %APPDATA%\TransparencyTool\settings\cardfolders\}
+     *
+     * <p>Darunter je Ordner eine {@code cards.txt}.
+     *
+     * <p><b>Achtung:</b> Das liegt unter {@code settings/}, nicht direkt im
+     * Anwendungsverzeichnis. Das Javadoc von {@code CardListStore} behauptete
+     * bis 2026-07-30 das Gegenteil; maßgeblich ist diese Methode.
+     */
+    public static File getCardFoldersDir() {
+        if (!cardFoldersDir.exists()) cardFoldersDir.mkdirs();
+        return cardFoldersDir;
     }
 
     /**

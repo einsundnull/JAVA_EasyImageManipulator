@@ -103,16 +103,24 @@ OFFEN — nach Hebel sortiert
     AppSettings (§31). Ein Token ist eine Design-Entscheidung, keine
     Benutzereinstellung.
 
-[7] BOOKS_ROOT + CARDFOLDERS auf AppPaths ziehen  (§31, Befund S13)  [B]
-    *** BookController.BOOKS_ROOT ist HARTKODIERT:
-        user.home + "AppData/Roaming/TransparencyTool/books".
-        Es liest %APPDATA% NICHT und umgeht den AppPaths-Fallback. Bei
-        umgeleitetem oder nicht-englischem Windows-Profil zeigt der Pfad ins
-        Leere. LATENTER FEHLER, nicht Kosmetik. ***
-    CardListStore legt cardfolders/ unter settings/ ab, sein Javadoc
-    behauptet %APPDATA%/TransparencyTool/cardfolders/.
-    ACHTUNG: die PFADBILDUNG verlagern ist [B]. Den ABLAGEORT aendern ist es
-    nicht — dort liegen Buecher der User. Beides trennen.
+[7] *** ERLEDIGT 2026-07-30: BOOKS_ROOT + CARDFOLDERS ueber AppPaths [B] ***
+    NEU AppPaths.getBooksDir() + getCardFoldersDir().
+    BookController.BOOKS_ROOT (hartkodiert aus user.home) ist ENTFALLEN;
+    getBooksRoot() delegiert. CardListStore delegiert ebenfalls, sein
+    falsches Javadoc (Pfad ohne settings/) ist korrigiert.
+    Die 3 Aufrufstellen blieben unberuehrt — der Pfad war sauber gekapselt.
+    Build 329 .class, unveraendert.
+
+    *** ABLAGEORT NACHWEISLICH UNVERAENDERT: getCanonicalPath-Vergleich
+        alt vs. neu gegen die echten Daten -> identisch, 5 Buecher und
+        2 Kartenordner weiterhin erreichbar. Die Aenderung behebt nur den
+        Fall des umgeleiteten/nicht-englischen Profils. ***
+    *** books/ und settings/cardfolders/ entstehen weiterhin ERST BEIM
+        ERSTEN ZUGRIFF (Getter), nicht beim Start wie die uebrigen
+        Verzeichnisse. Nicht "vereinheitlichen" — sonst bekommen Nutzer
+        ohne Buecher/Karten leere Ordner. ***
+    -> RUNTIME-VERIFY B1-B4 in progress_2026-07-30_apppaths-books.txt
+       (B1/B3 sind die wichtigen: keine Daten verschwunden).
 
 [8] KEYBINDINGS-REGISTRY + HILFE-DIALOG  (§25)  [B]
     Mockup doc/Schema_KeyBindings_Dialog.txt ZUERST -> Freigabe.
