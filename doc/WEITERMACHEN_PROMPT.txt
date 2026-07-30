@@ -58,26 +58,76 @@ DIE GOD-KLASSE IST NICHT DAS HAUPTFENSTER.
 ==============================================================================
 OFFEN — nach Hebel sortiert
 ==============================================================================
-[1] *** CLAUDE.md KORRIGIEREN — HOECHSTER HEBEL, [B] ***
-    Befund S9: CLAUDE.md beschreibt SelectiveAlphaEditor als "~1900 Zeilen,
-    owns all state" (ist 566) und CanvasPanel/HRulerPanel/VRulerPanel als
-    inner classes (sind eigene Dateien). Kennt die 18 Controller nicht,
-    kein Wort zu CanvasInstance, Layer, BaseSidebarPanel, Szenen, Books,
-    Maps, Cards, TTS.
-    WER DAS LIEST, ARBEITET AM FALSCHEN MODELL. Erst danach lohnt sich
-    jeder weitere Schritt.
-    Ein Verweis auf die beiden Guidelines-Dateien + eine Stand-Warnung sind
-    am 2026-07-30 bereits oben in CLAUDE.md eingefuegt — der Rumpf des
-    Dokuments ist aber weiterhin falsch.
-    Model: Sonnet/Opus (verlangt Codelesen, nicht raten).
+[1] *** ERLEDIGT 2026-07-30: CLAUDE.md NEU GESCHRIEBEN [B] ***
+    Befund S9 ist behoben. Der Architektur-Abschnitt beschreibt jetzt den
+    Ist-Zustand, nachgelesen im Code (nicht geraten):
+      - SelectiveAlphaEditor = 566-Zeilen-ORCHESTRATOR mit 20 Controllern
+        und Delegations-Einzeilern; Fachlogik steht im Controller
+      - CanvasPanel = die God-Klasse (3299 Z.), spricht nur ueber
+        CanvasCallbacks, enthaelt u. a. einen kompletten Text-Editor mit
+        eigenen Undo-Stacks
+      - CanvasInstance = Zustand pro Canvas (canvases[2], ci()/ci(idx))
+      - Layer-Familie unveraenderlich (Image/Text/Path/SpriteLayer),
+        replaceInLists() als Fallstrick
+      - Undo MAX_UNDO=50, pushUndo vor / markDirty nach der Aenderung
+      - zwei Koordinatensysteme + screenToImage/toSx als einzige Uebergaenge
+      - Callbacks/Factory-Muster, Modi-Enums, Persistenz-Tabelle,
+        Threading, AppColors-Luecke, Tastatur (F1-F7 belegt)
+      - Altlasten-Abschnitt mit Verweis auf diese Datei
+    Die alte Stand-Warnung ist entfallen (nicht mehr noetig).
+    *** DIE 4 Bau-/Run-Angaben sind gegengeprueft: MAX_UNDO=50 stimmt,
+        das Deploy-Skript src/paint/JAVA_EasyImageManipulator-Push.sh
+        existiert, Build ergibt 370 .class. ***
 
-[2] GRAPHIFY-GRAPH BAUEN (Univ. §1), [A/B]
-    Scope: src/**/*.java. AUSSCHLIESSEN: bin/, paint/ (Root-Ordner mit
-    veralteten .class-Dateien!), doc/, graphify-out/, resources/.
-    *** SCOPE-FALLE (Lehre aus dem German-Projekt): bei gefilterter Scope
-        NIE `graphify update .` — das re-extrahiert alles. Gezielt
-        `graphify <datei>.java --update`. ***
-    Ohne Graph ist die Extraktions-Landkarte fuer §22 nicht erstellbar.
+    NEUER BEFUND DABEI (S13, in §31 + CLAUDE.md aufgenommen):
+      BookController.BOOKS_ROOT baut den Pfad HARTKODIERT aus
+      user.home + "AppData/Roaming/TransparencyTool/books" zusammen und
+      liest %APPDATA% NICHT -> umgeht AppPaths samt Fallback. Bei
+      umgeleitetem/nicht-englischem Profil zeigt der Pfad ins Leere.
+      *** Das ist keine Kosmetik, sondern ein latenter Fehler. [B] ***
+      CardListStore legt cardfolders/ unter settings/ ab, waehrend sein
+      eigenes Javadoc %APPDATA%/TransparencyTool/cardfolders/ behauptet.
+
+[2] *** ERLEDIGT 2026-07-30: GRAPHIFY-GRAPH GEBAUT [A/B] ***
+    graphify-out/ liegt vor: graph.json, GRAPH_REPORT.md, graph.html,
+    manifest.json, cache/.
+    ERGEBNIS: 117 Java-Dateien -> 2662 Knoten, 6832 Kanten, 136 Communities.
+    78 % EXTRACTED / 22 % INFERRED / 0 % AMBIGUOUS. KEINE Import-Zyklen.
+    *** LLM-KOSTEN: 0 Tokens. Code-only-Korpus -> reine AST-Extraktion,
+        die semantische Subagenten-Phase entfaellt komplett. ***
+
+    SCAN-ROOT IST src/ , NICHT das Projekt-Root. Damit sind bin/, das
+    veraltete paint/, doc/ und resources/ ohne Filterliste ausgeschlossen.
+    Die 11 losen .txt in src/paint/ wurden bewusst aus der Scope entfernt
+    (code-only; sie wandern in Schritt [3] ohnehin nach doc/).
+    *** SCOPE-FALLE: bei gefilterter Scope NIE `graphify update .` — das
+        re-extrahiert alles. Gezielt `graphify <datei>.java --update`. ***
+
+    GOD NODES (Kanten): SelectiveAlphaEditor 153 | AppSettings 115 |
+      ArrayList 114 | CanvasCallbacks 93 | CanvasPanel 85 | JPanel 75 |
+      PaintToolbar 66 | PaintEngine 60 | MouseAdapter 57 | BufferedImage 48
+    *** BEMERKENSWERT: SelectiveAlphaEditor ist mit 153 Kanten der
+        zentralste Knoten, obwohl es nur 566 Zeilen hat. Das WIDERSPRICHT
+        §22 NICHT — es ist die Signatur eines Orchestrators: viele
+        Verbindungen, wenig Logik. Wer nur Kantenzahlen liest, haelt es
+        faelschlich fuer die God-Klasse. Die Zeilen-God-Klasse bleibt
+        CanvasPanel (3299 Z., 85 Kanten). ***
+    *** AppSettings auf Platz 2 (115 Kanten) ist der Beleg fuer §33: die
+        Einstellungen werden ueberall direkt gelesen. ***
+
+    *** WICHTIGE EINSCHRAENKUNG DES GRAPHEN (gilt fuer JEDE spaetere
+        Auswertung, jetzt auch in Univ. §1 dokumentiert):
+        Externe Typen (JPanel, ArrayList, Callbacks) existieren als VIELE
+        Knoten — je einer pro Datei, die sie erwaehnt, mit genau dieser
+        source_file. Wer Kanten auf DATEIEBENE aufrollt, liest daraus
+        "Datei A referenziert Datei B", obwohl beide nur dieselbe
+        Oberklasse benutzen.
+        KONKRET PASSIERT: der Graph meldete fuer BookListPanelLegacy
+        28 referenzierende Dateien. Tatsaechlich: NULL.
+        -> Loeschentscheidungen NIE allein aus dem Graphen. Immer mit
+           Textsuche gegenpruefen. ***
+    Hinweis zum Format: die Kantenliste in graph.json heisst "links",
+    nicht "edges" (node-link-Format).
 
 [3] DOKU EINSAMMELN nach doc/ (§28), [B], Haiku geeignet
     13 lose .md im Root + 11 lose .txt in src/paint/. Reines Verschieben.
@@ -90,12 +140,25 @@ OFFEN — nach Hebel sortiert
       [x] src/com/spriteanimator/{model,ui,engine,export,i18n}/  (leeres
           Verzeichnis aus fehlgeschlagener Brace-Expansion) — entfallen
       [x] src/com/** und src/PathAnimator/** — ausgelagert, nicht geloescht
-    OFFEN, ERST Referenzfreiheit im Graphen belegen (Schritt 2), DANN loeschen:
+    *** REFERENZ-BELEG LIEGT VOR (2026-07-30, Textsuche ueber src/**/*.java,
+        NICHT aus dem Graphen — siehe Einschraenkung in [2]): ***
+          Demo.java                     REFERENZFREI
+          DemoWorksheetEditor.java      REFERENZFREI
+          DemoWorksheetEditor2.java     REFERENZFREI
+          AutoGrowingPillFieldDemo.java REFERENZFREI
+          AutoGrowingPillFieldDemo2.java REFERENZFREI
+          BookListPanelLegacy.java      REFERENZFREI
+          PageLayoutToolbarLegacy.java  REFERENZFREI
+          BookPagesPanelLegacy.java     nur von BookListPanelLegacy (selbst tot)
+        -> Der ganze Block ist als GESCHLOSSENE EINHEIT loeschbar. Einzeln
+           loeschen wuerde BookListPanelLegacy kurzzeitig brechen; zusammen
+           loeschen ist sauber.
+    OFFEN (loeschbar, Beleg erbracht):
       [ ] Root-Ordner paint/ (veraltete .class-Dateien, NICHT der Quellcode
           in src/paint/! Namensgleichheit — vor dem rm zweimal hinsehen.)
-      [ ] Demo.java, DemoWorksheetEditor{,2}, AutoGrowingPillFieldDemo{,2},
-          BookListPanelLegacy, BookPagesPanelLegacy, PageLayoutToolbarLegacy
-          (~2100 Zeilen)
+      [ ] die 8 Dateien oben (~2100 Zeilen), als ein Commit
+    *** NACH DEM LOESCHEN: Build gegenpruefen (erwartet weiterhin exit 0,
+        aber WENIGER als 370 .class) und den Graphen auffrischen. ***
     *** ToolLegacySceneReader ist KEINE Altlast — Legacy-LESEN ist laut
         §23 ausdruecklich gewollt. Nicht mitloeschen. ***
     *** book/ ist KEINE Altlast — wird von BookController, NewFileController,

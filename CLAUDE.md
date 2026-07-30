@@ -9,111 +9,293 @@ Vor jeder Aufgabe in dieser Reihenfolge:
 1. **`../JAVA_GUIDELINES_UNIVERSAL.md`** — projektneutrale Standards für **alle**
    Java-Projekte im Workspace (§0–§15).
 2. **`doc/GUIDELINES.md`** — Projekt-Steckbrief (welche TT-Klasse welche Rolle
-   besetzt) + projektspezifische §20–§32.
+   besetzt) + projektspezifische §20–§33.
 3. **`doc/Prompt_Handling.txt`** — Task-Workflow: `[BT]`/`[ST]`, PD-Datei,
    Risikoklassen `[A]`/`[B]`/`[C]`, Abschluss-Block.
-4. **`doc/WEITERMACHEN_PROMPT.txt`** — aktueller Stand, offene Schritte,
-   offene Fragen Q1–Q4. Einstiegspunkt nach `/clear`.
+4. **`doc/WEITERMACHEN_PROMPT.txt`** — aktueller Stand und offene Schritte.
+   Einstiegspunkt nach `/clear`.
 
 Belege und Ist-Analyse: `doc/GUIDELINES_VORSCHLAG_2026-07-30.md` (Befunde S1–S12).
 
-> **⚠ Stand-Warnung (2026-07-30):** Der Architektur-Abschnitt weiter unten ist
-> **überholt** (Befund S9). Er beschreibt `SelectiveAlphaEditor` als
-> ~1900-Zeilen-God-Klasse (tatsächlich **566** Zeilen, reiner Orchestrator mit
-> 20 Controller-Feldern) und `CanvasPanel`/`HRulerPanel`/`VRulerPanel` als
-> *inner classes* (sind eigene Dateien). Nicht erwähnt: die **18 `*Controller`**,
-> die `*CallbacksFactory`-Verdrahtung, `CanvasInstance` (Zustand pro Canvas),
-> `Layer` als unveränderliches Wert-Objekt, `BaseSidebarPanel`, Szenen, Books,
-> Maps, Cards, TTS. Die God-Klasse ist heute **`CanvasPanel` (3299 Zeilen)**.
-> Bis zur Korrektur gilt `doc/GUIDELINES.md` (Steckbrief) als Architekturquelle.
-
-## Build & Run
-
-**Compile (from the project root):**
-```bash
-javac.exe -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
-```
-Always use `-encoding UTF-8` — source files contain Unicode symbols (arrows, emoji, etc.) that cause "unmappable character" errors without it.
-
-**Run:**
-```bash
-java.exe -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor
-```
-Or simply via Eclipse: Run → Run As → Java Application on `SelectiveAlphaEditor`.
-
-**Deploy to GitHub:**
-```bash
-bash src/paint/JAVA_EasyImageManipulator-Push.sh
-```
-Remote: `https://github.com/einsundnull/JAVA_EasyImageManipulator.git`
-
-**Java target:** JavaSE-16 (module system, switch expressions with `yield` require ≥ 14)
-
-No build tool (Maven/Gradle). No tests. Eclipse project: source → `src/`, output → `bin/`.
+**Leitprinzip:** Die Regeln gelten für **neuen und berührten** Code. Ein reines
+Refactoring laufender Logik zur Regelkonformität ist ausdrücklich unerwünscht.
 
 ---
 
-## Architecture
+## Build & Run
 
-The app is a single-window Java Swing image editor with two modes: **Alpha Editor** (make areas transparent) and **Paint** (MS-Paint-style drawing). Everything lives in `package paint`.
-
-### Core flow
-
+**Kompilieren (aus dem Projekt-Root):**
+```bash
+javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
 ```
-SelectiveAlphaEditor (JFrame)
-├── Top bar          – zoom buttons, mode toggles (Canvas/Paint), filmstrip toggle
-├── Center
-│   ├── TileGalleryPanel (WEST) – directory image browser, toggleable via filmstrip button
-│   └── JLayeredPane (CENTER)
-│       ├── dropHintPanel    – shown when no file is loaded
-│       └── viewportPanel    – shown after file load
-│           ├── rulerNorthBar (NORTH, optional) – HRulerPanel
-│           ├── VRulerPanel   (WEST,  optional)
-│           ├── JScrollPane → canvasWrapper → CanvasPanel (the drawing surface)
-│           └── scrollSpacer  (SOUTH, 16 px gap before toolbar)
-└── Bottom bar
-    ├── PaintToolbar (NORTH) – tool strip, hidden in Alpha-Editor mode
-    └── statusBar    (SOUTH) – action buttons, status label
+`-encoding UTF-8` ist **Pflicht** — die Quelldateien enthalten Unicode (Pfeile,
+Symbole, Umlaute). Ohne die Option: „unmappable character".
+**Erwartet: exit 0, 370 `.class`** (Stand 2026-07-30).
+
+**Starten:**
+```bash
+java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor
+```
+Oder in Eclipse: Run As → Java Application auf `SelectiveAlphaEditor`.
+
+**Java:** JavaSE-17 (`.classpath`), `module-info.java` deklariert Modul
+`TransparencyTool` mit `requires java.desktop`.
+Kein Build-Tool, keine Tests, keine externen Abhängigkeiten. Eclipse-Projekt:
+Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
+
+**Deploy:** `bash src/paint/JAVA_EasyImageManipulator-Push.sh` →
+`https://github.com/einsundnull/JAVA_EasyImageManipulator.git`
+
+> **Quellbaum:** nur noch `paint` + `book` + `module-info.java`.
+> `com.spriteanimator` und `PathAnimator` waren eigenständige Programme ohne
+> Bezug zu `paint` und sind am 2026-07-30 nach `../SpriteAnimator/` bzw.
+> `../PathAnimator/` ausgelagert worden.
+
+---
+
+## Architektur
+
+Swing-Werkzeug zum Bearbeiten von Bildern und Szenen. **Zwei unabhängige
+Canvases** nebeneinander, vier Modi, ein Zweitfenster für die Vorschau.
+Alles liegt im Package `paint` (110 Klassen, flach) plus `book` (3 Klassen).
+
+### Das Hauptfenster ist ein Orchestrator, keine God-Klasse
+
+`SelectiveAlphaEditor extends JFrame` hat **566 Zeilen** und enthält fast keine
+Fachlogik. Es hält Felder, instanziiert **20 Controller** und delegiert in
+Einzeilern:
+
+```java
+public void pushUndo()          { saveController.pushUndo(activeCanvasIndex); }
+public void markDirty()         { layoutController.markDirty(activeCanvasIndex); }
+void toggleSecondaryWindow()    { secWinController.toggleSecondaryWindow(); }
 ```
 
-### Key classes
+**Wer Fachlogik sucht, sucht sie im Controller — nicht hier.** Wer neue
+Fachlogik schreibt, legt sie ebenfalls dort ab (`doc/GUIDELINES.md` §22).
 
-| Class | Role |
+### Zustand: pro Canvas, nicht global
+
+`CanvasInstance` (`canvases[2]`, Zugriff über `ci()` / `ci(idx)`) hält **alles,
+was es zweimal gibt**: `workingImage`, `originalImage`, `sourceFile`,
+Undo-/Redo-Stacks, `activeElements`/`selectedElements`, Float-Zustand, Zoom,
+Verzeichnisliste, `appMode`, `showGrid`, die eigenen UI-Komponenten
+(`canvasPanel`, `scrollPane`, `viewportPanel`, `layeredPane`, `tileGallery`,
+`scenesPanel`) sowie `fileCache`/`preloadCache` (beide `ConcurrentHashMap` —
+Worker-Threads schreiben, der EDT liest).
+
+Genuin global bleibt im Hauptfenster: Zwischenablage, `dirtyFiles`,
+`showRuler`, `rulerUnit`, `projectManager`, Zweitfenster, Toolbars.
+
+> **Ein neues Feld im Hauptfenster, das pro Canvas verschieden sein kann, ist
+> ein Regelverstoß** (§30). Und: kein `canvases[0]` in Fachcode — eine feste `0`
+> ist der Grund, warum Canvas II Funktionen verliert.
+
+### Controller (Fachlogik)
+
+| Controller | Rolle |
 |---|---|
-| `SelectiveAlphaEditor` | Main frame (~1900 lines). Owns all state, coordinates between components. All modes, undo/redo, keyboard shortcuts, zoom, rulers, floating selection. |
-| `CanvasPanel` | Inner class of `SelectiveAlphaEditor`. Handles all mouse input and `paintComponent`. |
-| `PaintEngine` | Stateless static drawing methods: pencil, eraser, line, circle, rect, floodfill, eyedropper, crop/paste, flip, rotate, scale. All operate directly on a `BufferedImage` in image-space. |
-| `PaintToolbar` | The horizontal tool strip shown in Paint mode. Communicates via a `Callbacks` interface back to `SelectiveAlphaEditor`. |
-| `TileGalleryPanel` | Left sidebar showing directory images as tiles. Async thumbnail loading via `SwingWorker`. Contains `DarkScrollBarUI` (static, also used by the main scroll pane). |
-| `ColorPickerPopup` | Floating HSV color picker (`JWindow`). Used by `PaintToolbar` for primary/secondary color selection. |
-| `AppColors` | Single source of truth for all UI colors. |
-| `ToastNotification` | Shows a timed, translucent top-right popup (used for CTRL+S save confirmation). |
-| `WhiteToAlphaConverter` | Legacy utility: converts white pixels to transparent. Its `getOutputPath()` is reused for all save paths. |
+| `UIBuilder` | Baut Top-Bar, Center (Canvases, Ruler, Galerien), Bottom-Bar. Schreibt in `ed.feld` — die SAE-Felder bleiben maßgeblich |
+| `AppLifecycleController` | Start (Settings laden) und Shutdown (Settings speichern) |
+| `LayoutController` | Ruler-Layout, Nav-Buttons, Fokus-Rahmen, Panel-Sichtbarkeit, `markDirty`, `updateTitle/Status` |
+| `FileLoadController` | Laden, Verzeichnis-Indizierung, Navigation, `fitToViewport`, `centerCanvas` |
+| `SaveController` | Speichern, **Undo/Redo**, Alpha-Editor-Operationen, Floodfill |
+| `ElementController` | Layer-Operationen: Rendern, Persistenz, Selektion, Element-Koordinaten |
+| `ElementEditController` | Element-Edit-Modus: betreten, verlassen, übernehmen |
+| `FloatSelectionController` | Schwebende Auswahl: commit/cancel, Handle-Rechtecke, Hit-Test, Rotations-Handle |
+| `ClipboardController` | Copy/Cut/Paste, auch „außerhalb der Auswahl", System-Zwischenablage |
+| `TransformController` | Flip H/V, Rotieren, Skalieren |
+| `ZoomController` | Animierter Zoom, **`screenToImage()`** |
+| `ModeController` | Alpha / Paint / Book / Scene umschalten, Element-Panel, Mode-Label |
+| `ScenesController` | Szenen-Panel, Szenen laden (**inkl. GameII-Szenen**), Szene aus Drop erzeugen |
+| `NewFileController` | Neue Bitmap / Buchseite, Canvas-Hintergrund-Dialog |
+| `DropController` | Drag & Drop auf den Canvas, rechte Drop-Zone |
+| `PreloadController` | Hover-Preload-Cache für flüssiges Blättern (SwingWorker) |
+| `QuickOpenController` | Schnell-Öffnen zuletzt benutzter Projekte |
+| `SecondaryWindowController` | Zweitfenster (F1–F7) |
+| `BookController` | Buch-/Seiten-System, `%APPDATA%\TransparencyTool\books\` |
+| `EditorDialogs` | Zentrale Dialog-Erzeugung |
 
-### Coordinate systems
+**Panels kennen den Editor nicht.** Sie bekommen ein `Callbacks`-Interface
+(`CanvasCallbacks`, `TileGalleryPanel.Callbacks`, `PaintToolbar.Callbacks`,
+`ElementLayerPanel.Callbacks`, `TextToolbar.Callbacks`, `MapsPanel.Callbacks`,
+`EditorDialogCallbacks`, `RulerCallbacks`), das eine `*CallbacksFactory`
+verdrahtet. Neue Panels folgen dem — **kein `SelectiveAlphaEditor`-Feld in
+einem Panel**.
 
-- **Image-space**: pixel coordinates in `workingImage`. Used by `PaintEngine` and stored in `selectedAreas`, `floatRect`.
-- **Canvas (screen) space**: image-space × zoom. This is what `CanvasPanel.e.getPoint()` returns. `screenToImage()` converts between the two.
-- `toSx/toSy/toSw()` in `CanvasPanel.paintComponent` convert image coords to screen coords for drawing overlays.
+### `CanvasPanel` ist die God-Klasse (3299 Zeilen)
 
-### Floating selection (MS Paint style)
+`CanvasPanel extends JPanel` spricht ausschließlich über `CanvasCallbacks` mit
+dem Rest und trägt: gesamte Maus-Eingabe, Hit-Testing, `paintComponent` samt
+Overlays, Pan, Rechtsklick-Zoom, Gummiband-Multiselect, Element-Rotation,
+Snap-Drag, aufgeschobenes Undo (`pendingUndo` — der Snapshot entsteht erst bei
+echter Bewegung) **und einen vollständigen Text-Editor** (eigener Caret,
+eigene Text-Undo-Stacks, Bounding-Box).
 
-When the SELECT tool is active and the user clicks inside a selection, the region is **lifted** into `floatingImg` (a `BufferedImage`), the original canvas area is cleared, and `floatRect` (image-space `Rectangle`) tracks its position/size. The float is drawn on top of the canvas during `paintComponent`. Eight scale handles are drawn around it; corners scale proportionally, sides scale a single axis. Float interaction (hit detection, drag, scale) is checked **before** the `appMode`/tool switch, so it works regardless of current mode. `commitFloat()` merges back; `cancelFloat()` calls `doUndo()`.
+**Hier landet keine neue Fachlogik** (§22). Extraktion nur opportunistisch bei
+Berührung, mit Landkarte aus dem Graphen.
 
-Paste (CTRL+V) creates a floating selection immediately — nothing is written to the canvas until `commitFloat()`.
+### Modell: `Layer` ist unveränderlich
+
+```
+Layer (abstract)
+├── ImageLayer   – gerasterter Pixelbereich
+├── TextLayer    – Text, live aus Font-Einstellungen gerendert
+├── PathLayer    – Pfad mit Kontrollpunkten (Point3D), optional mit Bild
+└── SpriteLayer  – GameII-Sprite, hält rawLines() der Quelldatei
+```
+
+**Jede Mutation gibt eine neue Instanz zurück** (`withPosition`, `withBounds`,
+`withHidden`, `withRotation`, … — 25 Methoden). Identität läuft über `id()`.
+
+> Wer einen Layer ändert, muss ihn in **`activeElements` *und*
+> `selectedElements`** ersetzen (Suche über `id()`). Nur eine Liste zu
+> aktualisieren ist die typische Fehlerquelle — die Selektion zeigt dann auf
+> eine veraltete Kopie. Dafür gibt es `replaceInLists(...)`.
 
 ### Undo/Redo
 
-`ArrayDeque<BufferedImage>` stacks, max 50 entries. `pushUndo()` is called before any destructive canvas operation. `doUndo()` / `doRedo()` swap stacks. The floating selection is NOT part of the undo stack mid-drag; `cancelFloat()` calls `doUndo()` to restore the pre-lift state.
+`ArrayDeque<BufferedImage>` pro Canvas, max. 50. **`pushUndo()` vor der
+Änderung, `markDirty()` danach** — die Reihenfolge ist die Zusage (§29).
+`PaintEngine` arbeitet destruktiv auf `workingImage`; deshalb ist `pushUndo()`
+vor **jedem** `PaintEngine`-Aufruf Pflicht, es gibt keinen anderen Weg zurück.
+Die schwebende Auswahl ist mitten im Zug **nicht** Teil des Bandes:
+`cancelFloat()` ruft `doUndo()`.
 
-### Ruler panels
+### Zwei Koordinatensysteme
 
-`HRulerPanel` and `VRulerPanel` are inner classes. They read `scrollPane.getViewport().getViewPosition()` and `canvasPanel.getX()/getY()` (centering offset inside `canvasWrapper`) on every repaint to stay synchronized with scroll position. `buildRulerLayout()` adds/removes `rulerNorthBar` and `vRuler` from `viewportPanel` when the ruler is toggled.
+- **Image-Space** — Pixel in `workingImage`. Alles Persistente: `Layer`-Bounds,
+  `selectedAreas`, `floatRect`, `PaintEngine`-Argumente, Szenendateien.
+- **Canvas-/Screen-Space** — Image-Space × `zoom`; das liefert
+  `MouseEvent.getPoint()`.
 
-### Dark scrollbar
+**`screenToImage()` ist der einzige Weg hinein, `toSx/toSy/toSw()` der einzige
+hinaus.** Kein `* zoom` / `/ zoom` in Fachcode (§27). Ein drittes System —
+**Prozent-Koordinaten** — gehört GameII und existiert nur in
+`GameSceneReader/Writer`.
 
-`TileGalleryPanel.DarkScrollBarUI` (public static inner class) is applied to the gallery's scroll pane and also to the main viewport's horizontal and vertical scroll bars via `TileGalleryPanel.applyDarkScrollBar(JScrollBar)`.
+### `PaintEngine`
 
-### Saving
+Stateless, nur statische Methoden auf einem `BufferedImage`, reiner
+Image-Space: Stift, Radierer, Linie, Kreis, Rechteck, Floodfill, Pipette,
+Crop/Paste, Flip, Rotate, Scale, `clearRegion`, `clearOutside`,
+`clearPolygon`. Kein Zoom, kein `Component`, kein UI-Zustand — das hält sie
+testbar.
 
-Output is always PNG. The filename comes from `WhiteToAlphaConverter.getOutputPath(sourceFile, suffix)` which appends a mode suffix (`_painted`, `_floodfill_alpha`, `_selective_alpha`, `_white_to_alpha`) before the extension. CTRL+S saves silently and shows a toast; the "Speichern" button in the status bar shows a dialog with the saved filename.
+### Schwebende Auswahl (MS-Paint-Stil)
+
+Klick in eine Auswahl mit aktivem SELECT-Werkzeug **hebt** die Region in
+`floatingImg`, löscht den Originalbereich und verfolgt sie in `floatRect`
+(Image-Space). Acht Skalier-Handles plus Rotations-Handle; Ecken skalieren
+proportional, Seiten eine Achse. Die Float-Interaktion wird **vor** der
+Modus-/Werkzeug-Weiche geprüft und funktioniert daher in jedem Modus.
+`commitFloat()` führt zusammen, `cancelFloat()` verwirft. CTRL+V erzeugt sofort
+eine schwebende Auswahl — nichts landet auf dem Canvas, bis committet wird.
+
+### Modi
+
+`AppMode` (pro Canvas): `ALPHA_EDITOR` · `PAINT` · `BOOK` · `SCENE`.
+Zweitfenster: `PreviewMode` (SNAPSHOT / LIVE_ALL / LIVE_ALL_EDIT),
+`CanvasDisplayMode` (nur I / nur II / aktiver), `AlwaysOnTopMode`
+(TO_FRONT / NORMAL / TO_BACKGROUND).
+
+### Persistenz
+
+| Klasse | Zuständig für |
+|---|---|
+| `SceneFileReader` / `SceneFileWriter` | TT-Szenen |
+| `TextReader` / `TextWriter` | `TextLayer`-Konfiguration |
+| `GameSceneReader` / `GameSceneWriter` | **GameII-Szenen** (Prozent-Koordinaten) |
+| `ToolLegacySceneReader` | Altes GameII-Layout — **nur lesen** |
+| `SceneSerializer`, `SceneLocator`, `ProjectManager` | Szenen-/Projektverwaltung |
+| `AppSettings` | globale Einstellungen (Singleton) |
+| `MapManager`, `CardListStore`, `book.JsonStorage`, `PageLayoutManifest` | Maps, Karten, Bücher, Seitenlayout |
+
+**`AppPaths` ist die Pfad-Zentrale** (`%APPDATA%\TransparencyTool\`, Fallback
+`user.home`) und liefert: `projects/`, `projects/<P>/scenes/`, `settings/`,
+`settings/lastProjects/`, `assets/`, `maps/`. Neue Pfade gehören dorthin —
+kein `%APPDATA%`-Lesen und kein Pfad-Zusammenbau woanders.
+
+> **Zwei Ausreißer, die das heute verletzen:**
+> `CardListStore` legt `cardfolders/` unter **`settings/`** ab (`settings/
+> cardfolders/<name>/cards.txt`) — sein eigenes Javadoc behauptet
+> fälschlich `%APPDATA%/TransparencyTool/cardfolders/`.
+> `BookController.BOOKS_ROOT` baut den Pfad **hartkodiert** aus
+> `user.home + "AppData/Roaming/TransparencyTool/books"` zusammen und liest
+> `%APPDATA%` gar nicht — bei umgeleitetem oder nicht-englischem Profil zeigt
+> das ins Leere, und der `AppPaths`-Fallback greift nicht.
+
+> **Das Szenenformat ist ein Vertrag mit GameII** (§23), kein internes Format.
+> `#Sektion:` / `-key: value`, UTF-8, Szene = Verzeichnis, erster
+> `#Images:`-Eintrag ist der Hintergrund. Spezifikation:
+> `SCENE_FORMAT_READ_WRITE.md`. Wer es ändert, ändert zuerst das Dokument.
+> `GameSceneWriter` übernimmt **unbekannte Abschnitte unverändert**
+> (`SpriteLayer.rawLines()`) und aktualisiert nur `#INIT_POSITION`/`#SIZE` —
+> ein Writer, der fremde Abschnitte wegwirft, zerstört Animationen und Links.
+
+`AppSettings` liegt in `settings/default.txt` und enthält **JSON** trotz
+`.txt`-Endung (bewusst, damit bestehende Installationen ihre Einstellungen
+behalten). Der Parser ist zeilenbasiert: **ein Key pro Zeile**. Format:
+`doc/Schema_AppSettings.txt`.
+
+### Threading
+
+Alle UI-Änderungen auf dem EDT. Lange Arbeit (Bilder laden, Verzeichnisse
+scannen, Thumbnails, Startdialog) läuft in `SwingWorker` — so machen es
+`TileGalleryPanel`, `PreloadController`, `ScenesController`, `StartupDialog`,
+`ElementController`, `GalleryCallbacksFactory`. `invokeLater` (84 Stellen) ist
+für „nach dem aktuellen Event", **nicht** für Nebenläufigkeit. Zeitgesteuertes
+über `javax.swing.Timer`, nicht `java.util.Timer`.
+
+### Farben
+
+`AppColors` ist die Token-Quelle (591 Verwendungen). Sie kennt aber **nur
+Farben, keine Fonts/Abstände/Radien** — daher stehen im Bestand 454
+`new Color(`, 162 `new Font(`, 110 `new BasicStroke(`. In berührtem Code gilt:
+**kein neues Literal, fehlendes Token anlegen** (§21).
+Ausnahme: Farben, die der **User** wählt (Primär-/Sekundärfarbe,
+Canvas-Schachbrett, Kartenfarben) sind keine Tokens — sie gehören in
+`AppSettings`.
+
+### Tastatur
+
+`KeyboardShortcutManager` verdrahtet zwei Wege: die `InputMap`/`ActionMap` des
+Hauptfensters (`WHEN_IN_FOCUSED_WINDOW`) und einen globalen
+`KeyEventDispatcher` für F1–F7, ALT+T, ALT+P.
+
+**F1–F7 sind vollständig vergeben** (F1 Zweitfenster, F2 Preview-Modus,
+F3 Snapshot, F4 Vollbild, F5 Always-on-top, F6 auf Canvas anwenden,
+F7 Canvas-Anzeigemodus). Eine Hilfe-Taste wäre deshalb **SHIFT+F1** (§25).
+
+> Es gibt **keine** Shortcut-Registry und keinen Hilfe-Dialog.
+> `src/paint/Shortcut Table.txt` ist handgepflegt und **veraltet** (es fehlen
+> F1–F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S, CTRL+SHIFT+S, SHIFT+ALT+A) —
+> nicht als Quelle vertrauen. §25 beschreibt die Ablösung.
+
+---
+
+## Altlasten (geführt, kein Auftrag)
+
+Vollständige Liste mit Risiko: `doc/WEITERMACHEN_PROMPT.txt`.
+
+- **Tote/veraltete Dateien:** `Demo.java`, `DemoWorksheetEditor{,2}`,
+  `AutoGrowingPillFieldDemo{,2}`, `BookListPanelLegacy`,
+  `BookPagesPanelLegacy`, `PageLayoutToolbarLegacy` (~2100 Zeilen) sowie ein
+  veralteter **`paint/`-Ordner mit `.class`-Dateien im Projekt-Root** (nicht
+  mit `src/paint/` verwechseln). Löschen erst nach Referenz-Beleg.
+  `ToolLegacySceneReader` ist **keine** Altlast — Legacy-Lesen ist gewollt.
+- **`ImageIO.write` in 9 Dateien** statt in der `io`-Schicht.
+- **5 handgeschriebene JSON-Serializer** ohne gemeinsamen Writer.
+- **`AppSettings` liest/schreibt ohne Encoding** (Plattform statt UTF-8) —
+  betrifft Umlaute in `recentFiles`/`recentProjects`.
+- **`TextWriter` schreibt jede Datei zweimal** (Original + `src/`→`bin/`-Kopie).
+- **`BookController.BOOKS_ROOT` ist hartkodiert** (`user.home` +
+  `AppData/Roaming/…`) statt über `AppPaths` — bricht bei umgeleitetem
+  Profil. `CardListStore` legt `cardfolders/` unter `settings/` ab, sein
+  Javadoc sagt etwas anderes.
+- **Keine Fenster-Basisklasse:** 12 Klassen erben direkt von
+  `JFrame`/`JDialog`/`JWindow`; `JOptionPane` in 16 Dateien. `JOptionPane` ist
+  Altlast, **kein Vorbild** — in neuem Code nicht verwenden (§20).
+- **`toggleVis` ruft `pushUndo()` pro Element** statt pro Aktion.
+- **`#Paths:`** wird in Szenen referenziert, aber nicht gelesen;
+  `GameSceneWriter` schreibt `PathLayer` nicht.

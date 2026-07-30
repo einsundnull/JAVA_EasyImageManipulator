@@ -417,6 +417,16 @@ Häufigste Fehlerquelle der Codebase.
 - **Alle Pfade über `AppPaths`.** Kein harter Pfad, kein `%APPDATA%`-Lesen
   außerhalb dieser Klasse, kein `src/`→`bin/`-Pfad-`replace` in der
   Persistenz (`TextWriter` tut das heute — dokumentierte Altlast, Befund S11).
+- **Zwei bekannte Verstöße gegen diese Regel (Befund S13, 2026-07-30):**
+  `BookController.BOOKS_ROOT` baut den Pfad **hartkodiert** aus
+  `user.home + "AppData/Roaming/TransparencyTool/books"` — es liest
+  `%APPDATA%` nicht und umgeht damit auch den `AppPaths`-Fallback; bei
+  umgeleitetem oder nicht-englischem Profil zeigt der Pfad ins Leere.
+  `CardListStore` legt `cardfolders/` unter **`settings/`** ab, während sein
+  Javadoc `%APPDATA%/TransparencyTool/cardfolders/` behauptet.
+  **Beide gehören nach `AppPaths` [B]** — bei `books/` ist es zusätzlich eine
+  Fehlerbehebung, nicht nur Regelkonformität. Achtung: ein Umzug ändert den
+  Ablageort bestehender Daten, ein reines Verlagern der Pfadbildung nicht.
 
 ---
 

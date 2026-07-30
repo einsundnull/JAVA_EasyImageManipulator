@@ -142,3 +142,55 @@ Compile-Verify ist erbracht (3x exit 0). Offen bleibt der GUI-Test:
 #   die Auslagerung nachgezogen werden.
 # "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
 ==============================================================================
+
+==============================================================================
+NACHTRAG — Schritt [1] CLAUDE.md korrigiert (2026-07-30, [ST]/[B])
+==============================================================================
+PROMPT: "weiter" -> naechster Schritt der Liste war [1].
+
+VORGEHEN: Code gelesen, nicht geraten. Gelesen wurden vollstaendig
+SelectiveAlphaEditor (566 Z.), CanvasInstance, KeyboardShortcutManager,
+Layer + Subklassen-Signaturen, die vier Modus-Enums, CanvasPanel-Kopf und
+Feldblock, UIBuilder-Gliederung sowie die Javadoc-Koepfe aller 20
+Controller + ProjectManager/SceneLocator/MapManager/CardListStore/
+FileStateCache/TextToSpeech/CardTtsPlayer.
+
+ERSETZT WURDE (alles war falsch):
+  - "SelectiveAlphaEditor ~1900 Zeilen, owns all state"  -> 566 Z.,
+    Orchestrator mit 20 Controllern
+  - "CanvasPanel ist eine innere Klasse von SelectiveAlphaEditor"
+    -> eigene Datei, 3299 Z., spricht nur ueber CanvasCallbacks
+  - "HRulerPanel/VRulerPanel sind inner classes" -> eigene Dateien
+  - fehlten komplett: CanvasInstance, die Layer-Familie, das Callbacks-/
+    Factory-Muster, Szenen + GameII-Vertrag, Books/Maps/Cards/TTS,
+    Zweitfenster-Modi, Threading, AppPaths
+
+VIER ANGABEN GEGENGEPRUEFT statt uebernommen:
+  MAX_UNDO = 50                                   BESTAETIGT
+  src/paint/JAVA_EasyImageManipulator-Push.sh     EXISTIERT
+  Build 370 .class                                BESTAETIGT
+  "alle Pfade ueber AppPaths"                     *** WIDERLEGT ***
+
+NEUER BEFUND S13 (aus der letzten Pruefung):
+  BookController.BOOKS_ROOT = user.home + "AppData/Roaming/
+  TransparencyTool/books", HARTKODIERT. Liest %APPDATA% nicht und umgeht
+  den AppPaths-Fallback -> bei umgeleitetem oder nicht-englischem
+  Windows-Profil zeigt der Buecher-Pfad ins Leere.
+  *** Latenter Fehler, nicht nur Regelverstoss. [B] ***
+  CardListStore legt cardfolders/ unter settings/ ab; sein Javadoc
+  behauptet %APPDATA%/TransparencyTool/cardfolders/.
+  -> aufgenommen in GUIDELINES.md §31, CLAUDE.md und diese Liste.
+  -> NICHT behoben: ein Umzug aendert den Ablageort bestehender Daten
+     (Buecher der User). Das ist eine eigene Entscheidung, kein Nebenbei-Fix.
+
+GEAENDERT: CLAUDE.md (neu geschrieben), doc/GUIDELINES.md (§31 + S13),
+           doc/WEITERMACHEN_PROMPT.txt (Punkt [1] auf ERLEDIGT, S13 ergaenzt)
+KEIN Code geaendert.
+
+# progress.txt aktualisiert: ja
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Naechster Schritt: [2] Graphify-Graph bauen [A/B] — ohne ihn ist weder die
+#   Referenzfreiheit fuer [4] belegbar noch die Extraktions-Landkarte fuer [8].
+#   Alternativ [3] Doku einsammeln (Haiku geeignet, unabhaengig von [2]).
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

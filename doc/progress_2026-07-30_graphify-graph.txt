@@ -1,0 +1,110 @@
+==============================================================================
+progress_2026-07-30_graphify-graph.txt
+Aufgabentyp: [ST] — Schritt [2] der Liste im WEITERMACHEN_PROMPT
+Risiko:      [A/B] — reine Analyse, KEIN Code geaendert, Build unberuehrt
+==============================================================================
+
+PROMPT: "Schritt 2"  -> Graphify-KnowledgeMap bauen (Univ. §1)
+
+
+ERGEBNIS
+--------------------------------------------------------------------------
+graphify-out/  = graph.json (3,4 MB) · GRAPH_REPORT.md · graph.html (2,8 MB)
+                 manifest.json · cost.json · cache/
+
+  117 Java-Dateien  ->  2662 Knoten, 6832 Kanten, 136 Communities
+  78 % EXTRACTED · 22 % INFERRED (avg conf 0.8) · 0 % AMBIGUOUS
+  KEINE Import-Zyklen   <- bestaetigt Univ. §4
+  LLM-Kosten: 0 Tokens
+
+*** 0 TOKENS, WEIL DER KORPUS CODE-ONLY IST. ***
+Die semantische Subagenten-Phase (Part B der Skill-Pipeline) entfaellt bei
+reinem Code vollstaendig — die AST-Extraktion ist deterministisch und
+kostenlos. Wer spaeter Dokumente in die Scope nimmt, zahlt Tokens.
+
+
+SCOPE-ENTSCHEIDUNGEN
+--------------------------------------------------------------------------
+SCAN-ROOT = src/ , NICHT das Projekt-Root.
+  Damit sind bin/, der veraltete paint/-Ordner, doc/ und resources/ OHNE
+  Filterliste draussen. Eine Ausschlussliste waere fehleranfaelliger
+  gewesen (und der paint/-Ordner heisst wie das Package).
+11 lose .txt in src/paint/ AUS DER SCOPE ENTFERNT (code-only).
+  Begruendung: sie wandern in Schritt [3] ohnehin nach doc/ — haette man
+  sie aufgenommen, waere der Graph nach dem Verschieben sofort falsch.
+
+
+GOD NODES (Kantenzahl)
+--------------------------------------------------------------------------
+  SelectiveAlphaEditor 153 | AppSettings 115 | ArrayList 114 |
+  CanvasCallbacks 93 | CanvasPanel 85 | JPanel 75 | PaintToolbar 66 |
+  PaintEngine 60 | MouseAdapter 57 | BufferedImage 48
+
+*** DEUTUNG — HIER LIEGT DIE FALLE:
+    SelectiveAlphaEditor ist der zentralste Knoten (153 Kanten) und hat
+    trotzdem nur 566 Zeilen. Das widerspricht §22 NICHT, es ist die
+    SIGNATUR EINES ORCHESTRATORS: viele Verbindungen, kaum eigene Logik.
+    Wer nur Kantenzahlen liest, haelt es faelschlich fuer die God-Klasse
+    und extrahiert am falschen Ende.
+    Die Zeilen-God-Klasse bleibt CanvasPanel: 3299 Zeilen bei 85 Kanten —
+    das umgekehrte Profil (wenige Verbindungen, viel Logik). GENAU DAS
+    ist ein Extraktionskandidat. ***
+
+*** AppSettings auf Platz 2 (115 Kanten) ist der empirische Beleg fuer
+    §33: die Einstellungen werden ueberall direkt gelesen. Wer sie je
+    hinter eine Quelle legen will, sieht hier den Umfang. ***
+
+
+EINSCHRAENKUNG DES GRAPHEN — TEUER GELERNT
+--------------------------------------------------------------------------
+Der Graph sollte u. a. die Referenzfreiheit der Altlasten fuer Schritt [4]
+belegen. Erster Versuch (Kanten auf Dateiebene aufgerollt) ergab:
+    BookListPanelLegacy -> "referenziert von 28 Dateien"
+GEGENPROBE MIT TEXTSUCHE: NULL Referenzen.
+
+URSACHE: externe Typen (JPanel, ArrayList, Callbacks) liegen als VIELE
+Knoten vor — je einer pro Datei, die sie erwaehnt, mit genau dieser
+source_file. Der JPanel-Knoten mit source_file=BookListPanelLegacy.java
+sammelt die "inherits"-Kanten ALLER Panels ein. Ein Datei-Rollup liest
+daraus eine Referenz, die es nicht gibt.
+
+FOLGE, jetzt als Regel in JAVA_GUIDELINES_UNIVERSAL §1:
+  Der Graph beantwortet "wie haengt es zusammen", NICHT "ist das tot".
+  Loeschentscheidungen werden nie allein aus dem Graphen begruendet,
+  sondern mit einer Textsuche belegt.
+
+Nebenbei: die Kantenliste in graph.json heisst "links", nicht "edges"
+(node-link-Format).
+
+
+REFERENZ-BELEG FUER SCHRITT [4] (per Textsuche, nicht aus dem Graphen)
+--------------------------------------------------------------------------
+  Demo, DemoWorksheetEditor, DemoWorksheetEditor2,
+  AutoGrowingPillFieldDemo, AutoGrowingPillFieldDemo2,
+  BookListPanelLegacy, PageLayoutToolbarLegacy      alle REFERENZFREI
+  BookPagesPanelLegacy   nur von BookListPanelLegacy (selbst tot)
+-> Der Block ist als GESCHLOSSENE EINHEIT loeschbar (~2100 Zeilen).
+   Einzeln loeschen wuerde BookListPanelLegacy kurzzeitig brechen.
+   Schritt [4] ist damit entblockt.
+
+
+OFFENE ENTSCHEIDUNG
+--------------------------------------------------------------------------
+graphify-out/ ist derzeit NICHT in Git (Repo hat kein .gitignore im Root).
+graph.json 3,4 MB + graph.html 2,8 MB. Zwei Wege:
+  a) committen wie in GameLoop2 (Graph ist dann fuer jede Sitzung sofort da)
+  b) .gitignore-Eintrag (Repo bleibt schlank, Graph wird lokal neu gebaut)
+NICHT ENTSCHIEDEN — Frage an den User, kein Alleingang.
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja ([2] erledigt, [4] entblockt)
+# Die Aufgabe "Schritt [2] Graphify" wurde vollstaendig abgeschlossen: ja
+# Naechster Schritt: [3] Doku einsammeln nach doc/ [B, Haiku geeignet] ODER
+#   [4] Altlasten loeschen [B] — der Beleg liegt jetzt vor, es ist ein
+#   Commit. [4] zuerst waere sauberer: danach ist der Graph um 8 tote
+#   Dateien kleiner und muss nur einmal aufgefrischt werden.
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================
