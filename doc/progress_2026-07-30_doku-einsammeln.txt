@@ -1,0 +1,126 @@
+==============================================================================
+progress_2026-07-30_doku-einsammeln.txt
+Aufgabentyp: [ST] — Schritt [3] der Liste im WEITERMACHEN_PROMPT
+Risiko:      [B] — reines Verschieben, KEIN Code angefasst
+==============================================================================
+
+PROMPT: "weiter"  -> Schritt [3]: Doku nach doc/ einsammeln (§28)
+
+
+VERSCHOBEN (24 Dateien, git mv -> Historie bleibt erhalten)
+--------------------------------------------------------------------------
+Aus dem Projekt-Root (13 .md):
+  ANALYSIS_ARRAY_ISSUES, Dialog-Vergleich,
+  EXTENDED_IMPLEMENTATION_SUMMARY, F1_F6_COMPLETE_REFERENCE, F6_FEATURE,
+  F6_IMPLEMENTATION_SUMMARY, IMPLEMENTATION_SUMMARY,
+  PATH_TOOL_DOCUMENTATION, QUICK_REFERENCE_F1_F5,
+  SCENE_FORMAT_READ_WRITE, SECONDARY_WINDOW_EXTENDED_TEST,
+  SECONDARY_WINDOW_TEST, TextLayer_Implementation_Documentation
+
+Aus src/paint/ (11 .txt):
+  12_04_2026_13_20 Refactor Canvas Array, Canvas Visibility Bug
+  15_04_2026_10_57, HowImagesForScenesAreLoaded, Preload,
+  ReaderWriterScenesImplementPlan 15_04_2026_17_04,
+  Scene_read_write_comparison mit Game, Schema ButtonLeiste Top with Books,
+  Shortcut Table, SplitCanvas, SplitCanvas II,
+  Streamlining Code 16_04_2026_17_19
+
+UMBENANNT (Konvention Univ. §9):
+  "Schema ButtonLeiste Top with Books.txt"
+  -> Schema_ButtonLeiste_Top_with_Books.txt
+
+ERGEBNIS:
+  Projekt-Root: nur noch CLAUDE.md  (Einstiegspunkt, gehoert dorthin)
+  src/        : nur noch Java + das Deploy-Skript
+  Build       : exit 0, 328 .class — unveraendert
+
+
+DIE EINE ENTSCHEIDUNG, DIE HIER ZAEHLT: doc/ BLEIBT FLACH
+--------------------------------------------------------------------------
+Geplant war urspruenglich eine Trennung in doc/ (aktuell) und
+doc/archive_2026-07-30/ (historisch).
+
+VORHER GEPRUEFT — und deshalb VERWORFEN: die aelteren Dokumente verweisen
+mit NACKTEM DATEINAMEN aufeinander, quer ueber die geplante Trennlinie:
+  EXTENDED_IMPLEMENTATION_SUMMARY -> SECONDARY_WINDOW_EXTENDED_TEST
+  F1_F6_COMPLETE_REFERENCE        -> QUICK_REFERENCE_F1_F5, F6_FEATURE,
+                                     EXTENDED_IMPLEMENTATION_SUMMARY
+  F6_IMPLEMENTATION_SUMMARY       -> F6_FEATURE, QUICK_REFERENCE_F1_F5,
+                                     F1_F6_COMPLETE_REFERENCE
+  IMPLEMENTATION_SUMMARY          -> SECONDARY_WINDOW_TEST
+  QUICK_REFERENCE_F1_F5           -> F6_FEATURE
+Ein Unterordner haette JEDEN dieser Verweise still gebrochen — genau die
+Art Schaden, die bei "reinem Verschieben" niemand erwartet und die erst
+Monate spaeter auffaellt.
+
+STATTDESSEN: NEU doc/README.md als Wegweiser, 7 Abschnitte:
+  1 verbindlich (Guidelines/Workflow)  2 Vertraege & Formate
+  3 Analyse & Begruendung              4 Feature-Doku
+  5 Tastatur (Quellen fuer §25)        6 progress-Protokolle
+  7 historisch (April 2026)
+Die Sortierung leistet damit der Index, nicht die Ordnerstruktur.
+*** Wer spaeter doch Unterordner will: ERST die Querverweise umschreiben. ***
+
+Abschnitt 7 traegt eine ausdrueckliche Warnung: diese Dokumente beschreiben
+Zustaende von April 2026 und sind KEINE Architekturbeschreibung. Bei
+Widerspruch gewinnt der Code, danach CLAUDE.md. Genau diese Verwechslung
+war Befund S9 (die veraltete CLAUDE.md).
+
+
+NICHT VERSCHOBEN — BEWUSST
+--------------------------------------------------------------------------
+src/paint/JAVA_EasyImageManipulator-Push.sh bleibt im Quellbaum.
+Es ist kein Dokument, sondern das Deploy-Skript. Beim Hineinsehen zeigte
+sich: es setzt PROJEKT_PFAD ABSOLUT, ein Verschieben waere technisch also
+gefahrlos — ABER es ist offensichtlich der Ausloeser der regelmaessigen
+"WhiteBoard Update"-Commits (heute 10:55 und 15:29). Wird es von einer
+Aufgabenplanung per Pfad aufgerufen, braeche ein Verschieben diese
+Automatik LAUTLOS.
+-> Liegen gelassen, als Ausnahme in §28 begruendet. Verlegen nur zusammen
+   mit dem Aufrufer.
+
+
+VERWEISE NACHGEZOGEN
+--------------------------------------------------------------------------
+CLAUDE.md            SCENE_FORMAT_READ_WRITE.md -> doc/...
+                     src/paint/Shortcut Table.txt -> doc/...
+                     NEU Verweis auf doc/README.md; S1-S12 -> S1-S13
+doc/GUIDELINES.md    dieselben zwei Pfade, Verweis auf README,
+                     §28 komplett neu (siehe unten)
+
+§28 WAR AN DREI STELLEN VERALTET und ist bereinigt:
+  - "Einzusammeln (reines Verschieben)" -> erledigt, plus die Begruendung
+    fuer die flache Struktur und die Skript-Ausnahme
+  - "CLAUDE.md ist heute ueberholt" -> ist seit Schritt [1] neu geschrieben
+  - "Altlasten sind zu listen und zu loeschen" -> seit Schritt [4] erledigt
+  NEU als Regel aufgenommen, weil in Schritt [4] teuer gelernt:
+    *** Eine Klasse mit main() ist auch ohne Referenz nicht tot.
+        "referenzfrei" != "unbenutzt". ***
+
+
+RUNTIME-VERIFY
+--------------------------------------------------------------------------
+Entfaellt weitgehend — keine Code-Aenderung, Build unveraendert (328).
+Pruefbar ist die Dokumentenlage:
+  D1  Projekt-Root enthaelt nur CLAUDE.md an .md/.txt-Dateien
+  D2  doc/README.md oeffnen: alle 7 Abschnitte, Links klickbar
+  D3  Stichprobe Querverweis: F1_F6_COMPLETE_REFERENCE.md nennt
+      QUICK_REFERENCE_F1_F5.md — beide liegen in doc/, Verweis gilt
+  D4  Deploy-Skript weiterhin unter src/paint/ auffindbar; die naechsten
+      automatischen "WhiteBoard Update"-Commits laufen normal
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja ([3] erledigt)
+# Die Aufgabe "Schritt [3] Doku einsammeln" wurde vollstaendig
+#   abgeschlossen: ja
+# Naechster Schritt: [5] AppColors -> Tokens erweitern (§21).
+#   ZUERST NUR ADDITIV [A]: FONT_*, PAD_*, GAP_*, RADIUS_*, STROKE_*,
+#   BTN_W/BTN_H anlegen, ohne einen bestehenden Wert zu aendern. Die
+#   Bereinigung der 726 Literale ist [C] und laeuft danach PRO DATEI mit
+#   Sichtpruefung — nicht in einem Rutsch.
+#   Danach [6] KeyBindings-Registry [B]. [7]/[8] bleiben freigabepflichtig.
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================
