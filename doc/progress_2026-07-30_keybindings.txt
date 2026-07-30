@@ -1,0 +1,122 @@
+==============================================================================
+progress_2026-07-30_keybindings.txt
+Aufgabentyp: [ST] — Schritt [8]: KeyBindings-Registry + Hilfe-Dialog (§25)
+Risiko:      [B] — nur NEUE Klassen + zwei Einhaengepunkte; keine bestehende
+                   Belegung geaendert
+==============================================================================
+
+PROMPT: "weiter" -> Mockup gebaut und zur Freigabe vorgelegt
+        "4. Knopf und F1; 2. nein; 1. Tasten; 3. Wie es besser ist"
+
+
+ZWEI ANTWORTEN WAREN MEHRDEUTIG — NACHGEFRAGT STATT GERATEN
+--------------------------------------------------------------------------
+"4. Knopf und F1" konnte SHIFT+F1 (die Q3-Entscheidung) ODER das blanke F1
+meinen. F1 ist mit dem Zweitfenster belegt — die zweite Lesart haette eine
+eingeuebte Taste umgehaengt. NACHGEFRAGT -> SHIFT+F1 + Knopf.
+
+"1. Tasten" konnte "nur die Tastenliste" ODER "eine Liste statt Reiter"
+meinen. Die erste Lesart haette die beiden versteckten Maus-Gesten
+weiterhin unauffindbar gelassen. NACHGEFRAGT -> eine Liste mit ALLEN drei
+Abschnitten.
+
+"3. Wie es besser ist" war eine echte Delegation -> DEUTSCHE Beschriftung
+(Strg, Umschalt, Entf, Ruecktaste). Begruendung: genau so steht es auf einer
+deutschen Tastatur, und die Oberflaeche ist ohnehin deutsch. Entspricht der
+Microsoft-Schreibweise.
+
+
+UMGESETZT
+--------------------------------------------------------------------------
+NEU KeyBindings.java
+    Scope (6) · KeyBinding(scope, combo, description, condition) ·
+    GuideEntry(title, steps)
+    ALL   = 53 Eintraege     GLOBAL 10 · WINDOW 20 · CANVAS 1 · TEXT 8 ·
+                             MOUSE 13 · MOUSE_UI 1
+    GUIDE =  5 Ablaeufe, 21 Schritte
+NEU KeyBindingsDialog.java
+    EINE durchgehende Liste mit Zwischenueberschriften, keine Reiter, kein
+    Suchfeld (Freigabe F1/F2). ESC schliesst. Erzeugt ueber
+    UIComponentFactory.createBaseDialog — solange es keine BaseDialog-Klasse
+    gibt, ist das der einzige erlaubte Weg fuer ein neues Fenster (§20).
+    *** Die Beschreibung ist eine JTextArea mit Zeilenumbruch, KEIN JLabel.
+        Ein Label wuerde langen Text abschneiden; §25 verlangt ausdruecklich
+        "umbrechen, nie abschneiden". ***
+    ERSTER NUTZER VON AppTheme: Fonts, Abstaende und pad() kommen aus den
+    Tokens, kein new Font/new Color im neuen Code (§21).
+GEAENDERT KeyboardShortcutManager
+    Umschalt+F1 im globalen Dispatcher.
+    *** Die Abfrage steht VOR der F1-Abfrage. Stuende sie danach, wuerde
+        der F1-Zweig den Fall schlucken und die Hilfe waere nie
+        erreichbar. ***
+GEAENDERT UIBuilder
+    Knopf "?" rechts in der oberen Leiste, Tooltip nennt Umschalt+F1.
+GELOESCHT doc/Shortcut Table.txt
+    §25: eine zweite handgepflegte Liste neben der Registry ist die Ursache
+    des Problems. Sie kannte 13 von 53 Belegungen. Historie bleibt in Git.
+
+Build: exit 0, 329 -> 335 .class.
+
+
+DIE BESTANDSAUFNAHME — WAS DER CODE HERGAB
+--------------------------------------------------------------------------
+Quelle war KeyboardShortcutManager UND CanvasPanel, nicht die alte Tabelle.
+
+  alte Tabelle: 13 Eintraege        Registry jetzt: 53
+
+DABEI ENTDECKT, VORHER NIRGENDS DOKUMENTIERT:
+  *** Strg + Rad auf einem TEXT-Layer aendert die SCHRIFTGROESSE statt zu
+      zoomen. ***
+  *** Alt + T festhalten + Rad aendert die DECKKRAFT des Bild-Layers. ***
+  Beides errraet niemand. Beides steht jetzt mit condition in der Registry.
+
+EBENFALLS ENTDECKT — EIN VIERTER SCOPE, DEN DIE PLANUNG NICHT HATTE:
+  *** Waehrend der Textbearbeitung lenkt CanvasPanel Strg+A/C/X/V/Z, Esc,
+      Enter und Entf auf den TEXT um. Dieselbe Taste bedeutet dort etwas
+      anderes als im Hauptfenster. Kein Fehler, sondern gewollt — aber
+      unsichtbar, solange es nirgends steht. Deshalb Scope TEXT. ***
+  Strg+Z hat dort sogar einen EIGENEN Verlauf, getrennt vom Bild-Undo.
+
+
+KONFLIKTPRUEFUNG (§25 verlangt: Konflikte fuehren, nicht verschweigen)
+--------------------------------------------------------------------------
+Mit einem Wegwerf-Programm gegen die kompilierte Registry geprueft:
+
+  Mehrfachbelegung im GLEICHEN Scope:
+    MOUSE | Strg + Rad
+      -> Zoomen, zum Mauszeiger hin
+      -> Aendert die SCHRIFTGROESSE statt zu zoomen
+         (wenn ein Text-Layer gewaehlt ist)
+  Gleiche Taste in VERSCHIEDENEN Scopes:
+    Enter, Esc, Strg + A, Strg + Z   [WINDOW, TEXT]
+  Leere Beschreibungen: 0
+
+Alle Faelle tragen eine condition und sind damit im Dialog erklaert.
+
+
+RUNTIME-VERIFY (GUI, User)
+--------------------------------------------------------------------------
+  K1  Umschalt+F1 oeffnet die Uebersicht          <- der Hauptweg
+  K2  Knopf "?" rechts in der oberen Leiste oeffnet dieselbe
+  K3  *** F1 ALLEIN oeffnet WEITERHIN das Zweitfenster *** — die
+      wichtigste Regressionspruefung dieses Schritts
+  K4  Esc schliesst den Dialog, ebenso der Knopf "Schliessen"
+  K5  Lange Beschreibungen brechen um und werden NICHT abgeschnitten
+      (gut sichtbar bei F2, F5 und "Ruecktaste")
+  K6  Scrollen laeuft durch alle sieben Abschnitte bis "Anleitung"
+  K7  Stichprobe: eine Zeile mit Bedingung ist gedaempft dargestellt
+      (z. B. "Strg + A ... (nur im Malmodus)")
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja ([8] erledigt)
+# Die Aufgabe "Schritt [8] KeyBindings" wurde vollstaendig abgeschlossen: ja
+#   (Code-seitig; Runtime-Verify K1-K7 offen)
+# Naechster Schritt: [6] AppTheme-Bereinigung [C] ODER [9] BaseDialog [C] —
+#   beide freigabepflichtig. Ohne Freigabe bleibt nur Kleinarbeit.
+#   Empfehlung: [6] mit UIComponentFactory beginnen, EINE Datei, danach
+#   Sichtpruefung durch den User.
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

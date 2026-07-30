@@ -17,13 +17,13 @@ LIES ZUERST (Reihenfolge ist verbindlich):
 
 BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
        -encoding UTF-8 ist PFLICHT (Unicode im Quelltext).
-       ERWARTET: exit 0, 329 .class
-       (Aeltere Zahlen -- 370, 328, 226, 208 -- sind veraltet.)
+       ERWARTET: exit 0, 335 .class
+       (Aeltere Zahlen -- 329, 370, 328, 226, 208 -- sind veraltet.)
 RUN:   java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor
 
 STRUKTUR: Projekt-Root = nur CLAUDE.md · src/ = nur Java + Deploy-Skript ·
           doc/ = alle Dokumente (flach, Wegweiser in README.md)
-          src/paint 104 .java + book 3 + module-info
+          src/paint 106 .java + book 3 + module-info
 GRAPH:    graphify-out/ ist eingecheckt. 2479 Knoten / 6369 Kanten /
           123 Communities, code-only, 0 LLM-Tokens.
 
@@ -61,6 +61,10 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     ../JavaDemos/ ausgelagert, Root-paint/ (60 .class) geloescht.
 [5] AppTheme angelegt — additiv, 0 Aufrufer, kein Wert geaendert.
     -> progress_2026-07-30_apptheme.txt
+[7] BOOKS_ROOT + cardfolders ueber AppPaths; Ablageort nachweislich gleich.
+    -> progress_2026-07-30_apppaths-books.txt
+[8] KeyBindings-Registry + Hilfe-Dialog (Umschalt+F1 und Knopf).
+    -> progress_2026-07-30_keybindings.txt
 
 VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
   a) "referenzfrei" != "unbenutzt". Eine Klasse mit main() ist startbar.
@@ -122,31 +126,39 @@ OFFEN — nach Hebel sortiert
     -> RUNTIME-VERIFY B1-B4 in progress_2026-07-30_apppaths-books.txt
        (B1/B3 sind die wichtigen: keine Daten verschwunden).
 
-[8] KEYBINDINGS-REGISTRY + HILFE-DIALOG  (§25)  [B]
-    *** MOCKUP LIEGT VOR UND WARTET AUF FREIGABE:
-        doc/Schema_KeyBindings_Dialog.txt (2026-07-30).
-        Es enthaelt Layout, Datenmodell (Scope/KeyBinding/GUIDE), die
-        vollstaendige Bestandsaufnahme und vier Fragen F1-F4.
-        KEIN CODE, bis die Freigabe da ist (Univ. §9). ***
+[8] *** ERLEDIGT 2026-07-30: KEYBINDINGS-REGISTRY + HILFE-DIALOG [B] ***
+    NEU KeyBindings.java      Registry: 6 Scopes, 53 Eintraege, 5 Ablaeufe
+    NEU KeyBindingsDialog.java  eine durchgehende Liste, keine Reiter, kein
+                              Suchfeld; ESC schliesst; ueber
+                              UIComponentFactory.createBaseDialog (§20)
+    KeyboardShortcutManager   Umschalt+F1 im globalen Dispatcher
+    UIBuilder                 Knopf "?" rechts in der oberen Leiste
+    GELOESCHT doc/Shortcut Table.txt (kannte 13 von 53 Belegungen)
+    Build 329 -> 335 .class.
 
-    DIE BESTANDSAUFNAHME AUS DEM CODE (nicht aus der alten Tabelle):
-      doc/Shortcut Table.txt kennt 13 Eintraege — belegt sind ueber 40.
-      Dort fehlen F1-F7, ALT+T, ALT+P, R, UMSCH+R, UMSCH+V, STRG+ALT+S,
-      STRG+UMSCH+S, STRG+ALT+UMSCH+S, UMSCH+ALT+A, +/=/NUM+ und
-      SAEMTLICHE Maus-Gesten.
-    *** ZWEI GESTEN SIND NIRGENDWO DOKUMENTIERT UND NICHT ERRATBAR:
-          STRG + Rad auf einem TEXT-Layer aendert die SCHRIFTGROESSE
-            statt zu zoomen
-          ALT + T festhalten + Rad aendert die DECKKRAFT des Bild-Layers
-        Beide gehoeren in die Registry, sonst findet sie nie jemand. ***
+    ENTSCHEIDUNGEN DES USERS: eine Liste statt Reiter · kein Suchfeld ·
+    deutsche Beschriftung (Strg/Umschalt/Entf) · Umschalt+F1 UND Knopf.
+    F1 bleibt beim Zweitfenster.
 
-    Quellen: KeyboardShortcutManager.java + CanvasPanel.java (= die
-    WAHRHEIT), doc/F1_F6_COMPLETE_REFERENCE.md, QUICK_REFERENCE_F1_F5.md.
-    Hilfe-Taste = SHIFT+F1 (F1-F7 sind belegt, F1 = Zweitfenster).
-    Maus-Gesten in der TREFFERREIHENFOLGE des Codes registrieren (§22).
-    Nach der Umsetzung: doc/Shortcut Table.txt aus der Registry erzeugen
-    oder loeschen — eine zweite handgepflegte Liste ist die Ursache des
-    Problems, nicht die Loesung.
+    *** DIE UMSCHALT+F1-ABFRAGE STEHT VOR DER F1-ABFRAGE IM DISPATCHER.
+        Wer sie verschiebt, macht die Hilfe unerreichbar — F1 schluckt
+        den Fall sonst. ***
+    *** Beschreibungen sind JTextArea, KEIN JLabel: §25 verlangt
+        umbrechen statt abschneiden. Nicht "vereinfachen". ***
+    *** KeyBindingsDialog ist der ERSTE NUTZER von AppTheme. Neuer Code
+        ohne new Font/new Color — so ist §21 gemeint. ***
+
+    DREI FUNDE AUS DER BESTANDSAUFNAHME, die vorher NIRGENDS standen:
+      - Strg + Rad auf einem TEXT-Layer aendert die SCHRIFTGROESSE statt
+        zu zoomen
+      - Alt + T festhalten + Rad aendert die DECKKRAFT des Bild-Layers
+      - Waehrend der Textbearbeitung lenkt CanvasPanel Strg+A/C/X/V/Z,
+        Esc, Enter und Entf auf den TEXT um (eigener Scope TEXT, Strg+Z
+        hat dort einen EIGENEN Verlauf)
+
+    -> RUNTIME-VERIFY K1-K7 in progress_2026-07-30_keybindings.txt.
+       *** K3 ist die wichtigste: F1 ALLEIN muss weiterhin das
+           Zweitfenster oeffnen. ***
 
 [9] BASEDIALOG + CONFIRMDIALOG  (§20)  [C], NUR MIT FREIGABE
     12 Klassen erben direkt von JFrame/JDialog/JWindow, JOptionPane in

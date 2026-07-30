@@ -1,5 +1,5 @@
 ==============================================================================
-Schema_KeyBindings_Dialog.txt   —   MOCKUP, NOCH NICHT FREIGEGEBEN
+Schema_KeyBindings_Dialog.txt   —   FREIGEGEBEN UND UMGESETZT 2026-07-30
 Stand 2026-07-30 | Regel: doc/GUIDELINES.md §25, Univ. §9 (Mockup-Pflicht)
 ==============================================================================
 
@@ -171,18 +171,31 @@ oder geloescht (§25) — eine zweite, handgepflegte Liste ist die Ursache
 des Problems, nicht die Loesung.
 
 
-OFFENE FRAGEN ZUR FREIGABE
+ENTSCHEIDUNGEN DES USERS (2026-07-30) — SO UMGESETZT
 --------------------------------------------------------------------------
-F1  Drei Reiter (Tasten / Maus / Anleitung) wie skizziert — oder EINE
-    lange Liste mit Zwischenueberschriften zum Durchscrollen?
-F2  Suchfeld: ja/nein? Bei ueber 40 Eintraegen hilfreich, kostet aber
-    Aufwand und eine weitere Bedienstelle.
-F3  Sollen die Kuerzel deutsch (STRG, UMSCH, ENTF, RUECKTASTE) oder
-    englisch (CTRL, SHIFT, DEL, BACKSPACE) angezeigt werden? Der bisherige
-    Text im Programm ist gemischt.
-F4  Reicht SHIFT+F1, oder soll die Uebersicht zusaetzlich ueber einen
-    Knopf in der oberen Leiste erreichbar sein?
+F1  EINE durchgehende Liste mit Zwischenueberschriften. KEINE Reiter.
+    Reihenfolge: Global · Hauptfenster · Zeichenflaeche · Textbearbeitung ·
+    Maus · Seitenleisten · Anleitung.
+F2  KEIN Suchfeld.
+F3  DEUTSCHE Beschriftung (Strg, Umschalt, Entf, Ruecktaste, Esc, Enter).
+    Begruendung: genau so steht es auf einer deutschen Tastatur, und die
+    Oberflaeche ist ohnehin deutsch. Entspricht der Microsoft-Schreibweise.
+F4  BEIDES: Umschalt+F1 UND ein Knopf "?" rechts in der oberen Leiste.
+    F1 bleibt beim Zweitfenster (Bestaetigung der Q3-Entscheidung).
+
+UMGESETZT ALS
+--------------------------------------------------------------------------
+  KeyBindings.java        Registry: Scope (6), KeyBinding, GuideEntry,
+                          ALL (53 Eintraege), GUIDE (5 Ablaeufe, 21 Schritte)
+  KeyBindingsDialog.java  eine Liste, JTextArea je Zeile (umbricht, statt
+                          abzuschneiden), ESC schliesst, Dialog ueber
+                          UIComponentFactory.createBaseDialog (§20)
+  KeyboardShortcutManager Umschalt+F1 VOR der F1-Abfrage im Dispatcher
+  UIBuilder               Knopf "?" rechts in der oberen Leiste
+
+VOM MOCKUP ABGEWICHEN: statt drei Reitern eine Liste (F1), kein Suchfeld
+(F2). Beides laut Freigabe.
 
 ==============================================================================
-STATUS: MOCKUP — WARTET AUF FREIGABE. Kein Code geschrieben.
+STATUS: UMGESETZT. Build gruen, 335 .class.
 ==============================================================================

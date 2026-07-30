@@ -285,10 +285,16 @@ Hauptfensters (`WHEN_IN_FOCUSED_WINDOW`) und einen globalen
 F3 Snapshot, F4 Vollbild, F5 Always-on-top, F6 auf Canvas anwenden,
 F7 Canvas-Anzeigemodus). Eine Hilfe-Taste wäre deshalb **SHIFT+F1** (§25).
 
-> Es gibt **keine** Shortcut-Registry und keinen Hilfe-Dialog.
-> `doc/Shortcut Table.txt` ist handgepflegt und **veraltet** (es fehlen
-> F1–F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S, CTRL+SHIFT+S, SHIFT+ALT+A) —
-> nicht als Quelle vertrauen. §25 beschreibt die Ablösung.
+**`KeyBindings.ALL` ist die Registry** (53 Einträge, sechs Scopes) —
+`KeyBindingsDialog` zeigt sie über **Umschalt+F1** oder den Knopf „?“ rechts
+in der oberen Leiste. **Neue Taste oder Geste → zuerst Registry-Eintrag, dann
+Handler** (§25); der Dialog enthält keinen eigenen Text.
+
+> Zwei Gesten, die man nicht errät und die vorher nirgends standen:
+> **`Strg`+Rad auf einem Text-Layer** ändert die Schriftgröße statt zu zoomen,
+> **`Alt+T` halten + Rad** ändert die Deckkraft des Bild-Layers.
+> Während der Textbearbeitung sind `Strg+A/C/X/V/Z`, `Esc`, `Enter` und `Entf`
+> auf den Text umgelenkt (Scope `TEXT`).
 
 ---
 

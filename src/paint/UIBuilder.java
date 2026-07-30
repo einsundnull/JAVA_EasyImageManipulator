@@ -370,6 +370,16 @@ class UIBuilder {
 		right.add(ed.secondScenesBtn);
 		right.add(ed.bookPagesIIBtn); // ganz rechts – nur sichtbar in Book-Modus
 		right.add(ed.bookListIIBtn);  // ganz rechts – nur sichtbar in Book-Modus
+
+		// Hilfe: zweiter Weg neben Umschalt+F1 (§25, Entscheidung 2026-07-30).
+		// Ein Shortcut allein ist unauffindbar, wenn man ihn nicht kennt.
+		JButton helpBtn = UIComponentFactory.buildButton("?", AppColors.BTN_BG, AppColors.BTN_HOVER);
+		helpBtn.setPreferredSize(new Dimension(AppTheme.BTN_W, AppTheme.BTN_H));
+		helpBtn.setToolTipText("Tastatur, Maus und Abläufe  (Umschalt+F1)");
+		helpBtn.setForeground(AppColors.TEXT);
+		helpBtn.addActionListener(e -> KeyBindingsDialog.show(ed));
+		right.add(helpBtn);
+
 		ed.topBarRight = right;
 		bar.add(right, BorderLayout.EAST);
 

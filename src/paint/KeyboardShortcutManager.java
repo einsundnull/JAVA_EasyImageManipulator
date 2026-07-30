@@ -270,9 +270,18 @@ class KeyboardShortcutManager {
 		});
 
 		// Global F1–F7 key dispatcher for secondary preview window
+		// Jede hier vergebene Taste MUSS in KeyBindings.ALL stehen (§25).
 		java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
 			if (e.getID() != KeyEvent.KEY_PRESSED)
 				return false;
+			// Umschalt+F1: Übersicht aller Tasten und Gesten.
+			// Muss VOR der F1-Abfrage stehen — sonst schluckt F1 den Fall und
+			// die Hilfe wäre nie erreichbar.
+			if (e.getKeyCode() == KeyEvent.VK_F1
+					&& (e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0) {
+				KeyBindingsDialog.show(ed);
+				return true;
+			}
 			// Alt+T: Textfeld im sekundären Fenster anzeigen
 			if (e.getKeyCode() == KeyEvent.VK_T
 					&& (e.getModifiersEx() & InputEvent.ALT_DOWN_MASK) != 0

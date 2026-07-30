@@ -41,19 +41,24 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`TextLayer_Implementation_Documentation.md`](TextLayer_Implementation_Documentation.md) | TextLayer |
 | [`F6_FEATURE.md`](F6_FEATURE.md) | F6 „auf Canvas anwenden" |
 | [`Schema_ButtonLeiste_Top_with_Books.txt`](Schema_ButtonLeiste_Top_with_Books.txt) | ASCII-Mockup der oberen Leiste (Buch-Modus) |
-| [`Schema_KeyBindings_Dialog.txt`](Schema_KeyBindings_Dialog.txt) | ⏳ **Mockup, wartet auf Freigabe** — Hilfe-Dialog (§25) |
 | [`HowImagesForScenesAreLoaded.txt`](HowImagesForScenesAreLoaded.txt) · [`Preload.txt`](Preload.txt) | Bild-/Preload-Pfade |
 | [`SplitCanvas.txt`](SplitCanvas.txt) · [`SplitCanvas II.txt`](<SplitCanvas II.txt>) | Konzept der zwei Canvases |
 
-## 5. Tastatur — Quellen für die geplante Registry (§25)
+## 5. Tastatur (§25)
 
-| Datei | Achtung |
+> **Die Wahrheit steht seit 2026-07-30 im Code: `paint.KeyBindings.ALL`.**
+> 53 Einträge, sichtbar im Programm über **Umschalt+F1** oder den Knopf „?“.
+> Neue Taste oder Geste → **zuerst** Registry-Eintrag, dann Handler.
+
+| Datei | Rolle |
 |---|---|
-| [`F1_F6_COMPLETE_REFERENCE.md`](F1_F6_COMPLETE_REFERENCE.md) · [`QUICK_REFERENCE_F1_F5.md`](QUICK_REFERENCE_F1_F5.md) | Beste vorhandene Übersicht der F-Tasten |
-| [`Shortcut Table.txt`](<Shortcut Table.txt>) | ⚠ **handgepflegt und veraltet** — es fehlen F1–F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S, CTRL+SHIFT+S, SHIFT+ALT+A. Nicht als Wahrheit lesen |
+| [`Schema_KeyBindings_Dialog.txt`](Schema_KeyBindings_Dialog.txt) | Mockup + Entscheidungen zum Hilfe-Dialog (umgesetzt) |
+| [`F1_F6_COMPLETE_REFERENCE.md`](F1_F6_COMPLETE_REFERENCE.md) · [`QUICK_REFERENCE_F1_F5.md`](QUICK_REFERENCE_F1_F5.md) | Historische F-Tasten-Beschreibung (April 2026) — bei Widerspruch gewinnt die Registry |
 
-> Alle drei werden von der Registry aus §25 abgelöst. Bis dahin gilt: **der
-> Code ist die Wahrheit** (`KeyboardShortcutManager`).
+> `Shortcut Table.txt` wurde am 2026-07-30 **gelöscht**: handgepflegt, kannte
+> 13 von 53 Belegungen. Eine zweite Liste neben der Registry ist die Ursache
+> des Problems, nicht die Lösung (§25). Inhalt steckt in `KeyBindings.ALL`,
+> die Historie in Git.
 
 ## 6. Verlaufsprotokolle (`progress_*`) — was wann warum passiert ist
 

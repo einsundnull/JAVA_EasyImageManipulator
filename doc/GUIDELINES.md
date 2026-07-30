@@ -45,7 +45,7 @@
 | Persistenz-Paare (Univ. §6) | `SceneFileReader/Writer` · `TextReader/Writer` · `GameSceneReader/Writer` · `ToolLegacySceneReader` (nur lesen) · `SceneSerializer` · `PageLayoutManifest` |
 | Format-Verträge (Univ. §7) | **Szenen-Format ↔ GameII** → §23 |
 | Settings (Univ. §12) | **`AppSettings`** (Singleton) → `%APPDATA%\TransparencyTool\settings\default.txt` (Inhalt: JSON, siehe §31) |
-| Shortcut-Registry (Univ. §11) | **fehlt noch** → §25. Aufbau-Ort ist `KeyboardShortcutManager` |
+| Shortcut-Registry (Univ. §11) | **`KeyBindings.ALL`** (53 Einträge) + **`KeyBindings.GUIDE`**; Dialog `KeyBindingsDialog`, Taste **Umschalt+F1** und Knopf „?“ → §25 |
 | Mess-Anzeige (Univ. §13) | **keine** — bewusst, siehe §26 |
 | Graphify-Scope (Univ. §1) | Scan-Root **`src/`** (schließt `bin/`, `doc/`, `resources/` ohne Filter aus), code-only. Graph ist eingecheckt: 2479 Knoten / 6369 Kanten / 123 Communities, 0 Tokens |
 
@@ -232,14 +232,19 @@ keinen GameLoop. An seine Stelle tritt:
 F1–F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S, CTRL+SHIFT+S, SHIFT+ALT+A.
 Es gibt **keinen** Hilfe-Dialog (Befund S6).
 
-- **Eine Registry [B]:** `paint.KeyBindings.ALL` als statische Liste
-  `KeyBinding{combo, scope, description}`. **Neue Tastenfunktion → zuerst
-  Eintrag, dann Handler.** Kein stiller Shortcut.
-  `KeyboardShortcutManager` **verdrahtet** die Registry (InputMap/ActionMap +
-  globaler `KeyEventDispatcher`), er ist nicht die Quelle der Beschreibung.
-- **Scopes:** `GLOBAL` (`KeyEventDispatcher`, alle Fenster — heute F1–F7,
-  ALT+T, ALT+P) · `WINDOW` (`WHEN_IN_FOCUSED_WINDOW`-InputMap des
-  Hauptfensters) · `DIALOG` (ESC/ENTER je Dialog) · `MOUSE` (Canvas-Gesten).
+- **Umgesetzt 2026-07-30: `KeyBindings.ALL`** — `KeyBinding{scope, combo,
+  description, condition}`, 53 Einträge, plus `KeyBindings.GUIDE` (5 Abläufe).
+  **Neue Taste oder Geste → zuerst Eintrag, dann Handler.** Kein stiller
+  Shortcut. `KeyboardShortcutManager` und `CanvasPanel` **verdrahten** die
+  Funktionen; ihre Beschreibung steht in der Registry.
+- **Beschriftung ist deutsch** (Strg, Umschalt, Entf, Rücktaste) — so steht es
+  auf einer deutschen Tastatur, und die Oberfläche ist ebenfalls deutsch.
+- **Sechs Scopes:** `GLOBAL` (Dispatcher, alle Fenster) · `WINDOW`
+  (InputMap des Hauptfensters) · `CANVAS` · **`TEXT`** · `MOUSE` · `MOUSE_UI`.
+  **`TEXT` überschreibt `WINDOW`:** während der Textbearbeitung bedeuten
+  `Strg+A/C/X/V/Z`, `Esc`, `Enter` und `Entf` etwas anderes — sie wirken auf
+  den Text, nicht auf das Bild. Das ist kein Fehler, sondern gewollt, und
+  genau deshalb steht es in der Registry.
 - **Maus-Gesten werden wie Tasten registriert**, in der
   **Trefferreihenfolge des Codes** (§22): CTRL+Rad = Zoom · Rad = vertikal ·
   SHIFT+Rad = horizontal · Mitteltaste-Drag = Pan · CTRL+Links-Drag = Pan ·
@@ -255,11 +260,13 @@ Es gibt **keinen** Hilfe-Dialog (Befund S6).
   ein GUIDE-Absatz**, sonst ist sie in der UI nicht auffindbar.
   Beschreibungen werden **umgebrochen, nie abgeschnitten**.
 - **Mockup-Pflicht (Univ. §9):** `doc/Schema_KeyBindings_Dialog.txt` zuerst.
-- **`Shortcut Table.txt` wird aus der Registry erzeugt oder gelöscht.** Eine
-  zweite, handgepflegte Liste ist die Ursache des Problems, nicht die Lösung.
-- **Konflikte dokumentieren:** ALT+P (Floating PaintBar) und die
-  Alpha-Editor-Belegungen von `R`/`V` ohne Modifier sind mit Vermerk in die
-  Registry aufzunehmen, bis geprüft ist, ob sie in Textfeldern störn.
+- **`Shortcut Table.txt` ist am 2026-07-30 gelöscht.** Sie war handgepflegt
+  und kannte 13 von 53 Belegungen. Eine zweite Liste neben der Registry ist
+  die Ursache des Problems, nicht die Lösung. Historie in Git.
+- **Konflikte werden geführt, nicht verschwiegen.** Aktuell in der Registry
+  sichtbar: `Strg+Rad` bedeutet **zweierlei** (zoomen; auf einem Text-Layer
+  dagegen Schriftgröße), und `Enter`/`Esc`/`Strg+A`/`Strg+Z` unterscheiden
+  sich zwischen `WINDOW` und `TEXT`. Beide Fälle tragen eine `condition`.
 
 ---
 
