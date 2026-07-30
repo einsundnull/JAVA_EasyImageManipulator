@@ -28,15 +28,15 @@
 | UI-Toolkit | **Swing** (nicht AWT — GameLoop2-Rendering-Regeln gelten hier **nicht**, siehe §24) |
 | Einstiegspunkt | `paint.SelectiveAlphaEditor` |
 | Run | `java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor` |
-| Build | `javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java` — **`-encoding UTF-8` ist Pflicht** (Unicode-Symbole im Quelltext). Erwartet: **exit 0, 370 `.class`** (Stand 2026-07-30, nach Auslagerung §28) |
-| Quellbaum | **nur** `paint` + `book` + `module-info.java`. `com.spriteanimator` und `PathAnimator` sind seit 2026-07-30 eigene Projekte (`../SpriteAnimator/`, `../PathAnimator/`) |
+| Build | `javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java` — **`-encoding UTF-8` ist Pflicht** (Unicode-Symbole im Quelltext). Erwartet: **exit 0, 328 `.class`** (Stand 2026-07-30, nach Auslagerung + Altlast-Löschung §28) |
+| Quellbaum | **nur** `paint` (103) + `book` (3) + `module-info.java`. Seit 2026-07-30 eigene Projekte: `../SpriteAnimator/`, `../PathAnimator/`, `../JavaDemos/` |
 | Token-Quelle (Univ. §3) | **`AppColors`** (Farben vorhanden; Fonts/Metrik fehlen → §21) |
 | Fenster-Basisklasse (Univ. §2) | **fehlt noch** → §20. Bis dahin `UIComponentFactory.createBaseDialog(...)` als Minimum |
 | Zeichenflächen-Basisklasse | **keine** (Swing puffert selbst) → Regeln in §24 |
 | Panel-Basisklassen | **`BaseSidebarPanel`** (6 Unterklassen) · **`CardListPanel`** (2) |
 | Domänen-Basisklasse | **`Layer`** (Wert-Objekt, unveränderlich) → §29 |
 | Bestätigungs-Dialog | **fehlt noch** → §20. `JOptionPane` ist Altlast, kein Vorbild |
-| Grafik-/Widget-Fabrik | `UIComponentFactory` · `UIBuilder` · `PanelToggleButton` · `SmartLabel` |
+| Grafik-/Widget-Fabrik | `UIComponentFactory` · `UIBuilder` · `PanelToggleButton` (`SmartLabel` ist am 2026-07-30 nach `../JavaDemos/` gezogen — es war nur vom Demo benutzt) |
 | Pfad-Zentrale | **`AppPaths`** — **alle** Pfade unter `%APPDATA%\TransparencyTool\`. Nie `new File("...")` mit hartem Pfad |
 | Zustands-Träger | **`CanvasInstance`** (Zustand **pro Canvas**), `canvases[2]`, `ci()`/`ci(idx)` → §30 |
 | Fachlogik | **18 `*Controller`** + 5 `*CallbacksFactory` + `Callbacks`-Interfaces → §22 |
@@ -46,7 +46,7 @@
 | Settings (Univ. §12) | **`AppSettings`** (Singleton) → `%APPDATA%\TransparencyTool\settings\default.txt` (Inhalt: JSON, siehe §31) |
 | Shortcut-Registry (Univ. §11) | **fehlt noch** → §25. Aufbau-Ort ist `KeyboardShortcutManager` |
 | Mess-Anzeige (Univ. §13) | **keine** — bewusst, siehe §26 |
-| Graphify-Scope (Univ. §1) | `src/**/*.java`; **ausgeschlossen**: `bin/`, `paint/` (Root, veraltete `.class`), `doc/`, `graphify-out/`, `resources/` |
+| Graphify-Scope (Univ. §1) | Scan-Root **`src/`** (schließt `bin/`, `doc/`, `resources/` ohne Filter aus), code-only. Graph ist eingecheckt: 2479 Knoten / 6369 Kanten / 123 Communities, 0 Tokens |
 
 ---
 

@@ -30,7 +30,7 @@ javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.ja
 ```
 `-encoding UTF-8` ist **Pflicht** — die Quelldateien enthalten Unicode (Pfeile,
 Symbole, Umlaute). Ohne die Option: „unmappable character".
-**Erwartet: exit 0, 370 `.class`** (Stand 2026-07-30).
+**Erwartet: exit 0, 328 `.class`** (Stand 2026-07-30).
 
 **Starten:**
 ```bash
@@ -46,10 +46,20 @@ Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
 **Deploy:** `bash src/paint/JAVA_EasyImageManipulator-Push.sh` →
 `https://github.com/einsundnull/JAVA_EasyImageManipulator.git`
 
-> **Quellbaum:** nur noch `paint` + `book` + `module-info.java`.
-> `com.spriteanimator` und `PathAnimator` waren eigenständige Programme ohne
-> Bezug zu `paint` und sind am 2026-07-30 nach `../SpriteAnimator/` bzw.
-> `../PathAnimator/` ausgelagert worden.
+> **Quellbaum:** nur noch `paint` (103 Dateien) + `book` (3) +
+> `module-info.java`. Am 2026-07-30 ausgelagert, weil ohne Bezug zu `paint`:
+> `com.spriteanimator` → `../SpriteAnimator/`, `PathAnimator` →
+> `../PathAnimator/`, die startbaren Prototypen (`Demo`, `DemoWorksheetEditor{,2}`,
+> `AutoGrowingPillFieldDemo` + `SmartLabel`) → `../JavaDemos/`.
+> Ersatzlos gelöscht: `AutoGrowingPillFieldDemo2`, `BookListPanelLegacy`,
+> `BookPagesPanelLegacy`, `PageLayoutToolbarLegacy` und der veraltete
+> `paint/`-Ordner im Projekt-Root.
+
+> **KnowledgeMap:** `graphify-out/` ist eingecheckt — `GRAPH_REPORT.md` für den
+> Überblick, `graph.html` im Browser, `graph.json` für Abfragen. Code-only
+> (Scan-Root `src/`). **Vorsicht:** externe Typen wie `JPanel` liegen als viele
+> Knoten vor; der Graph taugt für „wie hängt es zusammen", **nicht** für
+> „ist das tot" — dafür Textsuche.
 
 ---
 
@@ -57,7 +67,7 @@ Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
 
 Swing-Werkzeug zum Bearbeiten von Bildern und Szenen. **Zwei unabhängige
 Canvases** nebeneinander, vier Modi, ein Zweitfenster für die Vorschau.
-Alles liegt im Package `paint` (110 Klassen, flach) plus `book` (3 Klassen).
+Alles liegt im Package `paint` (103 Klassen, flach) plus `book` (3 Klassen).
 
 ### Das Hauptfenster ist ein Orchestrator, keine God-Klasse
 
@@ -278,12 +288,9 @@ F7 Canvas-Anzeigemodus). Eine Hilfe-Taste wäre deshalb **SHIFT+F1** (§25).
 
 Vollständige Liste mit Risiko: `doc/WEITERMACHEN_PROMPT.txt`.
 
-- **Tote/veraltete Dateien:** `Demo.java`, `DemoWorksheetEditor{,2}`,
-  `AutoGrowingPillFieldDemo{,2}`, `BookListPanelLegacy`,
-  `BookPagesPanelLegacy`, `PageLayoutToolbarLegacy` (~2100 Zeilen) sowie ein
-  veralteter **`paint/`-Ordner mit `.class`-Dateien im Projekt-Root** (nicht
-  mit `src/paint/` verwechseln). Löschen erst nach Referenz-Beleg.
-  `ToolLegacySceneReader` ist **keine** Altlast — Legacy-Lesen ist gewollt.
+- ~~Tote/veraltete Dateien~~ — **erledigt 2026-07-30** (2540 Zeilen raus,
+  siehe Quellbaum-Hinweis oben). `ToolLegacySceneReader` ist **keine**
+  Altlast — Legacy-Lesen ist gewollt (§23).
 - **`ImageIO.write` in 9 Dateien** statt in der `io`-Schicht.
 - **5 handgeschriebene JSON-Serializer** ohne gemeinsamen Writer.
 - **`AppSettings` liest/schreibt ohne Encoding** (Plattform statt UTF-8) —

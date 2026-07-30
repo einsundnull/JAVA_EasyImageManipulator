@@ -108,3 +108,56 @@ NICHT ENTSCHIEDEN — Frage an den User, kein Alleingang.
 #   Dateien kleiner und muss nur einmal aufgefrischt werden.
 # "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
 ==============================================================================
+
+==============================================================================
+NACHTRAG — Schritt [4] Altlasten beseitigt (2026-07-30, [ST]/[B])
+==============================================================================
+PROMPT: "Schritt 4 und Committen wie in GameLoop2"
+
+*** DIE VORLAGE WAR UNGENAU — GEPRUEFT STATT AUSGEFUEHRT:
+    Die Liste nannte 8 "tote" Dateien. Vier davon haben eine main()-Methode
+    und sind eigenstaendig startbar. "Referenzfrei" heisst bei einer Klasse
+    mit main NICHT "unbenutzt". Rueckfrage gestellt -> User: auslagern. ***
+
+GELOESCHT (892 Z., referenzfrei per TEXTSUCHE belegt, nicht aus dem Graphen):
+  AutoGrowingPillFieldDemo2, BookListPanelLegacy, BookPagesPanelLegacy,
+  PageLayoutToolbarLegacy
+GELOESCHT: Root-Ordner paint/ — 60 veraltete .class-Dateien, die TATSAECHLICH
+  in Git lagen (nicht nur untracked, wie vermutet).
+AUSGELAGERT nach ../JavaDemos/ (1648 Z., 5 Dateien):
+  Demo, DemoWorksheetEditor, DemoWorksheetEditor2, AutoGrowingPillFieldDemo
+  + SmartLabel
+
+*** SMARTLABEL — DER FUND DES SCHRITTS:
+    179 Zeilen, sah wie Produktivcode aus (steht sogar im Guidelines-
+    Steckbrief als Widget-Fabrik), wurde aber von NICHTS benutzt ausser
+    Demo.java. Haette man nur die 4 Demos verschoben, waere SmartLabel als
+    DUBLETTE noetig geworden -> Univ. §3/§6-Verstoss. Es ist mitgezogen. ***
+
+NEUES PROJEKT ../JavaDemos/  (.project/.classpath/.gitignore/CLAUDE.md/
+  doc/GUIDELINES.md/doc/Prompt_Handling.txt), Build exit 0, 26 .class.
+  Package bleibt "paint" -> KEINE Zeile Code geaendert, Verifikation blieb
+  ein reiner Compile-Vergleich. Umbenennen waere ein eigener [B]-Schritt.
+  Die GUIDELINES dort sagen vor allem, welche universellen Regeln fuer
+  Wegwerf-Prototypen NICHT gelten (§2/§3/§4/§5/§13) — sonst entsteht der
+  Eindruck, an 1648 Zeilen Prototyp muesse aufgeraeumt werden.
+
+BILANZ TransparencyTool:
+  src/paint  117 -> 103 Java-Dateien
+  Build      370 -> 328 .class, exit 0
+  Graph      2662 -> 2479 Knoten, 6832 -> 6369 Kanten,
+             136 -> 123 Communities, weiterhin KEINE Import-Zyklen
+  *** Der Graph-Stand VOR der Loeschung liegt in
+      graphify-out/2026-07-30_vor-altlast-loeschung/. Noetig, weil to_json
+      ein Schrumpfen von graph.json sonst verweigert (Schutz #479). ***
+
+DOKU NACHGEZOGEN: CLAUDE.md (Build-Zahl, Quellbaum, KnowledgeMap-Hinweis,
+  Altlasten-Abschnitt), doc/GUIDELINES.md (Steckbrief Build/Quellbaum/
+  Graphify-Scope, SmartLabel aus der Widget-Zeile), WEITERMACHEN_PROMPT
+  (Kopf + Punkt [4]).
+
+# progress.txt aktualisiert: ja
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja ([4] erledigt)
+# Naechster Schritt: [3] Doku einsammeln nach doc/ [B, Haiku geeignet]
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

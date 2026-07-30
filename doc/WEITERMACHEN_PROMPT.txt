@@ -15,10 +15,13 @@ LIES ZUERST (Reihenfolge ist verbindlich):
 
 BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
        -encoding UTF-8 ist PFLICHT (Unicode im Quelltext).
-       ERWARTET: exit 0, 370 .class  (Stand 2026-07-30, nach der Auslagerung
-       von spriteanimator/PathAnimator. Aeltere Zahlen sind veraltet.)
+       ERWARTET: exit 0, 328 .class  (Stand 2026-07-30, nach Auslagerung
+       spriteanimator/PathAnimator/JavaDemos + Altlast-Loeschung.
+       Aeltere Zahlen -- 370, 226, 208 -- sind veraltet.)
 RUN:   java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor
-QUELLBAUM: nur noch paint + book + module-info.java.
+QUELLBAUM: nur noch paint (103 .java) + book (3) + module-info.java.
+GRAPH:     graphify-out/ ist committed (Entscheidung 2026-07-30, wie GameLoop2).
+           2479 Knoten / 6369 Kanten / 123 Communities, code-only, 0 Tokens.
 
 ==============================================================================
 STAND 2026-07-30 — GUIDELINES EINGEFUEHRT
@@ -135,34 +138,35 @@ OFFEN — nach Hebel sortiert
     sondern der Format-VERTRAG mit GameII (§23) — beim Verschieben den
     Verweis in §23 mitziehen.
 
-[4] ALTLASTEN LOESCHEN (§28 / Befund S10), [B]  — TEILWEISE ERLEDIGT
-    ERLEDIGT am 2026-07-30 durch die Auslagerung (Q1):
-      [x] src/com/spriteanimator/{model,ui,engine,export,i18n}/  (leeres
-          Verzeichnis aus fehlgeschlagener Brace-Expansion) — entfallen
-      [x] src/com/** und src/PathAnimator/** — ausgelagert, nicht geloescht
-    *** REFERENZ-BELEG LIEGT VOR (2026-07-30, Textsuche ueber src/**/*.java,
-        NICHT aus dem Graphen — siehe Einschraenkung in [2]): ***
-          Demo.java                     REFERENZFREI
-          DemoWorksheetEditor.java      REFERENZFREI
-          DemoWorksheetEditor2.java     REFERENZFREI
-          AutoGrowingPillFieldDemo.java REFERENZFREI
-          AutoGrowingPillFieldDemo2.java REFERENZFREI
-          BookListPanelLegacy.java      REFERENZFREI
-          PageLayoutToolbarLegacy.java  REFERENZFREI
-          BookPagesPanelLegacy.java     nur von BookListPanelLegacy (selbst tot)
-        -> Der ganze Block ist als GESCHLOSSENE EINHEIT loeschbar. Einzeln
-           loeschen wuerde BookListPanelLegacy kurzzeitig brechen; zusammen
-           loeschen ist sauber.
-    OFFEN (loeschbar, Beleg erbracht):
-      [ ] Root-Ordner paint/ (veraltete .class-Dateien, NICHT der Quellcode
-          in src/paint/! Namensgleichheit — vor dem rm zweimal hinsehen.)
-      [ ] die 8 Dateien oben (~2100 Zeilen), als ein Commit
-    *** NACH DEM LOESCHEN: Build gegenpruefen (erwartet weiterhin exit 0,
-        aber WENIGER als 370 .class) und den Graphen auffrischen. ***
-    *** ToolLegacySceneReader ist KEINE Altlast — Legacy-LESEN ist laut
-        §23 ausdruecklich gewollt. Nicht mitloeschen. ***
-    *** book/ ist KEINE Altlast — wird von BookController, NewFileController,
-        NewImageDialog und BookPagesPanelLegacy genutzt. ***
+[4] *** ERLEDIGT 2026-07-30: ALTLASTEN BESEITIGT [B] ***
+    Build gruen: 370 -> 328 .class. src/paint: 117 -> 103 Java-Dateien.
+
+    GELOESCHT (4 Dateien, 892 Z., referenzfrei per Textsuche belegt):
+      AutoGrowingPillFieldDemo2, BookListPanelLegacy,
+      BookPagesPanelLegacy, PageLayoutToolbarLegacy
+    GELOESCHT: Root-Ordner paint/ (60 veraltete .class-Dateien, WAREN in Git)
+    AUSGELAGERT nach ../JavaDemos/ (5 Dateien, 1648 Z.):
+      Demo, DemoWorksheetEditor, DemoWorksheetEditor2,
+      AutoGrowingPillFieldDemo + SmartLabel
+
+    *** WARUM NICHT ALLE 8 GELOESCHT WURDEN — WICHTIG:
+        4 der 8 Kandidaten haben eine main()-Methode. "Referenzfrei" heisst
+        bei einer Klasse mit main NICHT "unbenutzt" — sie ist eigenstaendig
+        startbar. Die alte Liste hat das nicht unterschieden.
+        Entscheidung des Users: auslagern statt loeschen. ***
+
+    *** SMARTLABEL WAR DER UEBERRASCHUNGSFUND:
+        sah wie Produktivcode aus, wurde aber von NICHTS benutzt ausser
+        Demo.java -> gehoerte zum Demo und ist mitgezogen. Haette man nur
+        die 4 Demos verschoben, waere SmartLabel als Dublette noetig
+        geworden (Univ. §3/§6-Verstoss). ***
+
+    GRAPH AUFGEFRISCHT: 2662 -> 2479 Knoten, 6832 -> 6369 Kanten,
+    136 -> 123 Communities. Weiterhin KEINE Import-Zyklen.
+    Der Stand VOR der Loeschung liegt in
+    graphify-out/2026-07-30_vor-altlast-loeschung/ (graph.json +
+    GRAPH_REPORT.md) — noetig, weil to_json ein Schrumpfen sonst
+    verweigert (Schutz #479).
 
 [5] AppColors -> Tokens erweitern (§21), [A] additiv, dann [C] Bereinigung
     Anlass: 454 new Color, 162 new Font, 110 new BasicStroke — Ursache ist

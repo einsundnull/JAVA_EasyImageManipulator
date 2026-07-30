@@ -49,16 +49,6 @@
     "ast_hash": "a0dea6f94b164163bbf8a0259d6c59d8",
     "semantic_hash": "a0dea6f94b164163bbf8a0259d6c59d8"
   },
-  "paint/AutoGrowingPillFieldDemo.java": {
-    "mtime": 1776880508.9961464,
-    "ast_hash": "3f420cdc28e4c71c5700879c1b8d7954",
-    "semantic_hash": "3f420cdc28e4c71c5700879c1b8d7954"
-  },
-  "paint/AutoGrowingPillFieldDemo2.java": {
-    "mtime": 1776880956.6409128,
-    "ast_hash": "e68871761489f994a097e82f92b509e1",
-    "semantic_hash": "e68871761489f994a097e82f92b509e1"
-  },
   "paint/BaseSidebarPanel.java": {
     "mtime": 1776671536.1715589,
     "ast_hash": "85cbd8aa5dc978042dddcf6eb757fc95",
@@ -68,16 +58,6 @@
     "mtime": 1776588037.6985934,
     "ast_hash": "08170ea270020e0ebec32c2a4ffb485e",
     "semantic_hash": "08170ea270020e0ebec32c2a4ffb485e"
-  },
-  "paint/BookListPanelLegacy.java": {
-    "mtime": 1776636733.4707553,
-    "ast_hash": "3f76d47f5f9b6e5b3df46c935593e275",
-    "semantic_hash": "3f76d47f5f9b6e5b3df46c935593e275"
-  },
-  "paint/BookPagesPanelLegacy.java": {
-    "mtime": 1776636740.320283,
-    "ast_hash": "a150a7617625225de8c3761b47d36b12",
-    "semantic_hash": "a150a7617625225de8c3761b47d36b12"
   },
   "paint/CanvasCallbacks.java": {
     "mtime": 1776684104.601534,
@@ -148,21 +128,6 @@
     "mtime": 1776014124.7000747,
     "ast_hash": "7fabb0980f77f9cec2c41be6c9ded143",
     "semantic_hash": "7fabb0980f77f9cec2c41be6c9ded143"
-  },
-  "paint/Demo.java": {
-    "mtime": 1776881200.20376,
-    "ast_hash": "2220b1648b1e1ee1935572cf8eb9e5bc",
-    "semantic_hash": "2220b1648b1e1ee1935572cf8eb9e5bc"
-  },
-  "paint/DemoWorksheetEditor.java": {
-    "mtime": 1776883044.5946236,
-    "ast_hash": "b468c884f7b69188c4184ace61787236",
-    "semantic_hash": "b468c884f7b69188c4184ace61787236"
-  },
-  "paint/DemoWorksheetEditor2.java": {
-    "mtime": 1776883674.8688593,
-    "ast_hash": "a7bea27b4b454315d90e367f5851e13d",
-    "semantic_hash": "a7bea27b4b454315d90e367f5851e13d"
   },
   "paint/DropController.java": {
     "mtime": 1776356653.4098458,
@@ -339,11 +304,6 @@
     "ast_hash": "b4d427a24ff2938927cf6bbd9b766b71",
     "semantic_hash": "b4d427a24ff2938927cf6bbd9b766b71"
   },
-  "paint/PageLayoutToolbarLegacy.java": {
-    "mtime": 1776518323.969787,
-    "ast_hash": "ee3b7390d42394c9b057f7398d26c8f5",
-    "semantic_hash": "ee3b7390d42394c9b057f7398d26c8f5"
-  },
   "paint/PaintCallbacksFactory.java": {
     "mtime": 1776687415.3133895,
     "ast_hash": "cb9dbd0d0eaf2ef36561b9af7eeda072",
@@ -468,11 +428,6 @@
     "mtime": 1776706877.726584,
     "ast_hash": "7d7d51e5535024fe97acfd5eb3b2d1fc",
     "semantic_hash": "7d7d51e5535024fe97acfd5eb3b2d1fc"
-  },
-  "paint/SmartLabel.java": {
-    "mtime": 1776881196.6068435,
-    "ast_hash": "1095cb21bb317a31ac7a2fb3de9637d6",
-    "semantic_hash": "1095cb21bb317a31ac7a2fb3de9637d6"
   },
   "paint/SpriteLayer.java": {
     "mtime": 1776374662.2535577,
