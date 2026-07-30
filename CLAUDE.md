@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠ Verbindliche Guidelines — ZUERST LESEN
+
+Vor jeder Aufgabe in dieser Reihenfolge:
+
+1. **`../JAVA_GUIDELINES_UNIVERSAL.md`** — projektneutrale Standards für **alle**
+   Java-Projekte im Workspace (§0–§15).
+2. **`doc/GUIDELINES.md`** — Projekt-Steckbrief (welche TT-Klasse welche Rolle
+   besetzt) + projektspezifische §20–§32.
+3. **`doc/Prompt_Handling.txt`** — Task-Workflow: `[BT]`/`[ST]`, PD-Datei,
+   Risikoklassen `[A]`/`[B]`/`[C]`, Abschluss-Block.
+4. **`doc/WEITERMACHEN_PROMPT.txt`** — aktueller Stand, offene Schritte,
+   offene Fragen Q1–Q4. Einstiegspunkt nach `/clear`.
+
+Belege und Ist-Analyse: `doc/GUIDELINES_VORSCHLAG_2026-07-30.md` (Befunde S1–S12).
+
+> **⚠ Stand-Warnung (2026-07-30):** Der Architektur-Abschnitt weiter unten ist
+> **überholt** (Befund S9). Er beschreibt `SelectiveAlphaEditor` als
+> ~1900-Zeilen-God-Klasse (tatsächlich **566** Zeilen, reiner Orchestrator mit
+> 20 Controller-Feldern) und `CanvasPanel`/`HRulerPanel`/`VRulerPanel` als
+> *inner classes* (sind eigene Dateien). Nicht erwähnt: die **18 `*Controller`**,
+> die `*CallbacksFactory`-Verdrahtung, `CanvasInstance` (Zustand pro Canvas),
+> `Layer` als unveränderliches Wert-Objekt, `BaseSidebarPanel`, Szenen, Books,
+> Maps, Cards, TTS. Die God-Klasse ist heute **`CanvasPanel` (3299 Zeilen)**.
+> Bis zur Korrektur gilt `doc/GUIDELINES.md` (Steckbrief) als Architekturquelle.
+
 ## Build & Run
 
 **Compile (from the project root):**

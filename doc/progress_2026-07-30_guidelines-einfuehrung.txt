@@ -1,0 +1,169 @@
+==============================================================================
+progress_2026-07-30_guidelines-einfuehrung.txt
+Aufgabentyp: [ST] — kleine Aufgabe, keine Aufteilung noetig, keine PD.txt
+Risiko:      [B] — reine Dokumentation, KEIN Code geaendert, Build unberuehrt
+==============================================================================
+
+PROMPT (sinngemaess)
+--------------------------------------------------------------------------
+"Ich habe dieses Programm C:\Users\pc\eclipse-workspace\TransparencyTool und
+Guidelines, die eigentlich fuer ein anderes Java-Programm sind. Passe die
+Guidelines so an, dass sie auf dieses Programm angewendet werden koennen.
+Ziel ist es, jetzt und zukuenftig ALLE meine Java-Programme nach
+festgelegten Standards zu erstellen und zu bearbeiten."
+Gelesen werden sollten: GameLoop2 GUIDELINES.md, GUIDELINES_VORSCHLAG_
+2026-07-27.md, Prompt_Handling.txt, WEITERMACHEN_PROMPT.txt.
+
+
+ZUSAMMENFASSUNG DER ANALYSE
+--------------------------------------------------------------------------
+Gelesen: die 4 GameLoop2-Dokumente vollstaendig. Danach TransparencyTool
+vermessen (129 .java, ~39.000 Zeilen) statt geraten:
+  - Datei-/Zeilenzaehlung aller .java
+  - Zaehlung new Color / new Font / new BasicStroke gegen AppColors-Nutzung
+  - Dialog-/Fenster-Klassen, JOptionPane-Verteilung, abstrakte Basisklassen
+  - Persistenz: Reader/Writer + jede direkte Datei-/Bild-Schreibstelle
+  - Callbacks-/Controller-Muster, CanvasInstance-Felder
+  - Threading (SwingWorker/invokeLater/Thread/Timer)
+  - Layer-Unveraenderlichkeit (with*-Methoden), pushUndo/markDirty-Zaehlung
+  - Shortcut-Ist gegen die vorhandene Shortcut Table.txt
+
+WICHTIGSTE BEFUNDE (vollstaendig als S1-S12 im Vorschlags-Dokument):
+  * Die vorhandene CLAUDE.md ist UEBERHOLT und beschreibt eine Architektur,
+    die es nicht mehr gibt (SelectiveAlphaEditor "~1900 Zeilen, owns all
+    state" -> tatsaechlich 566 Zeilen Orchestrator; CanvasPanel und die
+    Ruler als inner classes -> eigene Dateien; die 18 Controller fehlen
+    komplett). Das ist der teuerste Einzelbefund: wer sie liest, arbeitet
+    am falschen Modell.
+  * Die God-Klasse ist NICHT das Hauptfenster (wie in GameLoop2), sondern
+    CanvasPanel mit 3299 Zeilen. Die Controller-Zerlegung hat den Editor
+    entlastet, nicht den Canvas.
+  * 454 new Color / 162 new Font / 110 new BasicStroke — Ursache ist eine
+    LUECKE in AppColors (kennt nur Farben, keine Fonts/Metrik), nicht
+    Disziplinlosigkeit. Sogar UIComponentFactory, der StyleGuide-Anker,
+    tippt 7x new Font.
+  * Keine Fenster-Basisklasse: 12 Klassen erben direkt von JFrame/JDialog/
+    JWindow, JOptionPane steht in 16 Dateien.
+  * F1 ist belegt (toggleSecondaryWindow), F1-F7 vollstaendig vergeben ->
+    die GameLoop2-Regel "F1 oeffnet die Hilfe" ist NICHT uebertragbar.
+  * Das Szenen-Format ist kein internes Format: GameII liest es. Damit ist
+    es ein VERTRAG — dafuer gibt es in GameLoop2 bisher keine Regel.
+  * TransparencyTool ist an vier Stellen BESSER als GameLoop2 (Controller-
+    Zerlegung, Callbacks-Interfaces, Layer als Wert-Objekt, AppPaths). Die
+    Uebertragung durfte deshalb nicht einseitig laufen.
+
+
+VORSCHLAEGE, DIE ERWOGEN UND VERWORFEN WURDEN
+--------------------------------------------------------------------------
+V1  Die GameLoop2-GUIDELINES.md einfach kopieren und Klassennamen ersetzen.
+    VERWORFEN: haette §6 (DoubleBufferedCanvas), §13 (stepSpeed), §15
+    (Z-Modi) und §17 (Frame-Budget) mitgeschleppt — in einer Swing-App ohne
+    GameLoop allesamt wirkungslos oder schaedlich. Und es haette das Ziel
+    "alle meine Java-Programme" verfehlt: beim dritten Projekt gaebe es
+    drei divergierende Kopien derselben Regeln.
+
+V2  EINE grosse Guidelines-Datei fuer alle Java-Projekte.
+    VERWORFEN: die Haelfte der nuetzlichen Regeln ist projektspezifisch
+    (Koordinatensysteme, Szenen-Vertrag, Undo-Kopplung). Die waeren in
+    einer neutralen Datei entweder falsch oder so vage, dass sie nichts
+    entscheiden.
+
+V3  Sofort mit der Umsetzung beginnen (BaseDialog, Theme-Bereinigung).
+    VERWORFEN als "unnoetiger Schritt" ohne Freigabe: beides ist [C], und
+    Prompt_Handling.txt verlangt vorher Aufteilung, Risikoklassen und eine
+    Empfehlung. Ausserdem waere ohne korrigierte CLAUDE.md und ohne Graph
+    jede Extraktion blind.
+
+
+TATSAECHLICHE LOESUNG — ZWEI EBENEN
+--------------------------------------------------------------------------
+Die Regeln wurden GETEILT. Das ist die eigentliche Entscheidung dieser
+Aufgabe und der Grund, warum sie das Ziel "alle Java-Programme" erfuellt:
+
+  ../JAVA_GUIDELINES_UNIVERSAL.md   (NEU, Workspace-Ebene)
+      Projektneutral, §0-§15. Enthaelt KEINE Klassennamen, sondern ROLLEN
+      (Token-Quelle, Fenster-Basisklasse, Persistenz-Paar, God-Klasse ...).
+      Gilt fuer jedes Java-Projekt im Workspace (~30 Kandidaten).
+      Neu gegenueber GameLoop2 formuliert:
+        §7  Formate zwischen Projekten sind Vertraege
+        §9  "Doku, die dem Code widerspricht, ist ein Bug"
+        §14 Projekt-Steckbrief als Instanziierungs-Mechanismus
+      Pflegeregel: eine Regel wandert erst hierher, wenn sie im ZWEITEN
+      Projekt gilt.
+
+  TransparencyTool/doc/GUIDELINES.md   (NEU)
+      Projekt-Steckbrief (besetzt jede universelle Rolle mit einer
+      TT-Klasse) + §20-§32:
+        §20 Fenster & Bestaetigungen (BaseDialog fehlt, JOptionPane-Stopp)
+        §21 AppColors erweitern statt umgehen
+        §22 CanvasPanel ist die God-Klasse
+        §23 Szenen-Format ist ein Vertrag mit GameII
+        §24 Swing/EDT (ERSETZT GameLoop2 §6)
+        §25 Tastatur-/Maus-Register, Hilfe auf SHIFT+F1
+        §26 Messen statt vermuten (abgeschwaechtes §17)
+        §27 Zwei Koordinatensysteme
+        §28 Doku nach doc/
+        §29 Layer unveraenderlich — Undo haengt daran
+        §30 Zustand gehoert zum Canvas
+        §31 AppSettings — ein Format, ein Name
+        §32 Was aus GameLoop2 NICHT gilt (mit Begruendung je Zeile)
+      Nummerierung ab §20 mit Absicht: §0-§15 behalten projektuebergreifend
+      dieselbe Bedeutung.
+
+  TransparencyTool/doc/GUIDELINES_VORSCHLAG_2026-07-30.md   (NEU)
+      Die Analyse: Ist-Zustand, Befunde S1-S12 mit Zahlen und Fundstellen,
+      Uebertragungstabelle GameLoop2 -> TT (Zeile fuer Zeile: uebernommen /
+      angepasst / nicht anwendbar), Umsetzungsreihenfolge mit Risiko- und
+      Model-Empfehlung, Fragen Q1-Q4.
+
+  TransparencyTool/doc/Prompt_Handling.txt      (KOPIE, unveraendert)
+  TransparencyTool/doc/WEITERMACHEN_PROMPT.txt  (NEU, Einstieg nach /clear)
+  TransparencyTool/CLAUDE.md                    (Kopf-Verweis + Stand-Warnung)
+
+
+DREI BEWUSSTE ABWEICHUNGEN VON GAMELOOP2 (nicht "aufraeumen")
+--------------------------------------------------------------------------
+ 1. §24 ersetzt GameLoop2 §6: Swing puffert selbst -> keine
+    DoubleBufferedCanvas-Pflicht, stattdessen EDT-Regeln.
+ 2. Hilfe-Taste SHIFT+F1 statt F1 (F1-F7 sind belegt).
+ 3. Keine Mess-Anzeige/FrameStats gefordert: ohne GameLoop waere eine
+    Frame-Budget-Pflicht ein "unnoetiger Schritt" (Univ. §0).
+
+
+NICHT GEMACHT (bewusst)
+--------------------------------------------------------------------------
+ - Kein Code geaendert, kein Build ausgefuehrt (nichts zu bauen).
+ - CLAUDE.md nur um Verweis + Stand-Warnung ergaenzt, NICHT neu geschrieben:
+   das verlangt Codelesen und ist ein eigener Schritt (Liste [1] im
+   WEITERMACHEN_PROMPT).
+ - Keine Dokumente verschoben (§28-Einsammeln ist Schritt [3]) — Verschieben
+   ohne Graph haette die Verweise in den .md untereinander gebrochen.
+ - Keine Altlast geloescht (Schritt [4] verlangt vorher den Referenz-Beleg).
+
+
+RUNTIME-VERIFY
+--------------------------------------------------------------------------
+Entfaellt — keine Code-Aenderung. Pruefbar ist nur die Dokumentenlage:
+  G1  ../JAVA_GUIDELINES_UNIVERSAL.md existiert und enthaelt keine
+      TT-/GameLoop2-Klassennamen ausser im Anhang.
+  G2  doc/GUIDELINES.md Steckbrief-Tabelle: jede Zeile besetzt oder
+      ausdruecklich "fehlt noch" mit Verweis auf den Paragraphen.
+  G3  doc/WEITERMACHEN_PROMPT.txt nennt Build- und Run-Befehl korrekt.
+  G4  CLAUDE.md verweist im Kopf auf beide Guidelines-Dateien.
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT] — keine PD noetig)
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja (neu angelegt)
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert: entfaellt (erste
+#   Fassung, nichts zu archivieren)
+# Die Aufgabe "Guidelines-Einfuehrung TransparencyTool" wurde vollstaendig
+#   abgeschlossen: ja
+# Naechster Schritt: [1] CLAUDE.md korrigieren (Befund S9, [B], Sonnet/Opus)
+#   — hoechster Hebel, weil jede weitere Sitzung sonst am falschen
+#   Architekturmodell arbeitet.
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja — die Analyse-Details
+#   werden fuer Schritt [1] nicht gebraucht, der Einstieg steht im
+#   WEITERMACHEN_PROMPT.
+==============================================================================

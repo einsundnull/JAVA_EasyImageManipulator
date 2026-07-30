@@ -1,0 +1,157 @@
+==============================================================================
+Schema_AppSettings.txt  —  Format der globalen Einstellungen
+Stand 2026-07-30 | Regeln: doc/GUIDELINES.md §31, JAVA_GUIDELINES_UNIVERSAL §6/§12
+==============================================================================
+
+DATEI
+--------------------------------------------------------------------------
+Pfad:    %APPDATA%\TransparencyTool\settings\default.txt
+Geliefert von:  AppPaths.getSettingsFile()   <- EINZIGE Quelle des Pfades
+Gelesen/geschrieben von:  AppSettings (Singleton)
+Gelesen:  genau EINMAL beim Start
+Format:   JSON
+
+*** DER NAME LUEGT ABSICHTLICH. ***
+Die Datei heisst .txt und enthaelt JSON. Entscheidung Q4 vom 2026-07-30:
+Name bleibt, damit bestehende Installationen ihre Einstellungen behalten.
+Frueher behauptete das Javadoc von AppSettings, die Datei hiesse
+"settings.json" — eine solche Datei gibt es nicht. Das Javadoc ist
+korrigiert.
+
+*** ENCODING-ALTLAST [C] ***
+Gelesen wird mit FileReader, geschrieben mit FileWriter — beide OHNE
+Encoding-Angabe, also in der Plattform-Kodierung statt UTF-8. Univ. §6
+verlangt UTF-8. Betrifft in der Praxis nur Pfade mit Umlauten in
+recentFiles/recentProjects. Umstellung ist [C], weil bereits geschriebene
+Dateien danach anders gelesen wuerden.
+
+
+PARSER-VERTRAG
+--------------------------------------------------------------------------
+Der Parser ist handgeschrieben und ZEILENBASIERT. Er ist KEIN JSON-Parser.
+Daraus folgen harte Einschraenkungen:
+
+  1. EIN KEY PRO ZEILE.  Form:  "key": wert,
+     Wer die Ausgabe umformatiert (z. B. mehrere Keys in eine Zeile),
+     macht die Datei unlesbar.
+  2. Leerzeilen und Zeilen, die mit // beginnen, werden uebersprungen.
+  3. Ein abschliessendes Komma wird entfernt, ebenso eine schliessende } .
+  4. Strings stehen in doppelten Anfuehrungszeichen; Backslashes in Pfaden
+     werden beim Schreiben verdoppelt (\\).
+  5. Verschachtelte Objekte gibt es NICHT. Nur Skalare und zwei
+     String-Arrays (recentProjects, recentFiles), die einzeilig geschrieben
+     werden.
+
+FEHLENDER KEY = LAUFZEIT-DEFAULT (Univ. §12).
+Eine fehlende Datei muss exakt das alte Startverhalten ergeben. Deshalb
+darf ein Default nie aus der Datei stammen, sondern steht als
+Feldinitialisierung in AppSettings.
+
+
+FELDER
+--------------------------------------------------------------------------
+Gruppe        Key                    Typ      Default
+------------- ---------------------- -------- --------------------------
+Paint-Tool    primaryColor           int RGB  Color.BLACK
+              secondaryColor         int RGB  Color.WHITE
+              strokeWidth            int      3
+              antialias              bool     true
+              fillMode               String   "SOLID"
+              brushShape             String   "ROUND"
+              activeTool             String   "PENCIL"
+              wandTolerance          int      20
+
+Text-Tool     fontName               String   "SansSerif"
+              fontSize               int      24
+              textBold               bool     false
+              textItalic             bool     false
+              fontColor              int RGB  Color.BLACK
+
+Canvas        bg1                    int RGB  (200,200,200)
+              bg2                    int RGB  (160,160,160)
+
+View          showGrid               bool     false
+              showRuler              bool     true
+              rulerUnit              String   "PX"
+              filmstripVisible       bool     true
+              appMode                String   "ALPHA_EDITOR"
+
+Zoom          zoomMin                double   0.05
+              zoomMax                double   16.0
+              zoomStep               double   0.10
+              zoomFactor             double   1.08
+
+Window        windowX / windowY      int      100 / 100
+              windowWidth/Height     int      1200 / 800
+              windowMaximized        bool     false
+
+Maus          mouseWheelSensitivity  int      16
+
+Galerie 2     gallery2Dir0 / ...Dir1 String   ""   (Pfad, je Canvas)
+
+Kartenlisten  cardListBgLeft         int RGB  (38,38,50)
+              cardListBgRight        int RGB  (38,50,38)
+              cardListLeftVisible    bool     false
+              cardListRightVisible   bool     false
+              cardFontFamily         String   "SansSerif"
+              cardFontSize           int      13
+              cardFontColor          int RGB  WHITE
+              cardBgColor            int RGB  (59,59,59)
+              cardPaddingTop/Bottom  int      4 / 4
+              cardPaddingLeft/Right  int      6 / 6
+              cardTtsLanguageLeft    String   "ja"
+              cardTtsLanguageRight   String   "de"
+              cardCurrentFolder      String   "default"
+              cardPanelLeftWidth     int      240
+              cardPanelRightWidth    int      240
+
+Zuletzt       recentProjects         String[] []   (einzeiliges Array)
+              recentFiles            String[] []   (einzeiliges Array)
+
+
+FARBEN SIND HIER RICHTIG (§21-Abgrenzung)
+--------------------------------------------------------------------------
+primaryColor, secondaryColor, fontColor, bg1/bg2, cardListBg*, cardFontColor,
+cardBgColor sind LAUFZEIT-Farben: der User waehlt sie.
+*** Sie sind KEINE Design-Tokens und gehoeren NICHT nach AppColors. ***
+Das ist die ausdrueckliche Ausnahme in GUIDELINES.md §21.
+
+Umgekehrt gilt: eine Farbe, die der User NICHT waehlen kann, gehoert nicht
+hierher, sondern in die Token-Quelle.
+
+
+BEISPIEL (gekuerzt)
+--------------------------------------------------------------------------
+{
+  "primaryColor": -16777216,
+  "strokeWidth": 3,
+  "antialias": true,
+  "activeTool": "PENCIL",
+  "fontName": "SansSerif",
+  "showRuler": true,
+  "rulerUnit": "PX",
+  "appMode": "ALPHA_EDITOR",
+  "zoomMax": 16.0,
+  "windowWidth": 1200,
+  "windowMaximized": false,
+  "cardTtsLanguageLeft": "ja",
+  "recentProjects": ["C:\\Users\\pc\\Bilder", "C:\\Projekt"],
+  "recentFiles": []
+}
+
+
+AENDERN
+--------------------------------------------------------------------------
+Neues Feld hinzufuegen:
+  1. Feld + Default in AppSettings deklarieren
+  2. Getter/Setter
+  3. Lesen in loadFromFile(), Schreiben in save()
+  4. DIESE DATEI ergaenzen
+  5. Umschalter ruft save()
+Alte Dateien laden danach unveraendert (fehlender Key = Default).
+
+Feld entfernen:
+  Unbekannte Keys werden beim Lesen ignoriert -> Entfernen ist
+  rueckwaertskompatibel. Zeile hier als "entfernt <Datum>" vermerken,
+  nicht loeschen.
+==============================================================================

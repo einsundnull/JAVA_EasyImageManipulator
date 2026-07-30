@@ -14,8 +14,35 @@ import java.util.Map;
 
 /**
  * Globale App-Einstellungen (Singleton).
- * Liest/schreibt settings.json im AppData-Verzeichnis.
- * Keine externe JSON-Bibliothek — manuelles Parsing/Serialisierung.
+ *
+ * <p><b>Ablageort:</b> {@code %APPDATA%\TransparencyTool\settings\default.txt}
+ * — geliefert von {@link AppPaths#getSettingsFile()}. Der Pfad wird nie hier
+ * gebildet.
+ *
+ * <p><b>Format:</b> JSON, obwohl die Datei {@code .txt} heißt. Der Name bleibt
+ * bewusst so, damit bestehende Installationen ihre Einstellungen behalten
+ * (Entscheidung Q4, 2026-07-30). Beschreibung des Formats:
+ * {@code doc/Schema_AppSettings.txt}. Zuvor nannte dieses Javadoc die Datei
+ * {@code settings.json} — die gibt es nicht.
+ *
+ * <p>Kein externes JSON-Framework: Parsing und Serialisierung sind von Hand
+ * geschrieben und zeilenbasiert. Der Parser erwartet <b>einen Key pro Zeile</b>
+ * — wer die Ausgabe umformatiert, macht die Datei unlesbar.
+ *
+ * <p><b>Regeln (siehe doc/GUIDELINES.md §31, Univ. §12):</b>
+ * <ul>
+ *   <li>Neuer globaler Schalter → zuerst Feld hier, dann Handler, dann
+ *       {@code save()} im Umschalter.</li>
+ *   <li>Fehlender Key = bisheriger Laufzeit-Default; eine fehlende Datei muss
+ *       exakt das alte Startverhalten ergeben.</li>
+ *   <li>Gelesen wird genau einmal beim Start.</li>
+ * </ul>
+ *
+ * <p><b>Altlast:</b> Gelesen/geschrieben wird mit {@code FileReader}/
+ * {@code FileWriter} ohne Encoding-Angabe, also in der Plattform-Kodierung
+ * statt UTF-8 (Univ. §6 verlangt UTF-8). Betrifft Pfade mit Umlauten in
+ * {@code recentFiles}/{@code recentProjects}. Eine Umstellung ist <b>[C]</b>:
+ * bereits geschriebene Dateien würden anders gelesen werden.
  */
 public class AppSettings {
 

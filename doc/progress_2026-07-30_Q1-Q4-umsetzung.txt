@@ -1,0 +1,144 @@
+==============================================================================
+progress_2026-07-30_Q1-Q4-umsetzung.txt
+Aufgabentyp: [ST] — Umsetzung von vier beantworteten Einzelfragen
+Risiko:      [B] — Q1 nach Pruefung reiner Verschiebe-Schritt, Q4 nur Javadoc,
+                   Q2/Q3 reine Dokumentation
+==============================================================================
+
+PROMPT
+--------------------------------------------------------------------------
+"Q1: Auslagern; Q2: JA; Q3: SHIFT+F1; Q4: Doku korrigieren"
+Rueckfrage zu Q2 gestellt (Prompt_Handling.txt verlangt "welche DB/API"):
+  -> Anbieter "Noch offen / spaeter entscheiden"
+  -> Daten "Karten + Uebersetzungs-Maps"
+
+
+Q1 — AUSLAGERN [B]
+--------------------------------------------------------------------------
+VORHER GEPRUEFT (das hat die Risikoklasse von [C] auf [B] gesenkt):
+  - committed?           ja, Commit 699b606
+  - paint -> spriteanimator/PathAnimator:   0 Referenzen
+  - spriteanimator/PathAnimator -> paint:   0 Referenzen
+  - je eine eigene main()-Methode
+  - resources/ wird von beiden nicht gebraucht
+Damit war es kein Architektur-Eingriff, sondern ein Verschieben.
+
+DURCHGEFUEHRT:
+  ../SpriteAnimator/   src/com/spriteanimator/** (10 Dateien)
+                       + .project .classpath .gitignore bin/
+                       + CLAUDE.md + doc/GUIDELINES.md + doc/Prompt_Handling.txt
+  ../PathAnimator/     src/PathAnimator/PathEditor.java
+                       + doc/Key Map.txt
+                       + .project .classpath .gitignore bin/
+                       + CLAUDE.md + doc/GUIDELINES.md + doc/Prompt_Handling.txt
+  TransparencyTool:    git rm -r --cached src/com src/PathAnimator + rm -rf
+
+VERIFY (alle drei gebaut):
+  SpriteAnimator     javac ... exit 0
+  PathAnimator       javac ... exit 0
+  TransparencyTool   javac ... exit 0, 370 .class   <- NEUE BASISZAHL
+KEINE Zeile Code geaendert.
+
+NEBENBEI ERLEDIGT: das leere Verzeichnis
+src/com/spriteanimator/{model,ui,engine,export,i18n} (fehlgeschlagene
+Brace-Expansion, Befund S10) ist mit entfallen.
+
+*** OFFEN GELASSEN: die neuen Projekte sind KEINE Git-Repos. Die Historie
+    bleibt in TransparencyTool (699b606). Ein `git init` je Projekt waere
+    ein eigener, bewusster Schritt — nicht ungefragt. ***
+
+
+Q2 — DB/API: JA, ANBIETER OFFEN, DATEN = KARTEN + UEBERSETZUNGS-MAPS
+--------------------------------------------------------------------------
+ERWOGEN UND VERWORFEN: eine service-Schicht mit Repository-Interfaces,
+DTOs, Sync-Strategie und asynchronen Signaturen vorbauen.
+VERWORFEN, weil der Anbieter offen ist: Firestore (Dokumente, Offline-Cache
+eingebaut), SQLite (lokal, synchron, Transaktionen) und eine REST-API
+(Latenz, Auth, Fehlerfaelle) fuehren zu DREI VERSCHIEDENEN Schnitten. Ein
+Entwurf jetzt waere mit hoher Wahrscheinlichkeit der falsche und damit ein
+"unnoetiger Schritt" (Univ. §0).
+
+STATTDESSEN GESCHRIEBEN: GUIDELINES.md §33 — anbieter-NEUTRALE Isolation.
+Der einzige Teil, der bei JEDER Anbieterwahl gleich ist:
+  - kein direkter Datei-Zugriff auf Karten-/Listendaten aus der UI
+  - MapManager + CardListStore = die einzigen Klassen, die wissen, WO die
+    Daten liegen (zwei Zugriffspunkte, nicht mehr)
+  - Rueckgaben sind Objekte/Listen, KEINE File-Handles nach aussen
+  - ausdrueckliche NICHT-Liste: Netz-Schicht, Auth, Caching/Offline,
+    Konfliktaufloesung, asynchrone Signaturen
+ABGEGRENZT: Projekte/Szenen bleiben dateibasiert -> der GameII-Format-
+Vertrag (§23) ist NICHT betroffen. Das war die riskanteste denkbare
+Auslegung der Antwort und ist damit ausgeschlossen.
+
+
+Q3 — SHIFT+F1 [B]
+--------------------------------------------------------------------------
+Bestaetigt. F1 wird NICHT freigeraeumt. In §25 von "Vorschlag" auf
+"ENTSCHIEDEN" gehoben, mit Warnung: wer die Abweichung von GameLoop2 §11
+"angleicht", nimmt dem Zweitfenster seine Taste.
+
+
+Q4 — DOKU KORRIGIEREN [B]
+--------------------------------------------------------------------------
+Dateiname settings/default.txt BLEIBT (bestehende Installationen behalten
+ihre Einstellungen). Korrigiert wurde die Doku:
+  - Javadoc von AppSettings: nannte eine settings.json, DIE ES NICHT GIBT.
+    Jetzt: Ablageort, Format (JSON in .txt, mit Begruendung), Parser-
+    Einschraenkung (ein Key pro Zeile), §31-Regeln, Encoding-Altlast.
+  - NEU doc/Schema_AppSettings.txt: vollstaendige Feldtabelle mit
+    Defaults, Parser-Vertrag, Aenderungs-Anleitung, und die Abgrenzung
+    "Laufzeit-Farben gehoeren hierher, NICHT nach AppColors" (§21).
+
+*** BEIM LESEN NEU GEFUNDEN, NICHT BEHOBEN [C]:
+    AppSettings liest mit FileReader und schreibt mit FileWriter — beide
+    OHNE Encoding-Angabe, also Plattform-Kodierung statt UTF-8 (Univ. §6).
+    Praktisch betroffen: Pfade mit UMLAUTEN in recentFiles/recentProjects.
+    Nicht behoben, weil bereits geschriebene Dateien danach anders gelesen
+    wuerden — das ist ein eigener [C]-Schritt, keine Nebenbei-Korrektur.
+    Als Altlast in §31, Schema und WEITERMACHEN_PROMPT gefuehrt. ***
+
+
+GEAENDERTE/NEUE DATEIEN
+--------------------------------------------------------------------------
+NEU   ../SpriteAnimator/   (Projekt: 10 Quelldateien + 3 Projektdateien
+                            + CLAUDE.md + doc/GUIDELINES.md + Prompt_Handling)
+NEU   ../PathAnimator/     (Projekt: 1 Quelldatei + Key Map.txt + 3
+                            Projektdateien + CLAUDE.md + doc/GUIDELINES.md
+                            + Prompt_Handling)
+NEU   doc/Schema_AppSettings.txt
+GEAEND src/paint/AppSettings.java        (NUR Javadoc)
+GEAEND doc/GUIDELINES.md                 (Steckbrief Build/Quellbaum, §25,
+                                          §28, §31, NEU §33)
+GEAEND doc/GUIDELINES_VORSCHLAG_2026-07-30.md  (Q1-Q4 beantwortet + Befund)
+GEAEND doc/WEITERMACHEN_PROMPT.txt       (Build-Zahl, Q-Block, Liste [4],
+                                          Altlasten)
+GELOE  src/com/**, src/PathAnimator/**   (ausgelagert, nicht vernichtet)
+
+
+RUNTIME-VERIFY
+--------------------------------------------------------------------------
+Compile-Verify ist erbracht (3x exit 0). Offen bleibt der GUI-Test:
+  R1  TransparencyTool startet und laedt ein Bild (Auslagerung hat nichts
+      gebrochen — erwartet, da 0 Querreferenzen).
+  R2  Einstellungen ueberleben einen Neustart (AppSettings unveraendert in
+      der Funktion, nur Javadoc angefasst).
+  R3  SpriteAnimator startet eigenstaendig:
+      java -cp bin com.spriteanimator.SpriteAnimator
+  R4  PathAnimator startet eigenstaendig:
+      java -cp bin PathAnimator.PathEditor
+  R5  Beide Projekte in Eclipse importierbar (File > Import > Existing
+      Projects). NUR falls Eclipse genutzt wird — .project/.classpath sind
+      auf JavaSE-17 gesetzt wie das Ursprungsprojekt.
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert: nein (noch kurz)
+# Die Aufgabe "Q1-Q4 umsetzen" wurde vollstaendig abgeschlossen: ja
+# Naechster Schritt: unveraendert [1] CLAUDE.md korrigieren (Befund S9, [B])
+#   — der Architektur-Rumpf ist weiterhin falsch; jetzt zusaetzlich muss dort
+#   die Auslagerung nachgezogen werden.
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

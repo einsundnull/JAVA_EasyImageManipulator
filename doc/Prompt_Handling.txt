@@ -1,0 +1,114 @@
+Prompts need to be distiguished into two categories
+
+- The prompt is within a bigger task that has ben splitt into multiple smaler tasks [BT]
+- The prompt adresses the execution of a smaller Task that does not need any breakdown [ST]
+
+[BT] Bigger Tasks
+Vor jeder Ausführung einer größeren Aufgabe:
+
+Aufgaben bekommen alle eine ID: Task_<DateTime>_<NameDerAufgabe>.txt, im Folgenden als PD.txt bezeichnet.
+-> Aufteilen von größeren Aufgaben in Schritte. Diese Schritte werden mit Schritt [m/n] bezeichnet;
+---> Diese Schritte werden unterteilt in
+[A] größtes ROI
+[B] 100% Sicher
+[C] Größeres Risiko
+
+Unnötige Schritte nicht ausführen. Diese Schritte als unnötig markieren und begründen, 
+warum sie unnötig sind. Unnötige Schritte sind alle Schritte, die keinen Mehrwert
+bringen. Zum Beispiel das Ändern einer bereits gut funktionierenden System-Architektur, die nur gemacht werden sollen,
+um den Guidelines zu entsprechen, aber den Aufwand nicht rechtfertigen und/oder sogar ein hohes Risiko, die Code-Base
+zu zerstören, beinhalten. Frage, falls du es noch nicht weisst, ob das Einbinden einer DB/API und wenn ja, welcher DB/API
+geplant ist, und passe deine Empfehlungen für die Architektur-Guidelines entsprechend an.
+
+----> Du gibst auch immer eine Empfehlung heraus, welches Model welchen Schritt ausführen sollte und ob es 100% sicher
+ist, dieses Model (zum Beispiel neigt HAIKU dazu Aufgaben zu vermasseln) zu verwenden.
+Aufgaben können auch so gegliedert werden, dass wir mit den Haiku Aufgaben beginnen und danach mit Befehl /clear und 
+dem WEITERMACHEN_PROMPT.txt mit einem anderen Model die Aufgabe wieder aufgreifen um Token zu sparen.
+Versuche diese Überlegung in eine Sinnvolle Planung zu integrieren.
+-----> Es wird immer eine Empfehlung mit herausgegeben welcher Schritt als nächster ausgeführt werden soll und warum es 
+sinnvoll ist, diesen Schritt als nächstes auszuführen. Du sagst auch, ob es sich lohnt den "/clear" Befehl zu benutzen
+und über den "WEITERMACHEN_PROMPT.txt" neu einzusteigen,um Token zu sparen, ohne dass Kontext verloren geht.
+------> Es wird nach Abschluss eines jeden Schrittes in der PD.txt angegeben, welcher Schritte erledigt wurden.
+
+
+Vor und nach der Ausführung 
+Die Letzten Zeilen deiner Ausgabe sind immer 
+# PD.txt aktualisiert (ja/nein)
+# progress.txt aktualisiert (ja/nein)
+# WEITERMACHEN_PROMPT.txt aktualisiert (ja/nein)
+#  WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert (ja/nein)
+# Die Aufgabe <ID> wurde vollständig abgeschlossen (ja/nein)
+# Nächster Schritt: [n/m] bzw. nächstes TODO: <Aufgabe>
+# "/clear" Befehl und WEITERMACHEN_PROMPT.txt empfohlen (ja/nein)
+
+Beispiel:
+
+Task_16_05_2025_CSS-Audit.txt 
+{
+
+<Initialer Prompt>
+
+Anzahl der Schritte:
+
+<Beschreibung der Schritte>
+[1/7] Erstellen einer Übersicht aller Tokens in <...>.css usw
+[n/m] <Weitere Beschreibungen>
+
+Fortschritt:
+
+[1/7] offen
+[2/7] abgeschlossen
+[3/7] begonnen
+[4/7] offen
+[5/7] abgeschlossen
+[6/7] abgeschlossen
+[7/7] abgeschlossen
+
+
+}
+
+Wenn der WEITERMACHEN_PROMPT.txt zu sehr mit abgeschlossenen Tasks gefüllt wird, wird der WEITERMACHEN_PROMPT mit einem
+<DATUM> Suffix versehen und archiviert. Es wird eine bereinigte Version erstelle, der nur noch die offenen TODOS und Tasks beinhaltet. 
+
+#############################
+
+In WEITERMACHEN_PROMPT.txt wird immer angegeben, in welcher PD.txt wir uns gerade befinden.
+
+#############################
+
+-------> ES wird nach jedem Schritt [n/m] und nach Abschluss eines jeden Task angegeben, 
+ob und unter welchem Namen die PD.txt und der WEITERMACHEN_PROMPT.txt gespeichert wurden.
+
+Zwischenschritte, werden auch erfasst. Das bedeutet, dass wenn im Prozess nach einem Schritt ein anderes Problem 
+zutage tritt, das vorher nicht sichtbar wird und der Benutzer verlangt, dieses zu bearbeiten, wird dieses als
+Zwischenschritt in den Prozess eigefügt.
+
+BSP. [n/m] -> [n+i/m] -> Problem tritt auf [n+i.j/m] -> Problem gelöst weiter in der eigentlichen Reihenfolte [n+i+1/m]
+
+#############################
+
+Alle Divs / Inputfields / Buttons / und alle wiederkehrenden UI Element bekommen eine Basisklasse.
+base_<type_subtype>.js
+base_<type_subtype>.css
+
+#############################
+Lies die UNIVERSAL_GUIDELINES.md zuerst. 
+Das einhalten der Architektur und der Style-Guidelines ist absolut verpflichtend, solange diese 
+die Funktionalität der App nicht in irgendeiner Weise einschränken. Sollte es nötig sein, von den
+Style oder Architekturguidelines abzuweichen, informierst du mich vor Beginn der Aufgabe darüber
+und begründest, warum eine Abweichung notwendig ist.
+#############################
+
+--------> 
+
+Du informierst mich immer, wenn alle Schritte einer Aufgabe vollständig abgeschlossen sind.
+Du gibst eine Empfehlung heraus, welche Schritte zur Überprüfung und Verbesserung der Codebase
+angefangen werden, ohne überzuoptimieren.
+
+#############################
+
+
+
+
+
+
