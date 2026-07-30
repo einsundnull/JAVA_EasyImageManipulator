@@ -1,0 +1,133 @@
+==============================================================================
+progress_2026-07-30_apptheme.txt
+Aufgabentyp: [ST] — Schritt [5], ADDITIVER Teil von §21
+Risiko:      [A] — eine neue Klasse, 0 Aufrufer, kein bestehender Wert
+                   veraendert. Die Bereinigung [C] ist NICHT Teil davon.
+==============================================================================
+
+PROMPT: "weiter und danach Weitermachen_Prompt.txt aktualisieren"
+
+
+WAS GEMACHT WURDE
+--------------------------------------------------------------------------
+NEU src/paint/AppTheme.java — Typografie, Abstaende, Radien, Linienstaerken,
+Standardgroessen. Build 328 -> 329 .class, exit 0.
+
+*** RUECKWIRKUNGSFREI: die Klasse hatte beim Anlegen NULL Aufrufer. Es
+    wurde kein Literal ersetzt und kein bestehender Wert veraendert. ***
+
+
+DIE ENTSCHEIDUNG: ZWEI KLASSEN, NICHT EINE
+--------------------------------------------------------------------------
+Die Guidelines liessen offen, ob AppColors erweitert oder ein neues Theme
+angelegt wird. Erwogen und verworfen:
+
+V1  AppColors um Fonts/Abstaende erweitern.
+    VERWORFEN: eine Klasse namens "AppColors", die Fonts enthaelt, luegt im
+    Namen. Wer FONT_BASE sucht, sucht dort zuletzt.
+
+V2  AppColors -> Theme umbenennen und alles hineinlegen.
+    VERWORFEN: 591 Verwendungsstellen. Das ist [C] und bringt fachlich
+    nichts — ein reiner Umbenenn-Umbau ist genau der "unnoetige Schritt"
+    aus Univ. §0.
+
+V3 (GEWAEHLT)  Zweite Klasse AppTheme, ueberschneidungsfrei:
+      AppColors = Farben, sonst nichts   (591 Verwendungen, unangetastet)
+      AppTheme  = Fonts, Abstaende, Radien, Strokes, Groessen, keine Farbe
+    Der Name folgt der Projektkonvention: AppColors, AppPaths, AppSettings,
+    AppMode -> AppTheme. Kein neues Namensschema.
+    *** Ausdrueckliche Regel in beiden Klassen und in §21: eine Farbe
+        gehoert NIE in AppTheme, ein Font NIE in AppColors. Sonst entstehen
+        zwei Quellen fuer dasselbe — genau das, was §3 verhindert. ***
+
+
+DIE WERTE SIND ABGEZAEHLT, NICHT ERFUNDEN
+--------------------------------------------------------------------------
+Vor dem Schreiben gemessen (grep ueber src/paint):
+
+FONTS — SansSerif dominiert vollstaendig:
+   27x PLAIN 11      18x PLAIN 12      13x BOLD 11      11x PLAIN 10
+    7x BOLD 10        6x BOLD 12        5x PLAIN 9       5x PLAIN 13
+    3x PLAIN 8        3x ITALIC 11      3x BOLD 15       2x BOLD 8
+-> Skala mit 12 Fonts: FONT_TINY/XS/SM/BASE/MD/LG (plain 8-13),
+   FONT_TINY_BOLD/SM_BOLD/BASE_BOLD/MD_BOLD, FONT_TITLE (bold 15),
+   FONT_BASE_ITALIC. FONT_BASE = PLAIN 11 = der haeufigste Wert.
+
+STROKES:  19x 1f · 9x 1.5f · 7x 2f · 1x 3
+-> STROKE_HAIRLINE / THIN / MEDIUM / THICK
+
+RADIEN (fillRoundRect):  7x 8 · 7x 6 · 2x 10 · je 1x 4, 12, 20
+-> RADIUS_SM 4 / MD 6 / LG 8 / XL 10 / XXL 12 / PILL 20
+
+ABSTAENDE: 3/3/3/3, 4/3/4/3, 10/10/10/10, 6/4/6/4, 5/9/5/9, 4/6/4/6,
+           2/4/2/4, 2/2/2/2 — stark gestreut
+-> PAD_XS 2 / SM 3 / MD 4 / LG 6 / XL 10 + GAP_SM 4 / MD 8 / LG 16
+   plus pad(all) / pad(v,h) / pad(t,l,b,r) als EmptyBorder-Helfer.
+
+GROESSEN: BTN_W/BTN_H = 36. Stand bisher DOPPELT:
+  UIComponentFactory.BUTTON_WIDTH/HEIGHT und
+  SelectiveAlphaEditor.TOPBAR_BTN_W/H.
+
+HELFER alpha(Color,int) — §21 verlangt abgeleitete Alpha-Varianten statt
+  eines zweiten RGB-Tripels. Statt new Color(255,255,255,55) kuenftig
+  AppTheme.alpha(AppColors.TEXT, 55).
+
+
+WAS BEWUSST NICHT AUFGENOMMEN WURDE
+--------------------------------------------------------------------------
+Die DYNAMISCHEN Fonts aus der Messung:
+  new Font(tl.fontName(), ...)      new Font(textFontName, style, scSz)
+  new Font(s.getCardFontFamily(),...)  new Font(cjk, Font.PLAIN, size)
+Das sind BENUTZERGEWAEHLTE Werte (Text-Werkzeug, Kartenschrift). Sie
+gehoeren nach AppSettings (§31), nicht in Tokens.
+*** Ein Token ist eine Design-Entscheidung, keine Benutzereinstellung. ***
+Dasselbe gilt fuer strokeWidth (Pinselbreite) und die Canvas-Schachbrett-
+Farben bg1/bg2.
+
+Ebenfalls NICHT dupliziert: RULER_THICK (SelectiveAlphaEditor),
+DEFAULT_PANEL_W (BaseSidebarPanel), TOOLBAR_H (PaintToolbar). Das sind
+bereits benannte Konstanten an ihrem fachlich richtigen Ort — sie nach
+AppTheme zu kopieren wuerde eine zweite Quelle schaffen.
+
+
+NICHT GEMACHT — UND WARUM
+--------------------------------------------------------------------------
+Die BEREINIGUNG (454 new Color / 162 new Font / 110 new BasicStroke ersetzen)
+ist NICHT Teil dieses Schrittes. Sie ist [C] und laut §21 freigabepflichtig,
+pro Datei mit Sichtpruefung. Ohne Sichtpruefung ist jede Ersetzung ein
+unbelegtes Risiko fuers Aussehen.
+-> steht als Punkt [6] im WEITERMACHEN_PROMPT, mit der Warnung: einen
+   abweichenden Wert (Font 14, Radius 16) NIE auf das naechste Token runden.
+
+
+DOKU NACHGEZOGEN
+--------------------------------------------------------------------------
+doc/GUIDELINES.md  Steckbrief (Token-Quelle = AppColors + AppTheme),
+                   §21 additiver Teil auf ERLEDIGT, Bereinigung mit
+                   Startpunkt UIComponentFactory und der Rundungs-Warnung
+CLAUDE.md          neuer Abschnitt "Farben, Fonts, Masse"
+WEITERMACHEN_PROMPT.txt  BEREINIGT und neu aufgebaut; die alte Fassung
+                   liegt als WEITERMACHEN_PROMPT_2026-07-30_archiv.txt
+doc/README.md      (Abschnitt 6 nennt diese Datei)
+
+
+RUNTIME-VERIFY
+--------------------------------------------------------------------------
+Entfaellt: 0 Aufrufer, das Programm verhaelt sich unveraendert. Der Verify
+faellt erst bei der Bereinigung [6] an — dann aber PRO DATEI und optisch.
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert: JA
+#   -> doc/WEITERMACHEN_PROMPT_2026-07-30_archiv.txt
+# Die Aufgabe "Schritt [5] AppTheme additiv" wurde vollstaendig
+#   abgeschlossen: ja
+# Naechster Schritt: [7] BOOKS_ROOT auf AppPaths ziehen [B] — kleiner
+#   Umfang, behebt einen LATENTEN FEHLER (hartkodierter Pfad bricht bei
+#   umgeleitetem Profil). Danach [8] KeyBindings-Registry [B].
+#   [6] (AppTheme-Bereinigung), [9] und [10] sind [C] und brauchen Freigabe.
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

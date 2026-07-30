@@ -1,226 +1,137 @@
 ==============================================================================
 WEITERMACHEN_PROMPT.txt  —  TransparencyTool
+Stand: 2026-07-30. BEREINIGTE FASSUNG.
+Die ausfuehrliche Vorgaenger-Fassung mit dem vollen Verlauf der Schritte
+[1]-[4] liegt in doc/WEITERMACHEN_PROMPT_2026-07-30_archiv.txt.
+Details je Schritt: die progress_2026-07-30_*.txt.
 ==============================================================================
-Aktive PD.txt: KEINE. Die Guidelines-Einfuehrung lief als [ST] (kleine
-               Aufgabe ohne Schrittaufteilung), dokumentiert in
-               doc/progress_2026-07-30_guidelines-einfuehrung.txt.
+Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
                                         Java-Projekte, §0-§15)
-  2. doc/GUIDELINES.md                 (Projekt-Steckbrief + §20-§32)
-  3. doc/Prompt_Handling.txt           (Task-Workflow [BT]/[ST], PD, Risiko-
-                                        klassen [A]/[B]/[C], Abschluss-Block)
-  4. doc/GUIDELINES_VORSCHLAG_2026-07-30.md  (Belege S1-S12, nur bei Bedarf)
+  2. doc/GUIDELINES.md                 (Projekt-Steckbrief + §20-§33)
+  3. doc/Prompt_Handling.txt           (Task-Workflow [BT]/[ST], PD,
+                                        Risikoklassen, Abschluss-Block)
+  4. doc/README.md                     (Wegweiser durch alle Dokumente)
 
 BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
        -encoding UTF-8 ist PFLICHT (Unicode im Quelltext).
-       ERWARTET: exit 0, 328 .class  (Stand 2026-07-30, nach Auslagerung
-       spriteanimator/PathAnimator/JavaDemos + Altlast-Loeschung.
-       Aeltere Zahlen -- 370, 226, 208 -- sind veraltet.)
+       ERWARTET: exit 0, 329 .class
+       (Aeltere Zahlen -- 370, 328, 226, 208 -- sind veraltet.)
 RUN:   java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor
-QUELLBAUM: nur noch paint (103 .java) + book (3) + module-info.java.
-GRAPH:     graphify-out/ ist committed (Entscheidung 2026-07-30, wie GameLoop2).
-           2479 Knoten / 6369 Kanten / 123 Communities, code-only, 0 Tokens.
+
+STRUKTUR: Projekt-Root = nur CLAUDE.md · src/ = nur Java + Deploy-Skript ·
+          doc/ = alle Dokumente (flach, Wegweiser in README.md)
+          src/paint 104 .java + book 3 + module-info
+GRAPH:    graphify-out/ ist eingecheckt. 2479 Knoten / 6369 Kanten /
+          123 Communities, code-only, 0 LLM-Tokens.
 
 ==============================================================================
-STAND 2026-07-30 — GUIDELINES EINGEFUEHRT
+DAS WICHTIGSTE IN FUENF SAETZEN
 ==============================================================================
-NEU, in zwei Ebenen aufgeteilt (das ist die eigentliche Entscheidung):
-  - ../JAVA_GUIDELINES_UNIVERSAL.md = projektneutrale Regeln, aus den
-    GameLoop2-Guidelines herausgeloest. Gilt fuer JEDES Java-Projekt im
-    Workspace. Enthaelt KEINE Klassennamen, sondern ROLLEN.
-  - doc/GUIDELINES.md = besetzt diese Rollen mit TT-Klassen
-    (Projekt-Steckbrief) und ergaenzt §20-§32.
-  *** WER EINE REGEL AENDERT, MUSS WISSEN, IN WELCHER EBENE SIE STEHT.
-      Eine Aenderung in JAVA_GUIDELINES_UNIVERSAL.md gilt sofort auch fuer
-      GameLoop2 und braucht dort einen WEITERMACHEN-Eintrag. ***
-  Projektspezifische Paragraphen beginnen bei §20, damit §0-§15 in allen
-  Projekten dieselbe Bedeutung behalten.
+1. Die Regeln stehen in ZWEI Ebenen: ../JAVA_GUIDELINES_UNIVERSAL.md (§0-§15,
+   projektneutral) + doc/GUIDELINES.md (Steckbrief + §20-§33, nur hier).
+   Wer eine Regel aendert, muss wissen, in welcher Ebene sie steht — eine
+   Aenderung oben gilt sofort auch fuer GameLoop2, SpriteAnimator,
+   PathAnimator und JavaDemos.
+2. Die God-Klasse ist CanvasPanel (3299 Z.), NICHT das Hauptfenster.
+   SelectiveAlphaEditor hat 566 Zeilen und ist ein Orchestrator — es ist zwar
+   der zentralste Knoten im Graphen (153 Kanten), aber das ist die Signatur
+   eines Orchestrators, nicht die einer God-Klasse.
+3. Die Regeln gelten fuer NEUEN und BERUEHRTEN Code. Bestandsverstoesse sind
+   dokumentierte Altlasten, kein Auftrag (Univ. §0).
+4. Das Szenen-Format ist ein VERTRAG mit GameII (§23) — kein internes Format.
+5. Runtime-Verify ist Sache des Users. "Build gruen" ist kein Verify.
 
-ES WURDE KEIN CODE GEAENDERT. Build unberuehrt.
+==============================================================================
+ERLEDIGT AM 2026-07-30 (Kurzfassung)
+==============================================================================
+[Q1-Q4] Vier Grundsatzfragen beantwortet und umgesetzt: 2 Programme
+        ausgelagert · DB/API-Regel §33 (anbieter-neutral) · Hilfe-Taste
+        SHIFT+F1 · Settings-Doku korrigiert + Schema_AppSettings.txt.
+        -> progress_2026-07-30_Q1-Q4-umsetzung.txt
+[1] CLAUDE.md neu geschrieben — beschrieb eine Architektur, die es nicht mehr
+    gab. Dabei Befund S13 gefunden (siehe [7] unten).
+[2] Graphify-Graph gebaut. 0 Tokens (code-only -> reine AST-Extraktion).
+    -> progress_2026-07-30_graphify-graph.txt
+[3] Doku eingesammelt: 24 Dateien nach doc/, Root nur noch CLAUDE.md.
+    -> progress_2026-07-30_doku-einsammeln.txt
+[4] Altlasten beseitigt: 2540 Zeilen. 4 Dateien geloescht, 5 nach
+    ../JavaDemos/ ausgelagert, Root-paint/ (60 .class) geloescht.
+[5] AppTheme angelegt — additiv, 0 Aufrufer, kein Wert geaendert.
+    -> progress_2026-07-30_apptheme.txt
 
-DREI ABWEICHUNGEN VON GAMELOOP2, NICHT "AUFRAEUMEN":
-  1. §24 ersetzt GameLoop2 §6. Swing puffert selbst -> es gibt hier KEINE
-     DoubleBufferedCanvas-Pflicht. Stattdessen EDT-Regeln + paintComponent-
-     Disziplin. Wer GameLoop2 §6 hier anwendet, baut eine Basisklasse ohne
-     Zweck.
-  2. §25: Hilfe-Taste ist SHIFT+F1, NICHT F1. F1 ist mit
-     toggleSecondaryWindow belegt, F1-F7 sind vollstaendig vergeben.
-  3. §26: KEINE Mess-Anzeige (FrameStats-Aequivalent) gefordert. Es gibt
-     keinen GameLoop -> eine Frame-Budget-Pflicht waere ein "unnoetiger
-     Schritt" (Univ. §0). Nur "gemessen wird vor optimiert" bleibt.
-
-DIE GOD-KLASSE IST NICHT DAS HAUPTFENSTER.
-  SelectiveAlphaEditor ist von ~1900 auf 566 Zeilen geschrumpft und heute
-  Orchestrator (20 Controller-Felder + Delegations-Einzeiler). Das ist der
-  Zielzustand, den GameLoop2 §4 fuer GameWindow erst anstrebt.
-  *** Die God-Klasse ist CanvasPanel mit 3299 Zeilen (§22). Wer die alte
-      CLAUDE.md liest, sucht sie an der falschen Stelle. ***
+VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
+  a) "referenzfrei" != "unbenutzt". Eine Klasse mit main() ist startbar.
+     Vier der acht Loeschkandidaten waren es — sie wurden ausgelagert.
+  b) Der GRAPH taugt fuer "wie haengt es zusammen", NICHT fuer "ist das tot".
+     Externe Typen (JPanel, ArrayList) liegen als VIELE Knoten vor, je einer
+     pro erwaehnender Datei. Der Graph meldete fuer eine tote Klasse 28
+     Referenzen — tatsaechlich null. Loeschungen IMMER per Textsuche belegen.
+  c) doc/ ist FLACH, weil die alten Dokumente sich mit NACKTEM DATEINAMEN
+     zitieren. Ein archive/-Unterordner braeche jeden dieser Verweise.
+     Wer doch umsortieren will: erst die Querverweise umschreiben.
+  d) Doku, die dem Code widerspricht, ist ein Bug. Genau das war Befund S9.
 
 ==============================================================================
 OFFEN — nach Hebel sortiert
 ==============================================================================
-[1] *** ERLEDIGT 2026-07-30: CLAUDE.md NEU GESCHRIEBEN [B] ***
-    Befund S9 ist behoben. Der Architektur-Abschnitt beschreibt jetzt den
-    Ist-Zustand, nachgelesen im Code (nicht geraten):
-      - SelectiveAlphaEditor = 566-Zeilen-ORCHESTRATOR mit 20 Controllern
-        und Delegations-Einzeilern; Fachlogik steht im Controller
-      - CanvasPanel = die God-Klasse (3299 Z.), spricht nur ueber
-        CanvasCallbacks, enthaelt u. a. einen kompletten Text-Editor mit
-        eigenen Undo-Stacks
-      - CanvasInstance = Zustand pro Canvas (canvases[2], ci()/ci(idx))
-      - Layer-Familie unveraenderlich (Image/Text/Path/SpriteLayer),
-        replaceInLists() als Fallstrick
-      - Undo MAX_UNDO=50, pushUndo vor / markDirty nach der Aenderung
-      - zwei Koordinatensysteme + screenToImage/toSx als einzige Uebergaenge
-      - Callbacks/Factory-Muster, Modi-Enums, Persistenz-Tabelle,
-        Threading, AppColors-Luecke, Tastatur (F1-F7 belegt)
-      - Altlasten-Abschnitt mit Verweis auf diese Datei
-    Die alte Stand-Warnung ist entfallen (nicht mehr noetig).
-    *** DIE 4 Bau-/Run-Angaben sind gegengeprueft: MAX_UNDO=50 stimmt,
-        das Deploy-Skript src/paint/JAVA_EasyImageManipulator-Push.sh
-        existiert, Build ergibt 370 .class. ***
 
-    NEUER BEFUND DABEI (S13, in §31 + CLAUDE.md aufgenommen):
-      BookController.BOOKS_ROOT baut den Pfad HARTKODIERT aus
-      user.home + "AppData/Roaming/TransparencyTool/books" zusammen und
-      liest %APPDATA% NICHT -> umgeht AppPaths samt Fallback. Bei
-      umgeleitetem/nicht-englischem Profil zeigt der Pfad ins Leere.
-      *** Das ist keine Kosmetik, sondern ein latenter Fehler. [B] ***
-      CardListStore legt cardfolders/ unter settings/ ab, waehrend sein
-      eigenes Javadoc %APPDATA%/TransparencyTool/cardfolders/ behauptet.
+[6] APPTHEME ANWENDEN: DIE BEREINIGUNG  (§21)  [C], BRAUCHT FREIGABE
+    Der additive Teil ist fertig: AppTheme existiert (12 Fonts, STROKE_*,
+    RADIUS_*, PAD_*/GAP_*, BTN_W/H, alpha(), pad()), hat 0 Aufrufer und
+    aendert keinen bestehenden Wert. Offen ist die Abloesung der Literale:
+    454 new Color · 162 new Font · 110 new BasicStroke.
 
-[2] *** ERLEDIGT 2026-07-30: GRAPHIFY-GRAPH GEBAUT [A/B] ***
-    graphify-out/ liegt vor: graph.json, GRAPH_REPORT.md, graph.html,
-    manifest.json, cache/.
-    ERGEBNIS: 117 Java-Dateien -> 2662 Knoten, 6832 Kanten, 136 Communities.
-    78 % EXTRACTED / 22 % INFERRED / 0 % AMBIGUOUS. KEINE Import-Zyklen.
-    *** LLM-KOSTEN: 0 Tokens. Code-only-Korpus -> reine AST-Extraktion,
-        die semantische Subagenten-Phase entfaellt komplett. ***
+    *** VORGEHEN IST PFLICHT: EINE DATEI PRO SCHRITT, MIT SICHTPRUEFUNG.
+        Nicht in einem Rutsch. Jede Migration ist WERTERHALTEND — Literal
+        raus, Token mit DEMSELBEN Wert rein. ***
+    *** WEICHT EIN WERT AB (Font 14, Radius 16, Stroke 2.5): NICHT auf das
+        naechste Token runden. Entweder neues Token anlegen oder das Literal
+        mit Begruendung stehen lassen. Runden aendert das Aussehen. ***
 
-    SCAN-ROOT IST src/ , NICHT das Projekt-Root. Damit sind bin/, das
-    veraltete paint/, doc/ und resources/ ohne Filterliste ausgeschlossen.
-    Die 11 losen .txt in src/paint/ wurden bewusst aus der Scope entfernt
-    (code-only; sie wandern in Schritt [3] ohnehin nach doc/).
-    *** SCOPE-FALLE: bei gefilterter Scope NIE `graphify update .` — das
-        re-extrahiert alles. Gezielt `graphify <datei>.java --update`. ***
+    SINNVOLLER ANFANG: UIComponentFactory — der StyleGuide-Anker tippt selbst
+    7x new Font, und BUTTON_WIDTH/HEIGHT (36) steht dort UND als
+    TOPBAR_BTN_W/H in SelectiveAlphaEditor doppelt -> AppTheme.BTN_W/BTN_H.
+    Danach nach Dichte: ElementLayerPanel (64 Farben) ·
+    TranslationMapListPanel (18 Fonts) · PageLayoutToolbar (12) ·
+    CanvasPanel (24 Farben) · MapsPanel (20).
 
-    GOD NODES (Kanten): SelectiveAlphaEditor 153 | AppSettings 115 |
-      ArrayList 114 | CanvasCallbacks 93 | CanvasPanel 85 | JPanel 75 |
-      PaintToolbar 66 | PaintEngine 60 | MouseAdapter 57 | BufferedImage 48
-    *** BEMERKENSWERT: SelectiveAlphaEditor ist mit 153 Kanten der
-        zentralste Knoten, obwohl es nur 566 Zeilen hat. Das WIDERSPRICHT
-        §22 NICHT — es ist die Signatur eines Orchestrators: viele
-        Verbindungen, wenig Logik. Wer nur Kantenzahlen liest, haelt es
-        faelschlich fuer die God-Klasse. Die Zeilen-God-Klasse bleibt
-        CanvasPanel (3299 Z., 85 Kanten). ***
-    *** AppSettings auf Platz 2 (115 Kanten) ist der Beleg fuer §33: die
-        Einstellungen werden ueberall direkt gelesen. ***
+    NICHT ANFASSEN: benutzergewaehlte Werte (Primaer-/Sekundaerfarbe,
+    bg1/bg2, Kartenfarben, Text-Werkzeug-Font, strokeWidth). Die gehoeren in
+    AppSettings (§31). Ein Token ist eine Design-Entscheidung, keine
+    Benutzereinstellung.
 
-    *** WICHTIGE EINSCHRAENKUNG DES GRAPHEN (gilt fuer JEDE spaetere
-        Auswertung, jetzt auch in Univ. §1 dokumentiert):
-        Externe Typen (JPanel, ArrayList, Callbacks) existieren als VIELE
-        Knoten — je einer pro Datei, die sie erwaehnt, mit genau dieser
-        source_file. Wer Kanten auf DATEIEBENE aufrollt, liest daraus
-        "Datei A referenziert Datei B", obwohl beide nur dieselbe
-        Oberklasse benutzen.
-        KONKRET PASSIERT: der Graph meldete fuer BookListPanelLegacy
-        28 referenzierende Dateien. Tatsaechlich: NULL.
-        -> Loeschentscheidungen NIE allein aus dem Graphen. Immer mit
-           Textsuche gegenpruefen. ***
-    Hinweis zum Format: die Kantenliste in graph.json heisst "links",
-    nicht "edges" (node-link-Format).
+[7] BOOKS_ROOT + CARDFOLDERS auf AppPaths ziehen  (§31, Befund S13)  [B]
+    *** BookController.BOOKS_ROOT ist HARTKODIERT:
+        user.home + "AppData/Roaming/TransparencyTool/books".
+        Es liest %APPDATA% NICHT und umgeht den AppPaths-Fallback. Bei
+        umgeleitetem oder nicht-englischem Windows-Profil zeigt der Pfad ins
+        Leere. LATENTER FEHLER, nicht Kosmetik. ***
+    CardListStore legt cardfolders/ unter settings/ ab, sein Javadoc
+    behauptet %APPDATA%/TransparencyTool/cardfolders/.
+    ACHTUNG: die PFADBILDUNG verlagern ist [B]. Den ABLAGEORT aendern ist es
+    nicht — dort liegen Buecher der User. Beides trennen.
 
-[3] *** ERLEDIGT 2026-07-30: DOKU EINGESAMMELT [B] ***
-    13 .md aus dem Projekt-Root + 11 .txt aus src/paint/ liegen jetzt in
-    doc/. Im Root steht nur noch CLAUDE.md (Einstiegspunkt, gehoert dorthin).
-    src/ enthaelt nur noch Java-Code + das Deploy-Skript.
-    Umbenannt: "Schema ButtonLeiste Top with Books.txt" ->
-    Schema_ButtonLeiste_Top_with_Books.txt (Konvention Univ. §9).
-
-    *** doc/ IST FLACH GEBLIEBEN — ABSICHT, NICHT NACHLAESSIGKEIT:
-        Die aelteren Dokumente verweisen mit NACKTEM DATEINAMEN aufeinander
-        ("siehe F6_FEATURE.md", "See SECONDARY_WINDOW_EXTENDED_TEST.md").
-        Ein archive/-Unterordner haette jeden dieser Verweise gebrochen.
-        Die Sortierung leistet stattdessen NEU doc/README.md — Wegweiser
-        in 7 Abschnitten: verbindlich / Vertraege / Analyse / Feature /
-        Tastatur / progress / historisch.
-        WER SPAETER AUFRAEUMEN WILL: erst die Querverweise umschreiben. ***
-
-    *** NICHT VERSCHOBEN, BEWUSST:
-        src/paint/JAVA_EasyImageManipulator-Push.sh bleibt liegen. Es ist
-        kein Dokument, sondern das Deploy-Skript — und offenbar der
-        Ausloeser der regelmaessigen "WhiteBoard Update"-Commits. Wird es
-        von aussen per Pfad aufgerufen, braeche ein Verschieben die
-        Automatik LAUTLOS. Nur zusammen mit dem Aufrufer verlegen. ***
-
-    ACHTUNG BEIM LESEN DER EINGESAMMELTEN DOKUMENTE: Abschnitt 7 der
-    README (IMPLEMENTATION_SUMMARY, SECONDARY_WINDOW_*TEST, die datierten
-    Arbeitsnotizen) beschreibt Zustaende von APRIL 2026. Das sind
-    Verlaufsdokumente, KEINE Architekturbeschreibung. Bei Widerspruch
-    gewinnt der Code, danach CLAUDE.md.
-    "Shortcut Table.txt" ist weiterhin veraltet (§25).
-
-[4] *** ERLEDIGT 2026-07-30: ALTLASTEN BESEITIGT [B] ***
-    Build gruen: 370 -> 328 .class. src/paint: 117 -> 103 Java-Dateien.
-
-    GELOESCHT (4 Dateien, 892 Z., referenzfrei per Textsuche belegt):
-      AutoGrowingPillFieldDemo2, BookListPanelLegacy,
-      BookPagesPanelLegacy, PageLayoutToolbarLegacy
-    GELOESCHT: Root-Ordner paint/ (60 veraltete .class-Dateien, WAREN in Git)
-    AUSGELAGERT nach ../JavaDemos/ (5 Dateien, 1648 Z.):
-      Demo, DemoWorksheetEditor, DemoWorksheetEditor2,
-      AutoGrowingPillFieldDemo + SmartLabel
-
-    *** WARUM NICHT ALLE 8 GELOESCHT WURDEN — WICHTIG:
-        4 der 8 Kandidaten haben eine main()-Methode. "Referenzfrei" heisst
-        bei einer Klasse mit main NICHT "unbenutzt" — sie ist eigenstaendig
-        startbar. Die alte Liste hat das nicht unterschieden.
-        Entscheidung des Users: auslagern statt loeschen. ***
-
-    *** SMARTLABEL WAR DER UEBERRASCHUNGSFUND:
-        sah wie Produktivcode aus, wurde aber von NICHTS benutzt ausser
-        Demo.java -> gehoerte zum Demo und ist mitgezogen. Haette man nur
-        die 4 Demos verschoben, waere SmartLabel als Dublette noetig
-        geworden (Univ. §3/§6-Verstoss). ***
-
-    GRAPH AUFGEFRISCHT: 2662 -> 2479 Knoten, 6832 -> 6369 Kanten,
-    136 -> 123 Communities. Weiterhin KEINE Import-Zyklen.
-    Der Stand VOR der Loeschung liegt in
-    graphify-out/2026-07-30_vor-altlast-loeschung/ (graph.json +
-    GRAPH_REPORT.md) — noetig, weil to_json ein Schrumpfen sonst
-    verweigert (Schutz #479).
-
-[5] AppColors -> Tokens erweitern (§21), [A] additiv, dann [C] Bereinigung
-    Anlass: 454 new Color, 162 new Font, 110 new BasicStroke — Ursache ist
-    eine LUECKE, nicht Disziplinlosigkeit: AppColors kennt nur Farben.
-    Zuerst ADDITIV FONT_*, PAD_*, GAP_*, RADIUS_*, STROKE_*, BTN_W/BTN_H
-    anlegen (nichts Bestehendes aendert seinen Wert). Bereinigung danach
-    PRO DATEI mit Sichtpruefung, Reihenfolge nach Dichte:
-    ElementLayerPanel (64) > CanvasPanel (24) > MapsPanel (20) >
-    TranslationMapListPanel (18 Fonts) > PageLayoutToolbar (12 Fonts).
-    *** Zwei Token mit gleichem RGB sind nicht automatisch dasselbe Token.
-        Vor dem Zusammenlegen die BEDEUTUNG pruefen. ***
-    *** Laufzeit-Farben (Primaer/Sekundaer, bg1/bg2, Kartenfarben) sind
-        KEINE Tokens — die gehoeren in AppSettings (§31). ***
-
-[6] KeyBindings-Registry + Hilfe-Dialog (§25), [B]
+[8] KEYBINDINGS-REGISTRY + HILFE-DIALOG  (§25)  [B]
     Mockup doc/Schema_KeyBindings_Dialog.txt ZUERST -> Freigabe.
-    Quelle fuer die Inhalte: KeyboardShortcutManager.java (Code),
-    F1_F6_COMPLETE_REFERENCE.md, QUICK_REFERENCE_F1_F5.md.
-    *** src/paint/Shortcut Table.txt ist handgepflegt und SCHON VERALTET —
-        es fehlen F1-F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S,
-        CTRL+SHIFT+S, SHIFT+ALT+A. Nicht als Quelle vertrauen, danach
-        aus der Registry erzeugen oder loeschen. ***
-    Hilfe-Taste = SHIFT+F1 (siehe Abweichung 2 oben).
+    Quellen: KeyboardShortcutManager.java (= die WAHRHEIT),
+    doc/F1_F6_COMPLETE_REFERENCE.md, doc/QUICK_REFERENCE_F1_F5.md.
+    *** doc/Shortcut Table.txt ist handgepflegt und VERALTET — es fehlen
+        F1-F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S, CTRL+SHIFT+S,
+        SHIFT+ALT+A. Nicht als Quelle vertrauen. Danach aus der Registry
+        erzeugen oder loeschen. ***
+    Hilfe-Taste = SHIFT+F1 (F1-F7 sind belegt, F1 = Zweitfenster).
+    Maus-Gesten werden wie Tasten registriert, in der Trefferreihenfolge des
+    Codes (§22).
 
-[7] BaseDialog + ConfirmDialog (§20), [C], NUR MIT FREIGABE
-    Befund S1/S2: 12 Klassen erben direkt von JFrame/JDialog/JWindow;
-    JOptionPane in 16 Dateien (~100 Aufrufe).
+[9] BASEDIALOG + CONFIRMDIALOG  (§20)  [C], NUR MIT FREIGABE
+    12 Klassen erben direkt von JFrame/JDialog/JWindow, JOptionPane in
+    16 Dateien (~100 Aufrufe).
     REIHENFOLGE IST PFLICHT (Univ. §2):
-      a) doc/Audit Redundanz Dialoge <Datum>.txt  ueber alle 12 Fenster
-         (Vorarbeit liegt schon vor: Dialog-Vergleich.md)
+      a) doc/Audit Redundanz Dialoge <Datum>.txt ueber alle 12 Fenster
+         (Vorarbeit liegt vor: doc/Dialog-Vergleich.md)
       b) doc/Schema_BaseDialog.txt als Mockup -> Freigabe
       c) Extraktion, dann Migration EINE DATEI PRO SCHRITT
     *** UIComponentFactory.createBaseDialog ist eine FACTORY, keine
@@ -230,86 +141,63 @@ OFFEN — nach Hebel sortiert
     ConfirmDialog/MessageDialog gehoeren in DENSELBEN Schritt, sonst bleibt
     JOptionPane mangels Alternative stehen.
 
-[8] CanvasPanel entflechten (§22), [C], NUR MIT FREIGABE
-    3299 Zeilen: Maus-Input + Hit-Test + paintComponent + Overlays +
-    8 Skalierhandles + Float + Pfad-Bearbeitung.
-    NUR opportunistisch bei Beruehrung, jede Extraktion mit Verhaltens-
-    Audit. Landkarte aus dem Graphen (Schritt 2) ZUERST.
-    Erwartbare Ziele: HitTester, CanvasOverlayRenderer, HandleController,
-    PathEditController. KEINE Big-Bang-Zerlegung.
+[10] CANVASPANEL ENTFLECHTEN  (§22)  [C], NUR MIT FREIGABE
+     3299 Zeilen: Maus-Input + Hit-Test + paintComponent + Overlays +
+     8 Skalierhandles + Float + Pfad-Bearbeitung + ein KOMPLETTER
+     Text-Editor (eigener Caret, eigene Text-Undo-Stacks).
+     NUR opportunistisch bei Beruehrung, jede Extraktion mit
+     Verhaltens-Audit. Landkarte aus dem Graphen ZUERST.
+     Erwartbare Ziele: HitTester · CanvasOverlayRenderer · HandleController ·
+     PathEditController · TextEditController.
+     KEINE Big-Bang-Zerlegung.
 
 ==============================================================================
-Q1-Q4 SIND BEANTWORTET UND UMGESETZT (2026-07-30) — KEINE OFFENEN FRAGEN
+DOKUMENTIERTE ALTLASTEN (gefuehrt, kein Auftrag — Univ. §0)
 ==============================================================================
-Q1 -> AUSGELAGERT. src/com/spriteanimator/** und src/PathAnimator/** sind
-   jetzt die eigenstaendigen Projekte ../SpriteAnimator/ und
-   ../PathAnimator/ (je mit .project/.classpath/CLAUDE.md/doc/GUIDELINES.md).
-   Vorher geprueft: NULL Querreferenzen zu paint in BEIDE Richtungen ->
-   reiner Verschiebe-Schritt [B], nicht [C]. Beide bauen eigenstaendig
-   (exit 0), TransparencyTool baut weiter gruen (370 .class).
-   KEINE Zeile Code geaendert.
-   Das leere Verzeichnis {model,ui,engine,export,i18n} ist dabei entfallen
-   -> Punkt [4] der Liste ist damit teilweise erledigt.
-   *** Die Historie beider Programme bleibt im Git-Repo von
-       TransparencyTool (Commit 699b606). Die neuen Projekte sind noch
-       KEINE Git-Repos — falls gewuenscht, ist das ein eigener Schritt. ***
-
-Q2 -> JA, ABER ANBIETER OFFEN. Daten stehen fest: KARTEN +
-   UEBERSETZUNGS-MAPS (maps/*.json, CardListStore). Projekte/Szenen sind
-   NICHT betroffen -> der GameII-Vertrag (§23) bleibt unberuehrt.
-   NEUE REGEL: GUIDELINES.md §33 — anbieter-NEUTRALE Isolation statt
-   Architektur auf Verdacht:
-     - kein direkter Datei-Zugriff auf Karten-/Listendaten aus der UI
-     - MapManager und CardListStore sind die EINZIGEN Klassen, die wissen,
-       wo diese Daten liegen
-     - Rueckgaben sind Objekte/Listen, KEINE File-Handles nach aussen
-       (ein getMapFile(...) an die UI macht eine Remote-Quelle unmoeglich)
-   *** NICHT BAUEN, bis der Anbieter feststeht: Netz-Schicht, Auth,
-       Caching/Offline, Konfliktaufloesung, asynchrone Signaturen.
-       "lokal-first mit Sync" vs. "remote-first mit Cache" ist eine
-       Produktentscheidung, keine Aufraeumarbeit. ***
-   Wenn der Anbieter feststeht -> Univ. §15: service-Schicht zwischen core
-   und io, und §33 wird durch konkrete Regeln ersetzt.
-
-Q3 -> SHIFT+F1 fuer den Hilfe-Dialog. F1 wird NICHT freigeraeumt, die
-   Zweitfenster-Belegung bleibt. Steht in §25.
-
-Q4 -> DOKU KORRIGIERT, DATEINAME BLEIBT. settings/default.txt enthaelt
-   weiterhin JSON; bestehende Installationen behalten ihre Einstellungen.
-   ERLEDIGT: Javadoc von AppSettings korrigiert (nannte eine nicht
-   existierende settings.json) + NEU doc/Schema_AppSettings.txt.
-
-   *** DABEI NEU GEFUNDEN, NICHT BEHOBEN: AppSettings liest/schreibt mit
-       FileReader/FileWriter OHNE Encoding -> Plattform-Kodierung statt
-       UTF-8 (Univ. §6). Betrifft Pfade mit UMLAUTEN in recentFiles/
-       recentProjects. Umstellung ist [C]: bereits geschriebene Dateien
-       wuerden danach anders gelesen. Als Altlast gefuehrt. ***
+  - AppSettings liest/schreibt OHNE Encoding (FileReader/FileWriter) ->
+    Plattform-Kodierung statt UTF-8. Betrifft Umlaute in recentFiles/
+    recentProjects. [C]: bereits geschriebene Dateien wuerden anders gelesen.
+  - ImageIO.write in 9 Dateien -> Bild-Persistenz liegt nicht in der
+    io-Schicht (Befund S5).
+  - 5 handgeschriebene JSON-Serializer ohne gemeinsamen Writer (AppSettings,
+    ProjectManager, MapManager, CardListStore, book.JsonStorage). Ein NEUER
+    Typ bekommt keinen sechsten (§31).
+  - TextWriter schreibt jede Datei zweimal (Original + src/->bin/-Kopie per
+    Pfad-replace). Haengt an der Eclipse-Ordnerstruktur.
+  - toggleVis ruft pushUndo() PRO ELEMENT statt pro Aktion -> n Undo-Schritte
+    statt einem (§29).
+  - GameSceneWriter schreibt PathLayer nicht; #Paths: wird referenziert, aber
+    nicht gelesen — im Vertrag §23 als Luecke dokumentiert.
+  - Karten-/Listendaten: bis §33 umgesetzt ist, greifen Panels teilweise noch
+    direkt auf Dateien zu. NEUE Direktzugriffe sind verboten.
+  - bin/ ist in Git (Build-Ausgabe wird mitversioniert). Vorgefunden, nicht
+    bewertet.
+  - src/paint/JAVA_EasyImageManipulator-Push.sh liegt im Quellbaum. Kein
+    Dokument, sondern das Deploy-Skript und offenbar der Ausloeser der
+    automatischen "WhiteBoard Update"-Commits. NICHT verschieben, ohne den
+    Aufrufer zu kennen — sonst bricht die Automatik lautlos.
 
 ==============================================================================
-DOKUMENTIERTE ALTLASTEN (kein Auftrag, nur gefuehrt — Univ. §0)
+OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
 ==============================================================================
-  - TextWriter schreibt JEDE Datei zweimal (Original + src/->bin/-Kopie
-    per Pfad-replace). Persistenz haengt an der Eclipse-Ordnerstruktur.
-    Befund S11, [C] wegen Verhaltensrisiko.
-  - ImageIO.write in 9 Dateien (SaveController 6x, GalleryCallbacksFactory
-    3x, ScenesController, NewFileController, ElementController,
-    SceneImageAdapter, TileGalleryPanel, BookController, SceneSerializer)
-    -> Bild-Persistenz liegt nicht in der io-Schicht. Befund S5.
-  - 5 handgeschriebene JSON-Serializer ohne gemeinsamen Writer
-    (AppSettings, ProjectManager, MapManager, CardListStore,
-    book.JsonStorage). Bestand, nicht Vorbild (§31).
-  - toggleVis ruft pushUndo() PRO ELEMENT statt pro Aktion -> eine
-    Mehrfach-Selektion ergibt n Undo-Schritte statt einem (§29).
-  - GameSceneWriter schreibt PathLayer nicht (#Paths: wird referenziert,
-    aber nicht gelesen) — im Vertrag §23 als Luecke dokumentiert.
-  - AppSettings liest/schreibt OHNE Encoding-Angabe (FileReader/FileWriter)
-    -> Plattform-Kodierung statt UTF-8, Univ. §6. Betrifft Pfade mit
-    Umlauten in recentFiles/recentProjects. [C] — bereits geschriebene
-    Dateien wuerden nach einer Umstellung anders gelesen. Gefunden
-    2026-07-30 beim Umsetzen von Q4.
-  - Karten-/Listendaten: bis §33 umgesetzt ist, greifen Panels teilweise
-    noch direkt auf Dateien zu. Neue Direktzugriffe sind ab jetzt
-    verboten, bestehende sind Altlast.
-  - (erledigt 2026-07-30) AppSettings-Formatbeschreibung -> jetzt
-    doc/Schema_AppSettings.txt.
+  R1  TransparencyTool startet, laedt ein Bild, Speichern funktioniert
+  R2  Einstellungen ueberleben einen Neustart
+  R3  java -cp bin com.spriteanimator.SpriteAnimator      (../SpriteAnimator)
+  R4  java -cp bin PathAnimator.PathEditor                (../PathAnimator)
+  R5  java -cp bin paint.DemoWorksheetEditor2             (../JavaDemos)
+  R6  Alle vier Projekte in Eclipse importierbar (File > Import > Existing)
+  Nichts davon ist durch den Compile-Verify abgedeckt.
+
+==============================================================================
+NACHBARPROJEKTE (dieselbe universelle Regelbasis, eigener Steckbrief)
+==============================================================================
+  ../SpriteAnimator/  10 Klassen. Package-Struktur ui/engine/model/export ist
+                      die REFERENZ-Umsetzung von Univ. §4.
+  ../PathAnimator/    1 Datei, 1819 Z. *** Speichert NICHTS — jede Pfad- und
+                      Animationsarbeit ist beim Schliessen verloren. [A] ***
+  ../JavaDemos/       5 Wegwerf-Prototypen. Die Guidelines dort sagen vor
+                      allem, welche universellen Regeln NICHT gelten.
+  ../GameLoop2/       Ursprung der Regeln (AWT). Aenderungen an
+                      JAVA_GUIDELINES_UNIVERSAL.md brauchen dort einen
+                      Eintrag.
 ==============================================================================

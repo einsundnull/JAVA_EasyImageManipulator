@@ -31,7 +31,7 @@
 | Run | `java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor` |
 | Build | `javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java` — **`-encoding UTF-8` ist Pflicht** (Unicode-Symbole im Quelltext). Erwartet: **exit 0, 328 `.class`** (Stand 2026-07-30, nach Auslagerung + Altlast-Löschung §28) |
 | Quellbaum | **nur** `paint` (103) + `book` (3) + `module-info.java`. Seit 2026-07-30 eigene Projekte: `../SpriteAnimator/`, `../PathAnimator/`, `../JavaDemos/` |
-| Token-Quelle (Univ. §3) | **`AppColors`** (Farben vorhanden; Fonts/Metrik fehlen → §21) |
+| Token-Quelle (Univ. §3) | **`AppColors`** (Farben) **+ `AppTheme`** (Fonts, Abstände, Radien, Strokes, Größen) — zwei Klassen, überschneidungsfrei → §21 |
 | Fenster-Basisklasse (Univ. §2) | **fehlt noch** → §20. Bis dahin `UIComponentFactory.createBaseDialog(...)` als Minimum |
 | Zeichenflächen-Basisklasse | **keine** (Swing puffert selbst) → Regeln in §24 |
 | Panel-Basisklassen | **`BaseSidebarPanel`** (6 Unterklassen) · **`CardListPanel`** (2) |
@@ -88,17 +88,29 @@ kennt nur Farben (Befund S3).
 - **Ab jetzt [B]:** In berührtem Code **kein** `new Color(...)` /
   `new Font(...)` / `new BasicStroke(...)`. Fehlt ein Token, wird es
   **angelegt** — nicht das Literal getippt.
-- **Erweiterung [A], additiv:** `AppColors` (oder ein neues `Theme`, das
-  `AppColors` referenziert) bekommt
-  `FONT_*` (**abgezählte** Menge, kein `new Font` mehr in der UI) ·
-  `PAD_*` / `GAP_*` (Abstände) · `RADIUS_*` (`fillRoundRect`-Radien) ·
-  `STROKE_*` (Linienstärken) · `BTN_W`/`BTN_H` (36/36, heute in
-  `SelectiveAlphaEditor` **und** `UIComponentFactory` doppelt).
-  Additiv heißt: nichts Bestehendes ändert seinen Wert.
-- **Bereinigung [C], inkrementell pro Datei mit Sichtprüfung.**
-  Reihenfolge nach Dichte: `ElementLayerPanel` (64 Farben) ·
+- **Erledigt 2026-07-30 [A], additiv: `AppTheme` existiert.** Zwei Klassen,
+  **überschneidungsfrei** — `AppColors` = Farben, sonst nichts; `AppTheme` =
+  `FONT_*` (12 abgezählte Fonts) · `STROKE_*` · `RADIUS_*` · `PAD_*`/`GAP_*` ·
+  `BTN_W`/`BTN_H` · `alpha(Color,int)` · `pad(...)`. **Eine Farbe gehört nie
+  in `AppTheme`, ein Font nie in `AppColors`.**
+  Der Name folgt der Projektkonvention (`AppColors`/`AppPaths`/`AppSettings`).
+  **Die Werte sind abgezählt, nicht erfunden:** die Font-Skala deckt die
+  gemessene Verteilung ab (PLAIN 11 = 27×, PLAIN 12 = 18×, BOLD 11 = 13×,
+  PLAIN 10 = 11× …), die Strichstärken 1/1.5/2/3 px ebenso (19×/9×/7×/1×).
+  **Kein bestehender Wert wurde geändert; die Klasse hatte beim Anlegen null
+  Aufrufer.**
+- **Bereinigung [C] — noch offen, braucht Freigabe.** Inkrementell **pro
+  Datei mit Sichtprüfung**, nie in einem Rutsch.
+  **Sinnvoller Anfang: `UIComponentFactory`** — es ist der StyleGuide-Anker
+  und tippt selbst 7× `new Font`; dort steht auch `BUTTON_WIDTH/HEIGHT` (36),
+  das `SelectiveAlphaEditor` als `TOPBAR_BTN_W/H` ein zweites Mal führt.
+  Danach nach Dichte: `ElementLayerPanel` (64 Farben) ·
   `TranslationMapListPanel` (18 Fonts) · `PageLayoutToolbar` (12) ·
   `CanvasPanel` (24 Farben) · `MapsPanel` (20).
+  **Jede Migration ist werterhaltend** — sie ersetzt ein Literal durch das
+  Token mit demselben Wert. Weicht ein Fundstellen-Wert ab (z. B. `Font` 14,
+  Radius 16), wird er **nicht** auf das nächste Token gerundet: entweder neues
+  Token oder Literal mit Begründung stehen lassen.
 - **Alpha-Varianten werden abgeleitet**, nie als zweites RGB-Tripel getippt.
   Für `new Color(255,255,255,55)`-Muster gehört ein `alpha(Color,int)`-Helfer
   in die Token-Quelle.

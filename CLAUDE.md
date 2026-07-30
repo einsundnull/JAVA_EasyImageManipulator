@@ -260,10 +260,17 @@ für „nach dem aktuellen Event", **nicht** für Nebenläufigkeit. Zeitgesteuer
 
 ### Farben
 
-`AppColors` ist die Token-Quelle (591 Verwendungen). Sie kennt aber **nur
-Farben, keine Fonts/Abstände/Radien** — daher stehen im Bestand 454
-`new Color(`, 162 `new Font(`, 110 `new BasicStroke(`. In berührtem Code gilt:
-**kein neues Literal, fehlendes Token anlegen** (§21).
+### Farben, Fonts, Maße
+
+Zwei Klassen, **überschneidungsfrei**: `AppColors` = Farben (591 Verwendungen),
+`AppTheme` = Fonts, Abstände, Radien, Stroke-Breiten, Standardgrößen, plus
+`alpha(Color,int)` und `pad(...)`. Eine Farbe gehört nie in `AppTheme`, ein
+Font nie in `AppColors`.
+
+Im Bestand stehen noch 454 `new Color(`, 162 `new Font(`, 110
+`new BasicStroke(` — `AppTheme` ist erst seit 2026-07-30 da und **noch nirgends
+benutzt**. In berührtem Code gilt ab jetzt: **kein neues Literal, fehlendes
+Token anlegen** (§21).
 Ausnahme: Farben, die der **User** wählt (Primär-/Sekundärfarbe,
 Canvas-Schachbrett, Kartenfarben) sind keine Tokens — sie gehören in
 `AppSettings`.

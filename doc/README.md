@@ -62,6 +62,8 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`progress_2026-07-30_Q1-Q4-umsetzung.txt`](progress_2026-07-30_Q1-Q4-umsetzung.txt) | Auslagerungen, DB/API-Regel §33, Settings-Doku · **Nachtrag:** `CLAUDE.md` neu geschrieben |
 | [`progress_2026-07-30_graphify-graph.txt`](progress_2026-07-30_graphify-graph.txt) | KnowledgeMap gebaut · **Nachtrag:** Altlasten beseitigt |
 | [`progress_2026-07-30_doku-einsammeln.txt`](progress_2026-07-30_doku-einsammeln.txt) | Diese Aufräumaktion |
+| [`progress_2026-07-30_apptheme.txt`](progress_2026-07-30_apptheme.txt) | `AppTheme` angelegt (Tokens für Fonts/Maße) |
+| [`WEITERMACHEN_PROMPT_2026-07-30_archiv.txt`](WEITERMACHEN_PROMPT_2026-07-30_archiv.txt) | Vorgänger-Fassung mit dem vollen Verlauf der Schritte [1]–[4] |
 
 ## 7. Historisch — abgeschlossene Arbeiten (nicht als Ist-Stand lesen)
 
