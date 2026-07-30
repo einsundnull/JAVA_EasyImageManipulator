@@ -15,7 +15,8 @@ Vor jeder Aufgabe in dieser Reihenfolge:
 4. **`doc/WEITERMACHEN_PROMPT.txt`** — aktueller Stand und offene Schritte.
    Einstiegspunkt nach `/clear`.
 
-Belege und Ist-Analyse: `doc/GUIDELINES_VORSCHLAG_2026-07-30.md` (Befunde S1–S12).
+Wegweiser durch alle Dokumente: **`doc/README.md`**.
+Belege und Ist-Analyse: `doc/GUIDELINES_VORSCHLAG_2026-07-30.md` (Befunde S1–S13).
 
 **Leitprinzip:** Die Regeln gelten für **neuen und berührten** Code. Ein reines
 Refactoring laufender Logik zur Regelkonformität ist ausdrücklich unerwünscht.
@@ -238,7 +239,7 @@ kein `%APPDATA%`-Lesen und kein Pfad-Zusammenbau woanders.
 > **Das Szenenformat ist ein Vertrag mit GameII** (§23), kein internes Format.
 > `#Sektion:` / `-key: value`, UTF-8, Szene = Verzeichnis, erster
 > `#Images:`-Eintrag ist der Hintergrund. Spezifikation:
-> `SCENE_FORMAT_READ_WRITE.md`. Wer es ändert, ändert zuerst das Dokument.
+> `doc/SCENE_FORMAT_READ_WRITE.md`. Wer es ändert, ändert zuerst das Dokument.
 > `GameSceneWriter` übernimmt **unbekannte Abschnitte unverändert**
 > (`SpriteLayer.rawLines()`) und aktualisiert nur `#INIT_POSITION`/`#SIZE` —
 > ein Writer, der fremde Abschnitte wegwirft, zerstört Animationen und Links.
@@ -278,7 +279,7 @@ F3 Snapshot, F4 Vollbild, F5 Always-on-top, F6 auf Canvas anwenden,
 F7 Canvas-Anzeigemodus). Eine Hilfe-Taste wäre deshalb **SHIFT+F1** (§25).
 
 > Es gibt **keine** Shortcut-Registry und keinen Hilfe-Dialog.
-> `src/paint/Shortcut Table.txt` ist handgepflegt und **veraltet** (es fehlen
+> `doc/Shortcut Table.txt` ist handgepflegt und **veraltet** (es fehlen
 > F1–F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S, CTRL+SHIFT+S, SHIFT+ALT+A) —
 > nicht als Quelle vertrauen. §25 beschreibt die Ablösung.
 

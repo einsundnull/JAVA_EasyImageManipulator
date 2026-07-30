@@ -17,7 +17,8 @@
 > **Lesereihenfolge:** `../JAVA_GUIDELINES_UNIVERSAL.md` → diese Datei →
 > `doc/Prompt_Handling.txt` → `doc/WEITERMACHEN_PROMPT.txt` → aktive `Task_*.txt`.
 > Analyse und Belege zu jeder Regel:
-> `doc/GUIDELINES_VORSCHLAG_2026-07-30.md` (Befunde S1–S12).
+> `doc/GUIDELINES_VORSCHLAG_2026-07-30.md` (Befunde S1–S13).
+> Wegweiser durch alle Dokumente im Ordner: `doc/README.md`.
 
 ---
 
@@ -149,7 +150,7 @@ und Pfad-Bearbeitung (Befund S4).
 liest es, und `GameSceneReader`/`GameSceneWriter`/`ToolLegacySceneReader`
 bedienen die Gegenrichtung. Eine stille Änderung bricht ein anderes Programm.
 
-- **`SCENE_FORMAT_READ_WRITE.md` (nach `doc/` verschoben) ist der Vertrag**,
+- **`doc/SCENE_FORMAT_READ_WRITE.md` ist der Vertrag**,
   nicht nur eine Beschreibung. Wer das Format ändert, ändert **zuerst** dieses
   Dokument und trägt es in die `WEITERMACHEN_PROMPT.txt` **beider** Projekte
   ein (Univ. §7).
@@ -215,7 +216,7 @@ keinen GameLoop. An seine Stelle tritt:
 ## §25 Tastatur- & Maus-Register  [B]
 
 **Anlass:** Die Beschreibung jeder Taste steckt nur im Code;
-`Shortcut Table.txt` ist handgepflegt und **schon veraltet** — es fehlen
+`doc/Shortcut Table.txt` ist handgepflegt und **schon veraltet** — es fehlen
 F1–F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S, CTRL+SHIFT+S, SHIFT+ALT+A.
 Es gibt **keinen** Hilfe-Dialog (Befund S6).
 
@@ -300,32 +301,41 @@ Häufigste Fehlerquelle der Codebase.
 - **`doc/` ist der einzige Ort für Projektdokumente.** Bis 2026-07-30 lagen
   13 `.md` im Root und 11 `.txt` in `src/paint/` (Quellbaum). Der Quellbaum
   enthält Code.
-- Einzusammeln (reines Verschieben, [B]): `SCENE_FORMAT_READ_WRITE.md` (→ §23
-  Vertrag) · `PATH_TOOL_DOCUMENTATION.md` · `TextLayer_Implementation_*.md` ·
-  `F1_F6_COMPLETE_REFERENCE.md` + `QUICK_REFERENCE_F1_F5.md` + `F6_*.md`
-  (→ Quelle für §25) · `ANALYSIS_ARRAY_ISSUES.md` · `Dialog-Vergleich.md`
-  (→ Vorarbeit für das §20-Audit) · `*IMPLEMENTATION_SUMMARY.md` ·
-  `SECONDARY_WINDOW_*TEST.md` · alle `src/paint/*.txt`
-  (`Shortcut Table.txt`, `SplitCanvas*.txt`, `Streamlining Code*.txt`,
-  `ReaderWriterScenesImplementPlan*.txt`, `HowImagesForScenesAreLoaded.txt`,
-  `Preload.txt`, `Schema ButtonLeiste*.txt` …).
+- **Erledigt 2026-07-30:** 13 `.md` aus dem Projekt-Root und 11 `.txt` aus
+  `src/paint/` liegen jetzt in `doc/`. **`CLAUDE.md` ist das einzige Dokument
+  außerhalb** — sie ist der Einstiegspunkt und wird im Root erwartet.
+- **`doc/` bleibt flach, mit `doc/README.md` als Wegweiser.** Die älteren
+  Dokumente verweisen mit **nacktem Dateinamen** aufeinander
+  (`siehe F6_FEATURE.md`); ein `archive/`-Unterordner hätte jeden dieser
+  Verweise gebrochen. Die Sortierung nach *verbindlich / Vertrag / Analyse /
+  Feature / historisch* leistet `README.md`, nicht die Ordnerstruktur.
+- **Ausnahme, bewusst liegengelassen:** `src/paint/JAVA_EasyImageManipulator-Push.sh`
+  bleibt im Quellbaum. Es ist kein Dokument, sondern das Deploy-Skript — und
+  es wird vermutlich von außen per Pfad aufgerufen (die regelmäßigen
+  „WhiteBoard Update"-Commits). Ein Verschieben bräche diese Automatik
+  lautlos. Verlegen nur zusammen mit dem Aufrufer.
 - **Zusammenfassungs-Dokumente einer abgeschlossenen Aufgabe** werden zu
   `progress_<DateTime>_<Name>.txt` (Univ. §10) — nicht zu einer weiteren
   Architekturbeschreibung, die veraltet.
-- **`CLAUDE.md` ist heute überholt** (Befund S9: beschreibt das Hauptfenster
-  als 1900-Zeilen-God-Klasse, `CanvasPanel`/Ruler als innere Klassen, kennt
-  die 18 Controller nicht). **Korrektur ist der nächste Schritt mit dem
-  höchsten Hebel** — wer sie liest, arbeitet sonst am falschen Modell.
-  Univ. §9 gilt ab jetzt: Wer die Struktur ändert, korrigiert `CLAUDE.md`
-  im selben Schritt.
-- **Altlasten im Quellbaum sind zu listen und nach Referenz-Prüfung zu
-  löschen [B]** (Befund S10): `Demo.java`, `DemoWorksheetEditor{,2}`,
-  `AutoGrowingPillFieldDemo{,2}`, `BookListPanelLegacy`,
-  `BookPagesPanelLegacy`, `PageLayoutToolbarLegacy` (≈ 2100 Z.), der
-  veraltete `paint/`-Ordner mit `.class`-Dateien im Projekt-Root und das
-  leere Verzeichnis `src/com/spriteanimator/{model,ui,engine,export,i18n}`
-  (fehlgeschlagene Brace-Expansion). `ToolLegacySceneReader` ist **keine**
-  Altlast — Legacy-Lesen ist laut §23 gewollt.
+- **`CLAUDE.md` war überholt und ist am 2026-07-30 neu geschrieben** (Befund
+  S9: beschrieb das Hauptfenster als 1900-Zeilen-God-Klasse, `CanvasPanel`
+  und die Ruler als innere Klassen, kannte die 18 Controller nicht).
+  **Univ. §9 gilt ab jetzt: Wer die Struktur ändert, korrigiert `CLAUDE.md`
+  im selben Schritt.** Eine falsche Architekturbeschreibung ist schlimmer als
+  keine — sie wird geglaubt.
+- **Altlasten sind beseitigt (2026-07-30, Befund S10):** gelöscht wurden
+  `AutoGrowingPillFieldDemo2`, `BookListPanelLegacy`, `BookPagesPanelLegacy`,
+  `PageLayoutToolbarLegacy` (892 Z.) und der veraltete `paint/`-Ordner mit
+  `.class`-Dateien im Projekt-Root. **`ToolLegacySceneReader` ist keine
+  Altlast** — Legacy-Lesen ist laut §23 gewollt; `book/` auch nicht, es wird
+  produktiv genutzt.
+- **Eine Klasse mit `main()` ist auch ohne Referenz nicht tot [B].** Vier der
+  acht Löschkandidaten waren eigenständig startbar und wurden deshalb nach
+  `../JavaDemos/` **ausgelagert statt gelöscht** (`Demo`,
+  `DemoWorksheetEditor{,2}`, `AutoGrowingPillFieldDemo`). `SmartLabel` kam
+  mit: es sah wie Produktivcode aus, wurde aber von nichts außer `Demo`
+  benutzt — ohne den Umzug wäre eine Dublette nötig gewesen (Univ. §3).
+  **Merksatz: „referenzfrei" ≠ „unbenutzt".**
 - **`com.spriteanimator` und `PathAnimator` sind AUSGELAGERT** (Q1,
   2026-07-30) in die eigenständigen Workspace-Projekte
   `../SpriteAnimator/` und `../PathAnimator/`. Beide hatten **null**

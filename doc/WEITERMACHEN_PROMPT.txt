@@ -132,11 +132,35 @@ OFFEN — nach Hebel sortiert
     Hinweis zum Format: die Kantenliste in graph.json heisst "links",
     nicht "edges" (node-link-Format).
 
-[3] DOKU EINSAMMELN nach doc/ (§28), [B], Haiku geeignet
-    13 lose .md im Root + 11 lose .txt in src/paint/. Reines Verschieben.
-    SCENE_FORMAT_READ_WRITE.md ist dabei KEIN gewoehnliches Dokument,
-    sondern der Format-VERTRAG mit GameII (§23) — beim Verschieben den
-    Verweis in §23 mitziehen.
+[3] *** ERLEDIGT 2026-07-30: DOKU EINGESAMMELT [B] ***
+    13 .md aus dem Projekt-Root + 11 .txt aus src/paint/ liegen jetzt in
+    doc/. Im Root steht nur noch CLAUDE.md (Einstiegspunkt, gehoert dorthin).
+    src/ enthaelt nur noch Java-Code + das Deploy-Skript.
+    Umbenannt: "Schema ButtonLeiste Top with Books.txt" ->
+    Schema_ButtonLeiste_Top_with_Books.txt (Konvention Univ. §9).
+
+    *** doc/ IST FLACH GEBLIEBEN — ABSICHT, NICHT NACHLAESSIGKEIT:
+        Die aelteren Dokumente verweisen mit NACKTEM DATEINAMEN aufeinander
+        ("siehe F6_FEATURE.md", "See SECONDARY_WINDOW_EXTENDED_TEST.md").
+        Ein archive/-Unterordner haette jeden dieser Verweise gebrochen.
+        Die Sortierung leistet stattdessen NEU doc/README.md — Wegweiser
+        in 7 Abschnitten: verbindlich / Vertraege / Analyse / Feature /
+        Tastatur / progress / historisch.
+        WER SPAETER AUFRAEUMEN WILL: erst die Querverweise umschreiben. ***
+
+    *** NICHT VERSCHOBEN, BEWUSST:
+        src/paint/JAVA_EasyImageManipulator-Push.sh bleibt liegen. Es ist
+        kein Dokument, sondern das Deploy-Skript — und offenbar der
+        Ausloeser der regelmaessigen "WhiteBoard Update"-Commits. Wird es
+        von aussen per Pfad aufgerufen, braeche ein Verschieben die
+        Automatik LAUTLOS. Nur zusammen mit dem Aufrufer verlegen. ***
+
+    ACHTUNG BEIM LESEN DER EINGESAMMELTEN DOKUMENTE: Abschnitt 7 der
+    README (IMPLEMENTATION_SUMMARY, SECONDARY_WINDOW_*TEST, die datierten
+    Arbeitsnotizen) beschreibt Zustaende von APRIL 2026. Das sind
+    Verlaufsdokumente, KEINE Architekturbeschreibung. Bei Widerspruch
+    gewinnt der Code, danach CLAUDE.md.
+    "Shortcut Table.txt" ist weiterhin veraltet (§25).
 
 [4] *** ERLEDIGT 2026-07-30: ALTLASTEN BESEITIGT [B] ***
     Build gruen: 370 -> 328 .class. src/paint: 117 -> 103 Java-Dateien.
