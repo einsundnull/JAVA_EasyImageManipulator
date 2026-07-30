@@ -1,0 +1,188 @@
+==============================================================================
+Schema_KeyBindings_Dialog.txt   —   MOCKUP, NOCH NICHT FREIGEGEBEN
+Stand 2026-07-30 | Regel: doc/GUIDELINES.md §25, Univ. §9 (Mockup-Pflicht)
+==============================================================================
+
+ZWECK
+--------------------------------------------------------------------------
+Ein Dialog, der beantwortet: "Welche Taste macht was?", "Was kann die Maus?"
+und "Wie mache ich X?" — gespeist AUSSCHLIESSLICH aus einer Registry.
+Der Dialog enthaelt KEINEN eigenen Text (§25). Wer eine Funktion ergaenzt
+und den Registry-Eintrag vergisst, dessen Funktion ist im Editor nicht
+auffindbar.
+
+OEFFNEN MIT:  SHIFT + F1
+*** NICHT F1 — F1 ist mit "Zweitfenster ein/aus" belegt, F1-F7 sind
+    vollstaendig vergeben. Bewusste Abweichung von GameLoop2 §11. ***
+
+
+LAYOUT
+--------------------------------------------------------------------------
+Groesse 720 x 560, mittig ueber dem Hauptfenster, ESC schliesst.
+Dunkel wie der Rest (AppColors.BG_PANEL), Titelzeile wie
+UIComponentFactory.createBaseDialog.
+
++--------------------------------------------------------------------------+
+|                      Tastatur, Maus und Abläufe                      [X] |  <- Titelleiste
++--------------------------------------------------------------------------+
+| +--------+ +--------+ +-----------+                                      |
+| | Tasten | |  Maus  | | Anleitung |          [ Suche: ______________ ]   |  <- Reiter + Filter
+| +========+ +--------+ +-----------+                                      |
++--------------------------------------------------------------------------+
+|                                                                          |
+|  GLOBAL — wirkt in jedem Fenster                                         |  <- Scope-Ueberschrift
+|  ----------------------------------------------------------------------  |
+|   F1              Zweitfenster ein- oder ausblenden                      |
+|   F2              Vorschau-Modus wechseln: Schnappschuss / live /        |
+|                   live mit Bearbeitung                                   |  <- UMBRUCH, nie abschneiden
+|   F3              Schnappschuss neu aufnehmen                            |
+|   F4              Zweitfenster als Vollbild                              |
+|   F5              Fenster-Ebene wechseln: nach vorn / normal /           |
+|                   nach hinten                                            |
+|   F6              Inhalt des Zweitfensters auf den Canvas anwenden       |
+|   F7              Canvas-Anzeige wechseln: nur I / nur II / aktiver      |
+|   ALT + T         Textfeld im Zweitfenster       (nur wenn es offen ist) |  <- Bedingung rechts
+|   ALT + P         Mal-Leiste als schwebendes Fenster                     |
+|   SHIFT + F1      Diese Übersicht                                        |
+|                                                                          |
+|  HAUPTFENSTER — wenn das Hauptfenster den Fokus hat                      |
+|  ----------------------------------------------------------------------  |
+|   STRG + C        Auswahl kopieren — wird sofort ein Layer               |
+|   STRG + UMSCH+C  Bereich AUSSERHALB der Auswahl kopieren                |
+|   STRG + X        Auswahl ausschneiden — Layer, Canvas wird geleert      |
+|   STRG + UMSCH+X  Bereich außerhalb ausschneiden                         |
+|   STRG + V        Einfügen — schwebt, bis ENTER es festlegt              |
+|   STRG + A        Alle Layer auswählen                    (nur Malmodus) |
+|   UMSCH + ALT + A Alle Layer auswählen                    (jeder Modus)  |
+|   STRG + Z        Rückgängig — bricht zuerst eine Schwebe-Auswahl ab     |
+|   STRG + Y        Wiederholen                                            |
+|   STRG + S        Speichern                                              |
+|   STRG + ALT + S  In die Originaldatei speichern                         |
+|   STRG + UMSCH+S  Kopie mit eingebrannten Layern                         |
+|   STRG+ALT+UMSCH+S Original mit eingebrannten Layern                     |
+|   R               90° im Uhrzeigersinn drehen                            |
+|   UMSCH + R       90° gegen den Uhrzeigersinn                            |
+|   UMSCH + V       Sichtbarkeit der gewählten Layer umschalten            |
+|   ESC             Schwebe-Auswahl abbrechen, sonst Auswahl aufheben      |
+|   ENTF            Auswahl-Inhalt oder gewählte Layer löschen             |
+|   RÜCKTASTE       Alles außerhalb der Auswahl löschen                    |
+|   ENTER           Schwebe-Auswahl festlegen / Layer einbrennen           |
+|                                                                          |
+|  CANVAS — wenn die Zeichenfläche den Fokus hat                           |
+|  ----------------------------------------------------------------------  |
+|   + / = / NUM +   Hineinzoomen                                           |
+|   ...                                                                    |
+|                                                                          |
++--------------------------------------------------------------------------+
+|                                                        [   Schließen   ] |
++--------------------------------------------------------------------------+
+
+Spaltenbreite: Kürzel 17 Zeichen, Rest fließend.
+Beschreibung laeuft ueber mehrere Zeilen, wenn noetig — NIE mit "..."
+abschneiden (§25).
+Eine Bedingung ("nur wenn es offen ist") steht rechtsbuendig in Klammern.
+
+
+REITER "MAUS"
+--------------------------------------------------------------------------
+Reihenfolge = TREFFERREIHENFOLGE IM CODE (§22: Handle -> Punkt/Layer ->
+Fläche). Wer das liest, versteht, warum ein Klick mal das eine und mal das
+andere trifft.
+
+|  RAD                                                                     |
+|   Rad                    senkrecht scrollen                              |
+|   UMSCH + Rad            waagerecht scrollen                             |
+|   STRG + Rad             zoomen, zum Zeiger hin                          |
+|   STRG + Rad  auf Text   Schriftgröße ändern STATT zu zoomen             |  <- ueberraschend
+|   ALT + T  + Rad         Deckkraft des gewählten Bild-Layers             |  <- nirgends dokumentiert
+|                                                                          |
+|  ZIEHEN                                                                  |
+|   Mittlere Taste         Bild verschieben                                |
+|   STRG + links           Bild verschieben                                |
+|   rechts, senkrecht      zoomen, 1 % je Pixel (ab 5 px Bewegung)         |
+|   UMSCH + ziehen         Gummiband: mehrere Layer wählen                 |
+|                                                                          |
+|  KLICKEN                                                                 |
+|   links                  Werkzeug anwenden / Layer wählen                |
+|   rechts                 malen mit der Sekundärfarbe                     |
+|   UMSCH + klick          Layer zur Auswahl hinzufügen oder entfernen     |
+|   Doppelklick auf Layer  Layer bearbeiten                                |
+|   Doppelklick auf leer   neue Seite                        (nur Buchmodus)|
+|   rechts ziehen (Leiste) Datei in eine andere Liste kopieren             |
+
+
+REITER "ANLEITUNG"
+--------------------------------------------------------------------------
+Kurze Abläufe in KLICK-REIHENFOLGE, aus KeyBindings.GUIDE.
+*** NEUE FUNKTION = EIN ABSATZ HIER. Sonst ist sie nicht auffindbar. ***
+
+|  Einen Bildausschnitt zu einem Layer machen                              |
+|   1. Werkzeug "Auswahl" wählen                                           |
+|   2. Rechteck aufziehen                                                  |
+|   3. STRG + C — der Ausschnitt wird sofort ein Layer                     |
+|   4. Layer verschieben, ENTER brennt ihn auf den Canvas                  |
+|                                                                          |
+|  Eine Szene für GameII anlegen                                           |
+|   1. ...                                                                 |
+|                                                                          |
+|  Zwei Bilder nebeneinander bearbeiten                                    |
+|   1. ...                                                                 |
+
+
+DATENMODELL (die Registry)
+--------------------------------------------------------------------------
+    enum Scope { GLOBAL, WINDOW, CANVAS, DIALOG, MOUSE }
+
+    record KeyBinding(Scope scope, String combo, String description,
+                      String condition) { }
+
+    final class KeyBindings {
+        static final List<KeyBinding> ALL   = List.of( ... );
+        static final List<GuideEntry> GUIDE = List.of( ... );
+    }
+
+REGELN:
+  - Neue Taste/Geste -> ZUERST Eintrag in ALL, DANN Handler-Code.
+  - KeyboardShortcutManager VERDRAHTET die Registry; die Beschreibung
+    steht nicht mehr nur im Code.
+  - Mehrfachbelegungen werden mit Vermerk gefuehrt, nicht verschwiegen.
+  - condition darf leer sein.
+
+
+WAS DIE BESTANDSAUFNAHME ERGEBEN HAT (Anlass fuer den ganzen Schritt)
+--------------------------------------------------------------------------
+Quelle war der CODE (KeyboardShortcutManager + CanvasPanel), nicht die
+vorhandene Tabelle. Ergebnis:
+
+  doc/Shortcut Table.txt kennt 13 Eintraege.
+  Tatsaechlich belegt sind ueber 40.
+
+  ES FEHLEN DORT VOLLSTAENDIG:
+    F1-F7, ALT+T, ALT+P, R, UMSCH+R, UMSCH+V, STRG+ALT+S, STRG+UMSCH+S,
+    STRG+ALT+UMSCH+S, UMSCH+ALT+A, +/=/NUM+
+  UND SAEMTLICHE MAUS-GESTEN, darunter zwei, die NIRGENDWO dokumentiert
+  sind und die man nicht erraet:
+    *** STRG + Rad auf einem Text-Layer aendert die SCHRIFTGROESSE
+        statt zu zoomen ***
+    *** ALT + T festhalten + Rad aendert die DECKKRAFT des Bild-Layers ***
+
+Genau deshalb wird die Tabelle nach der Umsetzung aus der Registry erzeugt
+oder geloescht (§25) — eine zweite, handgepflegte Liste ist die Ursache
+des Problems, nicht die Loesung.
+
+
+OFFENE FRAGEN ZUR FREIGABE
+--------------------------------------------------------------------------
+F1  Drei Reiter (Tasten / Maus / Anleitung) wie skizziert — oder EINE
+    lange Liste mit Zwischenueberschriften zum Durchscrollen?
+F2  Suchfeld: ja/nein? Bei ueber 40 Eintraegen hilfreich, kostet aber
+    Aufwand und eine weitere Bedienstelle.
+F3  Sollen die Kuerzel deutsch (STRG, UMSCH, ENTF, RUECKTASTE) oder
+    englisch (CTRL, SHIFT, DEL, BACKSPACE) angezeigt werden? Der bisherige
+    Text im Programm ist gemischt.
+F4  Reicht SHIFT+F1, oder soll die Uebersicht zusaetzlich ueber einen
+    Knopf in der oberen Leiste erreichbar sein?
+
+==============================================================================
+STATUS: MOCKUP — WARTET AUF FREIGABE. Kein Code geschrieben.
+==============================================================================

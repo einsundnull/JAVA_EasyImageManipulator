@@ -41,6 +41,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`TextLayer_Implementation_Documentation.md`](TextLayer_Implementation_Documentation.md) | TextLayer |
 | [`F6_FEATURE.md`](F6_FEATURE.md) | F6 „auf Canvas anwenden" |
 | [`Schema_ButtonLeiste_Top_with_Books.txt`](Schema_ButtonLeiste_Top_with_Books.txt) | ASCII-Mockup der oberen Leiste (Buch-Modus) |
+| [`Schema_KeyBindings_Dialog.txt`](Schema_KeyBindings_Dialog.txt) | ⏳ **Mockup, wartet auf Freigabe** — Hilfe-Dialog (§25) |
 | [`HowImagesForScenesAreLoaded.txt`](HowImagesForScenesAreLoaded.txt) · [`Preload.txt`](Preload.txt) | Bild-/Preload-Pfade |
 | [`SplitCanvas.txt`](SplitCanvas.txt) · [`SplitCanvas II.txt`](<SplitCanvas II.txt>) | Konzept der zwei Canvases |
 

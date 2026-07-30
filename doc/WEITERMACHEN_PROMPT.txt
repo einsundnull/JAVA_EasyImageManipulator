@@ -123,16 +123,30 @@ OFFEN — nach Hebel sortiert
        (B1/B3 sind die wichtigen: keine Daten verschwunden).
 
 [8] KEYBINDINGS-REGISTRY + HILFE-DIALOG  (§25)  [B]
-    Mockup doc/Schema_KeyBindings_Dialog.txt ZUERST -> Freigabe.
-    Quellen: KeyboardShortcutManager.java (= die WAHRHEIT),
-    doc/F1_F6_COMPLETE_REFERENCE.md, doc/QUICK_REFERENCE_F1_F5.md.
-    *** doc/Shortcut Table.txt ist handgepflegt und VERALTET — es fehlen
-        F1-F7, ALT+T, ALT+P, R/SHIFT+R, CTRL+ALT+S, CTRL+SHIFT+S,
-        SHIFT+ALT+A. Nicht als Quelle vertrauen. Danach aus der Registry
-        erzeugen oder loeschen. ***
+    *** MOCKUP LIEGT VOR UND WARTET AUF FREIGABE:
+        doc/Schema_KeyBindings_Dialog.txt (2026-07-30).
+        Es enthaelt Layout, Datenmodell (Scope/KeyBinding/GUIDE), die
+        vollstaendige Bestandsaufnahme und vier Fragen F1-F4.
+        KEIN CODE, bis die Freigabe da ist (Univ. §9). ***
+
+    DIE BESTANDSAUFNAHME AUS DEM CODE (nicht aus der alten Tabelle):
+      doc/Shortcut Table.txt kennt 13 Eintraege — belegt sind ueber 40.
+      Dort fehlen F1-F7, ALT+T, ALT+P, R, UMSCH+R, UMSCH+V, STRG+ALT+S,
+      STRG+UMSCH+S, STRG+ALT+UMSCH+S, UMSCH+ALT+A, +/=/NUM+ und
+      SAEMTLICHE Maus-Gesten.
+    *** ZWEI GESTEN SIND NIRGENDWO DOKUMENTIERT UND NICHT ERRATBAR:
+          STRG + Rad auf einem TEXT-Layer aendert die SCHRIFTGROESSE
+            statt zu zoomen
+          ALT + T festhalten + Rad aendert die DECKKRAFT des Bild-Layers
+        Beide gehoeren in die Registry, sonst findet sie nie jemand. ***
+
+    Quellen: KeyboardShortcutManager.java + CanvasPanel.java (= die
+    WAHRHEIT), doc/F1_F6_COMPLETE_REFERENCE.md, QUICK_REFERENCE_F1_F5.md.
     Hilfe-Taste = SHIFT+F1 (F1-F7 sind belegt, F1 = Zweitfenster).
-    Maus-Gesten werden wie Tasten registriert, in der Trefferreihenfolge des
-    Codes (§22).
+    Maus-Gesten in der TREFFERREIHENFOLGE des Codes registrieren (§22).
+    Nach der Umsetzung: doc/Shortcut Table.txt aus der Registry erzeugen
+    oder loeschen — eine zweite handgepflegte Liste ist die Ursache des
+    Problems, nicht die Loesung.
 
 [9] BASEDIALOG + CONFIRMDIALOG  (§20)  [C], NUR MIT FREIGABE
     12 Klassen erben direkt von JFrame/JDialog/JWindow, JOptionPane in
