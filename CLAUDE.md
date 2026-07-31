@@ -8,6 +8,12 @@ Vor jeder Aufgabe in dieser Reihenfolge:
 
 1. **`../JAVA_GUIDELINES_UNIVERSAL.md`** — projektneutrale Standards für **alle**
    Java-Projekte im Workspace (§0–§15).
+   *Randnotiz:* liegt seit 2026-07-31 auch als **byte-identische Lesekopie** in
+   `doc/JAVA_GUIDELINES_UNIVERSAL.md` (ebenso
+   `doc/PROMPT_Schwachstellen-Audit.md`). **Maßgeblich ist das Original im
+   Workspace-Root** — es gilt gleichlautend für GameLoop2, SpriteAnimator,
+   PathAnimator und JavaDemos. Ändern nur dort, danach neu kopieren;
+   Verfahren in `doc/README.md`, Abschnitt 1.
 2. **`doc/GUIDELINES.md`** — Projekt-Steckbrief (welche TT-Klasse welche Rolle
    besetzt) + projektspezifische §20–§33.
 3. **`doc/Prompt_Handling.txt`** — Task-Workflow: `[BT]`/`[ST]`, PD-Datei,

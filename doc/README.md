@@ -11,11 +11,27 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 
 | Datei | Inhalt |
 |---|---|
-| [`../../JAVA_GUIDELINES_UNIVERSAL.md`](../../JAVA_GUIDELINES_UNIVERSAL.md) | **Zuerst.** Projektneutrale Standards für alle Java-Projekte (§0–§15) |
+| [`JAVA_GUIDELINES_UNIVERSAL.md`](JAVA_GUIDELINES_UNIVERSAL.md) | **Zuerst.** Projektneutrale Standards für alle Java-Projekte (§0–§15). **KOPIE** — Original: `../../JAVA_GUIDELINES_UNIVERSAL.md` |
 | [`GUIDELINES.md`](GUIDELINES.md) | Projekt-Steckbrief + TransparencyTool-Regeln §20–§33 |
 | [`Prompt_Handling.txt`](Prompt_Handling.txt) | Task-Workflow: `[BT]`/`[ST]`, Risikoklassen, Abschluss-Block |
-| [`../../PROMPT_Schwachstellen-Audit.md`](../../PROMPT_Schwachstellen-Audit.md) | **Wiederverwendbarer Audit-Prompt** (alle Java-Projekte): Schwachstellen finden, bewerten, tabellieren |
+| [`PROMPT_Schwachstellen-Audit.md`](PROMPT_Schwachstellen-Audit.md) | **Wiederverwendbarer Audit-Prompt** (alle Java-Projekte): Schwachstellen finden, bewerten, tabellieren. **KOPIE** — Original: `../../PROMPT_Schwachstellen-Audit.md` |
 | [`WEITERMACHEN_PROMPT.txt`](WEITERMACHEN_PROMPT.txt) | **Aktueller Stand + offene Schritte.** Einstieg nach `/clear` |
+
+> **Randnotiz: die zwei universellen Prompts liegen doppelt — absichtlich.**
+> `JAVA_GUIDELINES_UNIVERSAL.md` und `PROMPT_Schwachstellen-Audit.md` gehören
+> dem **Workspace**, nicht diesem Projekt. Die maßgebliche Fassung liegt in
+> `C:\Users\pc\eclipse-workspace\` und gilt gleichlautend für GameLoop2,
+> SpriteAnimator, PathAnimator und JavaDemos.
+> Die Dateien in `doc/` sind **byte-identische Lesekopien**, damit ein Einstieg
+> nach `/clear` alle Pflichtdokumente an einem Ort findet.
+> - **Geändert wird nur das Original.** Eine Änderung an der Kopie ist ein Bug —
+>   sie gilt für die vier Nachbarprojekte nicht mit.
+> - Danach neu kopieren:
+>   `cp ../../JAVA_GUIDELINES_UNIVERSAL.md ../../PROMPT_Schwachstellen-Audit.md .`
+> - Gleichstand prüfen: `md5sum` beider Paare (Stand 2026-07-31: identisch).
+> - **Relative Pfade *innerhalb* der Kopien zählen ab dem Workspace-Root**
+>   (`../JAVA_GUIDELINES_UNIVERSAL.md` im Audit-Prompt meint das Original,
+>   nicht `TransparencyTool/`). Die Kopie ist eine Lesehilfe, keine Pfadbasis.
 
 ## 2. Verträge & Formate — ändern heißt: erst hier ändern
 
@@ -83,6 +99,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`progress_2026-07-31_apptheme-migration-09.txt`](progress_2026-07-31_apptheme-migration-09.txt) | Token-Bereinigung, **Datei 10**: `TranslationMapListPanel` · nur Schriften, alle Farben sind Benutzerdaten |
 | [`progress_2026-07-31_apptheme-migration-10.txt`](progress_2026-07-31_apptheme-migration-10.txt) | Token-Bereinigung, **Datei 11**: `CanvasPanel` · file-lokale Konstanten statt Palette · ⏳ §21-Ergänzung zur Freigabe |
 | [`progress_2026-07-31_apptheme-migration-11.txt`](progress_2026-07-31_apptheme-migration-11.txt) | Token-Bereinigung, **Datei 12**: `ElementLayerPanel` · Knopf-Familie in die Palette · **Schritt [6] inhaltlich abgeschlossen** |
+| [`progress_2026-07-31_universelle-prompts-in-doc.txt`](progress_2026-07-31_universelle-prompts-in-doc.txt) | Universelle Prompts als Lesekopie in `doc/` verankert · Randnotiz in vier Wegweisern |
 | [`WEITERMACHEN_PROMPT_2026-07-30_archiv.txt`](WEITERMACHEN_PROMPT_2026-07-30_archiv.txt) | Vorgänger-Fassung mit dem vollen Verlauf der Schritte [1]–[4] |
 
 ## 7. Historisch — abgeschlossene Arbeiten (nicht als Ist-Stand lesen)

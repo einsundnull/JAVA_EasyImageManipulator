@@ -1,0 +1,96 @@
+==============================================================================
+progress_2026-07-31_universelle-prompts-in-doc.txt
+Schritt-Typ: [ST]  (kein PD.txt noetig)  ·  Risiko: [B]  ·  nur Dokumentation
+==============================================================================
+
+PROMPT (sinngemaess)
+--------------------
+"Lies doc/GUIDELINES.md, doc/GUIDELINES_VORSCHLAG_2026-07-27.md,
+ doc/Prompt_Handling.txt, doc/WEITERMACHEN_PROMPT.txt; im Eclipse-Workspace
+ liegen die universellen Prompts. Diese muessen in die Doc kopiert werden und
+ in diesen Befehl als Randnotiz eingebaut werden."
+
+BEFUNDE
+-------
+1. doc/GUIDELINES_VORSCHLAG_2026-07-27.md EXISTIERT NICHT.
+   Die Datei heisst GUIDELINES_VORSCHLAG_2026-07-30.md (Befunde S1-S13).
+   Der Befehl nannte ein falsches Datum -> in der neuen Fassung korrigiert.
+
+2. DIE KOPIEN EXISTIERTEN BEREITS und sind byte-identisch:
+     JAVA_GUIDELINES_UNIVERSAL.md   md5 65b8ec31bc2c076c337a040b3283e850
+     PROMPT_Schwachstellen-Audit.md md5 f664b566449d8a836dbec8a21f91dd62
+   Jeweils Workspace-Root == doc/. Ein Kopierschritt war also nicht noetig;
+   was fehlte, war die DOKUMENTIERTE BEZIEHUNG. Ohne sie waeren die zwei
+   Dateien genau das, was §25 als Ursache benennt: eine zweite Liste neben
+   der Wahrheit, die still auseinanderlaeuft.
+
+3. Die Leseeinstiege zeigten weiterhin auf ../ bzw. ../../ - vier Stellen.
+   README.md verlinkte aus doc/ heraus mit ../../ ins Workspace-Root,
+   obwohl die Datei danebenlag.
+
+GEAENDERT (4 Dateien, nur Text)
+-------------------------------
+  doc/README.md
+      Abschnitt 1: beide Zeilen auf die LOKALEN Kopien umgestellt, jeweils
+      als "KOPIE" markiert mit Nennung des Originals.
+      Darunter neu: Randnotiz-Block mit Verfahren (nur Original aendern,
+      Kopierbefehl, md5sum-Pruefung) und dem Hinweis, dass relative Pfade
+      INNERHALB der Kopien ab Workspace-Root zaehlen.
+
+  doc/WEITERMACHEN_PROMPT.txt
+      - Audit-Prompt jetzt mit beiden Pfaden (Lesekopie + Original).
+      - Leseliste Punkt 1 auf doc/JAVA_GUIDELINES_UNIVERSAL.md umgestellt.
+      - Neuer Block "*** RANDNOTIZ ZU 1. UND ZUM AUDIT-PROMPT ***" mit
+        Verfahren und den beiden md5-Praefixen als Gleichstands-Beleg.
+
+  doc/GUIDELINES.md
+      Randnotiz unter der Lesereihenfolge. Die Lesereihenfolge selbst zeigt
+      bewusst WEITER auf ../JAVA_GUIDELINES_UNIVERSAL.md - diese Datei
+      beschreibt die Zwei-Ebenen-Regel, und die obere Ebene ist das Original.
+
+  CLAUDE.md
+      Randnotiz unter Punkt 1 der Pflichtlektuere.
+
+NICHT GEAENDERT - BEWUSST
+-------------------------
+  * Die Kopien selbst. Kein Kopf, kein "Dies ist eine Kopie"-Banner darin:
+    das wuerde die Byte-Identitaet zerstoeren und damit die einzige billige
+    Pruefung (md5sum) unbrauchbar machen. Die Kopie-Eigenschaft steht
+    ausserhalb, in den vier Wegweisern.
+  * Der Audit-Prompt bleibt inhaltlich unangetastet (Zeile 29 verweist auf
+    ../JAVA_GUIDELINES_UNIVERSAL.md - korrekt vom Workspace-Root aus).
+  * WEITERMACHEN_PROMPT_2026-07-30_archiv.txt und die progress-Dateien:
+    Archiv wird nicht nachtraeglich umgeschrieben.
+
+RESTRISIKO
+----------
+  Zwei Dateien an zwei Orten koennen auseinanderlaufen. Genau deshalb steht
+  in allen vier Wegweisern derselbe Satz - "geaendert wird nur das Original" -
+  plus Kopier- und Pruefbefehl. Wer die Kopie aendert, hat die Aenderung fuer
+  GameLoop2, SpriteAnimator, PathAnimator und JavaDemos NICHT gemacht.
+
+  EMPFEHLUNG FUER DIE NACHBARPROJEKTE: dieselbe Kopie + dieselbe Randnotiz,
+  sobald dort das naechste Mal gearbeitet wird. Nicht jetzt vorab - das waere
+  ein Schritt ohne Anlass (Univ. §0).
+
+VERIFY
+------
+  V1  md5sum-Vergleich beider Paare: identisch. (erledigt)
+  V2  Kein Code beruehrt -> Build unveraendert, kein Compile noetig. (erledigt)
+  V3  Offen fuer den User: die vier Randnotizen einmal quer lesen und
+      bestaetigen, dass "Original oben, Kopie unten" so gewollt ist.
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT], keine aktive PD.txt)
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert: nein (erst am
+  2026-07-31 bereinigt, Archiv liegt vor)
+# Die Aufgabe "Universelle Prompts in doc/ verankern" wurde vollstaendig
+  abgeschlossen: ja
+# Naechster Schritt: unveraendert - Sichtpruefung U1-U19 durch den User
+  (schliesst Schritt [6] formal ab), danach das SCHWACHSTELLEN-AUDIT nach
+  doc/PROMPT_Schwachstellen-Audit.md
+# "/clear" Befehl und WEITERMACHEN_PROMPT.txt empfohlen: ja - das Audit ist
+  eine frische, grosse Aufgabe und profitiert von leerem Kontext
+==============================================================================

@@ -16,6 +16,14 @@
 >
 > **Lesereihenfolge:** `../JAVA_GUIDELINES_UNIVERSAL.md` → diese Datei →
 > `doc/Prompt_Handling.txt` → `doc/WEITERMACHEN_PROMPT.txt` → aktive `Task_*.txt`.
+>
+> **Randnotiz (2026-07-31):** Die universellen Prompts —
+> `JAVA_GUIDELINES_UNIVERSAL.md` und `PROMPT_Schwachstellen-Audit.md` — liegen
+> seit 2026-07-31 zusätzlich als **byte-identische Lesekopie** in `doc/`, damit
+> der Einstieg nach `/clear` alles an einem Ort findet. **Maßgeblich bleibt das
+> Original im Workspace-Root** (`../…`) — es gilt gleichlautend für GameLoop2,
+> SpriteAnimator, PathAnimator und JavaDemos. Geändert wird nur dort, danach
+> neu kopiert. Verfahren und Prüfbefehl: `doc/README.md`, Abschnitt 1.
 > Analyse und Belege zu jeder Regel:
 > `doc/GUIDELINES_VORSCHLAG_2026-07-30.md` (Befunde S1–S13).
 > Wegweiser durch alle Dokumente im Ordner: `doc/README.md`.

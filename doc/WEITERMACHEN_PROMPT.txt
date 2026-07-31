@@ -16,7 +16,8 @@ Befunde in einer bewerteten Tabelle sammeln - ZUM SPAETEREN LOESEN, nicht
 sofort reparieren.
 
 FERTIGER PROMPT DAFUER (wiederverwendbar, auch fuer andere Projekte):
-    ../PROMPT_Schwachstellen-Audit.md
+    doc/PROMPT_Schwachstellen-Audit.md   (Lesekopie)
+    ../PROMPT_Schwachstellen-Audit.md    (ORIGINAL, Workspace-Ebene)
 
 *** DAS AUDIT REPARIERT NICHTS. Es sammelt und bewertet. Reparaturen sind
     danach einzelne, freigabepflichtige Schritte. ***
@@ -57,12 +58,28 @@ und NIEMALS `graphify update .` (Scope-Falle).
        Alle drei unveraendert uebernommen und im Javadoc vermerkt. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
-  1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
+  1. doc/JAVA_GUIDELINES_UNIVERSAL.md  (Workspace-Ebene, gilt fuer ALLE
                                         Java-Projekte, §0-§15)
   2. doc/GUIDELINES.md                 (Projekt-Steckbrief + §20-§33)
   3. doc/Prompt_Handling.txt           (Task-Workflow [BT]/[ST], PD,
                                         Risikoklassen, Abschluss-Block)
   4. doc/README.md                     (Wegweiser durch alle Dokumente)
+
+*** RANDNOTIZ ZU 1. UND ZUM AUDIT-PROMPT: DOPPELT, ABSICHTLICH. ***
+    JAVA_GUIDELINES_UNIVERSAL.md und PROMPT_Schwachstellen-Audit.md gehoeren
+    dem WORKSPACE, nicht diesem Projekt. Das ORIGINAL liegt in
+    C:\Users\pc\eclipse-workspace\ und gilt gleichlautend fuer GameLoop2,
+    SpriteAnimator, PathAnimator und JavaDemos. In doc/ liegt seit
+    2026-07-31 je eine BYTE-IDENTISCHE LESEKOPIE, damit der Einstieg nach
+    /clear alle Pflichtdokumente an EINEM Ort findet.
+    - GEAENDERT WIRD NUR DAS ORIGINAL. Eine Aenderung an der Kopie ist ein
+      Bug - sie gilt fuer die vier Nachbarprojekte nicht mit.
+    - Danach neu kopieren, aus doc/ heraus:
+        cp ../../JAVA_GUIDELINES_UNIVERSAL.md ../../PROMPT_Schwachstellen-Audit.md .
+    - Gleichstand pruefen: md5sum beider Paare.
+      Stand 2026-07-31: identisch (65b8ec31... / f664b566...).
+    - Relative Pfade INNERHALB der Kopien zaehlen ab dem Workspace-Root.
+      Die Kopie ist eine Lesehilfe, keine Pfadbasis.
 
 BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
        -encoding UTF-8 ist PFLICHT (Unicode im Quelltext).

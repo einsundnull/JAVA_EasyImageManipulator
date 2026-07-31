@@ -1,5 +1,8 @@
-Lies:
-C:\Users\pc\eclipse-workspace\TransparencyTool\doc\GUIDELINES.md
-C:\Users\pc\eclipse-workspace\TransparencyTool\doc\GUIDELINES_VORSCHLAG_2026-07-27.md
-C:\Users\pc\eclipse-workspace\TransparencyTool\doc\Prompt_Handling.txt
-C:\Users\pc\eclipse-workspace\TransparencyTool\doc\WEITERMACHEN_PROMPT.txt
+Lies in dieser Reihenfolge:
+  1. C:\Users\pc\eclipse-workspace\TransparencyTool\doc\JAVA_GUIDELINES_UNIVERSAL.md
+  2. C:\Users\pc\eclipse-workspace\TransparencyTool\doc\GUIDELINES.md
+  3. C:\Users\pc\eclipse-workspace\TransparencyTool\doc\Prompt_Handling.txt
+  4. C:\Users\pc\eclipse-workspace\TransparencyTool\doc\WEITERMACHEN_PROMPT.txt
+  5. C:\Users\pc\eclipse-workspace\TransparencyTool\doc\README.md
+  (Analyse/Belege bei Bedarf: doc\GUIDELINES_VORSCHLAG_2026-07-30.md)
+  (Audit-Prompt, wenn das Audit dran ist: doc\PROMPT_Schwachstellen-Audit.md)
