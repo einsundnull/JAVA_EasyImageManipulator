@@ -8,12 +8,12 @@ Details je Schritt: die progress_2026-07-30_*.txt.
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
-Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: DREI Dateien
-sind durch (UIComponentFactory, SelectiveAlphaEditor, UIBuilder), 445
-Literale ausserhalb der Token-Klassen verbleiben.
-*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U9 durch den User. Sie war
+Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: VIER Dateien
+sind durch (UIComponentFactory, SelectiveAlphaEditor, UIBuilder,
+TextToolbar), 430 Literale ausserhalb der Token-Klassen verbleiben.
+*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U11 durch den User. Sie war
     schon nach Datei 1 faellig und ist nicht erfolgt — deshalb deckt sie
-    jetzt drei Dateien ab. Vor der naechsten Datei nachholen. ***
+    jetzt vier Dateien ab. Vor der naechsten Datei nachholen. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -88,6 +88,11 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     dadurch KEINE der 33 Aufrufstellen in UIBuilder angefasst.
     UIBuilder Font 5->0, Color 1->0, Stroke 3->1. 2 neue Token.
     -> progress_2026-07-31_apptheme-migration-02.txt
+[6c] AppTheme-Bereinigung, DATEI 4: TextToolbar 15 -> 0 Literale, erste
+    vollstaendig saubere Datei. Drei gleiche RGB, drei verschiedene
+    Antworten (einmal vorhandenes Token wiederverwendet, zweimal neues) -
+    die Bedeutung entscheidet, nicht der Wert.
+    -> progress_2026-07-31_apptheme-migration-03.txt
 
 VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
   a) "referenzfrei" != "unbenutzt". Eine Klasse mit main() ist startbar.
@@ -111,13 +116,15 @@ OFFEN — nach Hebel sortiert
       UIComponentFactory    11 -> 2 Restliterale (parametrisiert)
       SelectiveAlphaEditor       2 Restliterale (Laufzeitfarben)
       UIBuilder                  1 Restliteral  (dash-Stroke)
+      TextToolbar           15 -> 0   <- erste vollstaendig saubere Datei
     VERBLEIBEND ausserhalb der Token-Klassen:
-      254 new Color · 125 new Font · 66 new BasicStroke
+      248 new Color · 118 new Font · 64 new BasicStroke
+    Token-Klassen: AppColors 31 Farben · AppTheme 19 Fonts, 5 Strokes
 
-    *** ZUERST: SICHTPRUEFUNG U1-U9 DURCH DEN USER (aufgestaut aus drei
-        Dateien, Liste in progress_2026-07-31_apptheme-migration-02.txt).
-        U9 (Ablageflaeche ohne geladenes Bild) und U3 (Symbol-Knoepfe)
-        sind die aussagekraeftigsten. ***
+    *** ZUERST: SICHTPRUEFUNG U1-U11 DURCH DEN USER (aufgestaut aus vier
+        Dateien; Listen in den progress_2026-07-31_*.txt).
+        U9 (Ablageflaeche ohne geladenes Bild), U10 (Text-Werkzeugleiste)
+        und U3 (Symbol-Knoepfe) sind die aussagekraeftigsten. ***
 
     VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
       1. EINE Datei pro Schritt (Ausnahme: zwei Dateien, die sich eine
@@ -125,7 +132,16 @@ OFFEN — nach Hebel sortiert
       2. Literal raus, Token mit DEMSELBEN Wert rein. Werterhaltend.
       3. *** WEICHT EIN WERT AB: NICHT RUNDEN. Neues Token anlegen oder
          das Literal mit Begruendung stehen lassen. Runden aendert das
-         Aussehen. Bisher 10 solcher Faelle -> 10 neue Token. ***
+         Aussehen. Bisher 14 solcher Faelle -> 14 neue Token. ***
+      3b. *** GLEICHES RGB HEISST NICHT GLEICHES TOKEN. Vor dem
+         Wiederverwenden die BEDEUTUNG pruefen. In TextToolbar trat der
+         Fall dreimal auf: (60,60,60) war wirklich BTN_BG und wurde
+         wiederverwendet; (55,55,55) und (50,50,50) hatten zufaellig
+         dasselbe RGB wie TILE_PLACEHOLDER bzw. BG_RULER_CORNER, aber eine
+         andere Bedeutung -> eigene Token. Zusammenlegen wuerde Dinge
+         koppeln, die sich unabhaengig aendern duerfen. ***
+      3c. *** GLEICHER NAME HEISST NICHT GLEICHER WERT: TextToolbar.BTN_H
+         ist 30, AppTheme.BTN_H ist 36. Nicht vereinheitlichen. ***
       4. Nachweisen, nicht behaupten: Wegwerf-Programm gegen die
          KOMPILIERTEN Klassen, Token gegen ersetztes Literal
          (Font.equals / Color.equals / getLineWidth). Vorlagen stehen in
@@ -144,16 +160,22 @@ OFFEN — nach Hebel sortiert
         454/162/110 der Ist-Analyse stammen aus dem GANZEN src-Baum
         inklusive der ausgelagerten Projekte — nicht vergleichbar. ***
 
-    NAECHSTE DATEI — EMPFEHLUNG: TextToolbar (15) oder ColorPickerPopup
-    (11). Beide klein, in sich abgeschlossen, gut sichtpruefbar.
+    *** PRUEFE VOR DER AUSWAHL, OB DIE FARBEN UEBERHAUPT TOKEN SIND.
+        ColorPickerPopup (11) wurde deshalb ZURUECKGESTELLT: seine Farben
+        sind groesstenteils BERECHNET (RGB-Komponenten, Alpha-Verlaeufe,
+        Schachbrett). Ein Farbwaehler erzeugt Farben - die duerfen nicht
+        aus einer Palette kommen. Nur 5 von 11 waeren Token gewesen. ***
+
+    NAECHSTE DATEI — EMPFEHLUNG: BaseSidebarPanel (11) oder
+    NewImageDialog (17). Beide klein und in sich abgeschlossen.
     *** NICHT ElementLayerPanel (84) oder CanvasPanel (58) — in einer
         Sitzung nicht mehr sichtpruefbar; CanvasPanel ist zusaetzlich die
         God-Klasse (§22). ***
     Dichte der restlichen Dateien:
       ElementLayerPanel 84 · CanvasPanel 58 · TranslationMapListPanel 27 ·
       MapsPanel 26 · PageLayoutToolbar 21 · TileGalleryPanel 20 ·
-      PaintToolbar 20 · NewImageDialog 17 · TextToolbar 15 ·
-      ColorPickerPopup 11 · BaseSidebarPanel 11
+      PaintToolbar 20 · NewImageDialog 17 · BaseSidebarPanel 11 ·
+      ColorPickerPopup 11 (zurueckgestellt)
 
     NICHT ANFASSEN: benutzergewaehlte Werte (Primaer-/Sekundaerfarbe,
     canvasBg1/bg2, Kartenfarben, Text-Werkzeug-Font, strokeWidth). Die
@@ -238,6 +260,12 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
       fette Ueberschrift "Bilddatei hier ablegen", gedaempfte Unterzeile.
       Aussagekraeftigste Pruefung — dort wurden zwei Strichstaerken, zwei
       Radien und zwei Fonts ersetzt. ***
+  U10 *** TEXT-WERKZEUGLEISTE (Textwerkzeug waehlen): Auswahllisten und
+      Zahlenfelder mit dunklem Hintergrund wie vorher, Fett/Kursiv-Knoepfe
+      mit fetter bzw. kursiver Beschriftung, aktiver Knopf blau, inaktiver
+      dunkelgrau. Leiste weiterhin 30 px hoch, NICHT 36. ***
+  U11 Kleine Beschriftungen der Leiste ("Schrift:", "Groesse:") gedaempft
+      grau, aber heller als der uebrige Hilfstext.
   K1-K7 (Hilfe-Dialog) und B1-B4 (Buecher/Karten) stehen in den
   progress-Dateien vom 2026-07-30.
   Nichts davon ist durch den Compile-Verify abgedeckt.
