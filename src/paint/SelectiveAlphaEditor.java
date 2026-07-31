@@ -251,7 +251,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// =========================================================================
 	private void initializeUI() {
 		setTitle("Selective Alpha Editor");
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		// NICHT EXIT_ON_CLOSE: das beendete die JVM sofort und verwarf jede
+		// ungespeicherte Bildänderung ohne Rückfrage (Audit-Befund F01,
+		// doc/Audit_Schwachstellen_2026-07-31.md). Das Beenden läuft jetzt
+		// über AppLifecycleController.requestExit().
+		setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		getContentPane().setBackground(AppColors.BG_DARK);
 		setLayout(new BorderLayout());
 		add(uiBuilder.buildTopBar(), BorderLayout.NORTH);
@@ -507,6 +511,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// ── Dialogs → EditorDialogs / UIComponentFactory ──────────────────────────
 	void showErrorDialog(String title, String message)             { editorDialogs.showErrorDialog(title, message); }
 	void showInfoDialog(String title, String message)              { editorDialogs.showInfoDialog(title, message); }
+	int  showUnsavedChangesDialog(String htmlQuestion)             { return editorDialogs.showUnsavedChangesDialog(htmlQuestion); }
 	JDialog createBaseDialog(String title, int w, int h)           { return UIComponentFactory.createBaseDialog(this, title, w, h); }
 	JPanel centeredColumnPanel(int vp, int hp, int bp)             { return UIComponentFactory.centeredColumnPanel(vp, hp, bp); }
 

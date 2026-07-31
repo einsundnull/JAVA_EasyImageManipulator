@@ -1,0 +1,174 @@
+==============================================================================
+progress_2026-07-31_I01-tts-injektion.txt
+Schritt-Typ: [ST]  ·  Risiko: [B]  ·  Audit-Befund I01 (S1) REPARIERT
+==============================================================================
+
+PROMPT
+------
+"weiter" - also der naechste Punkt der Top-5-Reihenfolge aus
+doc/Audit_Schwachstellen_2026-07-31.md nach dem erledigten F01:
+
+  I01  TextToSpeech.java:52-67 PowerShell-INJEKTION. Kartentext landet in
+       einer doppelt gequoteten PS-Zeichenkette; \" ist in PowerShell kein
+       Escape, $(...) wird ausgewertet. CardTtsPlayer macht es bereits
+       richtig -> MapsPanel umstellen, TextToSpeech loeschen.
+
+
+ZUSAMMENFASSUNG
+---------------
+Die Lehre aus F01 wurde zuerst angewandt: GIBT ES DIE LOESUNG SCHON?
+Antwort ja - CardTtsPlayer. Es war wieder "anschliessen", nicht "bauen".
+
+Der Befund im Detail, weil er den Kern der Reparatur erklaert:
+
+  TextToSpeech.speakWindows() baute EINE Kommandozeile und uebergab sie an
+  "powershell -Command". Der Kartentext stand darin in DOPPELTEN
+  Anfuehrungszeichen. Zwei Dinge machen das angreifbar:
+    a) escapedText ersetzte " durch \" - Backslash ist in PowerShell KEIN
+       Escape-Zeichen. Das Anfuehrungszeichen beendet die Zeichenkette
+       trotzdem, danach steht beliebiger PowerShell-Code.
+    b) In DOPPELTEN Anfuehrungszeichen wertet PowerShell $(...) aus. Ein
+       Kartentext $(Remove-Item ... -Recurse) braucht nicht einmal ein
+       Anfuehrungszeichen, um Code auszufuehren.
+  Ausloeser war ein Klick auf "Vorlesen" in MapsPanel. Maps liegen als
+  maps/<lang>.json - austauschbare, teilbare Dateien.
+
+  CardTtsPlayer macht es strukturell anders und ist damit nicht angreifbar:
+  der Text ist NIEMALS Teil der Kommandozeile. Er wird in eine temporaere
+  UTF-8-.ps1 geschrieben und steht dort in einem EINFACH gequoteten
+  Here-String @'...'@ - darin findet KEINE Ersetzung und KEINE Auswertung
+  statt. Ausgefuehrt wird per "-File", nicht per "-Command".
+
+
+AENDERUNGEN (drei Dateien, eine geloescht)
+------------------------------------------
+1. src/paint/MapsPanel.java
+   - Zeile 240: TextToSpeech.speak(text, map.language())
+                -> CardTtsPlayer.play(map.id() + idSuffix, text,
+                                      map.language(), null)
+   - addTTSButton() bekam einen Parameter idSuffix (":I" / ":II"), damit die
+     beiden Texte derselben Karte fuer den Player unterscheidbar sind.
+     GLEICHE KONVENTION wie in TranslationMapListPanel:565 (map.id()+":I").
+     Nicht erfunden - abgeschaut.
+   - Kommentar an der Aufrufstelle mit Verweis auf Befund I01.
+
+2. src/paint/CardTtsPlayer.java
+   - Klassen-Javadoc: nennt jetzt alle drei Nutzer (CardListPanel,
+     TranslationMapListPanel, MapsPanel) und erklaert, WARUM die
+     Here-String-Konstruktion sicher ist. *** Damit ist zugleich die Bitte
+     aus dem Audit "bei der Gelegenheit I02 kommentieren" erledigt. ***
+   - NEU: private static String norm(String) - trim + toLowerCase.
+     Benutzt in windowsLocale(), macVoice() und speakLinux().
+     *** WARUM: TextToSpeech rief lang.toLowerCase() auf, CardTtsPlayer
+         nicht. Und die Sprache einer Map kommt aus einem FREIEN TEXTFELD
+         (MapCreateDialog:105), nicht aus einer Auswahlliste - "DE" oder
+         " de" sind moeglich. Ohne norm() waere aus de-DE stillschweigend
+         en-US geworden: eine Verhaltensverschlechterung, die niemand mit
+         der Sicherheitsreparatur in Verbindung gebracht haette.
+         Fuer die Kartenlisten aendert sich nichts, die liefern ohnehin
+         Kleinbuchstaben (CardTtsPlayer.availableLanguages()). ***
+
+3. src/paint/TextToSpeech.java  -> GELOESCHT (172 Zeilen)
+   Referenzfreiheit per TEXTSUCHE belegt, nicht aus dem Graphen (Lehre b):
+     grep "TextToSpeech" ueber src/  -> nach der Umstellung nur noch die
+     eigene Deklaration. Kein main() (Lehre a greift nicht - die Klasse
+     war nicht startbar). Historie in Git.
+   Treffer in ../TransparencyTool3, ../TransparencyTool4 und den
+   "- Kopie"-Ordnern sind SNAPSHOTS des Projekts, keine Abhaengigkeiten.
+   *** ACHTUNG FUER SPAETER: dieselbe Luecke steckt unveraendert in diesen
+       vier Kopien. Wer eine davon je wiederbelebt, holt sie zurueck. ***
+
+
+WAS BEWUSST NICHT MITGEMACHT WURDE
+----------------------------------
+- I02 (S3) bleibt OFFEN. text.replace("'", "''") verdoppelt Apostrophe im
+  gesprochenen Text ("don''t"). Die Verdopplung ist aber KEIN Zufall: sie
+  verhindert zugleich, dass eine Zeile, die nur aus '@ besteht, den
+  Here-String vorzeitig beendet. Sie ist jetzt kommentiert.
+  *** Die korrekte Reparatur waere NICHT "Verdopplung entfernen" - das
+      oeffnet die Luecke wieder. Sie waere: nicht verdoppeln, aber Zeilen,
+      die mit '@ beginnen, entschaerfen (z. B. ein Leerzeichen davor).
+      Das aendert das Verhalten der Karten-Wiedergabe und ist ein eigener
+      Schritt. ***
+- A01 (S2, Wettlauf im CardTtsPlayer) bleibt OFFEN und ist durch diese
+  Aenderung LEICHT BREITER geworden: MapsPanel ist jetzt ein dritter
+  Nutzer desselben Singletons. Praktisch kaum spuerbar, weil MapsPanel
+  keinen Wiedergabe-Zustand anzeigt (es uebergibt onDone = null) - der
+  Fehler zeigt sich nur an Knoepfen, die zwischen "|>" und "[]" umschalten.
+- VERHALTENSAENDERUNG, bewusst und als Verbesserung uebernommen:
+  TextToSpeech startete pro Klick einen neuen Thread, mehrere Texte
+  konnten GLEICHZEITIG sprechen. CardTtsPlayer ist ein Singleton und
+  stoppt die laufende Wiedergabe. Das ist das Verhalten, das die Karten
+  schon immer hatten - jetzt verhaelt sich die App einheitlich.
+
+
+NACHWEIS
+--------
+BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java
+                                                    src/module-info.java
+       exit 0, keine Warnung.
+
+KLASSENZAHL - hier ist eine Unstimmigkeit der Doku aufgefallen:
+  Sauberer Build in ein LEERES Verzeichnis: 334 .class
+  (vorher 335, minus TextToSpeech = 334. Stimmt.)
+  bin/ enthaelt dagegen 336. Der Unterschied sind book/JsonStorage.class
+  und book/Sheet.class: der javac-Befehl uebersetzt nur src/paint/*.java
+  und zieht aus book/ nur nach, was von paint aus erreichbar ist -
+  ECLIPSE uebersetzt alle drei book-Klassen.
+  *** ERWARTUNGSWERT AB JETZT: 334 bei sauberem javac-Build,
+      336 in einem von Eclipse mitgepflegten bin/.
+      Die Zahlen 328 (doc/GUIDELINES.md, CLAUDE.md) und 335
+      (WEITERMACHEN_PROMPT) waren beide erklaerbar, aber nicht dieselbe
+      Messung. Wer kuenftig eine Zahl notiert, schreibt dazu, WOMIT
+      gemessen wurde. ***
+  bin/paint/TextToSpeech.class wurde mitgeloescht (Build-Ausgabe liegt
+  in Git - vorgefundene Altlast, nicht bewertet).
+
+KEIN RUNTIME-VERIFY DURCHGEFUEHRT. "Build gruen" ist kein Verify (Univ. §10).
+
+
+RUNTIME-VERIFY (OFFEN, nur der User kann das)
+---------------------------------------------
+  T1  Karten-Panel oeffnen (Knopf "Maps"), Lautsprecher-Knopf an einer
+      Karte klicken -> Text wird vorgelesen wie vorher.
+  T2  Karte mit UMLAUTEN vorlesen (ae/oe/ue/ss) -> korrekt ausgesprochen.
+      *** Die wichtigste Pruefung: hier geht es jetzt ueber eine
+          UTF-8-Datei mit BOM statt ueber die Kommandozeile. ***
+  T3  Karte mit einem APOSTROPH im Text ("don't", "l'ami") -> spricht,
+      stuerzt nicht ab. (Klingt evtl. minimal anders -> das ist I02.)
+  T4  BEIDE Lautsprecher-Knoepfe einer Karte (textI und textII) -
+      jeder liest SEINEN Text, nicht zweimal denselben.
+      *** Prueft den neuen idSuffix-Parameter. ***
+  T5  Waehrend Karte A spricht, Karte B anklicken -> A bricht ab,
+      B spricht. (Neu: vorher sprachen beide gleichzeitig.)
+  T6  Karte mit Sprache "DE" oder " de" GROSS/mit Leerzeichen angelegt
+      -> spricht deutsch, nicht englisch. *** Prueft norm(). ***
+  T7  Sprache leer oder Unsinn ("klingonisch") -> faellt auf Englisch
+      zurueck, kein Absturz.
+  T8  Uebersetzungs-Karten (TranslationMapListPanel) und Kartenlisten
+      (CardListPanel) vorlesen -> UNVERAENDERT. Sie nutzen denselben
+      Player; norm() darf dort nichts kaputt gemacht haben.
+  T9  *** Gegenprobe zur Luecke, freiwillig: eine Karte mit dem Text
+      $(Write-Host GEHACKT) anlegen und vorlesen. ERWARTET: die Zeichen
+      werden VORGELESEN. Vor der Reparatur waere der Befehl gelaufen. ***
+
+  Ausserdem weiterhin offen und aelter: U1-U19 (Sichtpruefung der
+  AppTheme-Bereinigung) und X1-X13 (F01, Schliessen-Schutz).
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (keine aktive PD - dies war [ST])
+# progress.txt aktualisiert: ja (diese Datei, neu angelegt)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert: nein
+  (am 2026-07-31 bereits bereinigt, noch schlank)
+# Die Aufgabe "I01 reparieren" wurde vollstaendig abgeschlossen: ja
+  (Code fertig, Build gruen - Runtime-Verify T1-T9 liegt beim User)
+# Naechster Schritt: F02+F03 - atomarer Speicher-Helfer in der io-Schicht
+  (S1, Aufwand M). 21 ImageIO.write-Stellen, EINE Aenderung. Ist zugleich
+  die Vorarbeit fuer F01b und fuer den gefuehrten Befund S5.
+  *** Vorher dieselbe Frage wie bei F01 und I01 stellen: gibt es den
+      Helfer schon irgendwo? ***
+# "/clear" Befehl und WEITERMACHEN_PROMPT.txt empfohlen: ja
+  (F02 beruehrt 12 andere Dateien - frischer Kontext lohnt)
+==============================================================================

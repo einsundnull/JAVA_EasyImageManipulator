@@ -1,0 +1,151 @@
+==============================================================================
+progress_2026-07-31_claudemd-korrektur.txt
+Aufgabe: [ST]  —  CLAUDE.md gegen den gemessenen Ist-Stand korrigieren
+Risiko:  [B]   —  reine Dokumentation, kein Code angefasst
+==============================================================================
+
+PROMPT
+------
+"Lies in dieser Reihenfolge: JAVA_GUIDELINES_UNIVERSAL.md, GUIDELINES.md,
+Prompt_Handling.txt, WEITERMACHEN_PROMPT.txt, README.md"  ->  danach "weiter".
+
+Beim Lesen fiel auf, dass CLAUDE.md an mehreren Stellen einen Zustand
+beschreibt, den es nicht mehr gibt. Univ. §9 stuft genau das als BUG ein:
+"Dokumentation, die dem Code widerspricht, ist ein Bug." Und §28 nennt
+Befund S9 als Praezedenzfall - CLAUDE.md beschrieb damals das Hauptfenster
+noch als 1900-Zeilen-God-Klasse.
+
+
+ZUSAMMENFASSUNG
+---------------
+Sechs Widersprueche gefunden, alle sechs korrigiert. KEINE Zahl aus einem
+Dokument abgeschrieben - jede einzeln nachgemessen (Befehle unten).
+
+
+VORSCHLAEGE, DIE ERWOGEN UND VERWORFEN WURDEN
+---------------------------------------------
+- "Alle Zahlen aus WEITERMACHEN_PROMPT.txt uebernehmen" - VERWORFEN. Das
+  haette denselben Fehler eine Ebene tiefer wiederholt: eine Zahl, die
+  niemand mehr nachgemessen hat. Die .class-Zahl war denn auch in BEIDEN
+  Dokumenten unterschiedlich (334 vs 335).
+- "Gleich auch die Altlasten abarbeiten, die dabei auffallen" - VERWORFEN,
+  Univ. §0. Der Auftrag war Doku, nicht Aufraeumen. Die Befunde stehen
+  jetzt sichtbar in der Altlasten-Liste; entscheiden tut der User.
+
+
+TATSAECHLICHE LOESUNG - was gemessen wurde und was herauskam
+------------------------------------------------------------
+M1  Clean-Build in ein LEERES Verzeichnis (nicht gegen Eclipse-bin/):
+      javac -encoding UTF-8 -sourcepath src -d <leer> \
+            src/paint/*.java src/module-info.java
+      -> exit 0, 335 .class
+    Eclipse-bin/: find bin -name "*.class" | wc -l  ->  337
+    CLAUDE.md sagte 334 bzw. 336. BEIDE Zahlen waren um eins zu klein -
+    ImageFileWriter (2026-07-31 angelegt) fehlte in der Rechnung.
+    *** DIE DIFFERENZ ECLIPSE-JAVAC BLEIBT ZWEI. Das ist kein Fehler:
+        Eclipse uebersetzt alle drei book-Klassen, javac nur die von paint
+        aus erreichbare. Wer eine Zahl notiert, schreibt dazu, WOMIT. ***
+
+M2  Quelldateien:  ls src/paint/*.java | wc -l  ->  106   (CLAUDE.md: 105)
+                   ls src/book/*.java  | wc -l  ->    3
+    105 -> 106 ist die Summe zweier Aenderungen vom selben Tag:
+    TextToSpeech geloescht (I01), ImageFileWriter angelegt (F02).
+    An ZWEI Stellen korrigiert (Quellbaum-Hinweis + Architektur-Abschnitt).
+
+M3  Literale ausserhalb der Token-Klassen:
+      grep -ro "new Color(" src/paint --include=*.java \
+        | grep -v AppColors.java | grep -v AppTheme.java | wc -l
+      -> Color 125 · Font 62 · Stroke 34
+    CLAUDE.md sagte 454 / 162 / 110 - das waren die Zahlen VOR der
+    Migration und sogar vor der Auslagerung der Nachbarprojekte.
+    Ausgangswerte laut WEITERMACHEN: 259 / 135 / 68. Die aktuellen Zahlen
+    bestaetigen die dort dokumentierte Halbierung exakt.
+
+M4  Token-Nutzung:
+      grep -ro "AppTheme\." src --include=*.java | wc -l  ->  154
+      grep -rl "AppTheme\." src --include=*.java | wc -l  ->   15 Dateien
+      grep -ro "AppColors\." src --include=*.java | wc -l ->  704
+    *** DER GROBSTE WIDERSPRUCH: CLAUDE.md behauptete, AppTheme sei
+        "noch nirgends benutzt". Es steht in 15 Dateien mit 154
+        Verwendungen. Wer das las, haette AppTheme fuer einen unfertigen
+        Entwurf gehalten und weiter Literale getippt - also genau das
+        Gegenteil dessen, was §21 verlangt. AppColors: 704 statt 591. ***
+
+M5  toggleVis:  liegt NICHT in ElementController, sondern in
+    KeyboardShortcutManager:165 (am.put("toggleVis", ...)).
+    Der Code ist seit D02 korrekt: EIN pushUndo() vor der Schleife,
+    Zeile 176-178, mit erklaerendem Kommentar. Die Altlasten-Liste in
+    CLAUDE.md fuehrte ihn trotzdem noch als offen.
+    *** MERKPOSTEN: die Aktion sitzt im Shortcut-Manager, nicht im
+        Controller. Wer sie im ElementController sucht, findet sie nicht. ***
+
+M6  ImageIO.write:  grep -rn "ImageIO.write" src --include=*.java  ->  3
+    Treffer, ALLE DREI in ImageFileWriter.java. §34 ist eingehalten,
+    der Quellbaum sonst frei davon. Bestaetigt, nicht korrigiert.
+
+
+GEAENDERT - CLAUDE.md, sieben Stellen
+--------------------------------------
+ 1. Kopf: "§20-§33" -> "§20-§34"  (§34 Bilder atomar kam am 2026-07-31 dazu)
+ 2. Build: 334 -> 335, Eclipse 336 -> 337, "nachgemessen 2026-07-31"
+ 3. Quellbaum-Hinweis: 105 -> 106 Dateien, mit Begruendung der Differenz
+ 4. Architektur-Einleitung: "105 Klassen" -> "106 Klassen"
+ 5. Abschnitt "Farben": doppelte Ueberschrift entfernt (dort stand
+    "### Farben" unmittelbar ueber "### Farben, Fonts, Masse"), Zahlen
+    aktualisiert, die zwoelf migrierten Dateien benannt, und die bewusst
+    NICHT migrierten (Farbe als Inhalt) dazugeschrieben - sonst liest
+    sich der Rest wie unerledigte Arbeit.
+ 6. Abschnitt "Undo/Redo": zwei Absaetze ergaenzt -
+    (a) die Stacks haengen an der DATEI (CanvasFileState in c.fileCache),
+        nicht am Canvas. Das ist der Befund, der bei D02/D03 die Loesung
+        bestimmt hat, und er ist die Vorbedingung fuer B01.
+    (b) D03: Undo/Redo SETZT den Aenderungsmarker nur noch. Mit dem
+        ausdruecklichen Vermerk, dass die Kehrseite GEWOLLT ist.
+ 7. Abschnitt "Tastatur": "Eine Hilfe-Taste WAERE deshalb SHIFT+F1" ->
+    sie IST es, seit 2026-07-30. Dazu der Dispatcher-Hinweis (Umschalt+F1
+    muss VOR F1 abgefragt werden).
+ 8. Altlasten-Liste: toggleVis durchgestrichen + Gegenprobe vermerkt;
+    ZWEI offene Befunde ergaenzt, die bisher nur in WEITERMACHEN standen:
+    die nicht-atomaren TEXT-Schreiber und G01 (ISO-8859-1 vs UTF-8 im
+    GameII-Vertrag).
+
+
+WARUM DIE ZWEI ERGAENZUNGEN IN DIE ALTLASTEN-LISTE GEHOEREN
+------------------------------------------------------------
+CLAUDE.md hakte "ImageIO.write in 9 Dateien" als erledigt ab - richtig,
+aber irrefuehrend: das Muster (nicht-atomares Schreiben) besteht bei den
+Text-Schreibern unveraendert weiter. Wer nur CLAUDE.md liest, haette die
+Persistenz fuer versorgt gehalten. G01 fehlte ganz, obwohl es der letzte
+offene S1-Befund ist und eine VERTRAGSDATEI betrifft (§23).
+
+
+NICHT GEAENDERT - bewusst
+--------------------------
+- doc/GUIDELINES.md und WEITERMACHEN_PROMPT.txt: inhaltlich korrekt bis
+  auf die eine .class-Zahl (siehe unten).
+- Kein Code. Kein Refactoring. Univ. §0.
+- Die Beinahe-Treffer und die §21-Ergaenzung bleiben offene
+  Entscheidungen des Users - nicht nebenbei entschieden.
+
+
+RUNTIME-VERIFY
+--------------
+KEINER. Diese Aufgabe hat nur Dokumentation geaendert; es gibt nichts zu
+starten. Der aufgestaute Verify aus den Vorschritten bleibt unveraendert
+offen: U1-U19, X1-X13, T1-T9, S1-S12, D1-D6.
+*** "Build gruen" ist kein Verify - hier war nicht einmal ein Build
+    noetig. Der Clean-Build lief nur als MESSUNG (M1), in ein
+    Wegwerf-Verzeichnis, nicht nach bin/. ***
+
+
+==============================================================================
+# PD.txt aktualisiert (nein - [ST], keine PD)
+# progress.txt aktualisiert (ja - diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert (ja - Build-Zahl + Eintrag)
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert (nein - nicht noetig)
+# Die Aufgabe CLAUDE.md-Korrektur wurde vollstaendig abgeschlossen (ja)
+# Naechster Schritt: Runtime-Verify durch den User; danach B01 (fileCache
+#   deckeln, Messung zuerst - und mit dem Wissen aus M-Punkt "Undo-Stacks
+#   haengen an der Datei")
+# "/clear" Befehl und WEITERMACHEN_PROMPT.txt empfohlen (nein)
+==============================================================================

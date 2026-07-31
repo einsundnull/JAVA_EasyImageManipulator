@@ -147,7 +147,7 @@ class ScenesController {
 				try {
 					File tmp = File.createTempFile("layer_scene_", ".png");
 					tmp.deleteOnExit();
-					javax.imageio.ImageIO.write(img, "PNG", tmp);
+					ImageFileWriter.writePng(img, tmp);
 					createSceneFromDrop(Arrays.asList(tmp), idx);
 				} catch (Exception ex) {
 					ed.showErrorDialog("Fehler", "Layer → Scene fehlgeschlagen:\n" + ex.getMessage());
@@ -220,7 +220,7 @@ class ScenesController {
 				if (canvasSnapshot != null) {
 					bgFile = File.createTempFile("scene_bg_", ".png");
 					bgFile.deleteOnExit();
-					javax.imageio.ImageIO.write(canvasSnapshot, "PNG", bgFile);
+					ImageFileWriter.writePng(canvasSnapshot, bgFile);
 				} else {
 					bgFile = fallbackFile;
 				}

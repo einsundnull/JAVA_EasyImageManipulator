@@ -1,0 +1,181 @@
+==============================================================================
+progress_2026-07-31_F02-F03-atomares-speichern.txt
+PD: Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt  -> ALLE SECHS
+    SCHRITTE ABGESCHLOSSEN
+==============================================================================
+
+PROMPT
+  "weiter" -> Top-5 Platz 3 aus dem Schwachstellen-Audit: F02 + F03.
+
+ZUSAMMENFASSUNG
+  Neue Klasse ImageFileWriter (io-Rolle fuer Bilder, Gegenstueck zu
+  ImageLoader). Alle 21 ImageIO.write-Aufrufstellen in 12 Dateien laufen
+  jetzt darueber. ImageIO.write steht damit nur noch an EINER Stelle im
+  ganzen Quellbaum - in ImageFileWriter selbst.
+
+  F02 behoben: geschrieben wird in eine Nachbardatei "<ziel>.NNNN.part" im
+       SELBEN Verzeichnis, danach Files.move(ATOMIC_MOVE). Ein Absturz oder
+       ein voller Datentraeger mitten im Schreiben laesst das Original
+       unangetastet. Vorher trunkierte ImageIO.write die Quelldatei beim
+       Oeffnen und fuellte sie dann - der Zwischenzustand war eine kaputte
+       Datei ohne Rueckweg.
+  F03 behoben: der Rueckgabewert wird geprueft. ImageIO.write WIRFT NICHT,
+       wenn kein Writer gefunden wird, sondern liefert false - der Code
+       meldete dann "Gespeichert", setzte hasUnsavedChanges=false und
+       entfernte aus dirtyFiles.
+
+==============================================================================
+VORSCHLAEGE, DIE ICH VORHER GEPRUEFT HABE
+==============================================================================
+  a) "Gibt es die Loesung schon?" (Pflichtfrage seit F01/I01)
+     -> DIESMAL NEIN. Textsuche: ATOMIC_MOVE 0x, Files.move 1x (Umbenennen
+        einer Buchseite, kein Speichern), createTempFile 5x - ausschliesslich
+        fuer Wegwerf-Dateien. ImageLoader existiert, hat aber kein
+        Gegenstueck zum Schreiben. Die Luecke war echt.
+
+  b) Zwei Methoden anbieten (atomar / direkt)?
+     -> VERWORFEN. Das haette an JEDER Aufrufstelle eine Entscheidung
+        verlangt - und damit die naechste Stelle geschaffen, an der jemand
+        die falsche waehlt. §6 will EINEN Schreibweg. Der Aufpreis fuer die
+        Wegwerf-Faelle ist ein Rename.
+
+  c) Zusaetzlich .bak-Dateien anlegen?
+     -> VERWORFEN, als "unnoetiger Schritt" (Univ. §0). Das wuerde
+        Benutzerverzeichnisse zumuellen und waere eine Produktentscheidung,
+        kein Bugfix. Temp+Rename loest F02 vollstaendig.
+
+  d) Package-Split nach "io" (Befund S5)?
+     -> NICHT GEMACHT. Das ist [C] und braucht Freigabe (§4). ImageFileWriter
+        IST die io-Schicht fuer Bilder, auch ohne eigenes Package.
+
+  e) Temp-Datei in %TEMP%?
+     -> FALSCH GEWESEN. ATOMIC_MOVE funktioniert nur INNERHALB eines
+        Datentraegers. Die Temp-Datei liegt deshalb im Zielverzeichnis.
+
+==============================================================================
+TATSAECHLICHE LOESUNG
+==============================================================================
+NEU: src/paint/ImageFileWriter.java (107 Z., package-private, final, keine
+     Instanzen)
+  writePng(BufferedImage, File) throws IOException
+     1. null-Pruefungen -> IOException statt NPE
+     2. Ziel auf absoluten Pfad (sonst hat ein relativer Name kein
+        Elternverzeichnis -> NPE in createTempFile)
+     3. Files.createDirectories(dir)                        (Univ. §6)
+     4. Temp-Datei IM ZIELVERZEICHNIS, Endung ".part"
+     5. ImageIO.write in den Strom, RUECKGABEWERT PRUEFEN   (F03)
+     6. Files.move ATOMIC_MOVE + REPLACE_EXISTING           (F02)
+        Rueckfall auf REPLACE_EXISTING allein bei
+        AtomicMoveNotSupportedException (Netz-/Fremddateisysteme) - dann
+        eben nicht atomar, aber die Daten sind zu dem Zeitpunkt bereits
+        vollstaendig geschrieben, also immer noch besser als in das
+        Original hinein.
+     7. finally: Temp-Leiche entfernen, Fehler ueber System.err
+        (kein stilles Verschlucken, Univ. §6)
+  writePng(BufferedImage, OutputStream) throws IOException
+     nur die F03-Pruefung. Schliesst den Strom NICHT.
+
+MIGRIERTE STELLEN - 21 in 12 Dateien:
+  GRUPPE A (ueberschreibt vorhandene Datei - hier sass F02, S1)        9
+    SaveController 119/142/199/214/259/283   *** die drei namentlich im
+      Audit genannten S1-Stellen sind 142, 199, 283 ***
+    SceneFileWriter:65      (image_N.png -> VERTRAGSDATEI §23)
+    SceneImageAdapter:163
+    ElementController:373   (saveLayerAsImageFile)
+  GRUPPE B (Zielname per while(exists), also garantiert neu -> F03)    7
+    NewFileController 100/185 · GalleryCallbacksFactory 85/212 ·
+    TileGalleryPanel:974 · BookController:366 · WhiteToAlphaConverter:48
+  GRUPPE C (Wegwerf-Temp, createTempFile+deleteOnExit -> F03)          4
+    ElementController:315 · GalleryCallbacksFactory:308 ·
+    ScenesController 150/223
+  GRUPPE D (gar keine Datei -> nur F03)                                1
+    SceneSerializer:272, ByteArrayOutputStream fuer Base64
+
+  *** DAS AUDIT SAGT "21 Fundstellen, eine Aenderung". DIE ZAHL STIMMT,
+      DIE GLEICHSETZUNG NICHT: nur die neun aus Gruppe A konnten ueberhaupt
+      eine vorhandene Datei zerstoeren. Gruppe B/C/D bekommen den Helfer,
+      weil EIN Schreibweg besser ist als zwei - nicht, weil sie das
+      F02-Risiko haetten. Wer das spaeter liest, soll die Prioritaet
+      richtig einschaetzen koennen. ***
+
+NEBENBEI: zwei tot gewordene "import javax.imageio.ImageIO" entfernt
+  (ElementController, NewFileController). Sonst nichts angefasst - keine
+  Fachlogik, keine Struktur, keine Fehlermeldungstexte.
+
+==============================================================================
+ZWEI VERHALTENSAENDERUNGEN, DIE MAN WISSEN MUSS
+==============================================================================
+  1. ZIELVERZEICHNISSE ENTSTEHEN JETZT. Vorher warf ImageIO.write eine
+     FileNotFoundException, wenn das Verzeichnis fehlte. Jetzt wird es
+     angelegt (Univ. §6 verlangt das ausdruecklich). Wo bisher ein Fehler
+     kam, entsteht nun eine Datei. Das ist gewollt, aber es ist eine
+     Aenderung.
+  2. WAEHREND DES SCHREIBENS LIEGT KURZ EINE ".part"-DATEI NEBEN DEM ZIEL.
+     Sie verschwindet mit dem Rename. Bleibt eine liegen, ist genau das der
+     Beweis, dass ein Schreibvorgang abgebrochen ist - und das Original ist
+     dann heil. Kein Bildfilter im Programm nimmt ".part" an.
+
+==============================================================================
+BUILD-VERIFY (erledigt)
+==============================================================================
+  javac -encoding UTF-8 -sourcepath src -d <LEER> src/paint/*.java src/module-info.java
+  -> exit 0, 335 .class     (334 vorher + ImageFileWriter, wie vorhergesagt)
+  Gemessen in einem LEEREN Zielverzeichnis, nicht im Eclipse-bin/.
+
+NACHWEIS-PROGRAMM (Wegwerf, im scratchpad, nicht eingecheckt):
+  13 Pruefungen, alle bestanden:
+    1  neue Datei entsteht, lesbar, richtige Groesse
+    1b keine .part-Leiche
+    2  Ueberschreiben ersetzt den Inhalt (85 B -> 165 B)
+    2b Farbe ist die neue        2c keine .part-Leiche
+    3a/3b fehlendes Zielverzeichnis wird angelegt
+    4  relativer Pfad ohne Verzeichnisanteil (haette ohne toAbsolutePath
+       eine NPE gegeben - der Test hat den Fall vor dem Einchecken gefunden)
+    5  null-Bild -> IOException      5b und KEINE Datei angelegt
+    6  *** ORIGINAL BYTE-IDENTISCH NACH FEHLVERSUCH (110 B) - das ist die
+       F02-Zusage, gemessen ***                  6b keine .part-Leiche
+    7  OutputStream-Variante liefert PNG-Bytes
+
+  *** DAS IST KEIN RUNTIME-VERIFY. Es beweist den Helfer, nicht das
+      Programm. "Build gruen" ist kein Verify (Univ. §10). ***
+
+==============================================================================
+RUNTIME-VERIFY S1-S12  -  OFFEN, GEHOERT DEM USER
+==============================================================================
+Alle Speicherwege einmal auesloesen und pruefen: Datei aktualisiert, KEINE
+".part"-Datei bleibt daneben liegen, Titelleiste verliert den Aenderungs-
+Marker.
+
+  S1  *** WICHTIGSTE: Bild laden, malen, "In Original speichern" ->
+      Datei ist aktualisiert, Bild danach neu laden zeigt die Aenderung.
+      (SaveController:142, einer der drei S1-Faelle) ***
+  S2  *** Buchseite oeffnen, aendern, Strg+S -> Seite gespeichert UND die
+      Layer (persistSceneIfActive laeuft danach). (SaveController:199) ***
+  S3  Normales Bild, Strg+S -> Datei mit Suffix (_selective_alpha /
+      _painted / _floodfill_alpha) entsteht neben dem Original
+  S4  Strg+Umschalt+S -> Dateidialog, Elemente eingebrannt gespeichert
+  S5  *** Strg+Umschalt+Alt+S -> Rueckfrage, dann Original UEBERSCHRIEBEN
+      mit eingebrannten Elementen. (SaveController:283) ***
+  S6  Neue Bitmap anlegen -> Untitled_N.png entsteht im zuletzt benutzten
+      Verzeichnis und erscheint in der Galerie
+  S7  *** Szene speichern -> images/image_N.png im Szenenverzeichnis.
+      Danach die Szene in GameII/GameLoop2 oeffnen - VERTRAG §23. ***
+  S8  Layer per Rechtsklick als Bilddatei speichern -> landet in der Galerie
+  S9  Layer auf den ANDEREN Canvas schieben (Temp-Weg, ElementController:315)
+  S10 Layer per Drop zu einer Szene machen (Temp-Weg, ScenesController:150)
+  S11 Neue Buchseite anlegen -> Seite entsteht, Manifest aktualisiert
+  S12 *** NACH DER SITZUNG: in den benutzten Verzeichnissen liegt KEINE
+      *.part-Datei. Findet sich doch eine, ist dort ein Schreibvorgang
+      abgebrochen - dann bitte melden, das Original ist heil. ***
+
+  Nichts davon deckt der Compile-Verify ab.
+
+==============================================================================
+WAS DIESER SCHRITT NICHT ANFASST
+==============================================================================
+  - D01/D03 (Undo-Band, Naechstes nach diesem Task: D02+D03)
+  - G01/G02 (Kodierung) - [C], Migrationsentscheidung des Users
+  - B01 (fileCache deckeln) - braucht vorher eine Messung (§26)
+  - F01b ("Alles speichern" ueber beide Canvases) - war ausdruecklich auf
+    F02 gewartet und ist damit jetzt MOEGLICH geworden. Braucht aber eine
+    Speicher-Politik und damit eine Entscheidung des Users.

@@ -1,0 +1,129 @@
+==============================================================================
+Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt   (PD.txt)
+==============================================================================
+INITIALER PROMPT
+  "weiter" -> naechster freigegebener Schritt laut WEITERMACHEN_PROMPT.txt,
+  Top-5 Platz 3: F02 + F03, atomarer Speicher-Helfer.
+
+BEFUNDE (doc/Audit_Schwachstellen_2026-07-31.md)
+  F02  S1  BELEGT   Kein atomares Schreiben, direkt auf die Quelldatei.
+                    ImageIO.write(workingImage,"PNG",c.sourceFile) TRUNKIERT
+                    das Original beim Oeffnen und fuellt es dann. Absturz /
+                    volle Platte / Stromausfall mitten im Schreiben ->
+                    Originaldatei zerstoert, weder alte noch neue Fassung.
+                    SaveController:142,199,283 (+ 21 ImageIO.write in 12 Dateien)
+  F03  S2  PLAUSIBEL ImageIO.write WIRFT NICHT, wenn kein Writer gefunden wird
+                    - es liefert false. Rueckgabewert wird an KEINER der 21
+                    Stellen geprueft -> "Gespeichert", hasUnsavedChanges=false,
+                    aus dirtyFiles entfernt, Datei leer/trunkiert.
+
+==============================================================================
+VORFRAGE (Pflicht seit F01/I01): GIBT ES DIE LOESUNG SCHON?
+==============================================================================
+  NEIN. Textsuche ueber src/ nach ATOMIC_MOVE / Files.move / createTempFile:
+    - Files.move            1x  BookController:547 (Seite umbenennen, kein Save)
+    - createTempFile        5x  ausschliesslich fuer WEGWERF-Dateien
+    - ATOMIC_MOVE           0x
+  Es gibt ImageLoader (Laden), aber KEIN Gegenstueck zum Schreiben.
+  -> Diesmal wird wirklich gebaut. Das Gegenstueck heisst ImageFileWriter
+     und schliesst die Luecke, die ImageLoader offen laesst.
+
+NAMENSWAHL: NICHT "ImageWriter" - javax.imageio.ImageWriter existiert und
+  waere in jeder Datei mit "import javax.imageio.*" eine Falle. "ImageFileWriter"
+  erfuellt §8 (*Writer) und bildet das Paar zu ImageLoader.
+
+==============================================================================
+KLASSIFIKATION DER 21 FUNDSTELLEN
+*** DAS AUDIT SAGT "21 Fundstellen, eine Aenderung". DAS IST ZU GROB. ***
+Nicht jede Stelle braucht atomares Schreiben; wo nichts zu zerstoeren ist,
+waere Temp+Rename ein UNNOETIGER SCHRITT (Univ. §0). F03 gilt dagegen ueberall.
+==============================================================================
+
+GRUPPE A - ueberschreibt eine VORHANDENE Datei. Hier sitzt F02 (S1).      9x
+  SaveController:119   saveImage            outFile (Suffix, kann existieren)
+  SaveController:142   saveImageToOriginal  c.sourceFile   <-- S1 im Audit
+  SaveController:199   saveImageSilent      c.sourceFile   <-- S1 im Audit
+  SaveController:214   saveImageSilent      outPath (Suffix)
+  SaveController:259   saveBurnedCopy       vom User im Dateidialog gewaehlt
+  SaveController:283   saveBurnedOriginal   c.sourceFile   <-- S1 im Audit
+  SceneFileWriter:65   image_N.png im Szenenverzeichnis -> VERTRAGSDATEI §23
+  SceneImageAdapter:163 outputImageFile vom Aufrufer
+  ElementController:373 saveLayerAsImageFile, file vom Aufrufer
+
+GRUPPE B - Zielname per while(exists)-Schleife, also GARANTIERT NEU.       7x
+  Kein Original zerstoerbar -> F02 trifft nicht zu, F03 sehr wohl.
+  NewFileController:100,185 · GalleryCallbacksFactory:85,212 ·
+  TileGalleryPanel:974 · BookController:366 (nextPageName) ·
+  WhiteToAlphaConverter:48
+
+GRUPPE C - Wegwerf-Temp (createTempFile + deleteOnExit, sofort weiter-      4x
+  verarbeitet). Atomar waere sinnlos; ein stiller false erzeugt aber eine
+  LEERE Datei, die der Folgeschritt unerklaert scheitern laesst.
+  ElementController:315 · GalleryCallbacksFactory:308 · ScenesController:150,223
+
+GRUPPE D - gar keine Datei.                                                1x
+  SceneSerializer:272 schreibt in einen ByteArrayOutputStream (Base64).
+  F02 nicht anwendbar, F03 ja.
+
+ENTSCHEIDUNG ZUR API: EINE oeffentliche Datei-Methode, nicht zwei.
+  writePng(img, File) ist IMMER atomar - auch fuer Gruppe B/C. Begruendung:
+  der Aufpreis ist ein Rename, der Preis einer zweiten Methode waere eine
+  ENTSCHEIDUNG AN JEDER AUFRUFSTELLE - und damit die naechste Stelle, an der
+  jemand die falsche waehlt. §6 will EINEN Schreibweg, keinen mit Varianten.
+  Dazu writePng(img, OutputStream) fuer Gruppe D (nur die Pruefung).
+
+==============================================================================
+SCHRITTE
+==============================================================================
+[1/6] ImageFileWriter anlegen.                                      [B]
+      Neue Klasse, NULL Aufrufer beim Anlegen (Muster: AppTheme).
+      writePng(BufferedImage, File):
+        - Zielverzeichnis anlegen (Univ. §6, Files.createDirectories)
+        - Temp-Datei IM SELBEN VERZEICHNIS wie das Ziel (nicht %TEMP%:
+          ATOMIC_MOVE funktioniert nur innerhalb eines Datentraegers)
+        - ImageIO.write-Rueckgabewert pruefen -> IOException (F03)
+        - Files.move(ATOMIC_MOVE), Rueckfall REPLACE_EXISTING
+        - Temp im Fehlerfall loeschen, Original bleibt unangetastet
+      writePng(BufferedImage, OutputStream): nur die Pruefung.
+      MODEL: Opus/Sonnet. Kurz, aber die Fehlerpfade muessen stimmen.
+
+[2/6] SaveController: 6 Stellen.                                    [A/B]
+      Enthaelt alle drei im Audit namentlich genannten S1-Stellen.
+      Groesster Hebel des ganzen Tasks.
+      MODEL: Opus/Sonnet - Fachlogik drumherum nicht anfassen.
+
+[3/6] Uebrige Gruppe A: SceneFileWriter, SceneImageAdapter,         [B]
+      ElementController:373. SceneFileWriter beruehrt den §23-Vertrag,
+      aendert aber nur das WIE des Schreibens, nicht das Format.
+
+[4/6] Gruppe B: 7 Stellen.                                          [B]
+      Rein mechanisch. MODEL: auch Haiku vertretbar.
+
+[5/6] Gruppe C + D: 5 Stellen.                                      [B]
+
+[6/6] Doku: CLAUDE.md (Altlast "ImageIO.write in 9 Dateien" +       [B]
+      Persistenz-Tabelle), doc/GUIDELINES.md (Steckbrief-Zeile
+      Persistenz-Paare), WEITERMACHEN_PROMPT.txt, progress-Datei.
+
+AUSDRUECKLICH NICHT TEIL DIESES TASKS (unnoetige Schritte, Univ. §0):
+  - Befund S5 "ImageIO.write gehoert in die io-Schicht" wird NICHT durch
+    einen Package-Split geloest - der ist [C] und braucht Freigabe (§4).
+    ImageFileWriter IST die io-Schicht fuer Bilder, auch ohne eigenes Package.
+  - KEINE .bak-Dateien. Sie muellen Benutzerverzeichnisse zu und waeren eine
+    Produktentscheidung, kein Bugfix.
+  - G01/G02 (Kodierung) bleiben unberuehrt - [C], Migrationsentscheidung.
+  - D01/D03 (Undo-Band) bleiben unberuehrt - eigener Task.
+
+==============================================================================
+FORTSCHRITT
+==============================================================================
+[1/6] abgeschlossen
+[2/6] abgeschlossen
+[3/6] abgeschlossen
+[4/6] abgeschlossen
+[5/6] abgeschlossen
+[6/6] abgeschlossen
+
+BUILD-VERIFY: javac exit 0, 335 .class in LEEREM Ziel (334 + ImageFileWriter).
+RUNTIME-VERIFY: S1-S12, siehe progress_2026-07-31_F02-F03-atomares-speichern.txt
+                *** GEHOERT DEM USER. "Build gruen" ist kein Verify. ***

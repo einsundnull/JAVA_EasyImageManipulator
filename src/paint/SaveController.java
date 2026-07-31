@@ -11,7 +11,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -78,17 +77,36 @@ class SaveController {
 		afterUndoRedo(idx);
 	}
 
+	/**
+	 * Nachbereitung von Undo/Redo. Setzt den Änderungszustand — aber
+	 * <b>nur in eine Richtung</b>.
+	 *
+	 * <p>Vorher stand hier „Undo-Stack leer ⇒ gespeichert". Das ist ein
+	 * Fehlschluss (Befund D03): der leere Stack bedeutet den Zustand beim
+	 * <i>Laden</i>, nicht beim <i>Speichern</i>. Nach mehr als
+	 * {@link #MAX_UNDO} Änderungen ist er nicht einmal das, weil die ältesten
+	 * Schnappschüsse verdrängt wurden. Das Programm meldete „keine
+	 * ungespeicherten Änderungen", während die Datei um die verdrängten
+	 * Schritte abwich — zusammen mit dem Schließen-Schutz ging genau das
+	 * still verloren.
+	 *
+	 * <p><b>Undo/Redo ändert das Bild, es schreibt es nicht.</b> Es kann
+	 * deshalb nie „gespeichert" bedeuten. Der Zustand wird hier nur noch
+	 * gesetzt, nicht gelöscht; zurückgesetzt wird er ausschließlich dort, wo
+	 * wirklich gespeichert oder geladen wird.
+	 *
+	 * <p><b>Bewusst in Kauf genommen:</b> wer eine Änderung macht und sofort
+	 * zurücknimmt, behält den Änderungsmarker, obwohl das Bild wieder der
+	 * Datei entspricht. Eine Rückfrage zu viel ist der harmlose Fehler; die
+	 * Alternative war stiller Datenverlust. Die exakte Antwort („ist das Bild
+	 * identisch mit der Datei?") braucht einen echten Speicher-Marker pro
+	 * Datei und gehört zu D01 — <b>hier nicht gelöst.</b>
+	 */
 	private void afterUndoRedo(int idx) {
 		CanvasInstance c = ed.ci(idx);
-		if (c.undoStack.isEmpty()) {
-			c.hasUnsavedChanges = false;
-			if (c.sourceFile != null)
-				ed.dirtyFiles.remove(c.sourceFile);
-		} else {
-			c.hasUnsavedChanges = true;
-			if (c.sourceFile != null)
-				ed.dirtyFiles.add(c.sourceFile);
-		}
+		c.hasUnsavedChanges = true;
+		if (c.sourceFile != null)
+			ed.dirtyFiles.add(c.sourceFile);
 		ed.updateTitle();
 		ed.updateDirtyUI();
 		ed.refreshElementPanel();
@@ -116,7 +134,7 @@ class SaveController {
 			String suffix = getSaveSuffix();
 			String outPath = WhiteToAlphaConverter.getOutputPath(c.sourceFile, suffix);
 			File outFile = new File(outPath);
-			ImageIO.write(c.workingImage, "PNG", outFile);
+			ImageFileWriter.writePng(c.workingImage, outFile);
 
 			if (ed.projectManager.getProjectName() != null) {
 				ed.projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode,
@@ -139,7 +157,7 @@ class SaveController {
 		if (c.sourceFile == null || c.workingImage == null)
 			return;
 		try {
-			ImageIO.write(c.workingImage, "PNG", c.sourceFile);
+			ImageFileWriter.writePng(c.workingImage, c.sourceFile);
 
 			// Book pages: persist layers via scene mechanism (writes .txt + images/ + texts/)
 			if (PageLayoutManifest.isBookPage(c.sourceFile)) {
@@ -196,7 +214,7 @@ class SaveController {
 		try {
 			// Book pages: save in-place and persist layers
 			if (PageLayoutManifest.isBookPage(c.sourceFile)) {
-				ImageIO.write(c.workingImage, "PNG", c.sourceFile);
+				ImageFileWriter.writePng(c.workingImage, c.sourceFile);
 				if (c.activeSceneFile == null)
 					c.activeSceneFile = BookController.getPageManifest(c.sourceFile);
 				ed.persistSceneIfActive(ed.activeCanvasIndex);
@@ -211,7 +229,7 @@ class SaveController {
 
 			String suffix = getSaveSuffix();
 			String outPath = WhiteToAlphaConverter.getOutputPath(c.sourceFile, suffix);
-			ImageIO.write(c.workingImage, "PNG", new File(outPath));
+			ImageFileWriter.writePng(c.workingImage, new File(outPath));
 
 			if (ed.projectManager.getProjectName() != null) {
 				ed.projectManager.saveScene(c.sourceFile, c.activeElements, c.zoom, c.appMode,
@@ -256,7 +274,7 @@ class SaveController {
 				if (!target.getName().toLowerCase().endsWith(".png")) {
 					target = new File(target.getAbsolutePath() + ".png");
 				}
-				ImageIO.write(burned, "PNG", target);
+				ImageFileWriter.writePng(burned, target);
 				ToastNotification.show(ed, "Mit Elementen gespeichert: " + target.getName());
 			} catch (IOException e) {
 				ed.showErrorDialog("Speicherfehler", e.getMessage());
@@ -280,7 +298,7 @@ class SaveController {
 
 		if (result == JOptionPane.OK_OPTION) {
 			try {
-				ImageIO.write(burned, "PNG", c.sourceFile);
+				ImageFileWriter.writePng(burned, c.sourceFile);
 				c.hasUnsavedChanges = false;
 				ed.dirtyFiles.remove(c.sourceFile);
 				ed.updateTitle();

@@ -971,7 +971,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         File dest = new File(targetDir, base + "_copy.png");
         for (int i = 1; dest.exists(); i++) dest = new File(targetDir, base + "_copy_" + i + ".png");
         try {
-            javax.imageio.ImageIO.write(img, "PNG", dest);
+            ImageFileWriter.writePng(img, dest);
             return dest;
         } catch (Exception ex) {
             System.err.println("[TileGalleryPanel] writeCompositeWithUniqueName failed: " + ex.getMessage());

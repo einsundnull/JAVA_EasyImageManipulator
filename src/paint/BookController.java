@@ -363,7 +363,7 @@ class BookController {
 				// Save page PNG
 				String pageName = nextPageName(bookDir);
 				File pageFile = new File(getPagesDir(bookDir), pageName);
-				ImageIO.write(page, "PNG", pageFile);
+				ImageFileWriter.writePng(page, pageFile);
 
 				// Update manifest
 				List<String> pages = readManifestPages(bookDir);

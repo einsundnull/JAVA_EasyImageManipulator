@@ -37,8 +37,8 @@
 | UI-Toolkit | **Swing** (nicht AWT — GameLoop2-Rendering-Regeln gelten hier **nicht**, siehe §24) |
 | Einstiegspunkt | `paint.SelectiveAlphaEditor` |
 | Run | `java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor` |
-| Build | `javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java` — **`-encoding UTF-8` ist Pflicht** (Unicode-Symbole im Quelltext). Erwartet: **exit 0, 328 `.class`** (Stand 2026-07-30, nach Auslagerung + Altlast-Löschung §28) |
-| Quellbaum | **nur** `paint` (103) + `book` (3) + `module-info.java`. Seit 2026-07-30 eigene Projekte: `../SpriteAnimator/`, `../PathAnimator/`, `../JavaDemos/` |
+| Build | `javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java` — **`-encoding UTF-8` ist Pflicht** (Unicode-Symbole im Quelltext). Erwartet: **exit 0, 334 `.class`** in einem **leeren** Zielverzeichnis (Stand 2026-07-31). Ein Eclipse-`bin/` hat **336** — Eclipse übersetzt alle drei `book`-Klassen. **Zur Zahl immer die Messmethode notieren.** |
+| Quellbaum | **nur** `paint` (105) + `book` (3) + `module-info.java`. Seit 2026-07-30 eigene Projekte: `../SpriteAnimator/`, `../PathAnimator/`, `../JavaDemos/` |
 | Token-Quelle (Univ. §3) | **`AppColors`** (Farben) **+ `AppTheme`** (Fonts, Abstände, Radien, Strokes, Größen) — zwei Klassen, überschneidungsfrei → §21 |
 | Fenster-Basisklasse (Univ. §2) | **fehlt noch** → §20. Bis dahin `UIComponentFactory.createBaseDialog(...)` als Minimum |
 | Zeichenflächen-Basisklasse | **keine** (Swing puffert selbst) → Regeln in §24 |
@@ -50,7 +50,8 @@
 | Zustands-Träger | **`CanvasInstance`** (Zustand **pro Canvas**), `canvases[2]`, `ci()`/`ci(idx)` → §30 |
 | Fachlogik | **18 `*Controller`** + 5 `*CallbacksFactory` + `Callbacks`-Interfaces → §22 |
 | God-Klasse (Univ. §5) | **`CanvasPanel` (3299 Z.)** — *nicht* das Hauptfenster (566 Z., bereits Orchestrator) |
-| Persistenz-Paare (Univ. §6) | `SceneFileReader/Writer` · `TextReader/Writer` · `GameSceneReader/Writer` · `ToolLegacySceneReader` (nur lesen) · `SceneSerializer` · `PageLayoutManifest` |
+| Persistenz-Paare (Univ. §6) | `SceneFileReader/Writer` · `TextReader/Writer` · `GameSceneReader/Writer` · `ToolLegacySceneReader` (nur lesen) · `SceneSerializer` · `PageLayoutManifest` · **`ImageLoader`/`ImageFileWriter`** (Bilder, seit 2026-07-31) |
+| Bild-Persistenz (§34) | **`ImageFileWriter.writePng(...)` ist der einzige Weg, ein Bild zu schreiben.** Kein `ImageIO.write` außerhalb dieser Klasse |
 | Format-Verträge (Univ. §7) | **Szenen-Format ↔ GameII** → §23 |
 | Settings (Univ. §12) | **`AppSettings`** (Singleton) → `%APPDATA%\TransparencyTool\settings\default.txt` (Inhalt: JSON, siehe §31) |
 | Shortcut-Registry (Univ. §11) | **`KeyBindings.ALL`** (53 Einträge) + **`KeyBindings.GUIDE`**; Dialog `KeyBindingsDialog`, Taste **Umschalt+F1** und Knopf „?“ → §25 |
@@ -530,6 +531,43 @@ Wahrscheinlichkeit die falsche.
 - **Bis dahin bleibt alles lokal und funktionsfähig.** Diese Regel verlangt
   **keine** Umstellung — nur, dass keine *neue* Direktzugriffs-Stelle
   entsteht.
+
+---
+
+## §34 Bilder werden atomar und geprüft geschrieben  [A/B]
+
+**Anlass:** Befunde **F02** (S1) und **F03** des Schwachstellen-Audits,
+behoben am 2026-07-31. `ImageIO.write(img, "PNG", c.sourceFile)` **trunkiert
+die Zieldatei beim Öffnen** und füllt sie dann — ein Absturz mitten im
+Schreiben ließ weder die alte noch die neue Fassung zurück. Und
+`ImageIO.write` **wirft nicht**, wenn kein Writer gefunden wird: es liefert
+`false`, was an keiner der 21 Fundstellen geprüft wurde.
+
+- **Verbindlich [B]: `ImageIO.write` steht nur noch in `ImageFileWriter`.**
+  Jeder andere Schreibweg für Bilder ist ein Regelverstoß — auch für
+  Wegwerf-Temp-Dateien. Konkretisierung von Univ. §6 („ein Writer pro
+  Entitätstyp") auf den Typ *Bild*.
+- **Eine Methode, keine Varianten.** `writePng(img, File)` ist **immer**
+  atomar. Eine zweite, „schnellere" Variante ohne Temp+Rename gäbe es nicht
+  umsonst: sie verlangte an jeder Aufrufstelle eine Entscheidung und wäre
+  damit die nächste Stelle, an der jemand die falsche trifft. Für Ziele, die
+  keine Datei sind, gibt es `writePng(img, OutputStream)` — dort ist nichts
+  zu zerstören, geprüft wird trotzdem.
+- **Die Temp-Datei liegt im Zielverzeichnis, nicht in `%TEMP%`.**
+  `ATOMIC_MOVE` funktioniert nur innerhalb eines Datenträgers. Wer die
+  Temp-Datei „aufgeräumt" nach `%TEMP%` verlegt, macht das Verschieben
+  wieder zu einem Kopiervorgang — und damit die Atomarität zunichte.
+- **Eine liegengebliebene `*.part`-Datei ist kein Müll, sondern ein Befund:**
+  dort ist ein Schreibvorgang abgebrochen. Das Original ist dann heil.
+- **Nicht jede der 21 Fundstellen trug das F02-Risiko.** Nur neun
+  überschrieben eine vorhandene Datei; sieben erzeugten über eine
+  `while (exists)`-Schleife garantiert neue Namen, vier schrieben
+  Wegwerf-Temp-Dateien, eine gar keine Datei. Die Einteilung steht in
+  `doc/progress_2026-07-31_F02-F03-atomares-speichern.txt` — wer später
+  priorisiert, soll sie nicht neu erfinden müssen.
+- **Zwei Verhaltensänderungen, bewusst:** Zielverzeichnisse **entstehen**
+  jetzt (Univ. §6), wo vorher eine `FileNotFoundException` kam; und während
+  des Schreibens liegt kurz eine `.part`-Datei neben dem Ziel.
 
 ---
 

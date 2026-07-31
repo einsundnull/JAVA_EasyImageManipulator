@@ -46,6 +46,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 
 | Datei | Inhalt |
 |---|---|
+| [`Audit_Schwachstellen_2026-07-31.md`](Audit_Schwachstellen_2026-07-31.md) | **Schwachstellen-Tabelle**, 20 Befunde nach Schwere (4× S1), je mit `Datei:Zeile` und Fehlerszenario · Top-5-Reihenfolge · „geprüft und sauber" |
 | [`GUIDELINES_VORSCHLAG_2026-07-30.md`](GUIDELINES_VORSCHLAG_2026-07-30.md) | Ist-Analyse mit Befunden **S1–S13**, Übertragungstabelle aus GameLoop2, Reihenfolge-Empfehlung |
 | [`Dialog-Vergleich.md`](Dialog-Vergleich.md) | **Vorarbeit für das `BaseDialog`-Audit** (§20) |
 | [`ANALYSIS_ARRAY_ISSUES.md`](ANALYSIS_ARRAY_ISSUES.md) | Analyse zur Canvas-Array-Umstellung |
@@ -100,6 +101,15 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`progress_2026-07-31_apptheme-migration-10.txt`](progress_2026-07-31_apptheme-migration-10.txt) | Token-Bereinigung, **Datei 11**: `CanvasPanel` · file-lokale Konstanten statt Palette · ⏳ §21-Ergänzung zur Freigabe |
 | [`progress_2026-07-31_apptheme-migration-11.txt`](progress_2026-07-31_apptheme-migration-11.txt) | Token-Bereinigung, **Datei 12**: `ElementLayerPanel` · Knopf-Familie in die Palette · **Schritt [6] inhaltlich abgeschlossen** |
 | [`progress_2026-07-31_universelle-prompts-in-doc.txt`](progress_2026-07-31_universelle-prompts-in-doc.txt) | Universelle Prompts als Lesekopie in `doc/` verankert · Randnotiz in vier Wegweisern |
+| [`progress_2026-07-31_schwachstellen-audit.txt`](progress_2026-07-31_schwachstellen-audit.txt) | Verlauf des Schwachstellen-Audits · was geprüft wurde und was **nicht** |
+| [`progress_2026-07-31_F01-schliessen-schutz.txt`](progress_2026-07-31_F01-schliessen-schutz.txt) | **F01 repariert:** Rückfrage beim Schließen · der Dialog existierte bereits ohne Aufrufer · Verify **X1–X13** |
+| [`progress_2026-07-31_I01-tts-injektion.txt`](progress_2026-07-31_I01-tts-injektion.txt) | **I01 repariert:** `MapsPanel` nutzt `CardTtsPlayer`, `TextToSpeech` gelöscht · Text nie mehr in der Kommandozeile · Verify **T1–T9** |
+| [`Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt`](Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt) | **PD** zu F02+F03 · Klassifikation der 21 Fundstellen in vier Gruppen · abgeschlossen |
+| [`progress_2026-07-31_F02-F03-atomares-speichern.txt`](progress_2026-07-31_F02-F03-atomares-speichern.txt) | **F02+F03 repariert:** `ImageFileWriter` (atomar + Rückgabewert geprüft), alle 21 Stellen migriert · §34 · Verify **S1–S12** |
+| [`progress_2026-07-31_D02-D03-undo-einzeiler.txt`](progress_2026-07-31_D02-D03-undo-einzeiler.txt) | **D02+D03 repariert:** ein `pushUndo` pro Aktion · „Stack leer ⇒ gespeichert" entfällt · **Befund: die Undo-Stacks hängen an der Datei, nicht am Canvas** · Verify **D1–D6** |
+| [`Task_2026-07-31_2300_B01-fileCache-deckeln.txt`](Task_2026-07-31_2300_B01-fileCache-deckeln.txt) | **PD** zu B01 · Messung, Politik-Entscheidung, Umsetzung · abgeschlossen |
+| [`progress_2026-07-31_B01-filecache-deckeln.txt`](progress_2026-07-31_B01-filecache-deckeln.txt) | **B01 repariert:** Historie inaktiver Dateien wird gekürzt · **die Messung hat die Lösung geändert** — nicht die Eintragszahl war das Problem, sondern die Undo-Stacks (606 MB je Eintrag) · Verify **B1–B7** |
+| [`progress_2026-07-31_claudemd-korrektur.txt`](progress_2026-07-31_claudemd-korrektur.txt) | **`CLAUDE.md` gegen den gemessenen Ist-Stand korrigiert** (Univ. §9) · sechs Widersprüche, jede Zahl einzeln nachgemessen · gröbster: „`AppTheme` noch nirgends benutzt" bei 154 Verwendungen |
 | [`WEITERMACHEN_PROMPT_2026-07-30_archiv.txt`](WEITERMACHEN_PROMPT_2026-07-30_archiv.txt) | Vorgänger-Fassung mit dem vollen Verlauf der Schritte [1]–[4] |
 
 ## 7. Historisch — abgeschlossene Arbeiten (nicht als Ist-Stand lesen)

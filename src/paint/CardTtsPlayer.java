@@ -8,10 +8,19 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Singleton TTS player for card panels.
+ * Singleton TTS player fuer alle Vorlese-Knoepfe der App
+ * (CardListPanel, TranslationMapListPanel, MapsPanel).
  * Kills any running speech before starting a new one.
  * Uses a temporary UTF-8 .ps1 script file on Windows to handle all
  * Unicode characters (including Japanese) and avoid quoting issues.
+ * <p>
+ * <b>Der Text ist niemals Teil der Kommandozeile.</b> Er steht in einem
+ * PowerShell-Here-String ({@code @'...'@}); das Verdoppeln der einfachen
+ * Anfuehrungszeichen schuetzt zugleich vor einem vorzeitigen Ende des
+ * Here-Strings. Nur so kann Kartentext keinen Befehl einschleusen — die
+ * geloeschte Klasse {@code TextToSpeech} baute den Text in eine doppelt
+ * gequotete PS-Zeichenkette ein und war dadurch angreifbar (Befund I01).
+ * <b>Keine zweite Vorlese-Implementierung anlegen.</b>
  */
 class CardTtsPlayer {
 
@@ -115,7 +124,7 @@ class CardTtsPlayer {
     }
 
     private static Process speakLinux(String text, String lang) throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("espeak", "-v", lang, text);
+        ProcessBuilder pb = new ProcessBuilder("espeak", "-v", norm(lang), text);
         pb.redirectErrorStream(true);
         return pb.start();
     }
@@ -126,8 +135,18 @@ class CardTtsPlayer {
         return new String[]{ "de", "en", "fr", "es", "it", "pt", "nl", "ru", "ja", "zh" };
     }
 
+    /**
+     * Sprachcode vereinheitlichen. Noetig, seit auch MapsPanel diesen Player
+     * benutzt: dort stammt die Sprache aus einem freien Textfeld
+     * (MapCreateDialog), kann also "DE" oder " de" lauten. Die Kartenlisten
+     * liefern ohnehin schon Kleinbuchstaben — fuer sie aendert sich nichts.
+     */
+    private static String norm(String l) {
+        return l == null ? "" : l.trim().toLowerCase();
+    }
+
     private static String windowsLocale(String l) {
-        return switch (l == null ? "" : l) {
+        return switch (norm(l)) {
             case "de" -> "de-DE"; case "en" -> "en-US"; case "fr" -> "fr-FR";
             case "es" -> "es-ES"; case "it" -> "it-IT"; case "pt" -> "pt-BR";
             case "nl" -> "nl-NL"; case "ru" -> "ru-RU"; case "ja" -> "ja-JP";
@@ -136,7 +155,7 @@ class CardTtsPlayer {
     }
 
     private static String macVoice(String l) {
-        return switch (l == null ? "" : l) {
+        return switch (norm(l)) {
             case "de" -> "Anna"; case "fr" -> "Amelie"; case "es" -> "Maria";
             case "it" -> "Alice"; case "nl" -> "Ellen"; case "ru" -> "Yuri";
             case "ja" -> "Kyoko"; case "zh" -> "Sin-ji"; default -> "Alex";

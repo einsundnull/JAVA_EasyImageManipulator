@@ -33,16 +33,40 @@ public class EditorDialogs {
     }
 
     // Simple dialogs
+
+    /**
+     * Fragt für den <b>aktiven</b> Canvas nach. Liefert sofort „Verwerfen",
+     * wenn dort nichts offen ist.
+     *
+     * @return 0 = Speichern · 1 = Verwerfen · 2 = Abbrechen
+     */
     public int showUnsavedChangesDialog() {
         if (!editor.ci().hasUnsavedChanges)
             return 1;
+        return showUnsavedChangesDialog(
+                "Das Bild hat ungespeicherte Änderungen.<br>Was möchtest du tun?");
+    }
+
+    /**
+     * Wie {@link #showUnsavedChangesDialog()}, aber <b>ohne</b> die Prüfung auf
+     * den aktiven Canvas: der Aufrufer entscheidet, wann gefragt wird, und
+     * formuliert die Frage selbst (HTML).
+     * <p>
+     * Gebraucht vom Schließen-Pfad ({@link AppLifecycleController#requestExit()}),
+     * der <b>beide</b> Canvases und {@code dirtyFiles} berücksichtigen muss —
+     * die Prüfung auf {@code ci()} allein würde ungespeicherte Arbeit im
+     * anderen Canvas übersehen.
+     *
+     * @return 0 = Speichern · 1 = Verwerfen · 2 = Abbrechen (auch beim
+     *         Schließen des Dialogs — der sichere Vorgabewert)
+     */
+    public int showUnsavedChangesDialog(String htmlQuestion) {
         final int[] result = { 2 };
         JDialog dialog = UIComponentFactory.createBaseDialog(editor, "Ungespeicherte Änderungen", 420, 310);
         JPanel content = UIComponentFactory.centeredColumnPanel(20, 28, 16);
         content.add(UIComponentFactory.styledLabel("⚠", 30, AppColors.WARNING, Font.PLAIN));
         content.add(Box.createVerticalStrut(10));
-        content.add(UIComponentFactory.htmlLabel(
-                "Das Bild hat ungespeicherte Änderungen.<br>Was möchtest du tun?", AppColors.TEXT, 13));
+        content.add(UIComponentFactory.htmlLabel(htmlQuestion, AppColors.TEXT, 13));
         content.add(Box.createVerticalStrut(18));
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         row.setOpaque(false);

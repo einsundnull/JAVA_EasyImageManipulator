@@ -28,7 +28,7 @@ class AppLifecycleController {
 		ed.addWindowListener(new java.awt.event.WindowAdapter() {
 			@Override
 			public void windowClosing(java.awt.event.WindowEvent e) {
-				saveOnClose();
+				requestExit();
 			}
 		});
 
@@ -143,7 +143,114 @@ class AppLifecycleController {
 
 	// ── Shutdown ──────────────────────────────────────────────────────────────
 
-	/** Persists all settings and shuts down the JVM. */
+	// ── Beenden ───────────────────────────────────────────────────────────────
+
+	/**
+	 * Fenster-X: <b>erst fragen, dann beenden.</b>
+	 * <p>
+	 * Vorher rief {@code windowClosing} direkt {@link #saveOnClose()} — und das
+	 * sichert nur Szene-Metadaten und Einstellungen, <b>nie</b> das
+	 * {@code workingImage}. Zusammen mit {@code EXIT_ON_CLOSE} beendete ein
+	 * Klick auf das X die JVM sofort und verwarf jede ungespeicherte
+	 * Bildänderung ohne Rückfrage (Audit-Befund <b>F01</b>,
+	 * {@code doc/Audit_Schwachstellen_2026-07-31.md}).
+	 * <p>
+	 * Der Dirty-Zustand wurde dabei bereits geführt ({@code dirtyFiles},
+	 * {@code hasUnsavedChanges}, Titelmarker) — er wurde nur nie abgefragt.
+	 * Auch der Dialog existierte schon
+	 * ({@link EditorDialogs#showUnsavedChangesDialog()}), war aber im gesamten
+	 * Quellbaum ohne einen einzigen Aufrufer.
+	 */
+	void requestExit() {
+		java.util.List<String> unsaved = collectUnsavedNames();
+		if (unsaved.isEmpty()) {
+			finishExit();
+			return;
+		}
+
+		java.util.List<String> shown = unsaved.size() <= 5 ? unsaved : unsaved.subList(0, 5);
+		String list = String.join("<br>", shown);
+		if (unsaved.size() > shown.size())
+			list += "<br>… und " + (unsaved.size() - shown.size()) + " weitere";
+
+		int answer = ed.showUnsavedChangesDialog(
+				"Ungespeicherte Änderungen an " + unsaved.size()
+						+ (unsaved.size() == 1 ? " Datei" : " Dateien") + ":<br><br><b>"
+						+ list + "</b><br><br>Was möchtest du tun?");
+
+		switch (answer) {
+		case 1 -> finishExit();                 // Verwerfen
+		case 0 -> {                              // Speichern
+			// Bewusst dieselbe Wirkung wie Strg+S — der Benutzer soll beim
+			// Beenden nicht überraschend ein anderes Ziel beschrieben bekommen.
+			ed.saveController.saveImageSilent();
+			java.util.List<String> rest = collectUnsavedNames();
+			if (rest.isEmpty()) {
+				finishExit();
+			} else {
+				// NICHT beenden: saveImageSilent speichert nur den AKTIVEN
+				// Canvas — und bei einem neu angelegten Bild ohne sourceFile
+				// gar nichts. Jetzt zu schließen hieße, genau den Verlust zu
+				// verursachen, den dieser Dialog verhindern soll.
+				ed.showInfoDialog("Noch nicht alles gespeichert",
+						"Es sind weiterhin ungespeicherte Änderungen vorhanden:\n"
+								+ String.join("\n", rest)
+								+ "\n\nEin neu angelegtes Bild braucht \"Speichern unter\".\n"
+								+ "Das Programm bleibt geöffnet.");
+			}
+		}
+		default -> { /* 2 = Abbrechen, auch beim Schließen des Dialogs: offen lassen */ }
+		}
+	}
+
+	/**
+	 * Namen aller Dateien mit ungespeicherten Änderungen — Grundlage der
+	 * Rückfrage in {@link #requestExit()}.
+	 * <p>
+	 * Zwei Quellen, weil keine allein vollständig ist: {@code dirtyFiles}
+	 * kennt auch Dateien, die gerade in <b>keinem</b> Canvas offen sind (man
+	 * bearbeitet A, blättert zu B — A bleibt schmutzig), trägt aber laut
+	 * {@code LayoutController.markDirty} nur ein, wenn {@code sourceFile != null}.
+	 * Ein <b>neu angelegtes, nie gespeichertes</b> Bild steht deshalb nur über
+	 * {@code hasUnsavedChanges} am Canvas.
+	 */
+	private java.util.List<String> collectUnsavedNames() {
+		java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+		for (java.io.File f : ed.dirtyFiles)
+			if (f != null)
+				names.add(f.getName());
+		for (int i = 0; i < ed.canvases.length; i++) {
+			CanvasInstance c = ed.ci(i);
+			if (c != null && c.hasUnsavedChanges && c.workingImage != null && c.sourceFile == null)
+				names.add("(neues Bild, Canvas " + (i == 0 ? "I" : "II") + ")");
+		}
+		return new java.util.ArrayList<>(names);
+	}
+
+	/**
+	 * Einstellungen/Szene sichern und die Anwendung wirklich beenden.
+	 * <p>
+	 * <b>Das {@code System.exit(0)} steht bewusst hier und nicht mehr am Ende
+	 * von {@link #saveOnClose()}</b>: eine Methode, die „speichern" heißt und
+	 * unangekündigt die JVM beendet, ist genau die Sorte versteckter
+	 * Nebenwirkung, die F01 so lange unentdeckt gelassen hat. {@code saveOnClose}
+	 * speichert jetzt nur noch.
+	 * <p>
+	 * Explizit beendet wird, weil das Hauptfenster auf
+	 * {@code DO_NOTHING_ON_CLOSE} steht und Zweitfenster bzw. schwebende
+	 * Malleiste die JVM sonst am Leben halten können.
+	 */
+	private void finishExit() {
+		saveOnClose();
+		ed.dispose();
+		System.exit(0);
+	}
+
+	/**
+	 * Sichert Szene-Metadaten und Einstellungen. <b>Speichert bewusst NICHT das
+	 * {@code workingImage}</b> — Bildspeichern ist eine Benutzerentscheidung
+	 * (siehe {@link #requestExit()}) — und beendet die JVM <b>nicht</b> mehr.
+	 */
 	void saveOnClose() {
 		try {
 			// Speichere aktuelle Szene
@@ -206,7 +313,6 @@ class AppLifecycleController {
 		if (ed.secWin != null) {
 			ed.secWin.dispose();
 		}
-
-		System.exit(0);
+		// KEIN System.exit(0) mehr an dieser Stelle — es steht in finishExit().
 	}
 }

@@ -1,0 +1,161 @@
+==============================================================================
+progress_2026-07-31_F01-schliessen-schutz.txt
+Schritt-Typ: [ST]  ·  Risiko: [B]  ·  Audit-Befund F01 (S1) REPARIERT
+==============================================================================
+
+PROMPT
+------
+"F01 reparieren" -> der S1-Befund aus doc/Audit_Schwachstellen_2026-07-31.md:
+Fenster-X beendete die App sofort und verwarf jede ungespeicherte
+Bildaenderung ohne Rueckfrage.
+
+DER ENTSCHEIDENDE BEFUND VOR DEM ERSTEN TASTENDRUCK
+---------------------------------------------------
+*** EditorDialogs.showUnsavedChangesDialog() EXISTIERTE BEREITS - fertig
+    gebaut, ueber createBaseDialog gestylt, mit genau den drei Optionen
+    Speichern / Verwerfen / Abbrechen. Strenge Textsuche ueber den GANZEN
+    Quellbaum: EIN Vorkommen, naemlich die eigene Deklaration.
+    NULL Aufrufer. Das Sicherheitsnetz war gebaut und nie angeschlossen. ***
+
+Damit war die Aufgabe nicht "Schutz bauen", sondern "Schutz anschliessen".
+Das aendert die Regellage vollstaendig:
+  - KEIN neuer Dialog  -> keine Mockup-Pflicht nach Univ. §9
+  - KEIN JOptionPane   -> kein Verstoss gegen §20
+  - KEIN BaseDialog noetig -> Schritt [9] muss NICHT vorgezogen werden
+Die im Audit angekuendigte Entscheidung "§20 vorziehen oder Ausnahme
+begruenden" hat sich damit ERLEDIGT. Es braucht weder das eine noch das
+andere.
+
+GEAENDERT (3 Dateien, 4 Stellen)
+--------------------------------
+1) SelectiveAlphaEditor.java:254
+   EXIT_ON_CLOSE -> DO_NOTHING_ON_CLOSE, mit Kommentar auf F01.
+   Zusaetzlich eine Delegation nach dem vorhandenen Muster (Z. 510):
+     int showUnsavedChangesDialog(String htmlQuestion)
+
+2) EditorDialogs.java:36ff
+   showUnsavedChangesDialog() um eine UEBERLADUNG mit Fragetext erweitert.
+   Die parameterlose Fassung behaelt ihre Pruefung auf den AKTIVEN Canvas
+   und delegiert. Grund fuer die Ueberladung: der Schliessen-Pfad muss
+   BEIDE Canvases und dirtyFiles beruecksichtigen - die Pruefung auf ci()
+   allein haette ungespeicherte Arbeit im anderen Canvas uebersehen.
+   Kein Layout geaendert, keine Farbe, kein Knopf.
+
+3) AppLifecycleController.java
+   - windowClosing ruft jetzt requestExit() statt saveOnClose().
+   - NEU requestExit(): sammelt die ungespeicherten Namen, fragt, und
+     handelt nach der Antwort.
+   - NEU collectUnsavedNames(): ZWEI Quellen, weil keine allein vollstaendig
+     ist. dirtyFiles kennt auch Dateien, die in KEINEM Canvas offen sind
+     (man bearbeitet A, blaettert zu B - A bleibt schmutzig), traegt aber
+     laut LayoutController.markDirty nur ein, wenn sourceFile != null. Ein
+     NEU ANGELEGTES, nie gespeichertes Bild steht deshalb nur ueber
+     hasUnsavedChanges am Canvas.
+   - NEU finishExit(): saveOnClose() + dispose() + System.exit(0).
+
+DAS VERHALTEN JETZT
+-------------------
+  nichts offen        -> beendet wie bisher
+  Abbrechen (Vorgabe) -> Fenster bleibt offen. Auch das Schliessen des
+                         Dialogs selbst ergibt Abbrechen (result-Vorgabe 2).
+  Verwerfen           -> beendet, Aenderungen weg (jetzt bewusst gewaehlt)
+  Speichern           -> saveImageSilent() = EXAKT dieselbe Wirkung wie
+                         Strg+S. Danach ERNEUTE Pruefung:
+                           alles sauber  -> beenden
+                           Rest offen    -> NICHT beenden, Info-Dialog mit
+                                            der Restliste
+
+*** WARUM "SPEICHERN" NICHT IMMER BEENDET:
+    saveImageSilent speichert nur den AKTIVEN Canvas - und bei einem neu
+    angelegten Bild ohne sourceFile gar nichts. Danach trotzdem zu
+    schliessen haette genau den Verlust verursacht, den dieser Dialog
+    verhindern soll. Die Schleife ist ausgeschlossen: es gibt hoechstens
+    einen Dialog und danach hoechstens einen Info-Hinweis. ***
+
+*** WARUM NICHT "ALLES SPEICHERN": das haette eine Speicher-Politik ueber
+    zwei Canvases und nicht offene dirtyFiles erfunden - und die Wahl
+    zwischen In-Place-Ueberschreiben und Suffix-Kopie ist eine
+    Produktentscheidung, keine Reparatur. Ausserdem ist In-Place-Schreiben
+    laut Befund F02 derzeit NICHT absturzsicher. Bleibt offen als F01b. ***
+
+NEBENBEFUND, MITREPARIERT (im beruehrten Code, Univ. §0)
+--------------------------------------------------------
+*** saveOnClose() endete selbst mit System.exit(0). Eine Methode, die
+    "speichern" heisst und unangekuendigt die JVM beendet, ist genau die
+    Sorte versteckter Nebenwirkung, die F01 so lange unsichtbar gelassen
+    hat. Der Exit steht jetzt in finishExit(); saveOnClose speichert nur
+    noch. Belegt sicher, weil saveOnClose nach der Umstellung GENAU EINEN
+    Aufrufer hat (finishExit). Javadoc beider Methoden korrigiert -
+    das alte "Persists all settings and shuts down the JVM" stimmte in
+    beiden Haelften nicht mehr. ***
+
+BUILD
+-----
+  javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
+  exit 0.
+*** ZUR .class-ZAHL: der inkrementelle Bau nach bin/ zeigt 337, der
+    SAUBERE VOLLBAU in ein leeres Verzeichnis zeigt 335 - exakt die
+    dokumentierte Erwartung. Die Differenz sind ZWEI Altbestaende in
+    bin/book/ (JsonStorage.class, Sheet.class). Ein Vollbau aus
+    src/paint/*.java erzeugt in book/ nur PaperFormat + PaperFormat$Format;
+    JsonStorage und Sheet sind vom Einstiegspunkt aus NICHT erreichbar und
+    stammen aus einem Eclipse-Bau ueber den ganzen Quellbaum.
+    -> Meine Aenderung fuegt KEINE Klasse hinzu. Die 335 gelten weiter.
+    -> book.JsonStorage/Sheet sind damit zwei WEITERE referenzfreie
+       Klassen (vgl. Audit L02). NICHT angefasst - das gehoert in einen
+       eigenen Schritt und JsonStorage ist in den Altlasten als "einer der
+       5 JSON-Serializer" gefuehrt. Die Liste sollte das korrigieren. ***
+
+RUNTIME-VERIFY (GUI - nur der User kann das)
+--------------------------------------------
+  X1  Bild oeffnen, NICHTS aendern, Fenster-X -> beendet ohne Rueckfrage
+  X2  Bild aendern (Pinselstrich), Fenster-X -> Dialog erscheint, nennt den
+      Dateinamen
+  X3  Im Dialog ABBRECHEN -> Programm bleibt offen, Bild unveraendert,
+      Titel weiterhin mit Punkt-Marker
+  X4  Dialog ueber sein eigenes X schliessen -> wie Abbrechen (nicht beenden)
+  X5  Im Dialog VERWERFEN -> Programm endet, Aenderung weg (erwartet)
+  X6  Im Dialog SPEICHERN -> speichert wie Strg+S, Programm endet
+  X7  *** ZWEI CANVASES: in Canvas II etwas aendern, Canvas I aktiv lassen,
+      Fenster-X -> der Dialog muss die Datei aus Canvas II NENNEN.
+      Das ist die Pruefung der Ueberladung. ***
+  X8  *** DATEI A aendern, in der Galerie zu B blaettern, Fenster-X ->
+      A muss im Dialog stehen, obwohl A gerade nicht angezeigt wird.
+      Das ist die Pruefung von collectUnsavedNames aus dirtyFiles. ***
+  X9  *** SPEICHERN mit noch offenem Rest (X7-Lage): Programm bleibt
+      OFFEN, Info-Dialog listet den Rest. ***
+  X10 Neues Bild anlegen (nie gespeichert), aendern, Fenster-X -> Dialog
+      nennt "(neues Bild, Canvas I)"; SPEICHERN laesst das Programm offen
+      mit dem Hinweis auf "Speichern unter"
+  X11 Alt+F4 verhaelt sich wie das Fenster-X (derselbe windowClosing-Pfad)
+  X12 Nach dem Beenden: Einstellungen und Fensterposition sind erhalten
+      (saveOnClose laeuft weiterhin) - das ist die Regressionspruefung zur
+      Exit-Verschiebung
+  X13 Zweitfenster offen (F1) und beenden -> JVM endet wirklich, kein
+      haengender Prozess (Pruefung von DO_NOTHING_ON_CLOSE + finishExit)
+
+  *** X13 ist die wichtigste Regressionspruefung: falls doch ein Prozess
+      haengen bleibt, liegt es NICHT am Dialog, sondern daran, dass ein
+      Fenster den EDT haelt - dann bitte melden, nicht selbst nachbessern. ***
+
+OFFEN GEBLIEBEN (bewusst)
+-------------------------
+  F01b  "Alles speichern" ueber beide Canvases und nicht offene dirtyFiles.
+        Braucht eine Speicher-Politik (In-Place vs. Suffix-Kopie) und
+        sinnvollerweise erst F02 (atomares Schreiben).
+  Die Sichtpruefung U1-U19 aus Schritt [6] ist davon unberuehrt und
+  weiterhin faellig.
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert: nein
+# Die Aufgabe "F01 reparieren" wurde vollstaendig abgeschlossen: ja
+  (Code fertig und uebersetzt; Runtime-Verify X1-X13 liegt beim User -
+   "Build gruen" ist kein Verify)
+# Naechster Schritt: I01 (TTS-Injektion, S1, Aufwand S) - braucht keine
+  Vorentscheidung, und die Loesung existiert bereits im eigenen Haus
+  (CardTtsPlayer). Danach F02+F03 (atomarer Speicher-Helfer).
+# "/clear" Befehl und WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

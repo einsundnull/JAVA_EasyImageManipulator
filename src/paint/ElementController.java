@@ -14,7 +14,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.imageio.ImageIO;
 import javax.swing.SwingWorker;
 
 /**
@@ -312,7 +311,7 @@ class ElementController {
 		try {
 			java.io.File tmp = java.io.File.createTempFile("element_" + el.id() + "_", ".png");
 			tmp.deleteOnExit();
-			ImageIO.write(img, "PNG", tmp);
+			ImageFileWriter.writePng(img, tmp);
 			int targetIdx = 1 - sourceIdx;
 			ed.activeCanvasIndex = targetIdx;
 			if (targetIdx == 1) {
@@ -370,7 +369,7 @@ class ElementController {
 	/** Writes img to file, adds file to the gallery of canvas idx, shows error on failure. */
 	void saveLayerAsImageFile(BufferedImage img, File file, int idx) {
 		try {
-			javax.imageio.ImageIO.write(img, "PNG", file);
+			ImageFileWriter.writePng(img, file);
 			if (ed.ci(idx).tileGallery != null)
 				ed.ci(idx).tileGallery.addFiles(java.util.Arrays.asList(file));
 		} catch (Exception ex) {

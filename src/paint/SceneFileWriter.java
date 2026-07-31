@@ -62,7 +62,7 @@ public class SceneFileWriter {
                 if (il.image() != null) {
                     String imageFileName = "image_" + imageCounter + ".png";
                     File imageFile = new File(imagesDir, imageFileName);
-                    javax.imageio.ImageIO.write(il.image(), "png", imageFile);
+                    ImageFileWriter.writePng(il.image(), imageFile);
                     // Format: -filename x y w h rotation opacity
                     imageRefs.append("-").append(imageFileName)
                              .append(" ").append(il.x())

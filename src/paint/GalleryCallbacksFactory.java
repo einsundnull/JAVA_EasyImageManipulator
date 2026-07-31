@@ -82,7 +82,7 @@ class GalleryCallbacksFactory {
 							int n = 1;
 							while (out.exists())
 								out = new File(dir, base + "_" + n++ + ".png");
-							javax.imageio.ImageIO.write(s.thumbnail, "PNG", out);
+							ImageFileWriter.writePng(s.thumbnail, out);
 							return out;
 						}
 
@@ -209,7 +209,7 @@ class GalleryCallbacksFactory {
 							File out = new File(dir, base + ".png");
 							int n = 1;
 							while (out.exists()) out = new File(dir, base + "_" + n++ + ".png");
-							javax.imageio.ImageIO.write(s.thumbnail, "PNG", out);
+							ImageFileWriter.writePng(s.thumbnail, out);
 							return out;
 						}
 						@Override protected void done() {
@@ -305,7 +305,7 @@ class GalleryCallbacksFactory {
 					try {
 						java.io.File tmp = java.io.File.createTempFile("layer_page_", ".png");
 						tmp.deleteOnExit();
-						javax.imageio.ImageIO.write(img, "PNG", tmp);
+						ImageFileWriter.writePng(img, tmp);
 						java.util.List<Layer> layers = new java.util.ArrayList<>();
 						layers.add(layer);
 						ed.bookController.createPageFromFile(tmp, layers, currentBook[0],

@@ -1,0 +1,120 @@
+==============================================================================
+progress_2026-07-31_schwachstellen-audit.txt
+Schritt-Typ: [ST]  ·  Risiko: keines (nur gelesen)  ·  KEIN CODE GEAENDERT
+==============================================================================
+
+PROMPT
+------
+"Suche nach Problemen" -> die in der WEITERMACHEN_PROMPT.txt aufgestaute
+naechste Aufgabe, ausgefuehrt nach doc/PROMPT_Schwachstellen-Audit.md.
+
+VORGEHEN
+--------
+Schritt 0  Grundlagen gelesen: JAVA_GUIDELINES_UNIVERSAL.md (§0-§15),
+           doc/GUIDELINES.md (Steckbrief + §20-§33), Prompt_Handling.txt,
+           WEITERMACHEN_PROMPT.txt (die [!]-Befunde uebernommen),
+           README.md.
+Schritt 1  GRAPHIFY BEWUSST UEBERSPRUNGEN. Begruendung: der Graph findet
+           laut eigenem Prompt keine Fehler, er priorisiert. Die
+           Priorisierung lief hier ueber Dateigroesse (wc -l) und gezielte
+           Textsuche - billiger und fuer diese Frage genauer. Ein Update
+           waere ein unnoetiger Schritt gewesen (Univ. §0).
+Schritt 2  Kategorien A-M einzeln durchgegangen, jeweils erst
+           Muster-Suche ueber alle 109 Dateien, dann Lesen der Treffer.
+           Vollstaendig gelesen: TextToSpeech, CardTtsPlayer, TextWriter,
+           SaveController (Kern), AppLifecycleController (Kern),
+           GameSceneWriter, KeyboardShortcutManager (toggleVis + Dispatcher),
+           ZoomController (Animation), PreloadController/FileLoadController
+           (Caches).
+Schritt 3  Jeder Eintrag mit Datei:Zeile + konkretem Szenario + Sicherheits-
+           stufe belegt. Vermutungen ohne Szenario wurden weggelassen.
+Schritt 4  doc/Audit_Schwachstellen_2026-07-31.md geschrieben.
+
+ERGEBNIS
+--------
+20 Befunde:  4x S1  ·  8x S2  ·  4x S3  ·  4x S4
+Sicherheit:  16x BELEGT  ·  4x PLAUSIBEL  ·  0x VERMUTUNG
+             (Ehrlichkeit vor Menge - Verdachtsmomente ohne nachvollzogenes
+             Szenario sind gar nicht erst in die Tabelle gekommen.)
+
+DIE VIER S1
+  F01  Kein Schutz beim Schliessen (EXIT_ON_CLOSE + saveOnClose ohne
+       Dirty-Pruefung). Aufwand S. Trifft jeden Benutzer taeglich.
+  I01  PowerShell-Injektion in TextToSpeech. Aufwand S, Loesung existiert
+       bereits im eigenen Haus (CardTtsPlayer).
+  F02  Kein atomares Schreiben, 21 Fundstellen, teils direkt auf die
+       Quelldatei. Aufwand M.
+  G01  GameII-Round-Trip ISO-8859-1 lesen / UTF-8 schreiben -> Vertrags-
+       bruch nach §23/§7. Aufwand S, aber Migrationsfrage.
+
+DREI BEFUNDE, DIE BEKANNTES VERSCHAERFEN
+  D01  Das Undo-Band traegt nur workingImage -> Element-Operationen sind
+       NICHT rueckgaengig zu machen. Das ist die Ursache HINTER der
+       gefuehrten toggleVis-Altlast, nicht bloss deren Nebenwirkung.
+  D03  "Undo-Stack leer" wird als "gespeichert" gedeutet - nach >50
+       Aenderungen falsch. Mit F01 zusammen stiller Verlust.
+  L02  Vier referenzfreie Klassen, 1332 Zeilen, 0 Referenzen, KEIN main().
+       Die Altlast-Bereinigung vom 2026-07-30 hat sie nicht erfasst.
+       *** Die Lehre a) "referenzfrei != unbenutzt" greift hier NICHT:
+           damals waren vier der acht Kandidaten per main() startbar.
+           Diese vier sind es nicht - deshalb ist Loeschen hier [B],
+           nach demselben Textsuche-Nachweis wie damals. ***
+
+WAS GEPRUEFT WURDE UND SAUBER IST (gehoert zum Ergebnis)
+  §24 Zeichenpfad (skriptgestuetzt ueber ALLE paintComponent-Bloecke):
+      kein repaint/markDirty/pushUndo/save im Zeichenpfad. Damit auch keine
+      repaint->paint->repaint-Rekursion.
+  §30: null Fundstellen fuer canvases[0]/[1] ausserhalb des Hauptfensters.
+  §29-Reihenfolge am PaintEngine: Floodfill-Stichprobe korrekt
+      (CanvasPanel:821 pushUndo VOR dem Aufruf).
+  Keine while(true), keine unbegrenzte Rekursion, keine CME-Muster,
+  keine ==-Vergleiche auf Fliesskomma-Koordinaten.
+  preloadCache hat Verdraengung (die Vorlage fuer B01).
+  Keine Java-Deserialisierung, kein Netz, keine Sperren -> die
+      entsprechenden Kategorien ENTFALLEN und sind als entfallen vermerkt.
+
+WAS NICHT ERNSTHAFT GEPRUEFT WURDE (ehrlich benannt)
+  CanvasPanel.java (3332 Z.) nur ueberflogen - Maus/Hit-Test/Texteditor
+      sind die wahrscheinlichste Fundstelle fuer Off-by-one. Eigener
+      Durchgang noetig. Deshalb enthaelt die Tabelle KEINEN Caret-Befund.
+  PaintEngine.java (1239 Z.) Pixelmathematik zeilenweise ungeprueft.
+  book/ nur gestreift.
+  Kategorie J nicht GEMESSEN, nur strukturell betrachtet - §26 verbietet
+      Optimierungsbefunde ohne Messung.
+
+ABWEICHUNGEN VOM PROMPT
+  - Graphify uebersprungen (siehe Schritt 1). Der Prompt erlaubt das
+    ausdruecklich ("Sonst ueberspringen").
+  - Ein Lauf statt zwei (A-F / G-M). Bei 32k Zeilen war der Schnitt nach
+    Kategorie unnoetig, weil die Muster-Suchen ohnehin dateiweit liefen.
+
+VERIFY
+  V1  Kein Code geaendert - git status zeigt nur doc/-Dateien. (erledigt)
+  V2  Build unberuehrt, kein Compile noetig. (erledigt)
+  V3  OFFEN, User: die vier S1 durchsehen und entscheiden, welcher zuerst
+      repariert wird. F01 ist der billigste und der mit dem groessten
+      taeglichen Schaden.
+  V4  OFFEN, User: I01 - ist "Kartentext ist immer eigener Text" als
+      Annahme akzeptabel, oder werden maps/*.json auch getauscht/geteilt?
+      Die Antwort aendert die Schwere nicht, aber die Dringlichkeit.
+
+UNVERAENDERT OFFEN AUS [6]
+  Die Sichtpruefung U1-U19 blockiert das Audit nicht und ist weiterhin
+  faellig. EIN Programmstart hakt alle neunzehn ab.
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT] - das Audit war ein Lesedurchgang)
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja (Audit-Block ersetzt durch
+  Ergebnis + Top-5 + die drei verschaerften Altlasten)
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert: nein (erst am
+  2026-07-31 bereinigt)
+# Die Aufgabe "Schwachstellen-Audit" wurde vollstaendig abgeschlossen: ja
+  - mit der ausdruecklichen Einschraenkung, dass CanvasPanel und
+  PaintEngine einen eigenen Durchgang brauchen (oben benannt).
+# Naechster Schritt: F01 (Warndialog beim Schliessen) - S1, Aufwand S,
+  braucht aber eine Entscheidung zu §20/ConfirmDialog. Alternativ I01
+  (TTS-Injektion), das keine Vorentscheidung braucht.
+# "/clear" Befehl und WEITERMACHEN_PROMPT.txt empfohlen: ja - das Audit hat
+  viel Code gelesen; eine Reparatur startet besser mit leerem Kontext.
+==============================================================================

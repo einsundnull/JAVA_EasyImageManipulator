@@ -1,37 +1,239 @@
 ==============================================================================
 WEITERMACHEN_PROMPT.txt  —  TransparencyTool
-Stand: 2026-07-31, Abend. BEREINIGTE FASSUNG.
+Stand: 2026-07-31, spaeter Abend. BEREINIGTE FASSUNG.
 Die ausfuehrliche Vorgaenger-Fassung mit dem vollen Verlauf der Schritte
 [1]-[4] liegt in doc/WEITERMACHEN_PROMPT_2026-07-30_archiv.txt.
-Details je Schritt: die progress_2026-07-30_*.txt.
+Details je Schritt: die progress_2026-07-30_*.txt / progress_2026-07-31_*.txt.
 ==============================================================================
-Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
+Aktive PD.txt: KEINE.
+  Zuletzt: Task_2026-07-31_2300_B01-fileCache-deckeln.txt -> ALLE FUENF
+  SCHRITTE ABGESCHLOSSEN, nur Runtime-Verify B1-B7 offen (User).
+  Davor: Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt (S1-S12 offen).
 
 ==============================================================================
-*** NAECHSTE AUFGABE: SCHWACHSTELLEN-AUDIT ***
+*** SCHWACHSTELLEN-AUDIT IST DURCHGEFUEHRT (2026-07-31) ***
 ==============================================================================
-Der User will das Programm systematisch auf Schwachstellen untersuchen
-(Bugs, Nebenlaeufigkeit, Lecks, Endlosschleifen, Datenverlust, ...) und die
-Befunde in einer bewerteten Tabelle sammeln - ZUM SPAETEREN LOESEN, nicht
-sofort reparieren.
+ERGEBNIS:  doc/Audit_Schwachstellen_2026-07-31.md
+           20 Befunde, nach Schwere sortiert, jeder mit Datei:Zeile und
+           konkretem Fehlerszenario. KEIN CODE GEAENDERT.
+PROTOKOLL: doc/progress_2026-07-31_schwachstellen-audit.txt
+PROMPT:    doc/PROMPT_Schwachstellen-Audit.md (Lesekopie) bzw.
+           ../PROMPT_Schwachstellen-Audit.md  (ORIGINAL, Workspace-Ebene)
 
-FERTIGER PROMPT DAFUER (wiederverwendbar, auch fuer andere Projekte):
-    doc/PROMPT_Schwachstellen-Audit.md   (Lesekopie)
-    ../PROMPT_Schwachstellen-Audit.md    (ORIGINAL, Workspace-Ebene)
+*** REPARATUREN WERDEN EINZELN FREIGEGEBEN. Das Audit war ausdruecklich
+    eine Sammlung, keine Aufraeumaktion. ***
 
-*** DAS AUDIT REPARIERT NICHTS. Es sammelt und bewertet. Reparaturen sind
-    danach einzelne, freigabepflichtige Schritte. ***
+DIE VIER S1 (Datenverlust / Sicherheit):
+  F01  *** ERLEDIGT 2026-07-31 ***
+       -> doc/progress_2026-07-31_F01-schliessen-schutz.txt
+       Fenster-X fragt jetzt nach (Speichern/Verwerfen/Abbrechen), prueft
+       BEIDE Canvases + dirtyFiles + neu angelegte Bilder.
+       *** DIE LEHRE: der Dialog EditorDialogs.showUnsavedChangesDialog()
+           EXISTIERTE BEREITS und hatte NULL Aufrufer. Die Reparatur war
+           "anschliessen", nicht "bauen" - dadurch entfielen Mockup-Pflicht
+           (§9), JOptionPane-Frage (§20) und das Vorziehen von Schritt [9].
+           VOR JEDER WEITEREN REPARATUR DIESELBE FRAGE STELLEN:
+           gibt es die Loesung schon? Bei I01 lautet die Antwort ebenfalls
+           JA (CardTtsPlayer). ***
+       *** NEBENBEFUND MITREPARIERT: saveOnClose() endete selbst mit
+           System.exit(0). Der Exit steht jetzt in finishExit();
+           saveOnClose speichert nur noch. Javadoc beider korrigiert. ***
+       *** RUNTIME-VERIFY X1-X13 OFFEN (User). Die wichtigsten: X7 (Canvas
+           II), X8 (Datei geaendert, weggeblaettert), X13 (Zweitfenster
+           offen -> JVM endet wirklich). ***
+       NEU OFFEN: F01b "Alles speichern" ueber beide Canvases und nicht
+       geoeffnete dirtyFiles - braucht eine Speicher-Politik und
+       sinnvollerweise erst F02. Reihenfolge: F02 vor F01b.
+  I01  *** ERLEDIGT 2026-07-31 ***
+       -> doc/progress_2026-07-31_I01-tts-injektion.txt
+       MapsPanel benutzt jetzt CardTtsPlayer; TextToSpeech.java GELOESCHT
+       (172 Z., Referenzfreiheit per Textsuche belegt, kein main()).
+       *** ZUM ZWEITEN MAL DIESELBE LEHRE: die Loesung war schon da.
+           Anschliessen, nicht bauen. VOR JEDER WEITEREN REPARATUR
+           DIESELBE FRAGE STELLEN. ***
+       *** NEBENBEFUND MITREPARIERT: TextToSpeech rief lang.toLowerCase()
+           auf, CardTtsPlayer nicht - und die Map-Sprache kommt aus einem
+           FREIEN TEXTFELD (MapCreateDialog:105). "DE" waere still zu
+           en-US geworden. Dafuer gibt es jetzt CardTtsPlayer.norm().
+           NICHT "vereinfachen". ***
+       *** I02 (Apostroph-Verdopplung) BLEIBT OFFEN, ist aber jetzt
+           KOMMENTIERT: die Verdopplung schuetzt zugleich den Here-String
+           vor einer Zeile '@. Wer sie ersatzlos entfernt, oeffnet die
+           Luecke wieder. Korrekte Reparatur steht in der progress-Datei. ***
+       *** A01 (Wettlauf im CardTtsPlayer) ist durch die Umstellung leicht
+           BREITER geworden - dritter Nutzer desselben Singletons. ***
+       *** RUNTIME-VERIFY T1-T9 OFFEN (User). Die wichtigsten: T2 (Umlaute
+           - laufen jetzt ueber eine UTF-8-Datei statt der Kommandozeile),
+           T4 (beide Knoepfe einer Karte lesen IHREN Text), T6 (Sprache
+           gross geschrieben). ***
+  F02  *** ERLEDIGT 2026-07-31 (zusammen mit F03) ***
+       -> doc/progress_2026-07-31_F02-F03-atomares-speichern.txt
+       -> PD: Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt
+       -> Regel: doc/GUIDELINES.md §34
+       NEU: ImageFileWriter (Gegenstueck zu ImageLoader). Schreibt in eine
+       ".part"-Nachbardatei im ZIELVERZEICHNIS, dann Files.move(ATOMIC_MOVE),
+       und prueft den Rueckgabewert von ImageIO.write (das war F03).
+       ALLE 21 Aufrufstellen migriert - ImageIO.write steht jetzt nur noch
+       in ImageFileWriter selbst.
+       *** DIESMAL LAUTETE DIE PFLICHTFRAGE "gibt es die Loesung schon?"
+           NEIN - ATOMIC_MOVE kam im ganzen Quellbaum null mal vor. Die
+           Frage hat sich trotzdem gelohnt: sie hat ImageLoader gefunden und
+           damit den Namen und die Rolle der neuen Klasse bestimmt. ***
+       *** DAS AUDIT SAGTE "21 Fundstellen, eine Aenderung". Die Zahl
+           stimmt, die Gleichsetzung nicht: nur NEUN ueberschrieben eine
+           vorhandene Datei (dort sass F02). Sieben erzeugten garantiert
+           neue Namen, vier Wegwerf-Temps, eine gar keine Datei. Sie haben
+           den Helfer trotzdem bekommen - EIN Schreibweg ist besser als
+           zwei -, aber wer priorisiert, soll den Unterschied kennen. ***
+       *** ZWEI VERHALTENSAENDERUNGEN: Zielverzeichnisse ENTSTEHEN jetzt
+           (Univ. §6), wo vorher eine FileNotFoundException kam. Und waehrend
+           des Schreibens liegt kurz eine .part-Datei neben dem Ziel. Eine
+           liegengebliebene .part ist KEIN Muell, sondern der Beweis eines
+           abgebrochenen Schreibvorgangs - das Original ist dann heil. ***
+       *** NICHT "AUFRAEUMEN": die Temp-Datei MUSS im Zielverzeichnis
+           liegen, nicht in %TEMP%. ATOMIC_MOVE wirkt nur innerhalb eines
+           Datentraegers. ***
+       *** RUNTIME-VERIFY S1-S12 OFFEN (User). Die wichtigsten: S1 ("In
+           Original speichern"), S5 (Elemente einbrennen + ueberschreiben),
+           S7 (Szene -> images/, VERTRAG §23), S12 (keine .part-Reste). ***
+       F01b ("Alles speichern" ueber beide Canvases) ist damit MOEGLICH
+       geworden - es hatte ausdruecklich auf F02 gewartet. Braucht aber
+       eine Speicher-Politik und damit eine Entscheidung des Users.
+  F03  *** ERLEDIGT 2026-07-31, siehe F02. ***
+  G01  GameSceneReader liest ISO-8859-1, GameSceneWriter schreibt UTF-8 ->
+       Round-Trip beschaedigt Umlaute in einer VERTRAGSDATEI (§23/§7).
 
-GRAPHIFY VORHER? Ja, aber nur GEZIELT: graphify-out/ existiert, ist aber
-vom 2026-07-30 und kennt AppTheme, KeyBindings und KeyBindingsDialog noch
-nicht. Ein gezielter Update dieser drei Dateien genuegt - KEIN Voll-Rebuild
-und NIEMALS `graphify update .` (Scope-Falle).
-*** Der Graph findet KEINE Fehler. Er dient der Priorisierung (welche
-    Klasse hat die groesste Reichweite) und dem Auffinden aller
-    Aufrufstellen. Das eigentliche Suchen ist Lesearbeit. ***
+TOP-5-REIHENFOLGE (Begruendung in der Tabelle, Abschnitt "Die fuenf"):
+  1. F01 Warndialog beim Schliessen        [S1, Aufwand S]  *** ERLEDIGT ***
+  2. I01 TTS-Injektion                      [S1, Aufwand S]  *** ERLEDIGT ***
+  3. F02+F03 atomarer Speicher-Helfer       [S1, Aufwand M]  *** ERLEDIGT ***
+  4. D02+D03 die zwei Undo-Einzeiler        [S2, Aufwand S]  *** ERLEDIGT ***
+     -> doc/progress_2026-07-31_D02-D03-undo-einzeiler.txt
+     D02: EIN pushUndo pro Aktion statt pro Element. Gegenprobe gemacht -
+          toggleVis war die EINZIGE solche Stelle, die Altlast ist zu.
+     D03: der Fehlschluss "Stack leer => gespeichert" ist raus. Undo/Redo
+          SETZT den Aenderungsmarker jetzt nur noch, es loescht ihn nicht.
+     *** BEFUND, DER DIE LOESUNG BESTIMMT HAT: DIE UNDO-STACKS SIND PRO
+         DATEI, NICHT PRO CANVAS (FileLoadController:77-84 stellt sie aus
+         c.fileCache wieder her). Das im Audit vorgeschlagene
+         Saettigungs-Flag am CanvasInstance haette beim Blaettern
+         desynchronisiert. Wer hier nachbessert, muss das wissen. ***
+     *** BEWUSSTE KEHRSEITE, NICHT "KORRIGIEREN": Aenderung + sofort
+         Strg+Z behaelt jetzt den Aenderungsmarker. Eine Rueckfrage zu
+         viel ist der harmlose Fehler; die Alternative war stiller
+         Datenverlust. ***
+     *** RUNTIME-VERIFY D1-D6 OFFEN (User). Wichtigste: D1 (ein Strg+Z
+         statt n), D4 (Aendern -> alles zurueck -> Schliessen fragt),
+         D5 (die gewollte Kehrseite). ***
+     D01 war AUSDRUECKLICH NICHT dabei und bleibt offen (siehe unten).
+  5. B01 fileCache deckeln                  [S2, Aufwand M]  *** ERLEDIGT ***
+     -> doc/progress_2026-07-31_B01-filecache-deckeln.txt
+     -> PD: Task_2026-07-31_2300_B01-fileCache-deckeln.txt
+     NEU: FileLoadController.trimInactiveHistory(idx) + INACTIVE_UNDO_KEEP=5.
+     Aufgerufen nach jedem Laden (loadFile, loadSceneBackground), jeweils
+     NACH der sourceFile-Zuweisung. Sonst nichts geaendert, 335 .class.
+     *** DIE MESSUNG HAT DIE LOESUNG GEAENDERT. Das Audit sagte "Vorlage
+         PreloadController:114" - also Eintragszahl deckeln. Gemessen:
+         die ANZAHL ist nicht das Problem. 682 Dateien passen in den Heap,
+         solange niemand sie bearbeitet; aber nur SECHS mit vollem
+         Undo-Stack, denn EIN Eintrag kostet dann 606 MB (Bild 6 MB x 101).
+         96 bearbeitete Dateien = 5,57 GB = OutOfMemory. Ein Deckel auf die
+         Eintragszahl haette kaum etwas gespart und das Unwiederbringliche
+         weggeworfen - das Bild kommt von der Platte zurueck, die Historie
+         nicht. GENAU DAVOR WARNT §26. ***
+     *** POLITIK, VOM USER ENTSCHIEDEN: aktive Datei unangetastet (voller
+         Stack); verlassene Datei behaelt Bild + 5 Undo, Redo faellt weg.
+         5,57 GB -> 0,86 GB. DER VERLUST IST GEWOLLT: wer zurueckkehrt,
+         hat 5 statt 50 Schritte. KEINE Altlast - wer es "verbessert",
+         holt den OutOfMemory zurueck. ***
+     *** DREI FALLEN, DIE DIE FORM BESTIMMT HABEN:
+         F1 saveCurrentState() waere der naheliegende Ort und ist FALSCH:
+            loadFile ruft es AUCH beim erneuten Klick auf die schon offene
+            Datei -> haette still 45 Schritte geloescht. Deshalb kuerzt die
+            Loesung ALLE Eintraege AUSSER dem aktiven (Vergleich mit
+            c.sourceFile) - die Falle kann nicht zuschnappen.
+         F2 undoStack ist ein Stack, push() legt VORNE ab. Der aelteste
+            Schritt ist pollLast(), NICHT pollFirst(). Wie SaveController:
+            57-58 bei MAX_UNDO.
+         F3 Keine Meldepflicht pro Bedienweg (jede vergessene Stelle waere
+            ein Leck), sondern eine Feststellung an der Wurzel nach jedem
+            Laden. Idempotent, selbstheilend. Univ. §13. ***
+     *** NICHT GEDECKT, bewusst: reines Durchblaettern von >680 grossen
+         Bildern waechst weiter - Bilder werden nicht verdraengt, nur
+         Historie. Der gemessene Fall (96 Dateien = 519 MB) liegt weit
+         darunter. Falls es je auftritt: die zweistufige Politik, die dem
+         User vorgelegt und NICHT gewaehlt wurde. Kein Aufweichen dieser
+         Regel. ***
+     *** RUNTIME-VERIFY B1-B7 OFFEN (User). Die wichtigsten: B3 (dieselbe
+         Datei erneut anklicken -> Historie VOLLSTAENDIG, prueft F1),
+         B2 (zurueckkehren -> 5 Schritte, GEWOLLT), B4 (grosser Ordner,
+         jedes Bild bemalt -> kein OutOfMemory). ***
+  *** Die Sorge "F01 braucht ConfirmDialog aus §20" hat sich ERLEDIGT: der
+      Dialog war schon da. Schritt [9] muss NICHT vorgezogen werden. ***
+  *** NICHT in den Top 5, bewusst: G01/G02 (Kodierung). Fachlich S1/S2,
+      aber jede Umstellung aendert, wie BEREITS GESCHRIEBENE Dateien
+      gelesen werden -> [C], Migrationsentscheidung des Users. ***
 
+DREI BEFUNDE, DIE DIE DOKUMENTIERTEN ALTLASTEN VERSCHAERFEN:
+  D01  Das Undo-Band speichert NUR workingImage. Element-Operationen
+       (verschieben, verstecken, drehen, loeschen) sind damit GAR NICHT
+       rueckgaengig zu machen - sie verbrauchen aber Slots. Das ist die
+       eigentliche Ursache hinter der gefuehrten toggleVis-Altlast.
+       -> eigener Task mit PD, und ohne Tests (M01) nicht verantwortbar.
+       *** ZWEI DINGE, DIE AM 2026-07-31 DAZUGEKOMMEN SIND UND IN DIESEN
+           TASK GEHOEREN:
+           1. Die Stacks sind PRO DATEI (CanvasFileState in c.fileCache),
+              nicht pro Canvas. Wer das Undo-Band um Elementzustaende
+              erweitert, muss sie AUCH dort mitfuehren, sonst verliert
+              jedes Blaettern die Elementhistorie.
+           2. Ein echter Speicher-Marker pro Datei ist der offene Rest von
+              D03 und gehoert an dieselbe Stelle. Beides in EINEM Task,
+              nicht zweimal dieselbe Datei anfassen. ***
+  D03  *** ERLEDIGT 2026-07-31, siehe Top-5 Platz 4. ***
+       *** D02 EBENFALLS ERLEDIGT - die toggleVis-Altlast weiter unten ist
+           damit zu. ***
+  L02  VIER referenzfreie Parallel-Implementierungen, 1332 Zeilen:
+       ZoomState, FileStateCache, ElementLayerState, FloatSelectionState.
+       0 Referenzen, KEIN main() (also nicht "startbar" wie die am
+       2026-07-30 ausgelagerten Faelle - die Lehre a) greift hier NICHT).
+       *** ZoomState dupliziert die Zoom-Animation INKLUSIVE des Timer-
+           Fehlers A02. Wer A02 repariert, repariert womoeglich die tote
+           Kopie. ***
+
+GRAPHIFY: fuer das Audit NICHT aufgefrischt - Priorisierung lief ueber
+Dateigroesse und Textsuche, und der Graph findet ohnehin keine Fehler.
+graphify-out/ ist weiterhin vom 2026-07-30 und kennt AppTheme, KeyBindings
+und KeyBindingsDialog nicht. Gezielter Update dieser drei Dateien bleibt
+offen - NIEMALS `graphify update .` (Scope-Falle).
+
+
+*** CLAUDE.md IST AM 2026-07-31 GEGEN DEN GEMESSENEN IST-STAND KORRIGIERT ***
+    -> doc/progress_2026-07-31_claudemd-korrektur.txt   [ST], [B], kein Code.
+    SECHS Widersprueche. Der groebste: CLAUDE.md sagte "AppTheme ist noch
+    NIRGENDS BENUTZT" - es steht in 15 Dateien mit 154 Verwendungen. Wer das
+    las, haette AppTheme fuer einen Entwurf gehalten und weiter Literale
+    getippt, also genau das Gegenteil von §21.
+    Ausserdem: .class 334->335 (Eclipse 336->337), Quelldateien 105->106,
+    Literale 454/162/110 -> gemessen 125/62/34, toggleVis-Altlast war noch
+    als offen gefuehrt, Hilfe-Taste stand im Konjunktiv ("waere SHIFT+F1").
+    ZWEI Befunde, die nur hier standen, sind jetzt AUCH in CLAUDE.md:
+    die nicht-atomaren TEXT-Schreiber und G01.
+    *** JEDE ZAHL EINZELN NACHGEMESSEN, KEINE aus einem Dokument
+        abgeschrieben - die .class-Zahl war denn auch in BEIDEN Dokumenten
+        verschieden. Befehle stehen in der progress-Datei. ***
+    *** NEBENBEFUND: toggleVis liegt in KeyboardShortcutManager:165, NICHT
+        im ElementController. Wer es dort sucht, findet es nicht. ***
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
+*** DIE GANZEN TOP 5 SIND ABGEARBEITET (F01, I01, F02/F03, D02/D03, B01).
+    Von den vier S1-Befunden ist nur noch G01 (Kodierung) offen, und das
+    ist [C] - eine Migrationsentscheidung des Users, keine Aufraeumarbeit.
+    Was den Fortschritt jetzt bremst, ist NICHT fehlende Arbeit, sondern
+    der aufgestaute RUNTIME-VERIFY: U1-U19 (Sichtpruefung), X1-X13
+    (Schliessen), T1-T9 (Vorlesen), S1-S12 (Speichern), D1-D6 (Undo),
+    B1-B7 (Speicher). Nur der User kann das. Ein einziger
+    Programmdurchlauf hakt den groessten Teil ab. ***
+
 *** SCHRITT [6] IST INHALTLICH ABGESCHLOSSEN. ZWOELF Dateien migriert,
     rund die HAELFTE aller Literale beseitigt (Color -51 %, Font -54 %,
     Stroke -50 %). ES IST KEIN ECHTER KANDIDAT MEHR OFFEN — was bleibt,
@@ -83,13 +285,21 @@ LIES ZUERST (Reihenfolge ist verbindlich):
 
 BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
        -encoding UTF-8 ist PFLICHT (Unicode im Quelltext).
-       ERWARTET: exit 0, 335 .class
-       (Aeltere Zahlen -- 329, 370, 328, 226, 208 -- sind veraltet.)
+       ERWARTET: exit 0, 335 .class in einem LEEREN Zielverzeichnis
+       *** NACHGEMESSEN 2026-07-31 (Clean-Build in ein Wegwerf-Verzeichnis):
+           javac 335 · Eclipse-bin/ 337. Die Differenz von ZWEI ist kein
+           Fehler: Eclipse uebersetzt alle DREI book-Klassen, der
+           javac-Befehl nur die von paint aus erreichbare.
+           Wer eine Zahl notiert, schreibt dazu, WOMIT gemessen wurde. ***
+       (Aeltere Zahlen -- 335, 329, 370, 328, 226, 208 -- sind veraltet
+        bzw. anders gemessen.)
 RUN:   java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEditor
 
 STRUKTUR: Projekt-Root = nur CLAUDE.md · src/ = nur Java + Deploy-Skript ·
           doc/ = alle Dokumente (flach, Wegweiser in README.md)
           src/paint 106 .java + book 3 + module-info
+          (106 -> 105: TextToSpeech geloescht; 105 -> 106: ImageFileWriter
+           angelegt. Beides 2026-07-31.)
 GRAPH:    graphify-out/ ist eingecheckt. 2479 Knoten / 6369 Kanten /
           123 Communities, code-only, 0 LLM-Tokens.
 
@@ -313,29 +523,40 @@ DOKUMENTIERTE ALTLASTEN (gefuehrt, kein Auftrag — Univ. §0)
     Plattform-Kodierung statt UTF-8. Betrifft Umlaute in recentFiles/
     recentProjects. [C]: bereits geschriebene Dateien wuerden anders gelesen.
     -> Audit-Kategorie "Kodierung/Locale".
-  - ImageIO.write in 9 Dateien -> Bild-Persistenz liegt nicht in der
-    io-Schicht (Befund S5).
+  - ~~ImageIO.write in 9 Dateien -> Bild-Persistenz liegt nicht in der
+    io-Schicht (Befund S5).~~ ERLEDIGT 2026-07-31 als F02+F03. Es gibt jetzt
+    EINEN Schreibweg: ImageFileWriter (§34). Ein PHYSISCHER Package-Split
+    nach "io" ist damit NICHT gemacht - der bleibt [C] und braucht Freigabe
+    (§4). ImageFileWriter IST die io-Schicht fuer Bilder, auch ohne Package.
   - 5 handgeschriebene JSON-Serializer ohne gemeinsamen Writer (AppSettings,
     ProjectManager, MapManager, CardListStore, book.JsonStorage). Ein NEUER
     Typ bekommt keinen sechsten (§31).
   - [!] TextWriter schreibt jede Datei zweimal (Original + src/->bin/-Kopie
     per Pfad-replace). Haengt an der Eclipse-Ordnerstruktur.
     -> Audit-Kategorien "Persistenz" und "Pfade".
-  - [!] toggleVis ruft pushUndo() PRO ELEMENT statt pro Aktion -> n
-    Undo-Schritte statt einem (§29). -> Audit-Kategorie "Korrektheit".
+  - [!] ~~toggleVis ruft pushUndo() PRO ELEMENT statt pro Aktion -> n
+    Undo-Schritte statt einem (§29).~~ ERLEDIGT 2026-07-31 als D02.
+    Gegenprobe ueber alle 48 pushUndo-Vorkommen: es war die EINZIGE solche
+    Stelle. Die Altlast ist geschlossen, nicht nur punktuell repariert.
   - GameSceneWriter schreibt PathLayer nicht; #Paths: wird referenziert, aber
     nicht gelesen — im Vertrag §23 als Luecke dokumentiert.
   - Karten-/Listendaten: bis §33 umgesetzt ist, greifen Panels teilweise noch
     direkt auf Dateien zu. NEUE Direktzugriffe sind verboten.
   - bin/ ist in Git (Build-Ausgabe wird mitversioniert). Vorgefunden, nicht
     bewertet.
-  - [!] TextToSpeech / CardTtsPlayer starten PowerShell mit einer temporaeren
-    .ps1-Datei und uebergeben Kartentext. -> Audit-Kategorie "Einschleusung":
-    pruefen, ob Text mit Anfuehrungszeichen oder Sonderzeichen den Befehl
-    verlassen kann.
-  - [!] ImageIO.write in 9 Dateien und mehrere FileWriter OHNE erkennbares
-    atomares Speichern -> Audit-Kategorie "Datenverlust": was passiert bei
-    Absturz oder vollem Datentraeger mitten im Schreiben?
+  - ~~TextToSpeech / CardTtsPlayer starten PowerShell...~~ ERLEDIGT als I01
+    (2026-07-31). Es gibt nur noch EINEN Vorlese-Weg: CardTtsPlayer, ueber
+    eine temporaere UTF-8-.ps1 und einen Here-String. Der Text ist niemals
+    Teil der Kommandozeile. KEINE zweite Vorlese-Implementierung anlegen.
+  - [!] ~~ImageIO.write in 9 Dateien~~ und mehrere FileWriter OHNE
+    erkennbares atomares Speichern. BILDER: ERLEDIGT 2026-07-31 (F02/§34).
+    *** OFFEN BLEIBEN DIE TEXT-SCHREIBER: AppSettings, ProjectManager,
+        MapManager, CardListStore, book.JsonStorage, SceneFileWriter,
+        TextWriter schreiben weiterhin nicht-atomar. Dasselbe Muster, andere
+        Entitaeten - ein "TextFileWriter" nach dem Vorbild von
+        ImageFileWriter waere der naechste logische Schritt, ist aber NICHT
+        beauftragt. Zusammen mit G02 (Kodierung) zu planen, sonst wird
+        dieselbe Datei zweimal angefasst. ***
   - src/paint/JAVA_EasyImageManipulator-Push.sh liegt im Quellbaum. Kein
     Dokument, sondern das Deploy-Skript und offenbar der Ausloeser der
     automatischen "WhiteBoard Update"-Commits. NICHT verschieben, ohne den
@@ -350,6 +571,38 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
   R4  java -cp bin PathAnimator.PathEditor                (../PathAnimator)
   R5  java -cp bin paint.DemoWorksheetEditor2             (../JavaDemos)
   R6  Alle vier Projekte in Eclipse importierbar (File > Import > Existing)
+
+  T1-T9  VORLESEN NACH I01 (Karten-Panel, Knopf "Maps"). Liste steht in
+         doc/progress_2026-07-31_I01-tts-injektion.txt. Die drei
+         wichtigsten:
+         T2  Karte mit UMLAUTEN vorlesen -> korrekt ausgesprochen
+             (laeuft jetzt ueber eine UTF-8-Datei statt der Kommandozeile)
+         T4  BEIDE Lautsprecher-Knoepfe einer Karte lesen JEWEILS IHREN
+             Text, nicht zweimal denselben (prueft den neuen idSuffix)
+         T8  Uebersetzungs-Karten und Kartenlisten UNVERAENDERT
+             (sie nutzen denselben Player - norm() darf nichts brechen)
+
+  D1-D6  UNDO NACH D02/D03. Volle Liste in
+         doc/progress_2026-07-31_D02-D03-undo-einzeiler.txt. Die drei
+         wichtigsten:
+         D1  Mehrere Layer selektieren, Umschalt+V -> danach EIN Strg+Z,
+             nicht n
+         D4  Aendern, Strg+Z bis zum Anfang, schliessen -> es wird GEFRAGT
+             (vorher wurde kommentarlos beendet)
+         D5  Strich malen, sofort Strg+Z, schliessen -> es wird EBENFALLS
+             gefragt. *** DAS IST GEWOLLT, kein Fehler. ***
+
+  S1-S12 SPEICHERN NACH F02/F03. Volle Liste in
+         doc/progress_2026-07-31_F02-F03-atomares-speichern.txt.
+         Bei JEDEM Weg gilt: Datei aktualisiert, KEINE .part-Datei bleibt
+         liegen, Titelmarker verschwindet. Die vier wichtigsten:
+         S1  Bild aendern -> "In Original speichern" -> neu laden zeigt
+             die Aenderung        (SaveController:142)
+         S5  Strg+Umschalt+Alt+S -> Rueckfrage, Original UEBERSCHRIEBEN
+             mit eingebrannten Elementen   (SaveController:283)
+         S7  Szene speichern -> images/image_N.png, danach die Szene in
+             GameII/GameLoop2 oeffnen  *** VERTRAG §23 ***
+         S12 Nach der Sitzung: nirgends eine *.part-Leiche
 
   *** OFFEN UND VORRANGIG (aufgestaut aus DREI migrierten Dateien): ***
   U1  Dialog oeffnen: Titelleiste dunkel wie vorher, Titelschrift fett

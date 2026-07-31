@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import javax.imageio.ImageIO;
 import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -97,7 +96,7 @@ class NewFileController {
 			counter++;
 		} while (newFile.exists());
 		try {
-			ImageIO.write(c.workingImage, "PNG", newFile);
+			ImageFileWriter.writePng(c.workingImage, newFile);
 			c.sourceFile = newFile;
 			c.hasUnsavedChanges = false;
 			ed.dirtyFiles.remove(c.sourceFile);
@@ -182,7 +181,7 @@ class NewFileController {
 				} while (newFile.exists());
 
 				try {
-					ImageIO.write(c.workingImage, "PNG", newFile);
+					ImageFileWriter.writePng(c.workingImage, newFile);
 					c.sourceFile = newFile;
 					c.hasUnsavedChanges = false;
 					ed.dirtyFiles.remove(c.sourceFile);

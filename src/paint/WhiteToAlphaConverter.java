@@ -45,7 +45,7 @@ public class WhiteToAlphaConverter {
 			// Save result
 			String outputPath = getOutputPath(inputFile, "_white_to_alpha");
 			File outputFile = new File(outputPath);
-			ImageIO.write(result, "PNG", outputFile);
+			ImageFileWriter.writePng(result, outputFile);
 
 			JOptionPane.showMessageDialog(null,
 				"White-to-Alpha conversion complete!\nSaved: " + outputFile.getName());

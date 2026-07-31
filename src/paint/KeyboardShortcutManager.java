@@ -169,8 +169,13 @@ class KeyboardShortcutManager {
 				if (c.workingImage == null)
 					return;
 				List<Layer> toToggle = c.selectedElements.isEmpty() ? java.util.List.of() : c.selectedElements;
-				for (Layer el : toToggle) {
+				// EIN pushUndo pro Benutzeraktion, nicht pro Element (§29).
+				// Vorher stand der Aufruf in der Schleife: 50 selektierte Layer
+				// erzeugten 50 Schnappschüsse und verdrängten damit bei
+				// MAX_UNDO = 50 die gesamte echte Pixel-Historie.
+				if (!toToggle.isEmpty())
 					ed.pushUndo();
+				for (Layer el : toToggle) {
 					Layer updated = null;
 					if (el instanceof ImageLayer il) {
 						updated = il.withHidden(!il.isHidden());

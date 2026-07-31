@@ -1,0 +1,140 @@
+==============================================================================
+progress_2026-07-31_D02-D03-undo-einzeiler.txt
+Typ: [ST] - keine PD. Zwei isolierte Befunde, beide [B], beide Aufwand S.
+==============================================================================
+
+PROMPT
+  "weiter" -> Top-5 Platz 4 aus dem Schwachstellen-Audit: D02 + D03.
+
+ZUSAMMENFASSUNG
+  D02  toggleVis rief pushUndo() PRO ELEMENT. Jetzt EIN Aufruf pro Aktion (§29).
+  D03  afterUndoRedo schloss aus "Undo-Stack leer" auf "gespeichert". Dieser
+       Fehlschluss ist entfernt - Undo/Redo setzt den Aenderungsmarker jetzt
+       nur noch, es loescht ihn nicht mehr.
+  Kein neues Feld, keine neue Klasse, keine Struktur angefasst.
+  Build: exit 0, 335 .class (unveraendert - es kam keine Klasse dazu).
+
+==============================================================================
+D02 - pushUndo aus der Schleife
+==============================================================================
+DATEI: KeyboardShortcutManager.java, Aktion "toggleVis" (Umschalt+V)
+
+VORHER
+    for (Layer el : toToggle) {
+        ed.pushUndo();          <-- pro Element
+        ...
+    }
+
+NACHHER
+    if (!toToggle.isEmpty())
+        ed.pushUndo();          <-- pro Aktion
+    for (Layer el : toToggle) { ... }
+
+WARUM DAS MEHR IST ALS KOSMETIK: MAX_UNDO ist 50. Wer 50 Layer selektiert
+und Umschalt+V drueckt, erzeugte 50 Schnappschuesse und verdraengte damit
+die GESAMTE echte Pixel-Historie - und kein einziger davon machte das
+Verstecken rueckgaengig (das ist D01). Ein Griff, und die Rueckgaengig-Kette
+war leer.
+
+DIE if-ABFRAGE IST NICHT UEBERFLUESSIG: bei leerer Selektion ist toToggle
+List.of(), und ohne die Abfrage entstuende ein Undo-Schritt fuer eine Aktion,
+die nichts tut - derselbe Fehler in klein.
+
+GEGENPROBE: gibt es weitere pushUndo-in-Schleife-Stellen? Textsuche ueber
+alle 48 pushUndo-Vorkommen mit Kontext: EIN Verdachtsfall (CanvasPanel:2583),
+geprueft und WIDERLEGT - die Schleife darueber ist vor dem Aufruf geschlossen.
+toggleVis war die einzige Stelle. Die Altlast ist damit abgeschlossen, nicht
+nur an einer Stelle repariert.
+
+==============================================================================
+D03 - "Stack leer" heisst nicht "gespeichert"
+==============================================================================
+DATEI: SaveController.afterUndoRedo(int)
+
+VORHER
+    if (c.undoStack.isEmpty()) {
+        c.hasUnsavedChanges = false;
+        ed.dirtyFiles.remove(c.sourceFile);     <-- der Fehlschluss
+    } else {
+        c.hasUnsavedChanges = true;
+        ed.dirtyFiles.add(c.sourceFile);
+    }
+
+NACHHER
+    c.hasUnsavedChanges = true;
+    if (c.sourceFile != null)
+        ed.dirtyFiles.add(c.sourceFile);
+
+BEGRUENDUNG: Der leere Stack bedeutet den Zustand beim LADEN, nicht beim
+SPEICHERN. Nach mehr als MAX_UNDO Aenderungen ist er nicht einmal das, weil
+die aeltesten Schnappschuesse verdraengt wurden. Undo/Redo aendert das Bild,
+es SCHREIBT es nicht - es kann deshalb nie "gespeichert" bedeuten.
+
+*** BEWUSST IN KAUF GENOMMEN: wer eine Aenderung macht und sofort Strg+Z
+    drueckt, behaelt den Aenderungsmarker, obwohl das Bild wieder der Datei
+    entspricht. Eine Rueckfrage zu viel ist der harmlose Fehler; die
+    Alternative war stiller Datenverlust (D03 + F01). Wer das "korrigiert",
+    baut den Datenverlust wieder ein. ***
+
+==============================================================================
+DREI WEGE, DIE ICH GEPRUEFT UND VERWORFEN HABE
+==============================================================================
+  a) SAETTIGUNGS-FLAG merken (die im Audit vorgeschlagene Alternative:
+     "undoTruncated = true", sobald pollLast() verdraengt).
+     -> VERWORFEN, und das ist der interessante Befund dieses Schritts:
+        *** DIE UNDO-STACKS SIND PRO DATEI, NICHT PRO CANVAS. ***
+        FileLoadController:77-84 stellt sie beim Dateiwechsel aus
+        c.fileCache (CanvasFileState.undoStack) wieder her. Ein Flag am
+        CanvasInstance wuerde beim Blaettern desynchronisieren; korrekt
+        muesste es in CanvasFileState liegen und an allen 12 Stellen
+        mitgepflegt werden, die undoStack.clear() direkt aufrufen.
+        Fuer einen [B]-Fix waere das eine NEUE Fehlerklasse.
+     -> Ausserdem faengt das Flag den zweiten Fall gar nicht: wer
+        ZWISCHENDURCH speichert und danach bis zum leeren Stack zurueck-
+        geht, ist beim LADE-Zustand, nicht beim Speicher-Zustand.
+
+  b) ZAEHLER "editsSinceSave" (++ in pushUndo, -- in doUndo, 0 beim Speichern).
+     -> VERWORFEN. Waere das sauberste Modell, braeuchte aber einen Reset an
+        13 "hasUnsavedChanges = false"-Stellen und 12 "undoStack.clear()"-
+        Stellen (gezaehlt, nicht geschaetzt). Und er waere trotzdem falsch:
+        markDirty() und mehrere Controller setzen hasUnsavedChanges DIREKT,
+        ohne pushUndo - der Zaehler bliebe 0, waehrend die Datei schmutzig
+        ist. Das Zustandsmodell ist der eigentliche Befund, und das ist D01.
+
+  c) DEN VERGLEICH WIRKLICH RECHNEN (Bild gegen Datei).
+     -> VERWORFEN als unnoetiger Schritt (Univ. §0): ein Pixelvergleich bei
+        jedem Undo, bei 4000x3000 pro Tastendruck. §26 verlangt Messen vor
+        Optimieren - hier ist ohne Messung klar, dass der Preis nicht
+        gerechtfertigt ist.
+
+*** WAS OFFEN BLEIBT UND WO ES HINGEHOERT: ein echter Speicher-Marker PRO
+    DATEI (nicht pro Canvas) - dieselbe Stelle, an der D01 das Undo-Band um
+    Elementzustaende erweitern muss. Beides gehoert in EINEN Task mit PD und
+    braucht Tests (M01). NICHT nebenbei anfassen. ***
+
+==============================================================================
+BUILD-VERIFY (erledigt)
+==============================================================================
+  javac -encoding UTF-8 -sourcepath src -d <LEER> src/paint/*.java src/module-info.java
+  -> exit 0, 335 .class (unveraendert, es kam keine Klasse dazu)
+
+==============================================================================
+RUNTIME-VERIFY D1-D6  -  OFFEN, GEHOERT DEM USER
+==============================================================================
+  D1  *** MEHRERE Layer selektieren, Umschalt+V (verstecken/zeigen) ->
+      danach EIN Strg+Z, nicht n. Vorher brauchte man 50 Tastendruecke fuer
+      einen Griff. ***
+  D2  Vor dem Umschalt+V ein paar Pinselstriche machen: sie muessen NACH dem
+      Verstecken immer noch rueckgaengig zu machen sein. Das ist der
+      eigentliche Schaden von D02 - die verdraengte Historie.
+  D3  Umschalt+V OHNE Selektion -> es passiert nichts, und es entsteht KEIN
+      leerer Undo-Schritt (danach Strg+Z: es muss der Schritt davor kommen).
+  D4  *** Aendern, Strg+Z bis zum Anfang, Fenster schliessen -> es wird
+      GEFRAGT. Vorher wurde kommentarlos beendet. Das ist die eigentliche
+      D03-Reparatur, sichtbar nur im Zusammenspiel mit F01. ***
+  D5  Bewusst die Kehrseite pruefen: einen Strich malen, sofort Strg+Z,
+      schliessen -> es wird ebenfalls gefragt, obwohl das Bild der Datei
+      entspricht. DAS IST GEWOLLT (siehe oben), kein Fehler.
+  D6  Zwei Dateien abwechselnd bearbeiten und blaettern -> der
+      Aenderungsmarker (Titelleiste) bleibt der RICHTIGEN Datei zugeordnet.
+      Prueft, dass dirtyFiles weiterhin die dateiuebergreifende Wahrheit ist.

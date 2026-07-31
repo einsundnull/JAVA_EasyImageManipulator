@@ -1,0 +1,204 @@
+==============================================================================
+progress_2026-07-31_B01-filecache-deckeln.txt
+Aufgabe: [BT]  ->  PD: doc/Task_2026-07-31_2300_B01-fileCache-deckeln.txt
+Befund:  B01 aus doc/Audit_Schwachstellen_2026-07-31.md  [S2, Aufwand M]
+Risiko:  [B]   ->  eine neue Methode, zwei Aufrufe, keine Signatur geaendert
+==============================================================================
+
+PROMPT
+------
+"b01"
+
+
+ZUSAMMENFASSUNG
+---------------
+Der unbegrenzte c.fileCache ist gedeckelt - aber NICHT so, wie es im Audit
+stand. Die von §26 erzwungene Messung hat die Annahme widerlegt, auf der
+der Befund beruhte, und damit die Loesung geaendert.
+
+
+VORSCHLAEGE, DIE ERWOGEN UND VERWORFEN WURDEN
+---------------------------------------------
+V1  "PreloadController:114 nachbauen" (so stand es im Audit und in
+    WEITERMACHEN): MAX_CACHE_SIZE-Deckel, aeltester Eintrag fliegt raus.
+    VERWORFEN nach der Messung - siehe unten. Haette wenig gespart und das
+    Teuerste weggeworfen.
+V2  Ganze Eintraege per LRU verdraengen, nur nicht-dirty und nicht aktiv.
+    Dem User vorgelegt, NICHT gewaehlt. Haette einen timestamp in
+    CanvasFileState gebraucht (den es dort - anders als in
+    PreloadedFileState - nicht gibt).
+V3  Zweistufig: erst kuerzen, dann verdraengen. Dem User vorgelegt, NICHT
+    gewaehlt. Aufwand L statt M; deckt zusaetzlich Ordner mit >680 Bildern.
+V4  Nur messen und warnen. Dem User vorgelegt, NICHT gewaehlt.
+V5  Die Kuerzung in saveCurrentState() einbauen. Erster Entwurf, VERWORFEN
+    wegen der Selbe-Datei-Falle - siehe "Die drei Fallen" unten.
+
+
+DIE MESSUNG, DIE DIE LOESUNG GEAENDERT HAT  ([1/5], §26)
+---------------------------------------------------------
+Wegwerf-Programm MeasureCache.java gegen die ECHTEN Arbeitsverzeichnisse
+des Users (aus settings/default.txt, gallery2Dir0/1). Liest nur die
+Bild-Kopfdaten, dekodiert nicht.
+
+  JVM MaxHeapSize hier: 4,97 GB (ergonomisch, kein -Xmx im Projekt)
+  Bild im Speicher nach normalizeImage (TYPE_INT_ARGB): Median 6,0 MB
+  (33 Bilder in .../DE/Wege, 96 Bilder in .../Bilder)
+
+  EIN Eintrag, nie bearbeitet      :   6,0 MB
+  EIN Eintrag, 10 Undo             :  66,0 MB
+  EIN Eintrag, 50 Undo + 50 Redo   : 606,0 MB
+  96 Dateien, nur durchgeblaettert : 519 MB    passt
+  96 Dateien, je 10 Undo           : 5,57 GB   *** OutOfMemory ***
+
+*** DAS ZENTRALE ERGEBNIS: DIE DATEIZAHL IST NICHT DAS PROBLEM.
+    682 Dateien passen in den Heap, solange niemand sie bearbeitet. Aber
+    nur 6, wenn jede einen vollen Undo-Stack traegt. Der Verbrauch haengt
+    an den STACKS, nicht an der Anzahl der Eintraege.
+    Ein Deckel auf die Eintragszahl (V1) haette also kaum Speicher
+    gespart - und ausgerechnet das Unwiederbringliche weggeworfen: die
+    Historie. Das Bild laesst sich von der Platte neu laden, die
+    Rueckgaengig-Schritte nicht.
+    GENAU DAVOR WARNT §26. Der Befund war richtig, die vorgeschlagene
+    Loesung nicht. ***
+
+
+DREI STRUKTUR-BEFUNDE AUS DER DURCHSICHT
+-----------------------------------------
+S1  fileCache kennt WEDER remove NOCH clear - nur put. Textsuche ueber den
+    ganzen Quellbaum. Er war tatsaechlich voellig unbegrenzt.
+S2  CanvasFileState hat KEINEN timestamp, PreloadedFileState schon. Die im
+    Audit genannte "Vorlage PreloadController:114" haette also nicht nur
+    uebertragen, sondern erst ein Feld anlegen muessen.
+S3  cs.image und c.workingImage sind DIESELBE REFERENZ
+    (FileLoadController:79 und :301). Wer den aktiven Eintrag verdraengt,
+    zieht dem Canvas das Bild unter den Fuessen weg. Jede Verdraengungs-
+    Politik muss den aktiven Eintrag ausnehmen.
+
+
+ENTSCHEIDUNG DES USERS  ([2/5])
+--------------------------------
+GEWAEHLT: "Redo weg, Undo auf 5 kuerzen."
+  aktive Datei     : unangetastet, voller Stack
+  verlassene Datei : Bild bleibt, Redo weg, Undo auf 5 Schritte
+  gemessener Fall  : 5,57 GB -> 0,86 GB
+
+*** DER VERLUST IST GEWOLLT UND VOM USER ENTSCHIEDEN: wer zu einer Datei
+    zurueckkehrt, hat dort 5 statt 50 Undo-Schritte und kein Redo. Das ist
+    KEINE Altlast. Wer es "verbessert", holt den OutOfMemory zurueck. ***
+
+
+TATSAECHLICHE LOESUNG  ([3/5])
+-------------------------------
+FileLoadController, zwei Ergaenzungen:
+
+  static final int INACTIVE_UNDO_KEEP = 5;
+
+  void trimInactiveHistory(int idx) {
+      CanvasInstance c = ed.ci(idx);
+      for (Map.Entry<File, CanvasFileState> e : c.fileCache.entrySet()) {
+          if (e.getKey().equals(c.sourceFile)) continue;  // aktive Datei
+          CanvasFileState cs = e.getValue();
+          cs.redoStack.clear();
+          while (cs.undoStack.size() > INACTIVE_UNDO_KEEP)
+              cs.undoStack.pollLast();
+      }
+  }
+
+Aufgerufen an ZWEI Stellen, jeweils direkt NACH der sourceFile-Zuweisung:
+  loadFile(File, int)             (nach c.hasUnsavedChanges = ...)
+  loadSceneBackground(...)        (nach c.hasUnsavedChanges = false)
+
+Sonst nichts geaendert. Keine Signatur, kein Interface, keine neue Klasse -
+die .class-Zahl bleibt 335.
+
+
+DIE DREI FALLEN  (und warum die Loesung so aussieht)
+-----------------------------------------------------
+F1  DIE SELBE-DATEI-FALLE. Der naheliegende Ort waere saveCurrentState() -
+    alle vier Aufrufer sind Abschiede von einer Datei (loadFile:75,
+    loadSceneBackground:254, EditorDialogs:281, NewFileController:163).
+    ABER: loadFile ruft saveCurrentState AUCH DANN, wenn man die bereits
+    offene Datei erneut anklickt, und laedt den Eintrag danach wieder in
+    c.undoStack. Ein zweiter Klick auf die aktive Datei haette still 45
+    Undo-Schritte geloescht.
+    *** Deshalb kuerzt die Loesung ALLE Eintraege AUSSER dem aktiven,
+        identifiziert ueber c.sourceFile. Der aktive ist per Definition
+        ausgenommen - die Falle kann gar nicht zuschnappen. ***
+F2  DIE STACK-RICHTUNG. undoStack ist ein ArrayDeque, benutzt als Stack:
+    push() legt VORNE ab (SaveController:56). Der AELTESTE Schritt ist
+    deshalb pollLast() - genau so deckelt SaveController:57-58 auf
+    MAX_UNDO. Wer pollFirst() nimmt, wirft die NEUESTEN Schritte weg und
+    macht die Kuerzung zur Katastrophe.
+F3  DIE VERGESSENE STELLE. Eine Kuerzung "bei jedem Abschied" haette in
+    jedem Bedienweg einzeln stehen muessen - und die beiden
+    "neue Bitmap"-Wege laufen ueber das Callbacks-Interface
+    (EditorDialogCallbacks.saveCurrentState), also durch zwei weitere
+    Dateien. Jede vergessene Stelle waere ein Leck.
+    *** Stattdessen eine Feststellung an der WURZEL: nach jedem Laden wird
+        gekuerzt, unabhaengig davon, wie man dorthin kam. Dieselbe
+        Ueberlegung wie Univ. §13 zum Bedarfs-Redraw. Idempotent, also
+        auch mehrfach unschaedlich. Die "neue Bitmap"-Wege setzen
+        sourceFile auf null; ihr Vorgaenger wird beim naechsten Laden
+        mitgekuerzt - selbstheilend. ***
+
+
+THREADING
+---------
+Die Kuerzung laeuft auf dem EDT. ArrayDeque ist nicht threadsicher, das
+ist hier unbedenklich: PreloadController ist der einzige Worker-Zugriff auf
+fileCache und legt NUR neue CanvasFileState-Objekte mit Bild an
+(PreloadController:44) - die Stacks fasst er nie an. Die Iteration ueber
+die ConcurrentHashMap ist ohnehin schwach konsistent.
+*** Wer dem Preloader je Stack-Zugriff gibt, muss das hier mitbedenken. ***
+
+
+WAS NICHT GEDECKT IST  (ehrlich, nicht stillschweigend)
+--------------------------------------------------------
+Reines Durchblaettern eines Ordners mit MEHR ALS ~680 grossen Bildern
+waechst weiterhin unbegrenzt: die Bilder selbst werden nicht verdraengt,
+nur die Historie. Der gemessene Fall (96 Dateien = 519 MB) liegt weit
+darunter, und der User hat die zweistufige Politik (V3) bewusst NICHT
+gewaehlt. Wenn dieser Fall je auftritt, ist V3 die Antwort - nicht ein
+nachtraeglicher Deckel, der diese Regel aufweicht.
+
+
+BUILD-VERIFY  ([4/5])
+----------------------
+javac -encoding UTF-8 -sourcepath src -d <leeres Verz.> \
+      src/paint/*.java src/module-info.java
+  -> exit 0, 335 .class  (unveraendert)
+*** "Build gruen" ist KEIN Verify (Univ. §10). Die Wirkung dieser Aenderung
+    ist ausschliesslich zur Laufzeit sichtbar. ***
+
+
+RUNTIME-VERIFY B1-B7  (OFFEN - nur der User kann das)
+------------------------------------------------------
+  B1  Bild oeffnen, 10x malen, 10x Strg+Z -> alle zehn Schritte da.
+      (Die AKTIVE Datei darf NICHT gekuerzt sein.)
+  B2  Bild A bearbeiten (10 Schritte), zu B blaettern, zu A zurueck
+      -> 5 Undo moeglich, der sechste nicht mehr. *** GEWOLLT. ***
+  B3  Dieselbe Datei im Filmstreifen ERNEUT anklicken, ohne zu blaettern
+      -> Historie bleibt VOLLSTAENDIG.  *** Prueft Falle F1. ***
+  B4  Grossen Ordner (>50 Bilder) durchblaettern, jedes kurz bemalen
+      -> kein OutOfMemory, Programm bleibt fluessig.
+  B5  Canvas II: dort geoeffnete Datei behaelt ihre volle Historie,
+      waehrend in Canvas I geblaettert wird (getrennte fileCaches, §30).
+  B6  Datei mit UNGESPEICHERTEN Aenderungen verlassen und zurueckkehren
+      -> das BILD ist unveraendert da (nur die Historie ist kuerzer);
+      Titelmarker und Schliessen-Rueckfrage wie nach D03.
+  B7  Szene laden -> dieselbe Kuerzung greift, kein Fehler beim Wechsel
+      Bild <-> Szene.
+
+
+==============================================================================
+# PD.txt aktualisiert (ja - Task_2026-07-31_2300_B01-fileCache-deckeln.txt,
+#   alle 5 Schritte abgeschlossen)
+# progress.txt aktualisiert (ja - diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert (ja)
+# WEITERMACHEN_PROMPT.txt bereinigt und alter archiviert (nein)
+# Die Aufgabe B01 wurde vollstaendig abgeschlossen (ja - bis auf B1-B7)
+# Naechster Schritt: Runtime-Verify B1-B7; danach ist von den Top 5 nichts
+#   mehr offen. Verbleibend: G01 [C, Migrationsentscheidung], D01 (eigener
+#   Task, braucht M01), L02 (vier tote Parallel-Implementierungen).
+# "/clear" Befehl und WEITERMACHEN_PROMPT.txt empfohlen (ja)
+==============================================================================

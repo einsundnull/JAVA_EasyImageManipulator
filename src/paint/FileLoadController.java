@@ -25,8 +25,56 @@ class FileLoadController {
 	/** When true, loadFile() updates tileGallery2 instead of tileGallery. */
 	private boolean gallery2Mode = false;
 
+	/**
+	 * Wie viele Undo-Schritte eine Datei behält, von der weggeblättert wurde
+	 * (Befund B01). Die <b>aktive</b> Datei behält ihre vollen
+	 * {@link SaveController#MAX_UNDO} Schritte.
+	 * <p>
+	 * Gemessen am 2026-07-31: ein Cache-Eintrag mit vollem Stack kostet beim
+	 * typischen Bild von 6&nbsp;MB rund <b>606&nbsp;MB</b> — das Hundertfache
+	 * des Bildes. 96 bearbeitete Dateien belegten 5,57&nbsp;GB und sprengten
+	 * den Heap; mit dieser Kürzung sind es 0,86&nbsp;GB.
+	 * Details und die verworfenen Alternativen:
+	 * {@code doc/Task_2026-07-31_2300_B01-fileCache-deckeln.txt}.
+	 */
+	static final int INACTIVE_UNDO_KEEP = 5;
+
 	FileLoadController(SelectiveAlphaEditor ed) {
 		this.ed = ed;
+	}
+
+	/**
+	 * Kürzt die Undo-/Redo-Historie aller Dateien im {@code fileCache}, die
+	 * gerade <b>nicht</b> angezeigt werden (Befund B01). Das Bild jeder Datei
+	 * bleibt erhalten — nur die Historie schrumpft auf
+	 * {@link #INACTIVE_UNDO_KEEP} Schritte, der Redo-Stack entfällt ganz.
+	 * <p>
+	 * <b>Der aktive Eintrag ist per Definition ausgenommen</b> (Vergleich mit
+	 * {@code c.sourceFile}). Genau deshalb steht die Kürzung hier und nicht in
+	 * {@code saveCurrentState()}: dort hätte ein erneuter Klick auf die bereits
+	 * offene Datei still 45 Undo-Schritte gelöscht, weil {@code loadFile()}
+	 * {@code saveCurrentState()} auch in diesem Fall aufruft.
+	 * <p>
+	 * Die Methode ist idempotent und wird an der Wurzel aufgerufen (nach jedem
+	 * Laden), nicht als Meldepflicht in jedem einzelnen Bedienweg — eine
+	 * vergessene Stelle wäre sonst ein Leck (Univ. §13).
+	 * <p>
+	 * <b>Nicht „vereinfachen":</b> {@code undoStack} ist ein Stack, dessen
+	 * {@code push()} vorne ablegt. Der älteste Schritt ist deshalb
+	 * {@code pollLast()} — so wie in {@link SaveController} beim Deckeln auf
+	 * {@code MAX_UNDO}. {@code pollFirst()} würde die <i>neuesten</i> Schritte
+	 * wegwerfen.
+	 */
+	void trimInactiveHistory(int idx) {
+		CanvasInstance c = ed.ci(idx);
+		for (java.util.Map.Entry<File, CanvasInstance.CanvasFileState> e : c.fileCache.entrySet()) {
+			if (e.getKey().equals(c.sourceFile))
+				continue; // aktive Datei: volle Historie
+			CanvasInstance.CanvasFileState cs = e.getValue();
+			cs.redoStack.clear();
+			while (cs.undoStack.size() > INACTIVE_UNDO_KEEP)
+				cs.undoStack.pollLast();
+		}
 	}
 
 	/** Load a file and reflect it in the secondary gallery (tileGallery2) only. */
@@ -105,6 +153,10 @@ class FileLoadController {
 
 		c.sourceFile = file;
 		c.hasUnsavedChanges = ed.dirtyFiles.contains(file);
+		// B01: Historie der jetzt inaktiven Dateien kürzen. Muss NACH der
+		// sourceFile-Zuweisung stehen — sie bestimmt, welcher Eintrag verschont
+		// bleibt.
+		trimInactiveHistory(idx);
 		c.selectedAreas.clear();
 		c.isSelecting = false;
 		c.selectionStart = null;
@@ -270,6 +322,7 @@ class FileLoadController {
 		c.sourceFile = file;
 		c.activeSceneFile = null;
 		c.hasUnsavedChanges = false;
+		trimInactiveHistory(idx); // B01, siehe loadFile
 		c.selectedAreas.clear();
 		c.isSelecting = false;
 		c.floatingImg = null;

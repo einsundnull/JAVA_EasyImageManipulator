@@ -15,7 +15,7 @@ Vor jeder Aufgabe in dieser Reihenfolge:
    PathAnimator und JavaDemos. Ändern nur dort, danach neu kopieren;
    Verfahren in `doc/README.md`, Abschnitt 1.
 2. **`doc/GUIDELINES.md`** — Projekt-Steckbrief (welche TT-Klasse welche Rolle
-   besetzt) + projektspezifische §20–§33.
+   besetzt) + projektspezifische §20–§34.
 3. **`doc/Prompt_Handling.txt`** — Task-Workflow: `[BT]`/`[ST]`, PD-Datei,
    Risikoklassen `[A]`/`[B]`/`[C]`, Abschluss-Block.
 4. **`doc/WEITERMACHEN_PROMPT.txt`** — aktueller Stand und offene Schritte.
@@ -37,7 +37,11 @@ javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.ja
 ```
 `-encoding UTF-8` ist **Pflicht** — die Quelldateien enthalten Unicode (Pfeile,
 Symbole, Umlaute). Ohne die Option: „unmappable character".
-**Erwartet: exit 0, 328 `.class`** (Stand 2026-07-30).
+**Erwartet: exit 0, 335 `.class`** in einem **leeren** Zielverzeichnis
+(nachgemessen 2026-07-31). Ein von Eclipse mitgepflegtes `bin/` enthält
+**337** — Eclipse übersetzt alle drei `book`-Klassen, der `javac`-Befehl nur
+die von `paint` aus erreichbare. Wer eine Zahl notiert, schreibt dazu,
+**womit** gemessen wurde.
 
 **Starten:**
 ```bash
@@ -53,8 +57,9 @@ Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
 **Deploy:** `bash src/paint/JAVA_EasyImageManipulator-Push.sh` →
 `https://github.com/einsundnull/JAVA_EasyImageManipulator.git`
 
-> **Quellbaum:** nur noch `paint` (103 Dateien) + `book` (3) +
-> `module-info.java`. Am 2026-07-30 ausgelagert, weil ohne Bezug zu `paint`:
+> **Quellbaum:** nur noch `paint` (106 Dateien) + `book` (3) +
+> `module-info.java`. (105 → 106 am 2026-07-31: `TextToSpeech` gelöscht,
+> `ImageFileWriter` angelegt.) Am 2026-07-30 ausgelagert, weil ohne Bezug zu `paint`:
 > `com.spriteanimator` → `../SpriteAnimator/`, `PathAnimator` →
 > `../PathAnimator/`, die startbaren Prototypen (`Demo`, `DemoWorksheetEditor{,2}`,
 > `AutoGrowingPillFieldDemo` + `SmartLabel`) → `../JavaDemos/`.
@@ -74,7 +79,7 @@ Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
 
 Swing-Werkzeug zum Bearbeiten von Bildern und Szenen. **Zwei unabhängige
 Canvases** nebeneinander, vier Modi, ein Zweitfenster für die Vorschau.
-Alles liegt im Package `paint` (103 Klassen, flach) plus `book` (3 Klassen).
+Alles liegt im Package `paint` (106 Klassen, flach) plus `book` (3 Klassen).
 
 ### Das Hauptfenster ist ein Orchestrator, keine God-Klasse
 
@@ -179,6 +184,29 @@ vor **jedem** `PaintEngine`-Aufruf Pflicht, es gibt keinen anderen Weg zurück.
 Die schwebende Auswahl ist mitten im Zug **nicht** Teil des Bandes:
 `cancelFloat()` ruft `doUndo()`.
 
+> **Die Undo-Stacks hängen an der Datei, nicht am Canvas** — `FileLoadController`
+> stellt sie beim Blättern aus `c.fileCache` (`CanvasFileState`) wieder her.
+> Wer ein Sättigungs-Flag oder einen Speicher-Marker am `CanvasInstance`
+> anbringt, desynchronisiert ihn beim Blättern.
+>
+> **Deshalb hält `FileLoadController.trimInactiveHistory(idx)` den Cache
+> klein** (B01, 2026-07-31): nach jedem Laden behalten alle **nicht**
+> angezeigten Dateien nur noch `INACTIVE_UNDO_KEEP = 5` Undo-Schritte und
+> keinen Redo-Stack; ihr Bild bleibt. Die **aktive** Datei ist per Vergleich
+> mit `c.sourceFile` ausgenommen und behält ihre vollen 50.
+> Gemessen: ein Eintrag mit vollem Stack kostet beim 6-MB-Bild **606 MB**,
+> 96 bearbeitete Dateien sprengten mit 5,57 GB den Heap.
+> **Der Verlust ist gewollt** — wer zu einer Datei zurückkehrt, hat dort 5
+> statt 50 Schritte. Wer das „verbessert", holt den `OutOfMemoryError`
+> zurück. Und: `undoStack` ist ein Stack, `push()` legt **vorne** ab — der
+> älteste Schritt ist `pollLast()`, nicht `pollFirst()`.
+>
+> **Undo/Redo *setzt* den Änderungsmarker, es löscht ihn nicht** (D03,
+> 2026-07-31). Der Fehlschluss „Stack leer ⇒ gespeichert" ist raus. Die
+> gewollte Kehrseite: Änderung + sofort `Strg+Z` behält den Marker, das
+> Schließen fragt trotzdem nach. Eine Rückfrage zu viel ist der harmlose
+> Fehler — die Alternative war stiller Datenverlust. **Nicht „korrigieren".**
+
 ### Zwei Koordinatensysteme
 
 - **Image-Space** — Pixel in `workingImage`. Alles Persistente: `Layer`-Bounds,
@@ -224,6 +252,7 @@ Zweitfenster: `PreviewMode` (SNAPSHOT / LIVE_ALL / LIVE_ALL_EDIT),
 | `TextReader` / `TextWriter` | `TextLayer`-Konfiguration |
 | `GameSceneReader` / `GameSceneWriter` | **GameII-Szenen** (Prozent-Koordinaten) |
 | `ToolLegacySceneReader` | Altes GameII-Layout — **nur lesen** |
+| `ImageLoader` / `ImageFileWriter` | **Bilder** — laden bzw. schreiben |
 | `SceneSerializer`, `SceneLocator`, `ProjectManager` | Szenen-/Projektverwaltung |
 | `AppSettings` | globale Einstellungen (Singleton) |
 | `MapManager`, `CardListStore`, `book.JsonStorage`, `PageLayoutManifest` | Maps, Karten, Bücher, Seitenlayout |
@@ -250,6 +279,14 @@ beschrieb im Javadoc einen Pfad ohne `settings/`.
 > (`SpriteLayer.rawLines()`) und aktualisiert nur `#INIT_POSITION`/`#SIZE` —
 > ein Writer, der fremde Abschnitte wegwirft, zerstört Animationen und Links.
 
+> **Bilder werden ausschließlich über `ImageFileWriter.writePng(...)`
+> geschrieben** (§34, seit 2026-07-31). Es schreibt **atomar** — erst in eine
+> `.part`-Nachbardatei, dann `Files.move(ATOMIC_MOVE)` — und **prüft den
+> Rückgabewert** von `ImageIO.write`, der bei fehlendem Writer `false` ist,
+> ohne zu werfen. `ImageIO.write` steht nirgends sonst im Quellbaum, auch
+> nicht für Temp-Dateien. Eine liegengebliebene `.part`-Datei bedeutet: dort
+> ist ein Schreibvorgang abgebrochen, das Original ist heil.
+
 `AppSettings` liegt in `settings/default.txt` und enthält **JSON** trotz
 `.txt`-Endung (bewusst, damit bestehende Installationen ihre Einstellungen
 behalten). Der Parser ist zeilenbasiert: **ein Key pro Zeile**. Format:
@@ -264,19 +301,37 @@ scannen, Thumbnails, Startdialog) läuft in `SwingWorker` — so machen es
 für „nach dem aktuellen Event", **nicht** für Nebenläufigkeit. Zeitgesteuertes
 über `javax.swing.Timer`, nicht `java.util.Timer`.
 
-### Farben
+### Vorlesen (TTS)
+
+**`CardTtsPlayer` ist der einzige Weg** — genutzt von `CardListPanel`,
+`TranslationMapListPanel` und (seit 2026-07-31) `MapsPanel`. Der Text wird in
+eine temporäre UTF-8-`.ps1` geschrieben und dort in einem einfach gequoteten
+Here-String (`@'…'@`) übergeben; er ist **nie Teil der Kommandozeile**. Genau
+das war Befund **I01**: die gelöschte Klasse `TextToSpeech` interpolierte
+Kartentext in eine doppelt gequotete PowerShell-Zeichenkette, in der `$(…)`
+ausgewertet wird. **Keine zweite Vorlese-Implementierung anlegen.**
 
 ### Farben, Fonts, Maße
 
-Zwei Klassen, **überschneidungsfrei**: `AppColors` = Farben (591 Verwendungen),
-`AppTheme` = Fonts, Abstände, Radien, Stroke-Breiten, Standardgrößen, plus
-`alpha(Color,int)` und `pad(...)`. Eine Farbe gehört nie in `AppTheme`, ein
-Font nie in `AppColors`.
+Zwei Klassen, **überschneidungsfrei**: `AppColors` = Farben (704
+Verwendungen), `AppTheme` = Fonts, Abstände, Radien, Stroke-Breiten,
+Standardgrößen, plus `alpha(Color,int)` und `pad(...)` (154 Verwendungen in
+15 Dateien). Eine Farbe gehört nie in `AppTheme`, ein Font nie in
+`AppColors`.
 
-Im Bestand stehen noch 454 `new Color(`, 162 `new Font(`, 110
-`new BasicStroke(` — `AppTheme` ist erst seit 2026-07-30 da und **noch nirgends
-benutzt**. In berührtem Code gilt ab jetzt: **kein neues Literal, fehlendes
-Token anlegen** (§21).
+**Zwölf Dateien sind migriert** (Stand 2026-07-31, Schritt [6] inhaltlich
+abgeschlossen): `UIComponentFactory` · `SelectiveAlphaEditor` · `UIBuilder` ·
+`TextToolbar` · `BaseSidebarPanel` · `NewImageDialog` · `TileGalleryPanel` ·
+`PageLayoutToolbar` · `MapsPanel` · `TranslationMapListPanel` · `CanvasPanel` ·
+`ElementLayerPanel`. Im Bestand stehen außerhalb der Token-Klassen noch
+**125 `new Color(`** (vorher 259), **62 `new Font(`** (135) und
+**34 `new BasicStroke(`** (68) — nachgemessen, jeweils rund die Hälfte weniger.
+
+Der Rest ist bewusst **nicht** migriert: `PaintToolbar`, `ColorPickerPopup`,
+`PaintEngine` und die Kartenfarben führen Farbe als **Inhalt**, nicht als
+Oberfläche; der Rest ist Streubesitz mit 1–5 Fundstellen je Datei. In
+berührtem Code gilt trotzdem: **kein neues Literal, fehlendes Token anlegen**
+(§21).
 Ausnahme: Farben, die der **User** wählt (Primär-/Sekundärfarbe,
 Canvas-Schachbrett, Kartenfarben) sind keine Tokens — sie gehören in
 `AppSettings`.
@@ -289,7 +344,10 @@ Hauptfensters (`WHEN_IN_FOCUSED_WINDOW`) und einen globalen
 
 **F1–F7 sind vollständig vergeben** (F1 Zweitfenster, F2 Preview-Modus,
 F3 Snapshot, F4 Vollbild, F5 Always-on-top, F6 auf Canvas anwenden,
-F7 Canvas-Anzeigemodus). Eine Hilfe-Taste wäre deshalb **SHIFT+F1** (§25).
+F7 Canvas-Anzeigemodus). Die Hilfe-Taste ist deshalb **Umschalt+F1** (§25) —
+F1 wird **nicht** freigeräumt, die Zweitfenster-Belegung ist eingeübt.
+Die Umschalt+F1-Abfrage steht im Dispatcher **vor** der F1-Abfrage; wer sie
+verschiebt, macht die Hilfe unerreichbar.
 
 **`KeyBindings.ALL` ist die Registry** (53 Einträge, sechs Scopes) —
 `KeyBindingsDialog` zeigt sie über **Umschalt+F1** oder den Knopf „?“ rechts
@@ -311,7 +369,8 @@ Vollständige Liste mit Risiko: `doc/WEITERMACHEN_PROMPT.txt`.
 - ~~Tote/veraltete Dateien~~ — **erledigt 2026-07-30** (2540 Zeilen raus,
   siehe Quellbaum-Hinweis oben). `ToolLegacySceneReader` ist **keine**
   Altlast — Legacy-Lesen ist gewollt (§23).
-- **`ImageIO.write` in 9 Dateien** statt in der `io`-Schicht.
+- ~~`ImageIO.write` in 9 Dateien~~ — **erledigt 2026-07-31** als F02+F03:
+  alle 21 Aufrufe laufen über `ImageFileWriter` (§34).
 - **5 handgeschriebene JSON-Serializer** ohne gemeinsamen Writer.
 - **`AppSettings` liest/schreibt ohne Encoding** (Plattform statt UTF-8) —
   betrifft Umlaute in `recentFiles`/`recentProjects`.
@@ -319,6 +378,18 @@ Vollständige Liste mit Risiko: `doc/WEITERMACHEN_PROMPT.txt`.
 - **Keine Fenster-Basisklasse:** 12 Klassen erben direkt von
   `JFrame`/`JDialog`/`JWindow`; `JOptionPane` in 16 Dateien. `JOptionPane` ist
   Altlast, **kein Vorbild** — in neuem Code nicht verwenden (§20).
-- **`toggleVis` ruft `pushUndo()` pro Element** statt pro Aktion.
+- ~~`toggleVis` ruft `pushUndo()` pro Element~~ — **erledigt 2026-07-31** als
+  D02. Gegenprobe über alle 48 `pushUndo`-Vorkommen: es war die **einzige**
+  solche Stelle, die Altlast ist damit geschlossen.
+- **Text-Persistenz schreibt nicht atomar:** `AppSettings`, `ProjectManager`,
+  `MapManager`, `CardListStore`, `book.JsonStorage`, `SceneFileWriter`,
+  `TextWriter`. Bilder sind seit F02 versorgt (§34), Text nicht — ein
+  `TextFileWriter` nach demselben Vorbild wäre der nächste logische Schritt,
+  ist aber **nicht beauftragt** und gehört mit der Kodierungsfrage zusammen
+  geplant, sonst wird dieselbe Datei zweimal angefasst.
+- **`GameSceneReader` liest ISO-8859-1, `GameSceneWriter` schreibt UTF-8**
+  (Befund G01) — der Round-Trip beschädigt Umlaute in einer **Vertragsdatei**
+  (§23). `[C]`: eine Umstellung ändert, wie bereits geschriebene Dateien
+  gelesen werden.
 - **`#Paths:`** wird in Szenen referenziert, aber nicht gelesen;
   `GameSceneWriter` schreibt `PathLayer` nicht.

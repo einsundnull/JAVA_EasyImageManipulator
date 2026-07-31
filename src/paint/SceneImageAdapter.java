@@ -160,7 +160,7 @@ public class SceneImageAdapter {
         }
 
         // Speichere Thumbnail als Image
-        javax.imageio.ImageIO.write(sceneImg.thumbnail, "png", outputImageFile);
+        ImageFileWriter.writePng(sceneImg.thumbnail, outputImageFile);
 
         System.out.println("[SceneImageAdapter] Scene exportiert: " + outputImageFile.getAbsolutePath());
     }

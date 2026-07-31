@@ -269,7 +269,7 @@ public class SceneSerializer {
         if (img == null) return "";
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(img, "PNG", baos);
+        ImageFileWriter.writePng(img, baos);
         byte[] bytes = baos.toByteArray();
         return Base64.getEncoder().encodeToString(bytes);
     }

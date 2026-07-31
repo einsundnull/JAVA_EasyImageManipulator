@@ -209,11 +209,16 @@ public class MapsPanel extends BaseSidebarPanel {
             add(delBtn);
 
             // TTS buttons for textI and textII
-            addTTSButton(map.textI(), 150, 4);
-            addTTSButton(map.textII(), 168, 4);
+            addTTSButton(map.textI(), ":I", 150, 4);
+            addTTSButton(map.textII(), ":II", 168, 4);
         }
 
-        private void addTTSButton(String text, int x, int y) {
+        /**
+         * Ein Vorlese-Knopf. {@code idSuffix} unterscheidet die beiden Texte
+         * derselben Karte, damit {@link CardTtsPlayer} sie auseinanderhalten
+         * kann (gleiche Konvention wie in {@code TranslationMapListPanel}).
+         */
+        private void addTTSButton(String text, String idSuffix, int x, int y) {
             if (text == null || text.isEmpty()) return;
 
             JLabel ttsBtn = new JLabel("🔊", JLabel.CENTER);
@@ -229,7 +234,10 @@ public class MapsPanel extends BaseSidebarPanel {
                 @Override
                 public void mouseClicked(java.awt.event.MouseEvent e) {
                     e.consume();
-                    TextToSpeech.speak(text, map.language());
+                    // CardTtsPlayer statt TextToSpeech: der Kartentext geht ueber
+                    // eine UTF-8-.ps1-Datei und ein Here-String, nicht als Teil der
+                    // Kommandozeile (Audit-Befund I01, 2026-07-31).
+                    CardTtsPlayer.play(map.id() + idSuffix, text, map.language(), null);
                 }
 
                 @Override
