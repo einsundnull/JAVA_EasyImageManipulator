@@ -43,6 +43,19 @@ import javax.swing.event.DocumentListener;
  * Header per card: [LangI▼][💬][▶] | [LangII▼][💬][▶] [×]
  * LangII is stored in the section field of TranslationMap.
  * Transliteration rows (💬) are in-memory only (not persisted).
+ *
+ * <p><b>Token-Migration am 2026-07-31 (§21): nur Schriften, keine Farben.</b>
+ * Von 18 {@code new Font} wurden 12 zu Tokens; die restlichen sechs haben eine
+ * <b>dynamische</b> Größe oder Familie (benutzergewählte Kartenschrift mit
+ * CJK-Rückfall, Transliterations-Anzeige) und können keine Tokens werden.
+ *
+ * <p><b>Alle 10 {@code new Color} bleiben bewusst stehen.</b> Sie lesen aus
+ * {@link AppSettings} ({@code getCardFontColor}, {@code getCardBgColor}) oder
+ * leiten daraus ab — {@code cardBg()} hellt die <i>benutzergewählte</i>
+ * Kartenfarbe um 14 Stufen auf. Das sind Benutzereinstellungen, keine
+ * Design-Entscheidungen; sie gehören nach §31 in {@code AppSettings} und
+ * dürfen nicht in die Palette wandern. Wer sie „aufräumt", nimmt dem Benutzer
+ * die Farbwahl.
  */
 class TranslationMapListPanel extends BaseSidebarPanel {
 
@@ -240,7 +253,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         Object prop = hdr.getClientProperty("eastPanel");
         if (!(prop instanceof JPanel east)) return;
         javax.swing.JToggleButton btn = new javax.swing.JToggleButton("A");
-        btn.setFont(new Font("SansSerif", Font.BOLD, 10));
+        btn.setFont(AppTheme.FONT_SM_BOLD);
         btn.setForeground(AppColors.TEXT_MUTED);
         btn.setBackground(new java.awt.Color(42, 42, 42));
         btn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
@@ -411,7 +424,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             playIIBtn.addActionListener(e -> togglePlay(false));
 
             JButton editBtn = new JButton("✎");
-            editBtn.setFont(new Font("Dialog", Font.PLAIN, 11));
+            editBtn.setFont(AppTheme.FONT_SYMBOL_BASE);
             editBtn.setForeground(AppColors.TEXT_MUTED);
             editBtn.setBackground(cardBg());
             editBtn.setBorder(null);
@@ -422,7 +435,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             editBtn.addActionListener(e -> showEditPopup());
 
             JButton delBtn = new JButton("×");
-            delBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
+            delBtn.setFont(AppTheme.FONT_MD_BOLD);
             delBtn.setForeground(AppColors.DANGER);
             delBtn.setBackground(cardBg());
             delBtn.setBorder(null);
@@ -432,7 +445,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             delBtn.addActionListener(e -> delete());
 
             JLabel pipe = new JLabel(" | ");
-            pipe.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            pipe.setFont(AppTheme.FONT_SM);
             pipe.setForeground(AppColors.BORDER);
 
             JPanel leftCluster = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
@@ -497,13 +510,13 @@ class TranslationMapListPanel extends BaseSidebarPanel {
             JPopupMenu popup = new JPopupMenu();
             for (String l : availableLanguages()) {
                 JMenuItem item = new JMenuItem(l);
-                item.setFont(new Font("SansSerif", Font.PLAIN, 11));
+                item.setFont(AppTheme.FONT_BASE);
                 item.addActionListener(e -> { if (isI) setLangI(l); else setLangII(l); });
                 popup.add(item);
             }
             popup.addSeparator();
             JMenuItem newOpt = new JMenuItem("Neue Sprache...");
-            newOpt.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            newOpt.setFont(AppTheme.FONT_BASE);
             newOpt.addActionListener(e -> {
                 java.awt.Window win = SwingUtilities.getWindowAncestor(
                         TranslationMapListPanel.this);
@@ -732,14 +745,14 @@ class TranslationMapListPanel extends BaseSidebarPanel {
 
         private void addGridLbl(JPanel p, String txt) {
             JLabel l = new JLabel(txt);
-            l.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            l.setFont(AppTheme.FONT_BASE);
             l.setForeground(AppColors.TEXT_MUTED);
             p.add(l);
         }
         private javax.swing.JComboBox<String> fontCombo(String[] items, String override, String def) {
             javax.swing.JComboBox<String> cb = new javax.swing.JComboBox<>(items);
             cb.setSelectedItem(override != null ? override : def);
-            cb.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            cb.setFont(AppTheme.FONT_BASE);
             cb.setBackground(AppColors.BTN_BG);
             cb.setForeground(AppColors.TEXT);
             return cb;
@@ -768,7 +781,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
         }
         private JButton footBtn(String text) {
             JButton b = new JButton(text);
-            b.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            b.setFont(AppTheme.FONT_BASE);
             b.setBackground(AppColors.BTN_BG);
             b.setForeground(AppColors.TEXT);
             b.setFocusPainted(false);
@@ -797,7 +810,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
 
         private JButton langBtn(String lang) {
             JButton b = new JButton(lang);
-            b.setFont(new Font("SansSerif", Font.BOLD, 10));
+            b.setFont(AppTheme.FONT_SM_BOLD);
             b.setForeground(AppColors.TEXT_MUTED);
             b.setBackground(cardBg());
             b.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
@@ -809,7 +822,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
 
         private JToggleButton translitBtn() {
             JToggleButton b = new JToggleButton("\uD83D\uDCAC"); // 💬
-            b.setFont(new Font("Dialog", Font.PLAIN, 10));
+            b.setFont(AppTheme.FONT_SYMBOL_SM);
             b.setForeground(AppColors.TEXT_MUTED);
             b.setBackground(cardBg());
             b.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));
@@ -821,7 +834,7 @@ class TranslationMapListPanel extends BaseSidebarPanel {
 
         private JButton playBtn() {
             JButton b = new JButton("▶");
-            b.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            b.setFont(AppTheme.FONT_SM);
             b.setForeground(AppColors.TEXT_MUTED);
             b.setBackground(cardBg());
             b.setBorder(BorderFactory.createLineBorder(AppColors.BORDER));

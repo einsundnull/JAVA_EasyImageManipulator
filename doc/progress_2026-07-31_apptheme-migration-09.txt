@@ -1,0 +1,113 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-09.txt
+Aufgabentyp: [ST] — Schritt [6], DATEI 10 der AppTheme-Bereinigung (§21)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "27"  -> TranslationMapListPanel
+
+*** Sichtpruefung waechst auf U1-U17, ZEHN Dateien aufgestaut. ***
+
+
+DIE DATEI SAH GROESSER AUS, ALS SIE IST
+--------------------------------------------------------------------------
+27 Fundstellen — aber die Erwartung ("aehnliche Kartenstruktur wie
+MapsPanel, gute Chance auf Wiederverwendung von BG_CARD, BTN_TTS_* ...")
+hat sich NICHT bestaetigt. Vor dem Migrieren hineingesehen:
+
+*** ALLE ZEHN new Color( SIND BENUTZERDATEN — KEIN EINZIGES DESIGN-TOKEN:
+      new Color(AppSettings.getInstance().getCardFontColor())
+      new Color(AppSettings.getInstance().getCardBgColor())
+      new Color(st.fontColorI) / (st.fontColorII) / (st.bgColor)
+      cardBg(): hellt die BENUTZERGEWAEHLTE Kartenfarbe um 14 Stufen auf
+    Der Benutzer waehlt Schrift- und Hintergrundfarbe der Karten selbst;
+    AppSettings und CardStyle speichern sie. Waeren sie nach AppColors
+    gewandert, haette eine Palette-Aenderung dem Benutzer die Farbwahl
+    ueberschrieben. ***
+
+MapsPanel und TranslationMapListPanel sehen aehnlich aus und sind es
+NICHT: MapsPanel faerbt seine Knoepfe fest (Oberflaeche),
+TranslationMapListPanel faerbt seine Karten nach Benutzerwunsch (Inhalt).
+*** LEHRE: die Aehnlichkeit der Oberflaeche sagt nichts ueber die Herkunft
+    der Farben. Immer in die Datei sehen. ***
+
+
+MIGRIERT: TranslationMapListPanel.java   Schriften 18 -> 6, Farben 10 -> 10
+--------------------------------------------------------------------------
+  Font PLAIN 11 5x -> AppTheme.FONT_BASE
+  Font PLAIN 10 2x -> AppTheme.FONT_SM
+  Font BOLD  10 2x -> AppTheme.FONT_SM_BOLD
+  Font BOLD  12    -> AppTheme.FONT_MD_BOLD
+  Font Dialog PLAIN 11 -> AppTheme.FONT_SYMBOL_BASE   (neu)
+  Font Dialog PLAIN 10 -> AppTheme.FONT_SYMBOL_SM     (neu)
+
+ZWEI NEUE SYMBOL-SCHRIFTEN: die Knoepfe tragen "✎" und "💬". Deshalb
+Familie "Dialog" und nicht SansSerif — dieselbe Begruendung wie bei
+FONT_SYMBOL (16 pt): logische Fonts decken mehr Zeichen ab, SansSerif
+zeigt sonst Ersatzkaestchen. Jetzt drei Groessen derselben Rolle
+(16 / 11 / 10).
+
+REST (begruendet, im Klassen-Javadoc dokumentiert):
+  6 Fonts mit DYNAMISCHER Groesse oder Familie:
+    new Font(family, PLAIN, size)      benutzergewaehlte Kartenschrift
+    new Font(cjk, PLAIN, size)         CJK-Rueckfall
+    new Font("Dialog", PLAIN, size)    letzter Rueckfall
+    new Font("Dialog", ITALIC, transSize) 3x  Transliterations-Anzeige
+  10 Farben: saemtlich Benutzerdaten (siehe oben)
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+Alle sechs ersetzten Schriften gegen die kompilierten Klassen geprueft —
+identisch. Build: exit 0, 335 .class — unveraendert.
+
+
+STAND DER BEREINIGUNG (ausserhalb der Token-Klassen)
+--------------------------------------------------------------------------
+                  Start    jetzt    erledigt
+  new Color        259      194       25 %
+  new Font         135       76       43 %
+  new BasicStroke   68       57       16 %
+
+*** DIE FONT-QUOTE LAEUFT DER FARB-QUOTE DAVON (43 % gegen 25 %), und das
+    ist kein Zufall: Schriften sind fast immer Oberflaeche, Farben oft
+    Inhalt. Bei den Farben ist ein grosser Teil des Rests gar kein
+    Kandidat. ***
+
+  Zehn Dateien durch. Token-Klassen: AppColors 55 Farben ·
+  AppTheme 21 Fonts, 4 Strokes
+
+  ES BLEIBEN — und der Rest ist kleiner, als die Zahl 194 suggeriert:
+    ElementLayerPanel        84   echter Kandidat, groesster Brocken
+    CanvasPanel              58   echter Kandidat, God-Klasse (§22)
+    PaintToolbar             20   KEIN Kandidat (Mal-Palette)
+    ColorPickerPopup         11   KEIN Kandidat (berechnete Farben)
+    PaintEngine               8   vermutlich KEIN Kandidat — pruefen
+    TranslationMapListPanel  16   KEIN Kandidat (Benutzerdaten, s. o.)
+    Rest                     Kleinkram
+
+
+SICHTPRUEFUNG — JETZT U1-U17
+--------------------------------------------------------------------------
+  U1-U16 wie in den progress-Dateien 02 bis 08
+  neu:
+  U17 *** UEBERSETZUNGS-KARTEN (Liste im Karten-Panel): die Knoepfe "✎"
+      und "💬" muessen ihr ZEICHEN zeigen — nicht ein leeres Kaestchen.
+      Das ist die Schluesselstelle: dort wurde die Schriftfamilie
+      "Dialog" durch ein Token ersetzt, und genau dafuer ist sie da.
+      Ausserdem: die vom Benutzer eingestellten Karten-Farben und
+      -Schriften wirken UNVERAENDERT (sie wurden nicht angefasst). ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 10" wurde abgeschlossen: ja
+# Naechster Schritt: SICHTPRUEFUNG U1-U17 (zehn Dateien aufgestaut).
+#   *** DANACH BLEIBEN NUR NOCH ZWEI ECHTE KANDIDATEN:
+#       CanvasPanel (58) und ElementLayerPanel (84).
+#       Beide brauchen einen EIGENEN Termin. Bei CanvasPanel zusaetzlich
+#       §22: Token-Ersetzung NICHT mit einer Umstrukturierung vermischen. ***
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

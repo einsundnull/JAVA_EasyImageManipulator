@@ -87,6 +87,10 @@ public final class AppTheme {
      * mehr Symbole ab, SansSerif zeigt sonst Ersatzkästchen.
      */
     public static final Font FONT_SYMBOL  = new Font("Dialog", Font.PLAIN, 16);
+    /** 11 pt Symbol-Schrift — kleine Glyphen-Knöpfe in Listen (z. B. „✎"). */
+    public static final Font FONT_SYMBOL_BASE = new Font("Dialog", Font.PLAIN, 11);
+    /** 10 pt Symbol-Schrift — Emoji-Umschalter in Listen (z. B. „💬"). */
+    public static final Font FONT_SYMBOL_SM   = new Font("Dialog", Font.PLAIN, 10);
     /** 30 pt — Pfeil der großen Navigationsknöpfe über dem Bild. */
     public static final Font FONT_NAV     = new Font(FAMILY, Font.PLAIN, 30);
 

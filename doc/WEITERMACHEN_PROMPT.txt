@@ -8,15 +8,15 @@ Details je Schritt: die progress_2026-07-30_*.txt.
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
-Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: NEUN Dateien
-sind durch, 339 Literale verbleiben — davon sind rund 39 gar keine
-Kandidaten (Farbe als INHALT, siehe unten) und 169 stecken in nur drei
-Dateien.
-*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U16 durch den User. Sie war
+Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: ZEHN Dateien
+sind durch. Es bleiben nur noch ZWEI echte Kandidaten — CanvasPanel (58)
+und ElementLayerPanel (84). Alles andere im Rest ist Farbe als INHALT und
+wird NICHT migriert (siehe unten).
+*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U17 durch den User. Sie war
     schon nach Datei 1 faellig und ist nie erfolgt — deshalb deckt sie
-    jetzt NEUN Dateien ab. EIN Programmstart hakt alle sechzehn ab. ***
-*** DIE "KLEINEN, GUT PRUEFBAREN" DATEIEN SIND AUFGEBRAUCHT. Was bleibt,
-    braucht einen eigenen Termin. ***
+    jetzt ZEHN Dateien ab. EIN Programmstart hakt alle siebzehn ab. ***
+*** DIE "KLEINEN, GUT PRUEFBAREN" DATEIEN SIND AUFGEBRAUCHT. Die beiden
+    verbliebenen brauchen je einen eigenen Termin. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -102,6 +102,13 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     bewusst an FONT_TITLE GEKOPPELT (gleiche Kopfzeile, gleiches Gewicht),
     das "+" bekam ein EIGENES Token (soll leichter wirken).
     -> progress_2026-07-31_apptheme-migration-04.txt
+[6i] AppTheme-Bereinigung, DATEI 10: TranslationMapListPanel, Schriften
+    18 -> 6. *** KEINE Farbe angefasst: alle zehn new Color lesen aus
+    AppSettings oder leiten aus benutzergewaehlten Kartenfarben ab. Die
+    Aehnlichkeit zu MapsPanel taeuschte - dort sind die Knopffarben fest
+    (Oberflaeche), hier waehlt der Benutzer sie (Inhalt). ***
+    Neu: FONT_SYMBOL_BASE/_SM fuer die Glyphen-Knoepfe "✎" und "💬".
+    -> progress_2026-07-31_apptheme-migration-09.txt
 [6h] AppTheme-Bereinigung, DATEI 9: MapsPanel 26 -> 0. Erste der grossen
     Dateien. (70,70,70) 5x war exakt BORDER und wurde wiederverwendet.
     Neu: zwei Knopf-Gruppen (Loeschen rot, Vorlesen blau) mit je Ruhe- und
@@ -149,29 +156,39 @@ OFFEN — nach Hebel sortiert
 [6] APPTHEME-BEREINIGUNG (§21)  [C], FREIGEGEBEN — LAEUFT, NICHT FERTIG
 
     DURCH (je werterhaltend nachgewiesen), FUENF ohne Restliteral:
-      UIComponentFactory 2 (parametrisiert) · UIBuilder 1 (dash-Stroke) ·
-      SelectiveAlphaEditor 2 (Laufzeitfarben) · TextToolbar 0 ·
-      BaseSidebarPanel 0 · NewImageDialog 1 · TileGalleryPanel 0 ·
-      PageLayoutToolbar 4 (3 berechnete Fonts + dash-Stroke) · MapsPanel 0
+      UIComponentFactory 2 · UIBuilder 1 · SelectiveAlphaEditor 2 ·
+      TextToolbar 0 · BaseSidebarPanel 0 · NewImageDialog 1 ·
+      TileGalleryPanel 0 · PageLayoutToolbar 4 · MapsPanel 0 ·
+      TranslationMapListPanel (nur Schriften, Farben sind Benutzerdaten)
     VERBLEIBEND ausserhalb der Token-Klassen:
-      194 new Color (-25 %) · 88 new Font (-34 %) · 57 new BasicStroke (-16 %)
-    Token-Klassen: AppColors 55 Farben · AppTheme 19 Fonts, 4 Strokes
+      194 new Color (-25 %) · 76 new Font (-43 %) · 57 new BasicStroke (-16 %)
+    Token-Klassen: AppColors 55 Farben · AppTheme 21 Fonts, 4 Strokes
 
-    *** DREI DATEIEN SIND KEINE KANDIDATEN — FARBE ALS INHALT:
-          ColorPickerPopup (11)  erzeugt Farben (RGB-Komponenten, Verlaeufe)
-          PaintToolbar     (20)  haelt die MAL-PALETTE des Benutzers
-          PaintEngine       (8)  vermutlich ebenso - VOR einer Migration
-                                 pruefen, ob es Malfarben oder UI sind
-        NICHT migrieren. MERKSATZ: erst pruefen, ob die Farben ueberhaupt
-        Oberflaeche sind. ***
+    *** DIE FONT-QUOTE LAEUFT DER FARB-QUOTE DAVON (43 % gegen 25 %).
+        Kein Zufall: Schriften sind fast immer Oberflaeche, Farben oft
+        Inhalt. Der Farb-Rest ist zu einem grossen Teil gar kein
+        Kandidat. ***
 
-    *** ZUERST: SICHTPRUEFUNG U1-U16 DURCH DEN USER (aufgestaut aus NEUN
+    *** KEINE KANDIDATEN — FARBE ALS INHALT, NICHT MIGRIEREN:
+          PaintToolbar            20  Mal-Palette des Benutzers
+          TranslationMapListPanel 16  Kartenfarben aus AppSettings
+          ColorPickerPopup        11  erzeugt Farben (Verlaeufe, RGB)
+          PaintEngine              8  vermutlich ebenso - VOR einer
+                                      Migration pruefen
+        Zusammen ~55 der 194 verbliebenen Farb-Literale.
+        MERKSATZ: erst pruefen, ob die Farben ueberhaupt Oberflaeche sind.
+        Die Aehnlichkeit zweier Panels sagt darueber NICHTS - MapsPanel
+        und TranslationMapListPanel sehen gleich aus und liegen
+        entgegengesetzt. ***
+
+    *** ZUERST: SICHTPRUEFUNG U1-U17 DURCH DEN USER (aufgestaut aus ZEHN
         Dateien; Listen in den progress_2026-07-31_*.txt). EIN Start des
-        Programms hakt alle sechzehn ab.
-        Die aussagekraeftigsten: U16 (Karten-Panel, Hover-Zustaende der
-        farbigen Knoepfe), U14 (Galerie + Bildlaufleiste), U12
-        (Seitenleisten-Koepfe, 4 Panels), U15 (Seitenlayout-Vorschau),
-        U13 (Dialog "Neue Datei"), U9 (Ablageflaeche), U3 (Symbol-Knoepfe). ***
+        Programms hakt alle siebzehn ab.
+        Die aussagekraeftigsten: U17 (Knoepfe "✎"/"💬" zeigen ihr Zeichen),
+        U16 (Karten-Panel, Hover der farbigen Knoepfe), U14 (Galerie +
+        Bildlaufleiste), U12 (Seitenleisten-Koepfe, 4 Panels),
+        U15 (Seitenlayout-Vorschau), U13 (Dialog "Neue Datei"),
+        U9 (Ablageflaeche), U3 (Symbol-Knoepfe). ***
 
     VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
       1. EINE Datei pro Schritt (Ausnahme: zwei Dateien, die sich eine
@@ -225,20 +242,18 @@ OFFEN — nach Hebel sortiert
         Schachbrett). Ein Farbwaehler erzeugt Farben - die duerfen nicht
         aus einer Palette kommen. Nur 5 von 11 waeren Token gewesen. ***
 
-    *** ES BLEIBEN NUR NOCH DREI ECHTE KANDIDATEN:
-          TranslationMapListPanel 27  <- als naechstes
-          CanvasPanel             58  <- God-Klasse, §22 beachten
-          ElementLayerPanel       84  <- groesster Brocken, zuletzt
-        ElementLayerPanel allein ist groesser als die neun bisher
+    *** ES BLEIBEN NUR NOCH ZWEI ECHTE KANDIDATEN:
+          CanvasPanel        58  God-Klasse (§22)
+          ElementLayerPanel   84  groesster Brocken
+        ElementLayerPanel allein ist groesser als die zehn bisher
         migrierten Dateien zusammen.
         Bei CanvasPanel gilt §22 zusaetzlich: die Token-Ersetzung NICHT mit
         einer Umstrukturierung vermischen - erst Tokens, spaeter Extraktion.
         BEIDE BRAUCHEN EINEN EIGENEN TERMIN mit anschliessender
         Sichtpruefung. Nebenbei sind sie nicht pruefbar. ***
-    NAECHSTES — EMPFEHLUNG: TranslationMapListPanel (27). Vermutlich
-    aehnliche Kartenstruktur wie MapsPanel, also gute Chance, die dort
-    angelegten Token (BG_CARD, BTN_MINI_BG, BTN_TTS_*, TEXT_INFO)
-    wiederzuverwenden.
+    Reihenfolge-Empfehlung: erst CanvasPanel (58), dann ElementLayerPanel
+    (84) - der groesste zuletzt, wenn die Token-Sammlung am
+    vollstaendigsten ist und am meisten wiederverwendet werden kann.
     *** NICHT ElementLayerPanel (84) oder CanvasPanel (58) — in einer
         Sitzung nicht mehr sichtpruefbar; CanvasPanel ist zusaetzlich die
         God-Klasse (§22). ***
@@ -341,6 +356,10 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
       merklich kleiner als das "x" daneben. Betrifft VIER Panels
       gleichzeitig, weil sie von BaseSidebarPanel erben - eine der
       wichtigsten Pruefungen der ganzen Bereinigung. ***
+  U17 *** UEBERSETZUNGS-KARTEN: die Knoepfe "✎" und "💬" muessen ihr
+      ZEICHEN zeigen, nicht ein leeres Kaestchen - dort wurde die
+      Schriftfamilie "Dialog" durch ein Token ersetzt. Ausserdem: die vom
+      Benutzer eingestellten Karten-Farben wirken unveraendert. ***
   U16 *** KARTEN-PANEL (Knopf "Maps"): Karten mit dunkler Flaeche und
       feinem Rahmen; roter Loeschen- und blauer Vorlesen-Knopf zeigen im
       Ruhezustand nur farbige Schrift und FUELLEN SICH beim Ueberfahren.
