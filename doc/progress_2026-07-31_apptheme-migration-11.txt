@@ -1,0 +1,164 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-11.txt
+Aufgabentyp: [ST] — Schritt [6], DATEI 12: ElementLayerPanel (der letzte
+             und groesste Kandidat)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "weiter"
+
+*** Sichtpruefung waechst auf U1-U19, ZWOELF Dateien aufgestaut. ***
+
+
+ZUERST GEMESSEN — UND DAS ERGEBNIS WAR DAS GEGENTEIL VON CanvasPanel
+--------------------------------------------------------------------------
+Dieselbe Frage wie dort: wie oft kommt jeder Farbwert vor?
+
+  new Color(70, 70, 70)   14x     <- exakt AppColors.BORDER
+  new Color(50, 50, 50)   14x     <- exakt AppColors.BTN_MINI_BG
+  acht weitere Werte       je 3x  <- eine SYSTEMATISCHE Familie
+  ...
+
+*** Bei CanvasPanel kamen 23 von 24 Werten EINMAL vor -> file-lokal.
+    Hier hat der haeufigste Wert 14 Vorkommen und acht Farben treten in
+    einem erkennbaren Muster auf -> Palette. Dieselbe Frage, andere
+    Antwort. Genau dafuer wird gemessen statt geraten. ***
+
+
+DAS MUSTER: EINE FAMILIE FARBIGER MINI-KNOEPFE
+--------------------------------------------------------------------------
+Jeder Aktionsknopf einer Layer-Zeile folgt demselben Aufbau:
+    Ruhe:  Schrift = <Farbe>_FG · Flaeche = BTN_MINI_BG · Rahmen = BORDER
+    Hover: Flaeche = <Farbe>_HOVER_BG · Schrift = weiss · Rahmen = <Farbe>_FG
+Daher kommt jede FG-Farbe genau 3x vor (Anlegen, Hover-Rahmen,
+Exit-Wiederherstellen) und jede HOVER_BG genau 1x.
+
+Sieben Varianten neu in AppColors:
+  BTN_EXPORT_*      blau    "↓"  als Bild exportieren
+  BTN_BURN_*        orange       auf den Canvas einbrennen
+  BTN_RESET_*       gruen        Drehung zuruecksetzen
+  BTN_VISIBLE_*     tuerkis      sichtbar
+  BTN_HIDDEN_*      rot          ausgeblendet
+  BTN_MOUSETRANS_*  gold    "⊘"  Maus-Durchlaessigkeit
+  BTN_MAP_*         violett "🗺"  als Karte exportieren
+  + BTN_MINI_FG_OFF grau         neutraler Aus-Zustand
+
+*** WARUM PALETTE UND NICHT FILE-LOKAL — das war die Grundsatzfrage nach
+    der CanvasPanel-Abweichung. Der Ausschlag: (220,60,60) und (180,40,40)
+    kommen hier WIEDER vor und sind BTN_DELETE_FG / BTN_DELETE_HOVER_BG,
+    seit der MapsPanel-Migration in AppColors. Die Familie wird also
+    DATEIUEBERGREIFEND benutzt — das ist das Kriterium, nicht die
+    Vorkommenszahl allein. ***
+Das Muster steht als Kommentar ueber der Gruppe: wer eine Variante
+ergaenzt, haelt sich daran.
+
+
+WIEDERVERWENDET STATT NEU ANGELEGT — 36 Fundstellen
+--------------------------------------------------------------------------
+  AppColors.BORDER            14x   (70,70,70)
+  AppColors.BTN_MINI_BG       14x   (50,50,50)
+  AppColors.BTN_DELETE_FG      3x   \  aus MapsPanel
+  AppColors.BTN_DELETE_HOVER_BG 1x  /
+  AppColors.BG_SIDEBAR_LIST    2x   \  aus BaseSidebarPanel
+  AppColors.BG_SIDEBAR_HEADER  1x   |  *** DRITTE Unterklasse, die die
+  AppColors.BTN_TOGGLE_OFF     1x   /      Farben ihrer Basisklasse
+                                          erneut tippte (nach
+                                          TileGalleryPanel). ***
+
+
+FILE-LOKAL GEBLIEBEN: die Kachel-Darstellung
+--------------------------------------------------------------------------
+  TILE_BG (44,44,44) · TILE_BG_HOVER (58,54,44) · TILE_BORDER (62,62,62) ·
+  CHECKER_LIGHT (78,78,78) · CHECKER_DARK (62,62,62)
+Nur diese Kachel benutzt sie. CHECKER_DARK und TILE_BORDER haben denselben
+Wert und trotzdem zwei Namen — Schachbrett-Karo ist kein Kachelrahmen.
+
+
+EIN KOMMENTAR WURDE ZUR ECHTEN KOPPLUNG
+--------------------------------------------------------------------------
+Im Code stand:
+    // Warm amber hover border — mirrors the canvas hover outline colour
+    g2.setColor(new Color(255, 200, 80));
+Der Canvas hatte daneben COLOR_HOVER_OUTLINE = (255,200,80,200).
+*** Die "Spiegelung" war eine handgepflegte Dublette: zwei Stellen,
+    dieselbe Absicht, nichts verband sie. ***
+JETZT: AppColors.HOVER_OUTLINE ist die Quelle, und CanvasPanel LEITET
+seine halbtransparente Variante daraus ab. Wer den Ton aendert, aendert
+beide — was der Kommentar immer schon versprochen hat.
+
+
+MIGRIERT: ElementLayerPanel.java
+--------------------------------------------------------------------------
+  Font   13 -> 0
+  Color  72 -> 5   (die 5 sind die neuen lokalen Kachel-Konstanten;
+                    im Zeichenpfad KEINE)
+  Stroke  7 -> 1   (der verbliebene ist gestrichelt mit dash-Array)
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+22 Werte gegen die kompilierten Klassen geprueft (Palette direkt, die
+file-lokalen per Reflection) — alle identisch. Zusaetzlich bestaetigt, dass
+CanvasPanel.COLOR_HOVER_OUTLINE nach der Ableitung weiterhin exakt
+rgba(255,200,80,200) ist.
+Build: exit 0, 335 .class — unveraendert.
+
+
+*** STAND DER BEREINIGUNG — HALBZEIT UEBERSCHRITTEN ***
+--------------------------------------------------------------------------
+                  Start    jetzt    erledigt
+  new Color        259      125       51 %
+  new Font         135       62       54 %
+  new BasicStroke   68       34       50 %
+
+  ZWOELF Dateien durch. Token-Klassen: AppColors 72 Farben ·
+  AppTheme 21 Fonts, 4 Strokes
+
+*** ES IST KEIN ECHTER KANDIDAT MEHR OFFEN. Was bleibt, ist:
+      PaintToolbar        20  Mal-Palette des Benutzers      NICHT migrieren
+      ColorPickerPopup    11  erzeugt Farben                 NICHT migrieren
+      TranslationMapList  16  Kartenfarben aus AppSettings   NICHT migrieren
+      PaintEngine          8  vermutlich Malfarben           PRUEFEN
+      Rest                    verstreuter Kleinkram in ~30 Dateien,
+                              je 1-5 Fundstellen
+    Die Bereinigung hat damit ihr sinnvolles Ende erreicht. Was uebrig ist,
+    ist entweder Inhalt oder Streubesitz ohne Hebel. ***
+
+
+SICHTPRUEFUNG — JETZT U1-U19
+--------------------------------------------------------------------------
+  U1-U18 wie in den progress-Dateien 02 bis 10
+  neu:
+  U19 *** LAYER-PANEL (rechte Seitenleiste im Canvas-Modus):
+      a) Kachel: dunkler Grund, beim Ueberfahren leicht waermer, feiner
+         Rahmen; Miniatur mit grauem Schachbrett hinter transparenten
+         Stellen
+      b) *** DIE KNOPFREIHE - die wichtigste Pruefung: jeder Knopf zeigt
+         im Ruhezustand nur seine FARBIGE SCHRIFT auf dunklem Grund und
+         FUELLT SICH beim Ueberfahren mit einem dunkleren Ton derselben
+         Farbe, Schrift wird weiss. Sieben verschiedene Farben:
+         blau ↓ · orange · gruen · tuerkis/rot (Auge) · gold ⊘ ·
+         violett 🗺 · rot (Loeschen) ***
+      c) Beim Ueberfahren einer Kachel erscheint ein WARMER GELBER Rahmen
+         — derselbe Ton wie beim Ueberfahren des Elements auf dem Canvas.
+         Das ist jetzt technisch gekoppelt; beide muessen gleich aussehen.
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 12" wurde abgeschlossen: ja
+# *** SCHRITT [6] IST DAMIT INHALTLICH ABGESCHLOSSEN. Kein Kandidat mehr
+#     offen; der Rest ist Inhalt oder Streubesitz. ***
+# Naechster Schritt: SICHTPRUEFUNG U1-U19 (zwoelf Dateien). Danach ist
+#   [6] formal schliessbar.
+# ZWEI FRAGEN AN DEN USER:
+#   1. §21-Ergaenzung "einmalige Overlay-Farben duerfen file-lokal
+#      bleiben" verbindlich machen? (in CanvasPanel + ElementLayerPanel
+#      angewandt, Kriterium praezisiert: entscheidend ist die
+#      DATEIUEBERGREIFENDE Verwendung, nicht die Vorkommenszahl)
+#   2. Die drei dokumentierten Beinahe-Treffer angleichen? (140/150 Gruen,
+#      Alpha 170/180, BTN_DELETE_FG zwischen DANGER und DANGER_HOVER)
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

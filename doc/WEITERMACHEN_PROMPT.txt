@@ -8,17 +8,29 @@ Details je Schritt: die progress_2026-07-30_*.txt.
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
-Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: ELF Dateien
-sind durch, darunter die God-Klasse CanvasPanel. Es bleibt nur noch EIN
-echter Kandidat — ElementLayerPanel (84). Alles andere im Rest ist Farbe
-als INHALT und wird NICHT migriert (siehe unten).
-*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U18 durch den User. Sie war
-    schon nach Datei 1 faellig und ist nie erfolgt — deshalb deckt sie
-    jetzt ELF Dateien ab. EIN Programmstart hakt alle achtzehn ab.
-    U18 (der Canvas selbst) ist die groesste Einzelpruefung. ***
-*** OFFENE FRAGE AN DEN USER: soll die §21-Ergaenzung "einmalige
-    Overlay-Farben duerfen file-lokal bleiben" verbindlich werden?
-    Sie wurde in CanvasPanel bereits angewandt und begruendet. ***
+*** SCHRITT [6] IST INHALTLICH ABGESCHLOSSEN. ZWOELF Dateien migriert,
+    rund die HAELFTE aller Literale beseitigt (Color -51 %, Font -54 %,
+    Stroke -50 %). ES IST KEIN ECHTER KANDIDAT MEHR OFFEN — was bleibt,
+    ist Farbe als INHALT (Mal-Palette, Kartenfarben, Farbwaehler) oder
+    Streubesitz mit 1-5 Fundstellen ohne Hebel. ***
+
+*** ES FEHLT NUR NOCH DIE SICHTPRUEFUNG U1-U19 durch den User. Sie war
+    schon nach Datei 1 faellig und ist nie erfolgt — sie deckt jetzt ZWOELF
+    Dateien ab. EIN Programmstart hakt alle neunzehn ab. Danach ist [6]
+    formal schliessbar.
+    Die drei groessten: U19 (Layer-Panel, sieben farbige Knoepfe),
+    U18 (der Canvas selbst, sechs Teilpunkte), U16 (Karten-Panel). ***
+
+*** ZWEI ENTSCHEIDUNGEN LIEGEN BEIM USER:
+    1. §21-Ergaenzung verbindlich machen? "Einmalige Overlay-Farben duerfen
+       file-lokal bleiben." Angewandt in CanvasPanel und ElementLayerPanel.
+       Das Kriterium hat sich dabei praezisiert: entscheidend ist die
+       DATEIUEBERGREIFENDE Verwendung, nicht die Vorkommenszahl.
+    2. Die DREI dokumentierten Beinahe-Treffer angleichen?
+       - MARGIN_LABEL (0,140,255) neben ACCENT (0,150,255)
+       - MARGIN_GUIDE Alpha 170 neben CONTENT_GUIDE Alpha 180
+       - BTN_DELETE_FG (220,60,60) zwischen DANGER und DANGER_HOVER
+       Alle drei unveraendert uebernommen und im Javadoc vermerkt. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -104,6 +116,21 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     bewusst an FONT_TITLE GEKOPPELT (gleiche Kopfzeile, gleiches Gewicht),
     das "+" bekam ein EIGENES Token (soll leichter wirken).
     -> progress_2026-07-31_apptheme-migration-04.txt
+[6k] AppTheme-Bereinigung, DATEI 12: ElementLayerPanel, der letzte und
+    groesste Kandidat. Font 13->0, Color 72->5, Stroke 7->1.
+    *** DIESELBE MESSFRAGE WIE BEI CanvasPanel, GEGENTEILIGE ANTWORT:
+        dort kamen 23 von 24 Werten einmal vor (-> file-lokal), hier hat
+        der haeufigste 14 Vorkommen und acht Farben bilden ein System
+        (-> Palette). Ausschlag gab, dass (220,60,60)/(180,40,40) hier
+        WIEDER vorkommen und seit MapsPanel in AppColors liegen: die
+        Familie wird DATEIUEBERGREIFEND benutzt. Das ist das Kriterium. ***
+    36 Fundstellen auf vorhandene Token zurueckgefuehrt (BORDER 14x,
+    BTN_MINI_BG 14x, dazu Basisklassen-Farben - DRITTE Unterklasse, die
+    sie nachtippte).
+    Ein Kommentar wurde zur echten Kopplung: "mirrors the canvas hover
+    outline colour" war eine handgepflegte Dublette, jetzt leitet
+    CanvasPanel seine Variante aus AppColors.HOVER_OUTLINE ab.
+    -> progress_2026-07-31_apptheme-migration-11.txt
 [6j] AppTheme-Bereinigung, DATEI 11: CanvasPanel (God-Klasse).
     Im Zeichenpfad jetzt KEINE Farbe und KEIN einfacher Stroke mehr.
     *** BEGRUENDETE ABWEICHUNG: 23 der 24 Farbwerte kamen genau EINMAL
@@ -167,108 +194,49 @@ VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
 OFFEN — nach Hebel sortiert
 ==============================================================================
 
-[6] APPTHEME-BEREINIGUNG (§21)  [C], FREIGEGEBEN — LAEUFT, NICHT FERTIG
+[6] APPTHEME-BEREINIGUNG (§21)  [C]  — INHALTLICH ABGESCHLOSSEN,
+    ES FEHLT NUR DIE SICHTPRUEFUNG
 
-    DURCH (je werterhaltend nachgewiesen), ELF Dateien:
+    ZWOELF DATEIEN MIGRIERT, je werterhaltend nachgewiesen:
       UIComponentFactory · SelectiveAlphaEditor · UIBuilder · TextToolbar ·
       BaseSidebarPanel · NewImageDialog · TileGalleryPanel ·
-      PageLayoutToolbar · MapsPanel · TranslationMapListPanel (nur
-      Schriften) · CanvasPanel (file-lokale Konstanten)
-    Token-Klassen: AppColors 55 Farben · AppTheme 21 Fonts, 4 Strokes
+      PageLayoutToolbar · MapsPanel · TranslationMapListPanel ·
+      CanvasPanel · ElementLayerPanel
+    ERGEBNIS ausserhalb der Token-Klassen:
+      Color 259 -> 125 (-51 %) · Font 135 -> 62 (-54 %) ·
+      Stroke 68 -> 34 (-50 %)
+    Token-Klassen: AppColors 72 Farben · AppTheme 21 Fonts, 4 Strokes
 
-    *** ES BLEIBT NUR NOCH EIN ECHTER KANDIDAT: ElementLayerPanel (84).
-        Vorher pruefen, ob dort das CanvasPanel-Muster passt - Layer-
-        Overlays sind vermutlich ebenfalls Einmal-Zustaende und gehoeren
-        dann file-lokal, nicht in die Palette. ***
+    *** OFFEN: SICHTPRUEFUNG U1-U19 (siehe unten). Danach ist [6]
+        formal abgeschlossen. ***
 
-    *** KEINE KANDIDATEN — FARBE ALS INHALT, NICHT MIGRIEREN:
+    *** NICHT MEHR MIGRIEREN — FARBE ALS INHALT:
           PaintToolbar            20  Mal-Palette des Benutzers
           TranslationMapListPanel 16  Kartenfarben aus AppSettings
           ColorPickerPopup        11  erzeugt Farben (Verlaeufe, RGB)
-          PaintEngine              8  vermutlich ebenso - VOR einer
-                                      Migration pruefen
-        MERKSATZ: erst pruefen, ob die Farben ueberhaupt Oberflaeche sind.
-        Die Aehnlichkeit zweier Panels sagt darueber NICHTS. ***
+          PaintEngine              8  vermutlich Malfarben - PRUEFEN,
+                                      falls jemand doch weitermacht
+        Der uebrige Rest ist Streubesitz: ~30 Dateien mit je 1-5
+        Fundstellen, kein Hebel. ***
 
-    *** ZUERST: SICHTPRUEFUNG U1-U18 DURCH DEN USER (aufgestaut aus ELF
-        Dateien; Listen in den progress_2026-07-31_*.txt). EIN Start des
-        Programms hakt alle achtzehn ab.
-        Die aussagekraeftigsten: U18 (der Canvas selbst, sechs Teilpunkte),
-        U17 (Knoepfe "✎"/"💬"), U16 (Karten-Panel), U14 (Galerie +
-        Bildlaufleiste), U12 (Seitenleisten-Koepfe), U15 (Seitenlayout),
-        U13 (Dialog "Neue Datei"), U9 (Ablageflaeche). ***
-
-    VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
-      1. EINE Datei pro Schritt (Ausnahme: zwei Dateien, die sich eine
-         Konstante teilen — sonst laesst sich die Doppelung nicht loesen).
-      2. Literal raus, Token mit DEMSELBEN Wert rein. Werterhaltend.
-      3. *** WEICHT EIN WERT AB: NICHT RUNDEN. Neues Token anlegen oder
-         das Literal mit Begruendung stehen lassen. Runden aendert das
-         Aussehen. Bisher 14 solcher Faelle -> 14 neue Token. ***
-      3a. *** ERST PRUEFEN, OB DIE FARBEN UEBERHAUPT TOKEN SIND. Ein
-         Farbwaehler ERZEUGT Farben (berechnete RGB, Alpha-Verlaeufe) -
-         die duerfen nicht aus einer Palette kommen. ColorPickerPopup ist
-         deshalb zurueckgestellt. ***
-      3b. *** GLEICHES RGB HEISST NICHT GLEICHES TOKEN. Inzwischen SECHS
-         solcher Faelle - in einer dunklen Oberflaeche liegen die Grautoene
-         zwangslaeufig dicht beieinander, das ist kein Sonderfall. Vor dem
-         Wiederverwenden die BEDEUTUNG pruefen. In TextToolbar trat der
-         Fall dreimal auf: (60,60,60) war wirklich BTN_BG und wurde
-         wiederverwendet; (55,55,55) und (50,50,50) hatten zufaellig
-         dasselbe RGB wie TILE_PLACEHOLDER bzw. BG_RULER_CORNER, aber eine
-         andere Bedeutung -> eigene Token. Zusammenlegen wuerde Dinge
-         koppeln, die sich unabhaengig aendern duerfen. ***
-      3c. *** GLEICHER NAME HEISST NICHT GLEICHER WERT: TextToolbar.BTN_H
-         ist 30, AppTheme.BTN_H ist 36. Nicht vereinheitlichen. ***
+    WENN DOCH EINE WEITERE DATEI DRANKOMMT — das Verfahren, das sich
+    bewaehrt hat:
+      1. ZUERST MESSEN, nicht raten:
+           grep -o "new Color([0-9, ]*)" <datei> | sort | uniq -c | sort -rn
+         Viele Einmal-Werte -> file-lokale Konstanten.
+         Wenige Werte mit vielen Vorkommen -> Palette.
+         *** ENTSCHEIDEND IST ABER: wird der Wert in EINER ANDEREN DATEI
+             auch gebraucht? Dann Palette, unabhaengig von der Zahl. ***
+      2. Pruefen, ob die Farben ueberhaupt Oberflaeche sind (siehe oben).
+      3. Literal raus, Token mit DEMSELBEN Wert rein. NIE runden - lieber
+         ein neues Token oder das Literal mit Begruendung stehen lassen.
       4. Nachweisen, nicht behaupten: Wegwerf-Programm gegen die
-         KOMPILIERTEN Klassen, Token gegen ersetztes Literal
-         (Font.equals / Color.equals / getLineWidth). Vorlagen stehen in
-         den beiden progress-Dateien vom 2026-07-31.
-      5. Sichtpruefung durch den User, DANN die naechste Datei.
-      6. *** EINEN GEFUNDENEN SCHOENHEITSFEHLER NICHT NEBENBEI BEHEBEN.
-         In NewImageDialog liegt die Randmass-Farbe 10 Gruenwerte neben
-         ACCENT - vermutlich ein alter Tippfehler. Unveraendert als
-         eigenes Token uebernommen, mit Hinweis im Javadoc. Eine
-         Angleichung waere eine Design-Entscheidung des Users; sie haette
-         in einem Commit namens "werterhaltend" nichts zu suchen. ***
-
-    *** EIN GRIFF, DER SICH GELOHNT HAT UND WIEDER PASST:
-        UIBuilder liest ed.TOPBAR_BTN_W/H 33x. Statt 33 Aufrufstellen
-        umzuschreiben, bekam das FELD seinen Wert aus dem Token
-        (TOPBAR_BTN_W = AppTheme.BTN_W). Doppelung weg, null beruehrte
-        Aufrufstellen. Bei aehnlichen Konstanten genauso vorgehen. ***
-
-    *** DIE KENNZAHL "new Color( im Projekt" IST IRREFUEHREND: ein Token
-        IST ein new Color(...), nur an einer Stelle. Gemessen wird
-        AUSSERHALB von AppColors.java und AppTheme.java. Die Startzahlen
-        454/162/110 der Ist-Analyse stammen aus dem GANZEN src-Baum
-        inklusive der ausgelagerten Projekte — nicht vergleichbar. ***
-
-    *** PRUEFE VOR DER AUSWAHL, OB DIE FARBEN UEBERHAUPT TOKEN SIND.
-        ColorPickerPopup (11) wurde deshalb ZURUECKGESTELLT: seine Farben
-        sind groesstenteils BERECHNET (RGB-Komponenten, Alpha-Verlaeufe,
-        Schachbrett). Ein Farbwaehler erzeugt Farben - die duerfen nicht
-        aus einer Palette kommen. Nur 5 von 11 waeren Token gewesen. ***
-
-    LETZTE DATEI: ElementLayerPanel (84). Groesser als alles bisher
-    Migrierte zusammen. Eigener Termin, anschliessend Sichtpruefung.
-    *** DORT ZUERST DIE FRAGE STELLEN, DIE BEI CanvasPanel ENTSCHEIDEND
-        WAR: wie oft kommt jeder Farbwert vor? Einmal-Werte gehoeren
-        file-lokal, geteilte in die Palette. Messen mit
-          grep -o "new Color([0-9, ]*)" <datei> | sort | uniq -c | sort -rn
-    ***
-    *** NICHT ElementLayerPanel (84) oder CanvasPanel (58) — in einer
-        Sitzung nicht mehr sichtpruefbar; CanvasPanel ist zusaetzlich die
-        God-Klasse (§22). ***
-    Dichte der restlichen Dateien:
-      ElementLayerPanel 84 · CanvasPanel 58 · TranslationMapListPanel 27 ·
-      MapsPanel 26 · PageLayoutToolbar 21 · TileGalleryPanel 20 ·
-      PaintToolbar 20 · ColorPickerPopup 11 (zurueckgestellt)
-
-    NICHT ANFASSEN: benutzergewaehlte Werte (Primaer-/Sekundaerfarbe,
-    canvasBg1/bg2, Kartenfarben, Text-Werkzeug-Font, strokeWidth). Die
-    gehoeren in AppSettings (§31). Ein Token ist eine Design-Entscheidung,
-    keine Benutzereinstellung.
+         KOMPILIERTEN Klassen (Font.equals / Color.equals / getLineWidth,
+         file-lokale Konstanten per Reflection). Vorlagen in den
+         progress_2026-07-31_*.txt.
+      5. Sichtpruefung durch den User.
+      6. Gefundene Schoenheitsfehler NICHT nebenbei beheben - dokumentieren
+         und den User entscheiden lassen.
 
 [9] BASEDIALOG + CONFIRMDIALOG  (§20)  [C], NUR MIT FREIGABE
     12 Klassen erben direkt von JFrame/JDialog/JWindow, JOptionPane in
@@ -359,6 +327,17 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
       merklich kleiner als das "x" daneben. Betrifft VIER Panels
       gleichzeitig, weil sie von BaseSidebarPanel erben - eine der
       wichtigsten Pruefungen der ganzen Bereinigung. ***
+  U19 *** LAYER-PANEL (rechte Seitenleiste im Canvas-Modus):
+      a) Kachel dunkel, beim Ueberfahren leicht waermer, feiner Rahmen;
+         Miniatur mit grauem Schachbrett hinter transparenten Stellen
+      b) *** DIE KNOPFREIHE - wichtigste Pruefung: jeder Knopf zeigt im
+         Ruhezustand nur seine FARBIGE SCHRIFT und FUELLT SICH beim
+         Ueberfahren mit einem dunkleren Ton derselben Farbe, Schrift
+         weiss. Sieben Farben: blau ↓ · orange · gruen · tuerkis/rot
+         (Auge) · gold ⊘ · violett 🗺 · rot (Loeschen) ***
+      c) Beim Ueberfahren einer Kachel WARMER GELBER Rahmen - derselbe Ton
+         wie beim Ueberfahren des Elements auf dem Canvas. Jetzt technisch
+         gekoppelt, beide muessen gleich aussehen. ***
   U18 *** DER CANVAS SELBST - groesste Einzelpruefung, alles in einem
       Durchgang:
         a) Text-Werkzeug: Textrahmen blass gefuellt, Textauswahl blau

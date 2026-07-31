@@ -211,4 +211,48 @@ public final class AppColors {
 
     /** Kleine Zusatzangabe im Kartenkopf (Sprache, Anzahl). */
     public static final Color TEXT_INFO           = new Color(100, 150, 200);
+
+    // ── Ergänzt 2026-07-31, Migration von ElementLayerPanel ──────────────────
+    //
+    // FAMILIE DER KLEINEN AKTIONSKNÖPFE. Alle folgen demselben Muster:
+    //   Ruhe:  Schrift = *_FG, Rahmen = *_FG oder BORDER, Fläche = BTN_MINI_BG
+    //   Hover: Fläche  = *_HOVER_BG, Schrift = weiß, Rahmen = *_FG
+    // Sie stehen hier und nicht file-lokal, weil die Familie ÜBER DATEIEN
+    // hinweg benutzt wird: BTN_DELETE_* kommt in MapsPanel UND in
+    // ElementLayerPanel vor. Wer eine Variante ergänzt, hält sich an das
+    // Muster oben.
+
+    /** Als Bild exportieren („↓"). */
+    public static final Color BTN_EXPORT_FG          = new Color( 60, 140, 220);
+    public static final Color BTN_EXPORT_HOVER_BG    = new Color( 40, 100, 160);
+    /** Auf den Canvas einbrennen. */
+    public static final Color BTN_BURN_FG            = new Color(220, 140,  30);
+    public static final Color BTN_BURN_HOVER_BG      = new Color(160,  90,  10);
+    /** Drehung zurücksetzen. */
+    public static final Color BTN_RESET_FG           = new Color(100, 180, 100);
+    public static final Color BTN_RESET_HOVER_BG     = new Color( 80, 140,  80);
+    /** Sichtbarkeit — Zustand „sichtbar". */
+    public static final Color BTN_VISIBLE_FG         = new Color( 60, 180, 180);
+    public static final Color BTN_VISIBLE_HOVER_BG   = new Color( 40, 140, 140);
+    /** Sichtbarkeit — Zustand „ausgeblendet". */
+    public static final Color BTN_HIDDEN_FG          = new Color(180,  60,  60);
+    public static final Color BTN_HIDDEN_HOVER_BG    = new Color(140,  40,  40);
+    /** Maus-Durchlässigkeit („⊘"/„⊙"), Zustand aktiv. */
+    public static final Color BTN_MOUSETRANS_FG      = new Color(200, 150,  50);
+    public static final Color BTN_MOUSETRANS_HOVER_BG= new Color(140, 100,  30);
+    /** Als Karte exportieren („🗺"). */
+    public static final Color BTN_MAP_FG             = new Color(180, 100, 200);
+    public static final Color BTN_MAP_HOVER_BG       = new Color(140,  80, 160);
+    /** Neutraler Zustand eines Umschalt-Knopfes (nicht aktiv). */
+    public static final Color BTN_MINI_FG_OFF        = new Color(100, 100, 100);
+
+    /**
+     * Warmer Rahmen unter dem Mauszeiger.
+     * <p>Bewusst geteilt: die Layer-Kachel und der Canvas verwenden denselben
+     * Ton, damit dasselbe Element in Liste und Zeichenfläche gleich reagiert.
+     * Der Canvas leitet daraus seine halbtransparente Variante ab — vorher war
+     * die Übereinstimmung nur ein Kommentar („mirrors the canvas hover outline
+     * colour") und musste von Hand gepflegt werden.
+     */
+    public static final Color HOVER_OUTLINE          = new Color(255, 200,  80);
 }

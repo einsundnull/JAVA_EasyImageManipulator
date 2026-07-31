@@ -56,6 +56,18 @@ import javax.swing.SwingUtilities;
  */
 public class ElementLayerPanel extends BaseSidebarPanel {
 
+    // ── Kachel-Darstellung, 2026-07-31 aus dem Zeichenpfad gezogen ──────────
+    // FILE-LOKAL nach dem CanvasPanel-Muster: diese Werte beschreiben nur die
+    // Layer-Kachel dieses Panels. Geteilte Entscheidungen stehen in AppColors
+    // (die Knopf-Familie, HOVER_OUTLINE), einmalige Zustaende hier.
+    private static final Color TILE_BG          = new Color(44, 44, 44);
+    private static final Color TILE_BG_HOVER    = new Color(58, 54, 44);
+    private static final Color TILE_BORDER      = new Color(62, 62, 62);
+    /** Helle Karos des Transparenz-Schachbretts in der Miniatur. */
+    private static final Color CHECKER_LIGHT    = new Color(78, 78, 78);
+    /** Dunkle Karos. Gleicher Wert wie TILE_BORDER, andere Bedeutung. */
+    private static final Color CHECKER_DARK     = new Color(62, 62, 62);
+
     // ── DnD flavor for dragging a Layer between panels / onto a canvas ────────
     public static final DataFlavor LAYER_FLAVOR = new DataFlavor(Layer.class, "Layer");
 
@@ -124,7 +136,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             if (dropIndicatorY >= 0) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setColor(AppColors.ACCENT);
-                g2.setStroke(new BasicStroke(2f));
+                g2.setStroke(AppTheme.STROKE_MEDIUM);
                 g2.drawLine(0, dropIndicatorY, getWidth(), dropIndicatorY);
                 g2.dispose();
             }
@@ -142,7 +154,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
     public ElementLayerPanel(Callbacks cb) {
         this.cb = cb;
         setLayout(new BorderLayout());
-        setBackground(new Color(36, 36, 36));
+        setBackground(AppColors.BG_SIDEBAR_LIST);
         setPreferredSize(new Dimension(PANEL_W, 0));
         // Left border separates this panel from the canvas
         setBorder(BorderFactory.createCompoundBorder(
@@ -152,20 +164,20 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         // ── Header ────────────────────────────────────────────────────────────
         // Build header manually since we need both outline button + close button
         JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(new Color(42, 42, 42));
+        header.setBackground(AppColors.BG_SIDEBAR_HEADER);
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
         header.setPreferredSize(new Dimension(PANEL_W, 28));
 
         JLabel title = new JLabel("  Ebenen");
         title.setForeground(AppColors.TEXT_MUTED);
-        title.setFont(new Font("SansSerif", Font.BOLD, 11));
+        title.setFont(AppTheme.FONT_BASE_BOLD);
         title.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 4));
         header.add(title, BorderLayout.CENTER);
 
         // Close button (×) – hides the panel via onCloseRequested()
         JLabel closeBtn = new JLabel("×");
         closeBtn.setForeground(AppColors.TEXT_MUTED);
-        closeBtn.setFont(new Font("SansSerif", Font.BOLD, 15));
+        closeBtn.setFont(AppTheme.FONT_TITLE);
         closeBtn.setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 6));
         closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         closeBtn.addMouseListener(new MouseAdapter() {
@@ -179,13 +191,13 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(isSelected() ? AppColors.ACCENT : new Color(55, 55, 55));
+                g2.setColor(isSelected() ? AppColors.ACCENT : AppColors.BTN_TOGGLE_OFF);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 4, 4);
                 super.paintComponent(g2);
                 g2.dispose();
             }
         };
-        outlineBtn.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        outlineBtn.setFont(AppTheme.FONT_BASE);
         outlineBtn.setForeground(AppColors.TEXT);
         outlineBtn.setFocusPainted(false);
         outlineBtn.setBorderPainted(false);
@@ -223,7 +235,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         // Refresh button – reload elements from disk
         JLabel refreshBtn = new JLabel("⟳");
         refreshBtn.setForeground(AppColors.TEXT_MUTED);
-        refreshBtn.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        refreshBtn.setFont(AppTheme.FONT_MD);
         refreshBtn.setBorder(BorderFactory.createEmptyBorder(4, 3, 4, 3));
         refreshBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         refreshBtn.addMouseListener(new MouseAdapter() {
@@ -243,7 +255,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         // which causes BoxLayout Y_AXIS to resize tiles accordingly.
         tilesContainer = new TilesScrollablePanel();
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));
-        tilesContainer.setBackground(new Color(36, 36, 36));
+        tilesContainer.setBackground(AppColors.BG_SIDEBAR_LIST);
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
 
         // ── Drop target: accept Layer and image-file-as-element drags ─────────
@@ -358,7 +370,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         if (layers.isEmpty()) {
             JLabel empty = new JLabel("<html><center>Keine<br>Ebenen</center></html>", JLabel.CENTER);
             empty.setForeground(AppColors.TEXT_MUTED);
-            empty.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            empty.setFont(AppTheme.FONT_BASE);
             empty.setAlignmentX(CENTER_ALIGNMENT);
             empty.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
             tilesContainer.add(empty);
@@ -392,13 +404,13 @@ public class ElementLayerPanel extends BaseSidebarPanel {
 
             // ── Blue "zu image" (📥) button – export as image file ───────────────
             toImage = new JLabel("↓", JLabel.CENTER);
-            toImage.setForeground(new Color(60, 140, 220));
-            toImage.setFont(new Font("SansSerif", Font.BOLD, 11));
+            toImage.setForeground(AppColors.BTN_EXPORT_FG);
+            toImage.setFont(AppTheme.FONT_BASE_BOLD);
             toImage.setBounds(TILE_W - 55, 4, 16, 16);
             toImage.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             toImage.setOpaque(true);
-            toImage.setBackground(new Color(50, 50, 50));
-            toImage.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            toImage.setBackground(AppColors.BTN_MINI_BG);
+            toImage.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
             toImage.setToolTipText("Als Bild exportieren");
             toImage.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
@@ -407,27 +419,27 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                     cb.exportElementAsImage(layer);
                 }
                 @Override public void mouseEntered(MouseEvent e) {
-                    toImage.setBackground(new Color(40, 100, 160));
+                    toImage.setBackground(AppColors.BTN_EXPORT_HOVER_BG);
                     toImage.setForeground(Color.WHITE);
-                    toImage.setBorder(BorderFactory.createLineBorder(new Color(60, 140, 220), 1));
+                    toImage.setBorder(BorderFactory.createLineBorder(AppColors.BTN_EXPORT_FG, 1));
                 }
                 @Override public void mouseExited(MouseEvent e) {
-                    toImage.setBackground(new Color(50, 50, 50));
-                    toImage.setForeground(new Color(60, 140, 220));
-                    toImage.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    toImage.setBackground(AppColors.BTN_MINI_BG);
+                    toImage.setForeground(AppColors.BTN_EXPORT_FG);
+                    toImage.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 }
             });
             add(toImage);
 
             // ── Orange burn (⊕) button – second from top-right ───────────────
             burn = new JLabel("⊕", JLabel.CENTER);
-            burn.setForeground(new Color(220, 140, 30));
-            burn.setFont(new Font("SansSerif", Font.BOLD, 11));
+            burn.setForeground(AppColors.BTN_BURN_FG);
+            burn.setFont(AppTheme.FONT_BASE_BOLD);
             burn.setBounds(TILE_W - 37, 4, 16, 16);
             burn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             burn.setOpaque(true);
-            burn.setBackground(new Color(50, 50, 50));
-            burn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            burn.setBackground(AppColors.BTN_MINI_BG);
+            burn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
             burn.setToolTipText("Layer einbrennen (auf Canvas anwenden)");
             burn.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
@@ -436,14 +448,14 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                     cb.burnElement(layer);
                 }
                 @Override public void mouseEntered(MouseEvent e) {
-                    burn.setBackground(new Color(160, 90, 10));
+                    burn.setBackground(AppColors.BTN_BURN_HOVER_BG);
                     burn.setForeground(Color.WHITE);
-                    burn.setBorder(BorderFactory.createLineBorder(new Color(220, 140, 30), 1));
+                    burn.setBorder(BorderFactory.createLineBorder(AppColors.BTN_BURN_FG, 1));
                 }
                 @Override public void mouseExited(MouseEvent e) {
-                    burn.setBackground(new Color(50, 50, 50));
-                    burn.setForeground(new Color(220, 140, 30));
-                    burn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    burn.setBackground(AppColors.BTN_MINI_BG);
+                    burn.setForeground(AppColors.BTN_BURN_FG);
+                    burn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 }
             });
             add(burn);
@@ -451,13 +463,13 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             // ── Red (×) delete button – top-right corner (hidden for permanent page frames) ──
             boolean isWrappingFrame = cb.isPageFrame(layer);
             del = new JLabel("✕", JLabel.CENTER);
-            del.setForeground(new Color(220, 60, 60));
-            del.setFont(new Font("SansSerif", Font.BOLD, 10));
+            del.setForeground(AppColors.BTN_DELETE_FG);
+            del.setFont(AppTheme.FONT_SM_BOLD);
             del.setBounds(TILE_W - 19, 4, 16, 16);
             del.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             del.setOpaque(true);
-            del.setBackground(new Color(50, 50, 50));
-            del.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            del.setBackground(AppColors.BTN_MINI_BG);
+            del.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
             del.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
                     if (e.getClickCount() > 1) return;  // Let double-clicks through
@@ -465,14 +477,14 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                     cb.deleteElement(layer);
                 }
                 @Override public void mouseEntered(MouseEvent e) {
-                    del.setBackground(new Color(180, 40, 40));
+                    del.setBackground(AppColors.BTN_DELETE_HOVER_BG);
                     del.setForeground(Color.WHITE);
-                    del.setBorder(BorderFactory.createLineBorder(new Color(220, 60, 60), 1));
+                    del.setBorder(BorderFactory.createLineBorder(AppColors.BTN_DELETE_FG, 1));
                 }
                 @Override public void mouseExited(MouseEvent e) {
-                    del.setBackground(new Color(50, 50, 50));
-                    del.setForeground(new Color(220, 60, 60));
-                    del.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    del.setBackground(AppColors.BTN_MINI_BG);
+                    del.setForeground(AppColors.BTN_DELETE_FG);
+                    del.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 }
             });
             del.setVisible(!isWrappingFrame);
@@ -481,13 +493,13 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             // ── Green reset rotation button (↺) – only for rotated ImageLayers ─
             if (layer instanceof ImageLayer il && Math.abs(il.rotationAngle()) > 0.001) {
                 resetRot = new JLabel("↺", JLabel.CENTER);
-                resetRot.setForeground(new Color(100, 180, 100));
-                resetRot.setFont(new Font("SansSerif", Font.BOLD, 11));
+                resetRot.setForeground(AppColors.BTN_RESET_FG);
+                resetRot.setFont(AppTheme.FONT_BASE_BOLD);
                 resetRot.setBounds(TILE_W - 73, 4, 16, 16);
                 resetRot.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 resetRot.setOpaque(true);
-                resetRot.setBackground(new Color(50, 50, 50));
-                resetRot.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                resetRot.setBackground(AppColors.BTN_MINI_BG);
+                resetRot.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 resetRot.setToolTipText("Rotation zurücksetzen");
                 resetRot.addMouseListener(new MouseAdapter() {
                     @Override public void mouseClicked(MouseEvent e) {
@@ -496,14 +508,14 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                         cb.resetElementRotation(layer);
                     }
                     @Override public void mouseEntered(MouseEvent e) {
-                        resetRot.setBackground(new Color(80, 140, 80));
+                        resetRot.setBackground(AppColors.BTN_RESET_HOVER_BG);
                         resetRot.setForeground(Color.WHITE);
-                        resetRot.setBorder(BorderFactory.createLineBorder(new Color(100, 180, 100), 1));
+                        resetRot.setBorder(BorderFactory.createLineBorder(AppColors.BTN_RESET_FG, 1));
                     }
                     @Override public void mouseExited(MouseEvent e) {
-                        resetRot.setBackground(new Color(50, 50, 50));
-                        resetRot.setForeground(new Color(100, 180, 100));
-                        resetRot.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                        resetRot.setBackground(AppColors.BTN_MINI_BG);
+                        resetRot.setForeground(AppColors.BTN_RESET_FG);
+                        resetRot.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                     }
                 });
                 add(resetRot);
@@ -513,13 +525,13 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             boolean hidden = layer.isHidden();
 
             vis = new JLabel(hidden ? "🚫" : "👁", JLabel.CENTER);
-            vis.setForeground(hidden ? new Color(180, 60, 60) : new Color(60, 180, 180));
-            vis.setFont(new Font("SansSerif", Font.BOLD, 10));
+            vis.setForeground(hidden ? AppColors.BTN_HIDDEN_FG : AppColors.BTN_VISIBLE_FG);
+            vis.setFont(AppTheme.FONT_SM_BOLD);
             vis.setBounds(TILE_W - 109, 4, 16, 16);
             vis.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             vis.setOpaque(true);
-            vis.setBackground(new Color(50, 50, 50));
-            vis.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            vis.setBackground(AppColors.BTN_MINI_BG);
+            vis.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
             vis.setToolTipText(hidden ? "Sichtbar machen" : "Ausblenden");
             vis.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
@@ -529,16 +541,16 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                 }
                 @Override public void mouseEntered(MouseEvent e) {
                     boolean h = layer.isHidden();
-                    vis.setBackground(h ? new Color(140, 40, 40) : new Color(40, 140, 140));
+                    vis.setBackground(h ? AppColors.BTN_HIDDEN_HOVER_BG : AppColors.BTN_VISIBLE_HOVER_BG);
                     vis.setForeground(Color.WHITE);
                     vis.setBorder(BorderFactory.createLineBorder(
-                        h ? new Color(180, 60, 60) : new Color(60, 180, 180), 1));
+                        h ? AppColors.BTN_HIDDEN_FG : AppColors.BTN_VISIBLE_FG, 1));
                 }
                 @Override public void mouseExited(MouseEvent e) {
                     boolean h = layer.isHidden();
-                    vis.setBackground(new Color(50, 50, 50));
-                    vis.setForeground(h ? new Color(180, 60, 60) : new Color(60, 180, 180));
-                    vis.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    vis.setBackground(AppColors.BTN_MINI_BG);
+                    vis.setForeground(h ? AppColors.BTN_HIDDEN_FG : AppColors.BTN_VISIBLE_FG);
+                    vis.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 }
             });
             add(vis);
@@ -546,13 +558,13 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             // ── Mouse-transparent toggle (⊘) – for all layers ─────────────────
             boolean mt = layer.isMouseTransparent();
             mouseTrans = new JLabel(mt ? "⊘" : "⊙", JLabel.CENTER);
-            mouseTrans.setForeground(mt ? new Color(200, 150, 50) : new Color(100, 100, 100));
-            mouseTrans.setFont(new Font("SansSerif", Font.BOLD, 10));
+            mouseTrans.setForeground(mt ? AppColors.BTN_MOUSETRANS_FG : AppColors.BTN_MINI_FG_OFF);
+            mouseTrans.setFont(AppTheme.FONT_SM_BOLD);
             mouseTrans.setBounds(TILE_W - 127, 4, 16, 16);
             mouseTrans.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             mouseTrans.setOpaque(true);
-            mouseTrans.setBackground(new Color(50, 50, 50));
-            mouseTrans.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            mouseTrans.setBackground(AppColors.BTN_MINI_BG);
+            mouseTrans.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
             mouseTrans.setToolTipText(mt ? "Maus-transparent (Klick zum Deaktivieren)" : "Für Maus sichtbar (Klick für tool-transparent)");
             mouseTrans.addMouseListener(new MouseAdapter() {
                 @Override public void mouseClicked(MouseEvent e) {
@@ -561,15 +573,15 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                     cb.toggleElementMouseTransparent(layer);
                 }
                 @Override public void mouseEntered(MouseEvent e) {
-                    mouseTrans.setBackground(new Color(140, 100, 30));
+                    mouseTrans.setBackground(AppColors.BTN_MOUSETRANS_HOVER_BG);
                     mouseTrans.setForeground(Color.WHITE);
-                    mouseTrans.setBorder(BorderFactory.createLineBorder(new Color(200, 150, 50), 1));
+                    mouseTrans.setBorder(BorderFactory.createLineBorder(AppColors.BTN_MOUSETRANS_FG, 1));
                 }
                 @Override public void mouseExited(MouseEvent e) {
                     boolean isMt = layer.isMouseTransparent();
-                    mouseTrans.setBackground(new Color(50, 50, 50));
-                    mouseTrans.setForeground(isMt ? new Color(200, 150, 50) : new Color(100, 100, 100));
-                    mouseTrans.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    mouseTrans.setBackground(AppColors.BTN_MINI_BG);
+                    mouseTrans.setForeground(isMt ? AppColors.BTN_MOUSETRANS_FG : AppColors.BTN_MINI_FG_OFF);
+                    mouseTrans.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 }
             });
             add(mouseTrans);
@@ -577,13 +589,13 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             // ── Purple map button (🗺) – only for TextLayers ────────────────────
             if (layer instanceof TextLayer) {
                 mapBtn = new JLabel("🗺", JLabel.CENTER);
-                mapBtn.setForeground(new Color(180, 100, 200));
-                mapBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+                mapBtn.setForeground(AppColors.BTN_MAP_FG);
+                mapBtn.setFont(AppTheme.FONT_BASE_BOLD);
                 mapBtn.setBounds(TILE_W - 91, 4, 16, 16);
                 mapBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 mapBtn.setOpaque(true);
-                mapBtn.setBackground(new Color(50, 50, 50));
-                mapBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                mapBtn.setBackground(AppColors.BTN_MINI_BG);
+                mapBtn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 mapBtn.setToolTipText("Als Translation Map exportieren");
                 mapBtn.addMouseListener(new MouseAdapter() {
                     @Override public void mouseClicked(MouseEvent e) {
@@ -592,14 +604,14 @@ public class ElementLayerPanel extends BaseSidebarPanel {
                         cb.exportElementAsMap(layer);
                     }
                     @Override public void mouseEntered(MouseEvent e) {
-                        mapBtn.setBackground(new Color(140, 80, 160));
+                        mapBtn.setBackground(AppColors.BTN_MAP_HOVER_BG);
                         mapBtn.setForeground(Color.WHITE);
-                        mapBtn.setBorder(BorderFactory.createLineBorder(new Color(180, 100, 200), 1));
+                        mapBtn.setBorder(BorderFactory.createLineBorder(AppColors.BTN_MAP_FG, 1));
                     }
                     @Override public void mouseExited(MouseEvent e) {
-                        mapBtn.setBackground(new Color(50, 50, 50));
-                        mapBtn.setForeground(new Color(180, 100, 200));
-                        mapBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                        mapBtn.setBackground(AppColors.BTN_MINI_BG);
+                        mapBtn.setForeground(AppColors.BTN_MAP_FG);
+                        mapBtn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                     }
                 });
                 add(mapBtn);
@@ -613,7 +625,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             }
             lbl = new JLabel(displayName, JLabel.CENTER);
             lbl.setForeground(AppColors.TEXT_MUTED);
-            lbl.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            lbl.setFont(AppTheme.FONT_SM);
             lbl.setBounds(0, TILE_H - 18, TILE_W, 16);
             add(lbl);
 
@@ -713,7 +725,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             boolean hovered = hoveredElementId == layer.id();
 
             // Tile background – slightly lighter on hover
-            g2.setColor(hovered ? new Color(58, 54, 44) : new Color(44, 44, 44));
+            g2.setColor(hovered ? TILE_BG_HOVER : TILE_BG);
             g2.fillRoundRect(0, 0, w, TILE_H, 6, 6);
 
             // Checkerboard for transparency indication
@@ -801,7 +813,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
 
                     // Step 5: path lines
                     g2.setColor(new java.awt.Color(0, 200, 255, 180));
-                    g2.setStroke(new BasicStroke(1f));
+                    g2.setStroke(AppTheme.STROKE_HAIRLINE);
                     if (pl.isClosed() && points.size() >= 2) {
                         Point3D p1 = points.get(points.size() - 1);
                         Point3D p2 = points.get(0);
@@ -836,23 +848,23 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             // Selection border / hover border / normal border
             if (selected) {
                 g2.setColor(AppColors.ACCENT);
-                g2.setStroke(new BasicStroke(2f));
+                g2.setStroke(AppTheme.STROKE_MEDIUM);
                 g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 6, 6);
             } else if (hovered) {
                 // Warm amber hover border — mirrors the canvas hover outline colour
-                g2.setColor(new Color(255, 200, 80));
-                g2.setStroke(new BasicStroke(1.5f));
+                g2.setColor(AppColors.HOVER_OUTLINE);
+                g2.setStroke(AppTheme.STROKE_THIN);
                 g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 6, 6);
             } else {
-                g2.setColor(new Color(62, 62, 62));
-                g2.setStroke(new BasicStroke(1f));
+                g2.setColor(TILE_BORDER);
+                g2.setStroke(AppTheme.STROKE_HAIRLINE);
                 g2.drawRoundRect(0, 0, w - 1, TILE_H - 1, 6, 6);
             }
 
             // Draw red border for unlinked layers when showAll is true
             if (isShowAll && linkedLayerRef != null && layer.id() != linkedLayerRef.id()) {
                 g2.setColor(AppColors.DANGER);
-                g2.setStroke(new BasicStroke(1.5f));
+                g2.setStroke(AppTheme.STROKE_THIN);
                 g2.drawRoundRect(0, 0, w - 1, TILE_H - 1, 6, 6);
             }
 
@@ -863,7 +875,7 @@ public class ElementLayerPanel extends BaseSidebarPanel {
             int cs = 6;
             for (int row = 0; row * cs < h; row++) {
                 for (int col = 0; col * cs < w; col++) {
-                    g2.setColor((row + col) % 2 == 0 ? new Color(78, 78, 78) : new Color(62, 62, 62));
+                    g2.setColor((row + col) % 2 == 0 ? CHECKER_LIGHT : CHECKER_DARK);
                     int cx = x + col * cs, cy = y + row * cs;
                     int cw = Math.min(cs, x + w - cx);
                     int ch = Math.min(cs, y + h - cy);

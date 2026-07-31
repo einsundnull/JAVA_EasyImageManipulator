@@ -196,7 +196,12 @@ public class CanvasPanel extends JPanel {
 	private static final Color COLOR_HANDLE_HOV_BORDER = new Color(200, 140, 0);
 	private static final Color COLOR_ROT_HOV           = new Color(255, 180, 0);
 	private static final Color COLOR_ROT               = new Color(100, 180, 255);
-	private static final Color COLOR_HOVER_OUTLINE     = new Color(255, 200, 80, 200);
+	// Abgeleitet aus AppColors.HOVER_OUTLINE - Layer-Kachel und Canvas
+	// benutzen denselben Ton. Vorher war die Uebereinstimmung nur ein
+	// Kommentar und musste von Hand gepflegt werden.
+	private static final Color COLOR_HOVER_OUTLINE     = new Color(
+			AppColors.HOVER_OUTLINE.getRed(), AppColors.HOVER_OUTLINE.getGreen(),
+			AppColors.HOVER_OUTLINE.getBlue(), 200);
 	private static final Color COLOR_DIM_OUTLINE       = new Color(160, 160, 160, 140);
 	private static final Color COLOR_FREEPATH_LINE     = new Color(80, 160, 255, 200);
 	private static final Color COLOR_FREEPATH_START    = new Color(255, 200, 60);
