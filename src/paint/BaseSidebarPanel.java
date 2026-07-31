@@ -30,7 +30,20 @@ import javax.swing.TransferHandler;
 
 /**
  * Abstract base class for all sidebar panels (TileGalleryPanel, ElementLayerPanel,
- * ScenesPanel, MapsPanel). Provides common utilities for:
+ * ScenesPanel, MapsPanel).
+ *
+ * <p><b>Auf Tokens migriert am 2026-07-31</b> (§21): 11 Literale → 0.
+ * Weil sechs Panels davon erben, prägt diese Klasse den Kopfbereich der halben
+ * Oberfläche — die Farben stehen jetzt einmal in {@link AppColors}
+ * ({@code BG_SIDEBAR_HEADER}, {@code BG_SIDEBAR_LIST}) statt fünfmal hier.
+ *
+ * <p><b>Eine bewusste Kopplung:</b> das „×"-Zeichen zum Schließen benutzt
+ * {@link AppTheme#FONT_TITLE}, obwohl das eigentlich die Überschrift-Schrift
+ * ist. Es sitzt in derselben Kopfzeile und soll dasselbe Gewicht haben — eine
+ * Design-Entscheidung, keine Wert-Wiederverwendung aus Bequemlichkeit. Das
+ * „+" ist mit {@link AppTheme#FONT_HEADER_ADD} eine Stufe kleiner.
+ *
+ * <p>Provides common utilities for:
  * - Standard dark header with title + optional close button
  * - JScrollPane with dark-styled scrollbars
  * - Right-click drag-to-copy mechanism
@@ -134,13 +147,13 @@ public abstract class BaseSidebarPanel extends JPanel {
                                         java.util.function.Consumer<Boolean> onAllOnlyToggle,
                                         Runnable onClose, Runnable onTitleClick) {
         JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(new Color(42, 42, 42));
+        header.setBackground(AppColors.BG_SIDEBAR_HEADER);
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
         header.setPreferredSize(new Dimension(DEFAULT_PANEL_W, 28));
 
         JLabel titleLbl = new JLabel("  " + title);
         titleLbl.setForeground(AppColors.TEXT_MUTED);
-        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 11));
+        titleLbl.setFont(AppTheme.FONT_BASE_BOLD);
         titleLbl.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 4));
         if (onTitleClick != null) {
             titleLbl.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -155,7 +168,7 @@ public abstract class BaseSidebarPanel extends JPanel {
         // ── East side: all/only toggle (optional) + refresh button (optional) + close button (optional) ─
         if (onRefresh != null || onAllOnlyToggle != null || onClose != null) {
             JPanel eastPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
-            eastPanel.setBackground(new Color(42, 42, 42));
+            eastPanel.setBackground(AppColors.BG_SIDEBAR_HEADER);
             eastPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
 
             // All/Only toggle button — constructed but NOT added to the panel
@@ -182,7 +195,7 @@ public abstract class BaseSidebarPanel extends JPanel {
             if (onRefresh != null) {
                 JLabel refreshBtn = new JLabel("⟳");
                 refreshBtn.setForeground(AppColors.TEXT_MUTED);
-                refreshBtn.setFont(new Font("SansSerif", Font.PLAIN, 12));
+                refreshBtn.setFont(AppTheme.FONT_MD);
                 refreshBtn.setBorder(BorderFactory.createEmptyBorder(4, 3, 4, 3));
                 refreshBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 refreshBtn.addMouseListener(new MouseAdapter() {
@@ -196,7 +209,7 @@ public abstract class BaseSidebarPanel extends JPanel {
             if (onClose != null) {
                 JLabel closeBtn = new JLabel("×");
                 closeBtn.setForeground(AppColors.TEXT_MUTED);
-                closeBtn.setFont(new Font("SansSerif", Font.BOLD, 15));
+                closeBtn.setFont(AppTheme.FONT_TITLE);
                 closeBtn.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 0));
                 closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 closeBtn.addMouseListener(new MouseAdapter() {
@@ -212,7 +225,7 @@ public abstract class BaseSidebarPanel extends JPanel {
         } else {
             // Always provide an east panel so addAddButton() can insert into it later
             JPanel eastPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
-            eastPanel.setBackground(new Color(42, 42, 42));
+            eastPanel.setBackground(AppColors.BG_SIDEBAR_HEADER);
             eastPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
             header.add(eastPanel, BorderLayout.EAST);
             header.putClientProperty("eastPanel", eastPanel);
@@ -230,7 +243,7 @@ public abstract class BaseSidebarPanel extends JPanel {
         JPanel east = (JPanel) prop;
         JLabel addBtn = new JLabel("+");
         addBtn.setForeground(AppColors.TEXT_MUTED);
-        addBtn.setFont(new Font("SansSerif", Font.BOLD, 14));
+        addBtn.setFont(AppTheme.FONT_HEADER_ADD);
         addBtn.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
         addBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         addBtn.setToolTipText("Neu erstellen");
@@ -249,7 +262,7 @@ public abstract class BaseSidebarPanel extends JPanel {
         Object prop = header.getClientProperty("eastPanel");
         if (!(prop instanceof JPanel east)) return;
         JLabel btn = new JLabel("📁");
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        btn.setFont(AppTheme.FONT_BASE);
         btn.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.setToolTipText("Schnellauswahl öffnen");
@@ -269,7 +282,7 @@ public abstract class BaseSidebarPanel extends JPanel {
         if (!(prop instanceof JPanel east)) return;
         JLabel btn = new JLabel("⊞");
         btn.setForeground(AppColors.TEXT_MUTED);
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        btn.setFont(AppTheme.FONT_LG);
         btn.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.setToolTipText("Zusätzliche Liste erstellen");
@@ -292,8 +305,8 @@ public abstract class BaseSidebarPanel extends JPanel {
             JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
             JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         sp.setBorder(null);
-        sp.getViewport().setBackground(new Color(36, 36, 36));
-        sp.setBackground(new Color(36, 36, 36));
+        sp.getViewport().setBackground(AppColors.BG_SIDEBAR_LIST);
+        sp.setBackground(AppColors.BG_SIDEBAR_LIST);
         sp.getVerticalScrollBar().setUnitIncrement(14);
         TileGalleryPanel.applyDarkScrollBar(sp.getVerticalScrollBar());
         installMiddleMouseDragPan(sp, container);

@@ -1,0 +1,102 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-04.txt
+Aufgabentyp: [ST] — Schritt [6], DATEI 5 der AppTheme-Bereinigung (§21)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "weiter"
+
+*** Sichtpruefung waechst auf U1-U12. Weiterhin offen. ***
+
+
+MIGRIERT: BaseSidebarPanel.java   11 Literale -> 0
+--------------------------------------------------------------------------
+GEWAEHLT WEGEN DES HEBELS: sechs Panels erben von dieser Klasse
+(TileGalleryPanel, ElementLayerPanel, MapsPanel, TranslationMapListPanel,
+BookListPanelLegacy und BookPagesPanelLegacy sind weg — bleiben also vier
+aktive plus kuenftige). Ihr Kopfbereich praegt die halbe Oberflaeche.
+Die Kopf-Farbe stand FUENFMAL in dieser einen Datei.
+
+  Color(42,42,42) 3x -> AppColors.BG_SIDEBAR_HEADER   (neu)
+  Color(36,36,36) 2x -> AppColors.BG_SIDEBAR_LIST     (neu)
+  Font BOLD 11       -> AppTheme.FONT_BASE_BOLD
+  Font PLAIN 12      -> AppTheme.FONT_MD
+  Font BOLD 15  ("x")-> AppTheme.FONT_TITLE           (bewusste Kopplung)
+  Font BOLD 14  ("+")-> AppTheme.FONT_HEADER_ADD      (neu)
+  Font PLAIN 11      -> AppTheme.FONT_BASE
+  Font PLAIN 13      -> AppTheme.FONT_LG
+
+  Font 6->0 · Color 5->0
+
+
+DIE EINE ENTSCHEIDUNG, DIE ERKLAERUNG BRAUCHT
+--------------------------------------------------------------------------
+Das "x" zum Schliessen ist BOLD 15 — derselbe Wert wie FONT_TITLE, das als
+"Ueberschrift eines Dialogs oder Panels" dokumentiert ist.
+
+Zwei Moeglichkeiten:
+  (a) FONT_TITLE wiederverwenden -> koppelt Schliess-Zeichen und
+      Ueberschrift
+  (b) eigenes FONT_HEADER_CLOSE mit demselben Wert anlegen
+
+GEWAEHLT: (a), aber als DESIGN-ENTSCHEIDUNG begruendet, nicht aus
+Bequemlichkeit: das "x" sitzt in derselben Kopfzeile wie der Titel und soll
+dasselbe Gewicht haben. Wer den Titel schwerer macht, will das "x"
+mitziehen. Steht so im Javadoc der Klasse.
+
+Das "+" dagegen bekam ein EIGENES Token (BOLD 14): es steht neben dem "x",
+soll aber ausdruecklich nicht gleich schwer wirken. Haette man es auf
+FONT_TITLE gerundet, waere es 1 pt groesser geworden — genau die
+Rundungsfalle aus §21.
+
+*** Diese Runde zeigt beide Seiten der Regel: einmal koppeln (begruendet),
+    einmal trennen (begruendet). Nicht schematisch, sondern je Fall. ***
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+Alle acht ersetzten Werte gegen die kompilierten Klassen geprueft —
+identisch. Build: exit 0, 335 .class — unveraendert.
+
+
+STAND DER BEREINIGUNG (ausserhalb der Token-Klassen)
+--------------------------------------------------------------------------
+                  Start    jetzt
+  new Color        259      243
+  new Font         135      112
+  new BasicStroke   68       64
+
+  Fuenf Dateien durch:
+    UIComponentFactory   2 Restliterale (parametrisiert)
+    UIBuilder            1 Restliteral  (dash-Stroke)
+    SelectiveAlphaEditor 2 Restliterale (Laufzeitfarben)
+    TextToolbar          0
+    BaseSidebarPanel     0
+
+  Token-Klassen: AppColors 33 Farben · AppTheme 20 Fonts, 5 Strokes
+
+
+SICHTPRUEFUNG — JETZT U1-U12
+--------------------------------------------------------------------------
+  U1-U11 wie in den progress-Dateien 02 und 03
+  neu:
+  U12 *** ALLE SEITENLEISTEN (Galerie, Layer, Karten, Szenen): Kopfzeile
+      etwas heller als die Liste darunter — wie vorher. Titel fett und
+      klein. Das "+" merklich kleiner als das "x" daneben. Beide Zeichen
+      gedaempft grau, beim Ueberfahren heller.
+      Betrifft VIER Panels gleichzeitig, weil sie erben — deshalb eine
+      der wichtigsten Pruefungen der ganzen Bereinigung. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 5" wurde abgeschlossen: ja
+#   Die BEREINIGUNG INSGESAMT ist NICHT fertig — 419 Literale verbleiben.
+# Naechster Schritt: Sichtpruefung U1-U12. Danach naechste Datei —
+#   Empfehlung: NewImageDialog (17) oder PageLayoutToolbar (21).
+#   ColorPickerPopup bleibt zurueckgestellt (berechnete Farben).
+#   NICHT ElementLayerPanel (84) / CanvasPanel (58).
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

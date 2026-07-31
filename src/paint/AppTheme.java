@@ -98,6 +98,14 @@ public final class AppTheme {
     /** 12 pt kursiv — Kursiv-Umschalter der Text-Werkzeugleiste. */
     public static final Font FONT_MD_ITALIC = new Font(FAMILY, Font.ITALIC, 12);
 
+    // ── Ergänzt 2026-07-31, Migration von BaseSidebarPanel ───────────────────
+    /**
+     * 14 pt fett — das „+"-Zeichen im Kopf einer Seitenleiste.
+     * <p>Eine Stufe kleiner als {@link #FONT_TITLE}: das „+" steht neben dem
+     * „×", soll aber nicht gleich schwer wirken.
+     */
+    public static final Font FONT_HEADER_ADD = new Font(FAMILY, Font.BOLD, 14);
+
     // ── Linienstärken ─────────────────────────────────────────────────────────
     /** 1 px — Trennlinien, Raster, einfache Rahmen (häufigster Wert). */
     public static final Stroke STROKE_HAIRLINE = new BasicStroke(1f);

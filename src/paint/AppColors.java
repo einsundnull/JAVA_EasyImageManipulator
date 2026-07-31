@@ -75,4 +75,12 @@ public final class AppColors {
      * Heller als {@link #TEXT_MUTED} (140), dunkler als {@link #TEXT} (220).
      */
     public static final Color TEXT_MINI      = new Color(160, 160, 160);
+
+    // ── Ergänzt 2026-07-31, Migration von BaseSidebarPanel ───────────────────
+    // Betrifft alle sechs Seitenleisten-Panels, die von BaseSidebarPanel erben.
+
+    /** Kopfzeile einer Seitenleiste (Titel + Knöpfe). Heller als die Liste darunter. */
+    public static final Color BG_SIDEBAR_HEADER = new Color(42, 42, 42);
+    /** Listenfläche einer Seitenleiste unter der Kopfzeile. */
+    public static final Color BG_SIDEBAR_LIST   = new Color(36, 36, 36);
 }

@@ -8,12 +8,13 @@ Details je Schritt: die progress_2026-07-30_*.txt.
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
-Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: VIER Dateien
+Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: FUENF Dateien
 sind durch (UIComponentFactory, SelectiveAlphaEditor, UIBuilder,
-TextToolbar), 430 Literale ausserhalb der Token-Klassen verbleiben.
-*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U11 durch den User. Sie war
+TextToolbar, BaseSidebarPanel), 419 Literale ausserhalb der Token-Klassen
+verbleiben.
+*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U12 durch den User. Sie war
     schon nach Datei 1 faellig und ist nicht erfolgt — deshalb deckt sie
-    jetzt vier Dateien ab. Vor der naechsten Datei nachholen. ***
+    jetzt fuenf Dateien ab. EIN Programmstart hakt alle zwoelf ab. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -93,6 +94,12 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     Antworten (einmal vorhandenes Token wiederverwendet, zweimal neues) -
     die Bedeutung entscheidet, nicht der Wert.
     -> progress_2026-07-31_apptheme-migration-03.txt
+[6d] AppTheme-Bereinigung, DATEI 5: BaseSidebarPanel 11 -> 0. Groesster
+    Hebel bisher - vier aktive Panels erben davon, die Kopf-Farbe stand
+    fuenfmal in einer Datei. Zeigt beide Seiten der Regel: das "x" wurde
+    bewusst an FONT_TITLE GEKOPPELT (gleiche Kopfzeile, gleiches Gewicht),
+    das "+" bekam ein EIGENES Token (soll leichter wirken).
+    -> progress_2026-07-31_apptheme-migration-04.txt
 
 VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
   a) "referenzfrei" != "unbenutzt". Eine Klasse mit main() ist startbar.
@@ -116,15 +123,18 @@ OFFEN — nach Hebel sortiert
       UIComponentFactory    11 -> 2 Restliterale (parametrisiert)
       SelectiveAlphaEditor       2 Restliterale (Laufzeitfarben)
       UIBuilder                  1 Restliteral  (dash-Stroke)
-      TextToolbar           15 -> 0   <- erste vollstaendig saubere Datei
+      TextToolbar           15 -> 0
+      BaseSidebarPanel      11 -> 0   <- groesster Hebel: 4 Panels erben
     VERBLEIBEND ausserhalb der Token-Klassen:
-      248 new Color · 118 new Font · 64 new BasicStroke
-    Token-Klassen: AppColors 31 Farben · AppTheme 19 Fonts, 5 Strokes
+      243 new Color · 112 new Font · 64 new BasicStroke
+    Token-Klassen: AppColors 33 Farben · AppTheme 20 Fonts, 5 Strokes
 
-    *** ZUERST: SICHTPRUEFUNG U1-U11 DURCH DEN USER (aufgestaut aus vier
-        Dateien; Listen in den progress_2026-07-31_*.txt).
-        U9 (Ablageflaeche ohne geladenes Bild), U10 (Text-Werkzeugleiste)
-        und U3 (Symbol-Knoepfe) sind die aussagekraeftigsten. ***
+    *** ZUERST: SICHTPRUEFUNG U1-U12 DURCH DEN USER (aufgestaut aus fuenf
+        Dateien; Listen in den progress_2026-07-31_*.txt). EIN Start des
+        Programms hakt alle zwoelf ab.
+        Die aussagekraeftigsten: U12 (Seitenleisten-Koepfe, betrifft vier
+        Panels), U9 (Ablageflaeche ohne Bild), U10 (Text-Werkzeugleiste),
+        U3 (Symbol-Knoepfe). ***
 
     VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
       1. EINE Datei pro Schritt (Ausnahme: zwei Dateien, die sich eine
@@ -166,15 +176,15 @@ OFFEN — nach Hebel sortiert
         Schachbrett). Ein Farbwaehler erzeugt Farben - die duerfen nicht
         aus einer Palette kommen. Nur 5 von 11 waeren Token gewesen. ***
 
-    NAECHSTE DATEI — EMPFEHLUNG: BaseSidebarPanel (11) oder
-    NewImageDialog (17). Beide klein und in sich abgeschlossen.
+    NAECHSTE DATEI — EMPFEHLUNG: NewImageDialog (17) oder
+    PageLayoutToolbar (21). Beide in sich abgeschlossen.
     *** NICHT ElementLayerPanel (84) oder CanvasPanel (58) — in einer
         Sitzung nicht mehr sichtpruefbar; CanvasPanel ist zusaetzlich die
         God-Klasse (§22). ***
     Dichte der restlichen Dateien:
       ElementLayerPanel 84 · CanvasPanel 58 · TranslationMapListPanel 27 ·
       MapsPanel 26 · PageLayoutToolbar 21 · TileGalleryPanel 20 ·
-      PaintToolbar 20 · NewImageDialog 17 · BaseSidebarPanel 11 ·
+      PaintToolbar 20 · NewImageDialog 17 ·
       ColorPickerPopup 11 (zurueckgestellt)
 
     NICHT ANFASSEN: benutzergewaehlte Werte (Primaer-/Sekundaerfarbe,
@@ -266,6 +276,11 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
       dunkelgrau. Leiste weiterhin 30 px hoch, NICHT 36. ***
   U11 Kleine Beschriftungen der Leiste ("Schrift:", "Groesse:") gedaempft
       grau, aber heller als der uebrige Hilfstext.
+  U12 *** ALLE SEITENLEISTEN (Galerie, Layer, Karten, Szenen): Kopfzeile
+      etwas heller als die Liste darunter, Titel fett und klein, das "+"
+      merklich kleiner als das "x" daneben. Betrifft VIER Panels
+      gleichzeitig, weil sie von BaseSidebarPanel erben - eine der
+      wichtigsten Pruefungen der ganzen Bereinigung. ***
   K1-K7 (Hilfe-Dialog) und B1-B4 (Buecher/Karten) stehen in den
   progress-Dateien vom 2026-07-30.
   Nichts davon ist durch den Compile-Verify abgedeckt.
