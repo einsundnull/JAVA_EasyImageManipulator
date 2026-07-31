@@ -181,4 +181,34 @@ public final class AppColors {
     private static Color alphaOf(Color c, int a) {
         return new Color(c.getRed(), c.getGreen(), c.getBlue(), a);
     }
+
+    // ── Ergänzt 2026-07-31, Migration von MapsPanel ──────────────────────────
+
+    /** Fläche einer Karte/Kachel in einer Listenansicht. */
+    public static final Color BG_CARD    = new Color(48, 48, 48);
+
+    /**
+     * Ruhezustand der kleinen Aktionsknöpfe in Karten (Löschen, Vorlesen).
+     * <p>Dritter Wert mit dem RGB {@code (50,50,50)} neben {@link #BG_INPUT}
+     * und {@link #BG_RULER_CORNER} — und wieder eine eigene Bedeutung: ein
+     * Knopf ist weder Eingabefeld noch Lineal-Eckstück.
+     */
+    public static final Color BTN_MINI_BG = new Color(50, 50, 50);
+
+    // Löschen-Knopf. Eigenes Rot, NICHT DANGER (200,60,60) und nicht
+    // DANGER_HOVER (220,80,80): heller als das eine, gesättigter als das
+    // andere. Unverändert übernommen (§21 — nicht auf einen Nachbarn runden).
+    /** Schrift und Rahmen des Löschen-Knopfes. */
+    public static final Color BTN_DELETE_FG       = new Color(220,  60,  60);
+    /** Löschen-Knopf unter dem Mauszeiger (gefüllt). */
+    public static final Color BTN_DELETE_HOVER_BG = new Color(180,  40,  40);
+
+    // Vorlesen-Knopf (TTS). Eigenes Blau, unabhängig von ACCENT.
+    /** Schrift und Rahmen des Vorlesen-Knopfes. */
+    public static final Color BTN_TTS_FG          = new Color(100, 180, 220);
+    /** Vorlesen-Knopf unter dem Mauszeiger (gefüllt). */
+    public static final Color BTN_TTS_HOVER_BG    = new Color( 80, 150, 200);
+
+    /** Kleine Zusatzangabe im Kartenkopf (Sprache, Anzahl). */
+    public static final Color TEXT_INFO           = new Color(100, 150, 200);
 }

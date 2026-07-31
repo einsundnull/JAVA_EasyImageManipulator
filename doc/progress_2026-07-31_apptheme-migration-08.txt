@@ -1,0 +1,118 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-08.txt
+Aufgabentyp: [ST] — Schritt [6], DATEI 9 der AppTheme-Bereinigung (§21)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "26"  -> MapsPanel, der empfohlene Einstieg in die vier grossen
+
+*** Sichtpruefung waechst auf U1-U16, NEUN Dateien aufgestaut. ***
+
+
+MIGRIERT: MapsPanel.java   26 Literale -> 0
+--------------------------------------------------------------------------
+Erste der vier grossen Dateien. Klare Struktur, deshalb gut migrierbar:
+zwei kleine Aktionsknoepfe (Loeschen rot, Vorlesen blau) mit je einem
+Ruhe- und einem Hover-Zustand, plus Kartenflaeche und Kopfzeile.
+
+WIEDERVERWENDET — der beste Fall:
+  new Color(70,70,70) 5x -> AppColors.BORDER
+  *** Exakt derselbe Wert UND dieselbe Bedeutung (Rahmen). Fuenf Stellen,
+      kein neues Token. ***
+
+NEU (sieben Token, als zwei Knopf-Gruppen dokumentiert):
+  BG_CARD              (48,48,48)   Kartenflaeche
+  BTN_MINI_BG          (50,50,50)   Ruhezustand beider Knoepfe
+  BTN_DELETE_FG        (220,60,60)  Loeschen: Schrift + Rahmen
+  BTN_DELETE_HOVER_BG  (180,40,40)  Loeschen: gefuellt unter dem Zeiger
+  BTN_TTS_FG           (100,180,220) Vorlesen: Schrift + Rahmen
+  BTN_TTS_HOVER_BG     (80,150,200)  Vorlesen: gefuellt unter dem Zeiger
+  TEXT_INFO            (100,150,200) Zusatzangabe im Kartenkopf
+
+SCHRIFTEN:
+  BOLD 11 3x -> FONT_BASE_BOLD · BOLD 10 -> FONT_SM_BOLD ·
+  PLAIN 9 2x -> FONT_XS
+
+  Font 6->0 · Color 20->0     KEIN RESTLITERAL
+
+
+DRITTE KOLLISION MIT (50,50,50)
+--------------------------------------------------------------------------
+  BG_INPUT         Eingabefeld            (TextToolbar, NewImageDialog)
+  BG_RULER_CORNER  Lineal-Eckstueck       (UIBuilder)
+  BTN_MINI_BG      kleiner Aktionsknopf   (MapsPanel)   <- neu
+
+Drei Token, ein RGB, drei Bedeutungen. Im Nachweis-Programm bestaetigt.
+*** Das ist inzwischen der HAEUFIGSTE Einzelwert der Oberflaeche. Wer hier
+    zusammenlegt, koppelt Eingabefelder, Lineale und Knoepfe aneinander. ***
+
+
+DIE ROT-NACHBARSCHAFT — DRITTER BEINAHE-TREFFER
+--------------------------------------------------------------------------
+  DANGER        (200, 60, 60)
+  DANGER_HOVER  (220, 80, 80)
+  BTN_DELETE_FG (220, 60, 60)   <- liegt genau zwischen beiden
+
+Der Loeschen-Knopf nimmt den Rotwert des einen und den Gruen/Blau-Wert des
+anderen. Ob gewollt oder gewachsen, ist nicht erkennbar.
+UNVERAENDERT uebernommen, im Javadoc als eigener dritter Rotton vermerkt.
+*** Dritter dokumentierter Beinahe-Treffer (nach 140/150 im Gruenkanal und
+    Alpha 170/180). Sie stehen jetzt alle sichtbar da — eine Angleichung
+    ist eine Design-Entscheidung des Users, keine Aufraeumarbeit. ***
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+Alle Werte gegen die kompilierten Klassen geprueft — identisch.
+Build: exit 0, 335 .class — unveraendert.
+
+
+STAND DER BEREINIGUNG (ausserhalb der Token-Klassen)
+--------------------------------------------------------------------------
+                  Start    jetzt    erledigt
+  new Color        259      194       25 %
+  new Font         135       88       34 %
+  new BasicStroke   68       57       16 %
+
+  Neun Dateien durch, FUENF ohne jedes Restliteral:
+    UIComponentFactory 2 · UIBuilder 1 · SelectiveAlphaEditor 2 ·
+    TextToolbar 0 · BaseSidebarPanel 0 · NewImageDialog 1 ·
+    TileGalleryPanel 0 · PageLayoutToolbar 4 · MapsPanel 0
+
+  Token-Klassen: AppColors 55 Farben · AppTheme 19 Fonts, 4 Strokes
+
+  ES BLEIBEN:
+    ElementLayerPanel       84   <- groesster Brocken
+    CanvasPanel             58   <- God-Klasse, §22 beachten
+    TranslationMapListPanel 27
+    PaintToolbar            20   ZURUECKGESTELLT (Mal-Palette)
+    ColorPickerPopup        11   ZURUECKGESTELLT (berechnete Farben)
+    PaintEngine              8   pruefen: vermutlich auch Inhalt, nicht UI
+    Rest                    Kleinkram
+
+
+SICHTPRUEFUNG — JETZT U1-U16
+--------------------------------------------------------------------------
+  U1-U15 wie in den progress-Dateien 02 bis 07
+  neu:
+  U16 *** KARTEN-PANEL (Knopf "Maps" in der oberen Leiste): Karten mit
+      dunkler Flaeche und feinem Rahmen; der rote Loeschen-Knopf und der
+      blaue Vorlesen-Knopf zeigen im Ruhezustand nur farbige Schrift auf
+      dunklem Grund und FUELLEN SICH beim Ueberfahren mit ihrer Farbe.
+      Die beiden Hover-Zustaende sind die Schluesselstelle — dort wurden
+      vier Farben ersetzt, die es sonst nirgends gibt. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 9" wurde abgeschlossen: ja
+# Naechster Schritt: SICHTPRUEFUNG U1-U16 (neun Dateien aufgestaut).
+#   Danach TranslationMapListPanel (27) — noch vergleichbar mit MapsPanel,
+#   vermutlich aehnliche Kartenstruktur.
+#   *** ElementLayerPanel (84) und CanvasPanel (58) zuletzt und je mit
+#       eigenem Termin. Bei CanvasPanel zusaetzlich §22 beachten: die
+#       Token-Ersetzung NICHT mit einer Umstrukturierung vermischen. ***
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

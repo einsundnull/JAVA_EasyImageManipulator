@@ -114,7 +114,7 @@ public class MapsPanel extends BaseSidebarPanel {
                     // Language header
                     JLabel langHeader = new JLabel(language.toUpperCase());
                     langHeader.setForeground(AppColors.ACCENT);
-                    langHeader.setFont(new Font("SansSerif", Font.BOLD, 11));
+                    langHeader.setFont(AppTheme.FONT_BASE_BOLD);
                     langHeader.setBorder(BorderFactory.createEmptyBorder(6, 6, 2, 6));
                     langHeader.setAlignmentX(LEFT_ALIGNMENT);
                     langHeader.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
@@ -148,8 +148,8 @@ public class MapsPanel extends BaseSidebarPanel {
             setPreferredSize(new Dimension(140, 110));
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 110));
             setOpaque(true);
-            setBackground(new Color(48, 48, 48));
-            setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            setBackground(AppColors.BG_CARD);
+            setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
             // Doppelklick zum Bearbeiten
@@ -165,13 +165,13 @@ public class MapsPanel extends BaseSidebarPanel {
 
             // Delete button (top right)
             JLabel delBtn = new JLabel("✕", JLabel.CENTER);
-            delBtn.setForeground(new Color(220, 60, 60));
-            delBtn.setFont(new Font("SansSerif", Font.BOLD, 10));
+            delBtn.setForeground(AppColors.BTN_DELETE_FG);
+            delBtn.setFont(AppTheme.FONT_SM_BOLD);
             delBtn.setBounds(getPreferredSize().width - 19, 4, 16, 16);
             delBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             delBtn.setOpaque(true);
-            delBtn.setBackground(new Color(50, 50, 50));
-            delBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            delBtn.setBackground(AppColors.BTN_MINI_BG);
+            delBtn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
             delBtn.addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override
                 public void mouseClicked(java.awt.event.MouseEvent e) {
@@ -194,16 +194,16 @@ public class MapsPanel extends BaseSidebarPanel {
 
                 @Override
                 public void mouseEntered(java.awt.event.MouseEvent e) {
-                    delBtn.setBackground(new Color(180, 40, 40));
+                    delBtn.setBackground(AppColors.BTN_DELETE_HOVER_BG);
                     delBtn.setForeground(Color.WHITE);
-                    delBtn.setBorder(BorderFactory.createLineBorder(new Color(220, 60, 60), 1));
+                    delBtn.setBorder(BorderFactory.createLineBorder(AppColors.BTN_DELETE_FG, 1));
                 }
 
                 @Override
                 public void mouseExited(java.awt.event.MouseEvent e) {
-                    delBtn.setBackground(new Color(50, 50, 50));
-                    delBtn.setForeground(new Color(220, 60, 60));
-                    delBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    delBtn.setBackground(AppColors.BTN_MINI_BG);
+                    delBtn.setForeground(AppColors.BTN_DELETE_FG);
+                    delBtn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 }
             });
             add(delBtn);
@@ -217,13 +217,13 @@ public class MapsPanel extends BaseSidebarPanel {
             if (text == null || text.isEmpty()) return;
 
             JLabel ttsBtn = new JLabel("🔊", JLabel.CENTER);
-            ttsBtn.setForeground(new Color(100, 180, 220));
-            ttsBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+            ttsBtn.setForeground(AppColors.BTN_TTS_FG);
+            ttsBtn.setFont(AppTheme.FONT_BASE_BOLD);
             ttsBtn.setBounds(x, y, 16, 16);
             ttsBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             ttsBtn.setOpaque(true);
-            ttsBtn.setBackground(new Color(50, 50, 50));
-            ttsBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+            ttsBtn.setBackground(AppColors.BTN_MINI_BG);
+            ttsBtn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
             ttsBtn.setToolTipText("Text vorlesen");
             ttsBtn.addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override
@@ -234,16 +234,16 @@ public class MapsPanel extends BaseSidebarPanel {
 
                 @Override
                 public void mouseEntered(java.awt.event.MouseEvent e) {
-                    ttsBtn.setBackground(new Color(80, 150, 200));
+                    ttsBtn.setBackground(AppColors.BTN_TTS_HOVER_BG);
                     ttsBtn.setForeground(Color.WHITE);
-                    ttsBtn.setBorder(BorderFactory.createLineBorder(new Color(100, 180, 220), 1));
+                    ttsBtn.setBorder(BorderFactory.createLineBorder(AppColors.BTN_TTS_FG, 1));
                 }
 
                 @Override
                 public void mouseExited(java.awt.event.MouseEvent e) {
-                    ttsBtn.setBackground(new Color(50, 50, 50));
-                    ttsBtn.setForeground(new Color(100, 180, 220));
-                    ttsBtn.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
+                    ttsBtn.setBackground(AppColors.BTN_MINI_BG);
+                    ttsBtn.setForeground(AppColors.BTN_TTS_FG);
+                    ttsBtn.setBorder(BorderFactory.createLineBorder(AppColors.BORDER, 1));
                 }
             });
             add(ttsBtn);
@@ -280,22 +280,22 @@ public class MapsPanel extends BaseSidebarPanel {
             int h = getHeight();
 
             // Draw background
-            g2.setColor(new Color(48, 48, 48));
+            g2.setColor(AppColors.BG_CARD);
             g2.fillRect(0, 0, w, h);
 
             // Section title
             g2.setColor(AppColors.ACCENT);
-            g2.setFont(new Font("SansSerif", Font.BOLD, 11));
+            g2.setFont(AppTheme.FONT_BASE_BOLD);
             g2.drawString(map.section(), 6, 16);
 
             // Language tag
-            g2.setColor(new Color(100, 150, 200));
-            g2.setFont(new Font("SansSerif", Font.PLAIN, 9));
+            g2.setColor(AppColors.TEXT_INFO);
+            g2.setFont(AppTheme.FONT_XS);
             g2.drawString("[" + map.language() + "]", 6, 30);
 
             // Text I preview
             g2.setColor(AppColors.TEXT_MUTED);
-            g2.setFont(new Font("SansSerif", Font.PLAIN, 9));
+            g2.setFont(AppTheme.FONT_XS);
             String previewI = map.textI();
             if (previewI == null) previewI = "";
             if (previewI.length() > 50) previewI = previewI.substring(0, 50) + "...";
