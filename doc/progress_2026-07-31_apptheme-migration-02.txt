@@ -1,0 +1,137 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-02.txt
+Aufgabentyp: [ST] — Schritt [6], DATEIEN 2+3 der AppTheme-Bereinigung (§21)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "weiter"
+
+*** HINWEIS ZUR REIHENFOLGE: die Sichtpruefung U1-U5 aus Datei 1 war beim
+    Start dieses Schrittes NOCH OFFEN. Die eigene Regel sagt "Sichtpruefung,
+    dann die naechste Datei". Der User hat mit "weiter" entschieden
+    fortzufahren; die Pruefliste ist entsprechend GEWACHSEN (U1-U9) statt
+    abgehakt worden. Sie steht unten und im WEITERMACHEN_PROMPT. ***
+
+
+MIGRIERT: SelectiveAlphaEditor.java + UIBuilder.java
+--------------------------------------------------------------------------
+Zusammen bearbeitet, weil sie sich TOPBAR_BTN_W/H teilen — getrennt haette
+die Doppelung nicht aufgeloest werden koennen.
+
+SelectiveAlphaEditor:
+  static final int TOPBAR_BTN_W = 36;       -> = AppTheme.BTN_W
+  static final int TOPBAR_BTN_H = 36;       -> = AppTheme.BTN_H
+  static final int TOPBAR_ZOOM_BTN_W = 36;  -> = AppTheme.BTN_W
+  static final int TOPBAR_ZOOM_BTN_H = 36;  -> = AppTheme.BTN_H
+
+*** DER TRICK, DER 33 ZEILEN GESPART HAT:
+    UIBuilder liest ed.TOPBAR_BTN_W/H DREIUNDDREISSIGMAL. Haette man die
+    Felder geloescht und alle Aufrufstellen umgeschrieben, waeren das 33
+    Aenderungen mit 33 Gelegenheiten fuer einen Fehler. Stattdessen bekommt
+    das FELD seinen Wert aus dem Token — die Doppelung ist weg, und in
+    UIBuilder aendert sich dafuer keine einzige Zeile. ***
+
+UIBuilder:
+  3x Font SansSerif PLAIN 12   -> AppTheme.FONT_MD
+  1x Font SansSerif BOLD 18    -> AppTheme.FONT_HINT      (neu)
+  1x Font SansSerif PLAIN 13   -> AppTheme.FONT_LG
+  1x new Color(50,50,50)       -> AppColors.BG_RULER_CORNER (neu)
+  drawRoundRect(... 20, 20)    -> AppTheme.RADIUS_PILL
+  drawRoundRect(... 10, 10)    -> AppTheme.RADIUS_XL
+  new BasicStroke(3)           -> AppTheme.STROKE_THICK
+  new BasicStroke(1)           -> AppTheme.STROKE_HAIRLINE
+
+  Font 5 -> 0 · Color 1 -> 0 · Stroke 3 -> 1
+
+ZWEI NEUE TOKEN (nicht gerundet, §21):
+  AppTheme.FONT_HINT        SansSerif BOLD 18 — Ueberschrift der Ablage-
+                            flaeche ("Bilddatei hier ablegen")
+  AppColors.BG_RULER_CORNER rgb(50,50,50) — Eckstueck zwischen den Linealen
+
+
+WAS BEWUSST LITERAL BLEIBT
+--------------------------------------------------------------------------
+  SelectiveAlphaEditor.canvasBg1/bg2 = rgb(200,200,200) / rgb(160,160,160)
+    *** KEINE Tokens. Der Benutzer waehlt diese Farben zur Laufzeit ueber
+        den Hintergrund-Dialog, AppSettings.bg1/bg2 speichert sie. Die
+        Werte im Code sind nur Startwerte, bis die Einstellungen geladen
+        sind. Ein Token ist eine Design-Entscheidung, keine
+        Benutzereinstellung (§21/§31). Als Kommentar im Code vermerkt. ***
+  UIBuilder: new BasicStroke(2, CAP_ROUND, JOIN_ROUND, 0, dash, 0)
+    Gestrichelter Rahmen der Ablageflaeche. Traegt ein dash-Array und
+    Cap/Join — daraus wird kein einfaches STROKE_*-Token.
+  SelectiveAlphaEditor.RULER_THICK = 20
+    Bereits benannte Konstante am fachlich richtigen Ort. Sie nach AppTheme
+    zu kopieren wuerde eine zweite Quelle schaffen.
+  UIComponentFactory: 2 parametrisierte Fonts (aus Datei 1)
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+Wieder ein Wegwerf-Programm gegen die KOMPILIERTEN Klassen:
+
+  TOPBAR_BTN_W / _H / ZOOM_W / ZOOM_H   36            = identisch
+  FONT_MD    SansSerif PLAIN 12                       = identisch
+  FONT_HINT  SansSerif BOLD 18                        = identisch
+  FONT_LG    SansSerif PLAIN 13                       = identisch
+  BG_RULER_CORNER  rgb(50,50,50)                      = identisch
+  RADIUS_PILL 20 · RADIUS_XL 10                       = identisch
+  STROKE_THICK Breite 3.0 · STROKE_HAIRLINE 1.0       = identisch
+
+  >>> ALLE WERTE IDENTISCH.
+
+Build: exit 0, 335 .class — unveraendert.
+
+
+STAND DER BEREINIGUNG (Literale AUSSERHALB der Token-Klassen)
+--------------------------------------------------------------------------
+                    vor Datei 1     jetzt
+  new Color            259           254
+  new Font             135           125
+  new BasicStroke       68            66
+
+  Drei Dateien sind durch:
+    UIComponentFactory   2 Restliterale (parametrisiert)
+    UIBuilder            1 Restliteral  (dash-Stroke)
+    SelectiveAlphaEditor 2 Restliterale (Laufzeitfarben)
+
+*** DIE ZAHLEN FALLEN LANGSAM, UND DAS IST RICHTIG SO. Jede Migration ist
+    werterhaltend und einzeln pruefbar. Wer schneller sein will, muesste
+    ungeprueft ersetzen — genau das verbietet §21. ***
+
+
+RUNTIME-SICHTPRUEFUNG — JETZT U1-U9 (Datei 1 + 2/3 zusammen)
+--------------------------------------------------------------------------
+  aus Datei 1 (UIComponentFactory):
+  U1  Dialog oeffnen: Titelleiste dunkel, Titelschrift fett
+  U2  Quadratische Knoepfe oben: 36x36, Rundung, Schrift wie vorher
+  U3  Umschaltknoepfe mit SYMBOL-Beschriftung zeigen ihr Zeichen korrekt
+      (Familie "Dialog" — bei falscher Familie erschiene ein Kaestchen)
+  U4  Grosse Pfeil-Knoepfe: Pfeil gleich gross, Hintergrund
+      halbdurchsichtig, heller beim Ueberfahren, blass wenn nichts geht
+  U5  Buch-Umschaltknopf (blaeulich) unveraendert
+  neu aus dieser Runde:
+  U6  ALLE Knoepfe der oberen Leiste weiterhin gleich gross (36x36) —
+      das ist der Test der aufgeloesten Doppelung
+  U7  Statuszeile unten: Modus-, Status- und Zoom-Text unveraendert
+  U8  Lineal-Eckstueck (links oben zwischen den beiden Linealen) hat
+      denselben Grauton wie vorher
+  U9  *** ABLAGEFLAECHE: Programm ohne Bild starten. Gestrichelter
+      Rahmen, Pfeil-Symbol, Ueberschrift "Bilddatei hier ablegen" fett,
+      Unterzeile kleiner und gedaempft — alles wie vorher.
+      Das ist die aussagekraeftigste Pruefung dieser Runde: dort wurden
+      zwei Strichstaerken, zwei Radien und zwei Fonts ersetzt. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Dateien 2+3" wurde abgeschlossen: ja
+#   Die BEREINIGUNG INSGESAMT ist NICHT fertig — 445 Literale ausserhalb
+#   der Token-Klassen verbleiben.
+# Naechster Schritt: Sichtpruefung U1-U9. Danach naechste Datei —
+#   Empfehlung: TextToolbar (15) oder ColorPickerPopup (11), beide klein
+#   und abgeschlossen. NICHT ElementLayerPanel (84) / CanvasPanel (58).
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

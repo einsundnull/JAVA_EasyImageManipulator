@@ -45,4 +45,8 @@ public final class AppColors {
     public static final Color NAV_BG_HOVER    = new Color(255, 255, 255, 55);
     /** Navigationsknopf, wenn es nichts zu blättern gibt. */
     public static final Color NAV_BG_DISABLED = new Color(0, 0, 0, 30);
+
+    // ── Ergänzt 2026-07-31, Migration von UIBuilder ──────────────────────────
+    /** Eckstück zwischen waagerechtem und senkrechtem Lineal. */
+    public static final Color BG_RULER_CORNER = new Color(50, 50, 50);
 }

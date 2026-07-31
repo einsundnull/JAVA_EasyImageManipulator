@@ -231,11 +231,11 @@ class UIBuilder {
 		// Labels
 		ed.modeLabel = new javax.swing.JLabel("");
 		ed.modeLabel.setForeground(AppColors.TEXT_MUTED);
-		ed.modeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+		ed.modeLabel.setFont(AppTheme.FONT_MD);
 
 		ed.statusLabel = new javax.swing.JLabel("");
 		ed.statusLabel.setForeground(AppColors.TEXT_MUTED);
-		ed.statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+		ed.statusLabel.setFont(AppTheme.FONT_MD);
 
 		// Zoom controls
 		JButton zoomInBtn   = UIComponentFactory.buildButton("+",      AppColors.BTN_BG, AppColors.BTN_HOVER);
@@ -245,7 +245,7 @@ class UIBuilder {
 
 		ed.zoomLabel = new javax.swing.JLabel("100%");
 		ed.zoomLabel.setForeground(AppColors.TEXT_MUTED);
-		ed.zoomLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+		ed.zoomLabel.setFont(AppTheme.FONT_MD);
 		ed.zoomLabel.setPreferredSize(new Dimension(46, 20));
 		ed.zoomLabel.setHorizontalAlignment(javax.swing.JLabel.CENTER);
 		ed.zoomLabel.setToolTipText("Doppelklick: Zoom eingeben");
@@ -397,7 +397,7 @@ class UIBuilder {
 		ed.hRuler = new HRulerPanel(ed);
 		ed.vRuler = new VRulerPanel(ed);
 		ed.rulerCorner = new JPanel();
-		ed.rulerCorner.setBackground(new Color(50, 50, 50));
+		ed.rulerCorner.setBackground(AppColors.BG_RULER_CORNER);
 		ed.rulerCorner.setPreferredSize(new Dimension(ed.RULER_THICK, ed.RULER_THICK));
 		ed.rulerCorner.setOpaque(true);
 
@@ -842,23 +842,23 @@ class UIBuilder {
 				float[] dash = { 10f, 6f };
 				g2.setColor(AppColors.BORDER);
 				g2.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, dash, 0));
-				g2.drawRoundRect(20, 20, w - 41, h - 41, 20, 20);
-				g2.setStroke(new BasicStroke(3));
+				g2.drawRoundRect(20, 20, w - 41, h - 41, AppTheme.RADIUS_PILL, AppTheme.RADIUS_PILL);
+				g2.setStroke(AppTheme.STROKE_THICK);
 				int is = 64, ix = w / 2 - is / 2, iy = h / 2 - 70;
 				g2.setColor(AppColors.ACCENT);
-				g2.drawRoundRect(ix, iy, is, is, 10, 10);
+				g2.drawRoundRect(ix, iy, is, is, AppTheme.RADIUS_XL, AppTheme.RADIUS_XL);
 				int ax = w / 2;
 				g2.drawLine(ax, iy + 10, ax, iy + is - 10);
 				g2.drawLine(ax - 12, iy + is - 24, ax, iy + is - 10);
 				g2.drawLine(ax + 12, iy + is - 24, ax, iy + is - 10);
-				g2.setStroke(new BasicStroke(1));
+				g2.setStroke(AppTheme.STROKE_HAIRLINE);
 				g2.setColor(AppColors.TEXT);
-				g2.setFont(new Font("SansSerif", Font.BOLD, 18));
+				g2.setFont(AppTheme.FONT_HINT);
 				String t = "Bilddatei hier ablegen";
 				FontMetrics fm = g2.getFontMetrics();
 				g2.drawString(t, w / 2 - fm.stringWidth(t) / 2, iy + is + 36);
 				g2.setColor(AppColors.TEXT_MUTED);
-				g2.setFont(new Font("SansSerif", Font.PLAIN, 13));
+				g2.setFont(AppTheme.FONT_LG);
 				String s = "PNG · JPG · BMP · GIF   |   STRG+Rad = Zoom · Mittelmaus = Pan";
 				fm = g2.getFontMetrics();
 				g2.drawString(s, w / 2 - fm.stringWidth(s) / 2, iy + is + 60);

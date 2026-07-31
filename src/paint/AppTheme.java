@@ -90,6 +90,10 @@ public final class AppTheme {
     /** 30 pt — Pfeil der großen Navigationsknöpfe über dem Bild. */
     public static final Font FONT_NAV     = new Font(FAMILY, Font.PLAIN, 30);
 
+    // ── Ergänzt 2026-07-31, Migration von UIBuilder ──────────────────────────
+    /** 18 pt fett — Überschrift der Ablage-Fläche („Bilddatei hier ablegen"). */
+    public static final Font FONT_HINT    = new Font(FAMILY, Font.BOLD, 18);
+
     // ── Linienstärken ─────────────────────────────────────────────────────────
     /** 1 px — Trennlinien, Raster, einfache Rahmen (häufigster Wert). */
     public static final Stroke STROKE_HAIRLINE = new BasicStroke(1f);

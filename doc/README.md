@@ -72,6 +72,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`progress_2026-07-30_apppaths-books.txt`](progress_2026-07-30_apppaths-books.txt) | `books/` + `cardfolders/` über `AppPaths` |
 | [`progress_2026-07-30_keybindings.txt`](progress_2026-07-30_keybindings.txt) | Tasten-Registry + Hilfe-Dialog |
 | [`progress_2026-07-31_apptheme-migration-01.txt`](progress_2026-07-31_apptheme-migration-01.txt) | Token-Bereinigung, **Datei 1**: `UIComponentFactory` |
+| [`progress_2026-07-31_apptheme-migration-02.txt`](progress_2026-07-31_apptheme-migration-02.txt) | Token-Bereinigung, **Dateien 2+3**: `SelectiveAlphaEditor` + `UIBuilder` |
 | [`WEITERMACHEN_PROMPT_2026-07-30_archiv.txt`](WEITERMACHEN_PROMPT_2026-07-30_archiv.txt) | Vorgänger-Fassung mit dem vollen Verlauf der Schritte [1]–[4] |
 
 ## 7. Historisch — abgeschlossene Arbeiten (nicht als Ist-Stand lesen)

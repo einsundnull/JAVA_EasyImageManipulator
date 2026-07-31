@@ -8,10 +8,12 @@ Details je Schritt: die progress_2026-07-30_*.txt.
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
-Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) ist ANGEFANGEN:
-Datei 1 von n ist fertig (UIComponentFactory), 453 Literale ausserhalb der
-Token-Klassen verbleiben. OFFEN ist zuerst die SICHTPRUEFUNG U1-U5 durch
-den User, danach die naechste Datei.
+Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: DREI Dateien
+sind durch (UIComponentFactory, SelectiveAlphaEditor, UIBuilder), 445
+Literale ausserhalb der Token-Klassen verbleiben.
+*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U9 durch den User. Sie war
+    schon nach Datei 1 faellig und ist nicht erfolgt — deshalb deckt sie
+    jetzt drei Dateien ab. Vor der naechsten Datei nachholen. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -81,6 +83,11 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
 [6a] AppTheme-Bereinigung, DATEI 1: UIComponentFactory (11 -> 2 Literale),
     werterhaltend per Wertvergleich nachgewiesen. 8 neue Token.
     -> progress_2026-07-31_apptheme-migration-01.txt
+[6b] AppTheme-Bereinigung, DATEIEN 2+3: SelectiveAlphaEditor + UIBuilder.
+    Die 36er-Doppelung ist aufgeloest: TOPBAR_BTN_W/H = AppTheme.BTN_W/H,
+    dadurch KEINE der 33 Aufrufstellen in UIBuilder angefasst.
+    UIBuilder Font 5->0, Color 1->0, Stroke 3->1. 2 neue Token.
+    -> progress_2026-07-31_apptheme-migration-02.txt
 
 VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
   a) "referenzfrei" != "unbenutzt". Eine Klasse mit main() ist startbar.
@@ -98,58 +105,60 @@ VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
 OFFEN — nach Hebel sortiert
 ==============================================================================
 
-[6] APPTHEME-BEREINIGUNG (§21)  [C], FREIGEGEBEN — ANGEFANGEN, NICHT FERTIG
-    *** DATEI 1 VON n IST FERTIG: UIComponentFactory (2026-07-31).
-        11 Literale -> 2 (die zwei verbliebenen sind PARAMETRISIERT und
-        koennen kein Token werden). 8 neue Token angelegt.
-        -> progress_2026-07-31_apptheme-migration-01.txt ***
+[6] APPTHEME-BEREINIGUNG (§21)  [C], FREIGEGEBEN — LAEUFT, NICHT FERTIG
 
-    *** ZUERST: SICHTPRUEFUNG U1-U5 DURCH DEN USER. ***
-        Das ist ein [C]-Schritt; ohne Sichtpruefung ist die naechste Datei
-        ein unbelegtes Risiko. U3 (Symbol-Knoepfe zeigen ihr Zeichen) und
-        U4 (Pfeil-Knoepfe halbdurchsichtig) sind die aussagekraeftigsten.
+    DURCH (je werterhaltend nachgewiesen):
+      UIComponentFactory    11 -> 2 Restliterale (parametrisiert)
+      SelectiveAlphaEditor       2 Restliterale (Laufzeitfarben)
+      UIBuilder                  1 Restliteral  (dash-Stroke)
+    VERBLEIBEND ausserhalb der Token-Klassen:
+      254 new Color · 125 new Font · 66 new BasicStroke
+
+    *** ZUERST: SICHTPRUEFUNG U1-U9 DURCH DEN USER (aufgestaut aus drei
+        Dateien, Liste in progress_2026-07-31_apptheme-migration-02.txt).
+        U9 (Ablageflaeche ohne geladenes Bild) und U3 (Symbol-Knoepfe)
+        sind die aussagekraeftigsten. ***
 
     VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
-      1. EINE Datei pro Schritt. Nicht mehrere.
+      1. EINE Datei pro Schritt (Ausnahme: zwei Dateien, die sich eine
+         Konstante teilen — sonst laesst sich die Doppelung nicht loesen).
       2. Literal raus, Token mit DEMSELBEN Wert rein. Werterhaltend.
       3. *** WEICHT EIN WERT AB: NICHT RUNDEN. Neues Token anlegen oder
          das Literal mit Begruendung stehen lassen. Runden aendert das
-         Aussehen. In Datei 1 waren es 8 solcher Faelle (BOLD 13,
-         PLAIN 16, Dialog 16, PLAIN 30, vier Alpha-Farben). ***
-      4. Nachweisen, nicht behaupten: kleines Wegwerf-Programm gegen die
-         KOMPILIERTEN Klassen, das jedes Token gegen das ersetzte Literal
-         vergleicht (Font.equals / Color.equals). Vorlage steht im
-         progress-File von Datei 1.
+         Aussehen. Bisher 10 solcher Faelle -> 10 neue Token. ***
+      4. Nachweisen, nicht behaupten: Wegwerf-Programm gegen die
+         KOMPILIERTEN Klassen, Token gegen ersetztes Literal
+         (Font.equals / Color.equals / getLineWidth). Vorlagen stehen in
+         den beiden progress-Dateien vom 2026-07-31.
       5. Sichtpruefung durch den User, DANN die naechste Datei.
 
-    *** DIE KENNZAHL "new Color( im Projekt" IST IRREFUEHREND.
-        Durch Datei 1 fiel sie NICHT (284 -> 284): vier Literale sind aus
-        UIComponentFactory verschwunden und vier in AppColors ENTSTANDEN.
-        Ein Token IST ein new Color(...) — nur an einer Stelle.
-        RICHTIG GEMESSEN wird AUSSERHALB der Token-Klassen: ***
-          Stand 2026-07-31:  255 Color · 130 Font · 68 BasicStroke
-          in den Token-Klassen (erwuenscht): 27 · 17 · 5
-        Auch irrefuehrend: die Startzahlen 454/162/110 der Ist-Analyse
-        stammen aus dem GANZEN src-Baum, inklusive der seither
-        ausgelagerten Projekte. Nicht vergleichbar.
+    *** EIN GRIFF, DER SICH GELOHNT HAT UND WIEDER PASST:
+        UIBuilder liest ed.TOPBAR_BTN_W/H 33x. Statt 33 Aufrufstellen
+        umzuschreiben, bekam das FELD seinen Wert aus dem Token
+        (TOPBAR_BTN_W = AppTheme.BTN_W). Doppelung weg, null beruehrte
+        Aufrufstellen. Bei aehnlichen Konstanten genauso vorgehen. ***
 
-    NAECHSTE DATEI — EMPFEHLUNG: SelectiveAlphaEditor + UIBuilder zusammen.
-      Sie teilen TOPBAR_BTN_W/H (=36), das seit Datei 1 doppelt zu
-      AppTheme.BTN_W/BTN_H ist. Klein, und es schliesst eine angefangene
-      Doppelung. UIBuilder hat 9 Literale.
-    *** NICHT mit ElementLayerPanel (84) oder CanvasPanel (58) anfangen —
-        das ist in einer Sitzung nicht mehr sichtpruefbar. CanvasPanel ist
-        ausserdem die God-Klasse (§22). ***
+    *** DIE KENNZAHL "new Color( im Projekt" IST IRREFUEHREND: ein Token
+        IST ein new Color(...), nur an einer Stelle. Gemessen wird
+        AUSSERHALB von AppColors.java und AppTheme.java. Die Startzahlen
+        454/162/110 der Ist-Analyse stammen aus dem GANZEN src-Baum
+        inklusive der ausgelagerten Projekte — nicht vergleichbar. ***
+
+    NAECHSTE DATEI — EMPFEHLUNG: TextToolbar (15) oder ColorPickerPopup
+    (11). Beide klein, in sich abgeschlossen, gut sichtpruefbar.
+    *** NICHT ElementLayerPanel (84) oder CanvasPanel (58) — in einer
+        Sitzung nicht mehr sichtpruefbar; CanvasPanel ist zusaetzlich die
+        God-Klasse (§22). ***
     Dichte der restlichen Dateien:
       ElementLayerPanel 84 · CanvasPanel 58 · TranslationMapListPanel 27 ·
       MapsPanel 26 · PageLayoutToolbar 21 · TileGalleryPanel 20 ·
       PaintToolbar 20 · NewImageDialog 17 · TextToolbar 15 ·
-      ColorPickerPopup 11 · BaseSidebarPanel 11 · UIBuilder 9
+      ColorPickerPopup 11 · BaseSidebarPanel 11
 
     NICHT ANFASSEN: benutzergewaehlte Werte (Primaer-/Sekundaerfarbe,
-    bg1/bg2, Kartenfarben, Text-Werkzeug-Font, strokeWidth). Die gehoeren
-    in AppSettings (§31). Ein Token ist eine Design-Entscheidung, keine
-    Benutzereinstellung.
+    canvasBg1/bg2, Kartenfarben, Text-Werkzeug-Font, strokeWidth). Die
+    gehoeren in AppSettings (§31). Ein Token ist eine Design-Entscheidung,
+    keine Benutzereinstellung.
 
 [9] BASEDIALOG + CONFIRMDIALOG  (§20)  [C], NUR MIT FREIGABE
     12 Klassen erben direkt von JFrame/JDialog/JWindow, JOptionPane in
@@ -212,7 +221,7 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
   R5  java -cp bin paint.DemoWorksheetEditor2             (../JavaDemos)
   R6  Alle vier Projekte in Eclipse importierbar (File > Import > Existing)
 
-  *** OFFEN UND VORRANGIG (blockiert die naechste Datei in [6]): ***
+  *** OFFEN UND VORRANGIG (aufgestaut aus DREI migrierten Dateien): ***
   U1  Dialog oeffnen: Titelleiste dunkel wie vorher, Titelschrift fett
   U2  Quadratische Knoepfe oben: Groesse 36x36, Rundung, Schrift wie vorher
   U3  Umschaltknoepfe mit SYMBOL-Beschriftung zeigen ihr Zeichen korrekt
@@ -221,6 +230,14 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
       halbdurchsichtig, heller beim Ueberfahren, blass wenn nichts zu
       blaettern ist
   U5  Buch-Umschaltknopf (blaeulich) unveraendert
+  U6  ALLE Knoepfe der oberen Leiste gleich gross — Test der aufgeloesten
+      36er-Doppelung
+  U7  Statuszeile unten: Modus-, Status- und Zoom-Text unveraendert
+  U8  Lineal-Eckstueck links oben: gleicher Grauton
+  U9  *** Programm OHNE Bild starten: gestrichelter Rahmen, Pfeil-Symbol,
+      fette Ueberschrift "Bilddatei hier ablegen", gedaempfte Unterzeile.
+      Aussagekraeftigste Pruefung — dort wurden zwei Strichstaerken, zwei
+      Radien und zwei Fonts ersetzt. ***
   K1-K7 (Hilfe-Dialog) und B1-B4 (Buecher/Karten) stehen in den
   progress-Dateien vom 2026-07-30.
   Nichts davon ist durch den Compile-Verify abgedeckt.

@@ -48,10 +48,12 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 
 	static final int RULER_THICK = 20; // pixels wide/tall for ruler strip
 
-	static final int TOPBAR_BTN_W = 36;
-	static final int TOPBAR_BTN_H = 36;
-	static final int TOPBAR_ZOOM_BTN_W = 36;
-	static final int TOPBAR_ZOOM_BTN_H = 36;
+	// Wert kommt aus AppTheme (§21). Die Felder bleiben, weil UIBuilder sie
+	// 33x als ed.TOPBAR_BTN_W/H liest - so aendert sich dort keine Zeile.
+	static final int TOPBAR_BTN_W = AppTheme.BTN_W;
+	static final int TOPBAR_BTN_H = AppTheme.BTN_H;
+	static final int TOPBAR_ZOOM_BTN_W = AppTheme.BTN_W;
+	static final int TOPBAR_ZOOM_BTN_H = AppTheme.BTN_H;
 
 	// ── Gallery shrinking behavior ─────────────────────────────────────────────
 	// true → galleries shrink when both canvases shown, tiles scale to fit
@@ -143,6 +145,10 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	// All per-canvas element state now in CanvasInstance
 
 	// ── Canvas background ─────────────────────────────────────────────────────
+	// KEINE Tokens (§21): der Benutzer waehlt diese Farben zur Laufzeit ueber
+	// den Hintergrund-Dialog, und AppSettings.bg1/bg2 speichert sie. Die Werte
+	// hier sind nur die Startwerte, bis die Einstellungen geladen sind. Ein
+	// Token ist eine Design-Entscheidung, keine Benutzereinstellung.
 	Color canvasBg1 = new Color(200, 200, 200);
 	Color canvasBg2 = new Color(160, 160, 160);
 	Color canvasBg1Backup = null; // for QuickBG toggle
