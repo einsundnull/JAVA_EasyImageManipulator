@@ -31,6 +31,12 @@ import javax.swing.SwingUtilities;
 public class TextToolbar extends JPanel {
 
     public static final int TOOLBAR_H = 46;
+    /**
+     * Höhe der Bedienelemente dieser Leiste.
+     * <p><b>Nicht mit {@link AppTheme#BTN_H} (36) verwechseln</b> — gleicher
+     * Name, anderer Wert. Diese Leiste ist flacher als die obere Leiste. Wer
+     * beides „vereinheitlicht", macht die Text-Werkzeugleiste 6 px höher.
+     */
     private static final int BTN_H    = 30;
     private static final int GAP      = 4;
 
@@ -138,14 +144,14 @@ public class TextToolbar extends JPanel {
 
         // Bold
         boldBtn = toggleBtn("B", "Fett");
-        boldBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        boldBtn.setFont(AppTheme.FONT_MD_BOLD);
         boldBtn.addActionListener(e -> { if (!suppressSync) fire(); });
         strip.add(boldBtn);
         strip.add(Box.createHorizontalStrut(GAP));
 
         // Italic
         italicBtn = toggleBtn("I", "Kursiv");
-        italicBtn.setFont(new Font("SansSerif", Font.ITALIC, 12));
+        italicBtn.setFont(AppTheme.FONT_MD_ITALIC);
         italicBtn.addActionListener(e -> { if (!suppressSync) fire(); });
         strip.add(italicBtn);
         strip.add(Box.createHorizontalStrut(GAP));
@@ -199,9 +205,9 @@ public class TextToolbar extends JPanel {
     // =========================================================================
     private JComboBox<String> styledCombo(String[] items, int width) {
         JComboBox<String> c = new JComboBox<>(items);
-        c.setBackground(new Color(50, 50, 50));
+        c.setBackground(AppColors.BG_INPUT);
         c.setForeground(AppColors.TEXT);
-        c.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        c.setFont(AppTheme.FONT_BASE);
         c.setPreferredSize(new Dimension(width, BTN_H));
         c.setMaximumSize(new Dimension(width, BTN_H + 4));
         c.setFocusable(false);
@@ -209,14 +215,14 @@ public class TextToolbar extends JPanel {
     }
 
     private void styleSpinner(JSpinner s) {
-        s.setBackground(new Color(50, 50, 50));
+        s.setBackground(AppColors.BG_INPUT);
         s.setForeground(AppColors.TEXT);
-        s.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        s.setFont(AppTheme.FONT_BASE);
         if (s.getEditor() instanceof JSpinner.DefaultEditor de) {
-            de.getTextField().setBackground(new Color(50, 50, 50));
+            de.getTextField().setBackground(AppColors.BG_INPUT);
             de.getTextField().setForeground(AppColors.TEXT);
             de.getTextField().setCaretColor(AppColors.TEXT);
-            de.getTextField().setFont(new Font("SansSerif", Font.PLAIN, 11));
+            de.getTextField().setFont(AppTheme.FONT_BASE);
         }
     }
 
@@ -225,11 +231,11 @@ public class TextToolbar extends JPanel {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(isSelected() ? AppColors.ACCENT : new Color(55, 55, 55));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                g2.setColor(isSelected() ? AppColors.ACCENT : AppColors.BTN_TOGGLE_OFF);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), AppTheme.RADIUS_MD, AppTheme.RADIUS_MD);
                 g2.setColor(isSelected() ? AppColors.ACCENT.brighter() : AppColors.BORDER);
-                g2.setStroke(new BasicStroke(1f));
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+                g2.setStroke(AppTheme.STROKE_HAIRLINE);
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, AppTheme.RADIUS_MD, AppTheme.RADIUS_MD);
                 g2.dispose();
                 super.paintComponent(g);
             }
@@ -251,11 +257,11 @@ public class TextToolbar extends JPanel {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(60, 60, 60));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                g2.setColor(AppColors.BTN_BG);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), AppTheme.RADIUS_MD, AppTheme.RADIUS_MD);
                 g2.setColor(AppColors.BORDER);
-                g2.setStroke(new BasicStroke(1f));
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 6, 6);
+                g2.setStroke(AppTheme.STROKE_HAIRLINE);
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, AppTheme.RADIUS_MD, AppTheme.RADIUS_MD);
                 g2.dispose();
                 super.paintComponent(g);
             }
@@ -266,7 +272,7 @@ public class TextToolbar extends JPanel {
         b.setBorderPainted(false);
         b.setFocusPainted(false);
         b.setFocusable(false);
-        b.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        b.setFont(AppTheme.FONT_BASE);
         int w = b.getFontMetrics(b.getFont()).stringWidth(text) + 20;
         b.setPreferredSize(new Dimension(w, BTN_H));
         b.setMaximumSize(new Dimension(w + 4, BTN_H + 4));
@@ -276,8 +282,8 @@ public class TextToolbar extends JPanel {
 
     private JLabel miniLabel(String text) {
         JLabel l = new JLabel(text);
-        l.setForeground(new Color(160, 160, 160));
-        l.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        l.setForeground(AppColors.TEXT_MINI);
+        l.setFont(AppTheme.FONT_SM);
         return l;
     }
 

@@ -94,6 +94,10 @@ public final class AppTheme {
     /** 18 pt fett — Überschrift der Ablage-Fläche („Bilddatei hier ablegen"). */
     public static final Font FONT_HINT    = new Font(FAMILY, Font.BOLD, 18);
 
+    // ── Ergänzt 2026-07-31, Migration von TextToolbar ────────────────────────
+    /** 12 pt kursiv — Kursiv-Umschalter der Text-Werkzeugleiste. */
+    public static final Font FONT_MD_ITALIC = new Font(FAMILY, Font.ITALIC, 12);
+
     // ── Linienstärken ─────────────────────────────────────────────────────────
     /** 1 px — Trennlinien, Raster, einfache Rahmen (häufigster Wert). */
     public static final Stroke STROKE_HAIRLINE = new BasicStroke(1f);

@@ -49,4 +49,30 @@ public final class AppColors {
     // ── Ergänzt 2026-07-31, Migration von UIBuilder ──────────────────────────
     /** Eckstück zwischen waagerechtem und senkrechtem Lineal. */
     public static final Color BG_RULER_CORNER = new Color(50, 50, 50);
+
+    // ── Ergänzt 2026-07-31, Migration von TextToolbar ────────────────────────
+    // Zwei davon teilen ihr RGB mit einem bestehenden Token und sind trotzdem
+    // eigene Token: §21 verlangt, vor dem Zusammenlegen die BEDEUTUNG zu
+    // prüfen, nicht den Wert. Wer sie zusammenlegt, koppelt Dinge, die sich
+    // unabhängig ändern dürfen.
+
+    /**
+     * Hintergrund von Eingabefeldern (Auswahllisten, Zahlenfelder).
+     * Gleiches RGB wie {@link #BG_RULER_CORNER}, aber <b>nicht dasselbe
+     * Token</b> — ein Eingabefeld ist kein Lineal-Eckstück.
+     */
+    public static final Color BG_INPUT       = new Color(50, 50, 50);
+
+    /**
+     * Umschaltknopf im Zustand „aus".
+     * Gleiches RGB wie {@link #TILE_PLACEHOLDER}, aber <b>nicht dasselbe
+     * Token</b> — ein Knopf ist keine Platzhalter-Kachel.
+     */
+    public static final Color BTN_TOGGLE_OFF = new Color(55, 55, 55);
+
+    /**
+     * Kleine Beschriftungen in Werkzeugleisten („Schrift:", „Größe:").
+     * Heller als {@link #TEXT_MUTED} (140), dunkler als {@link #TEXT} (220).
+     */
+    public static final Color TEXT_MINI      = new Color(160, 160, 160);
 }
