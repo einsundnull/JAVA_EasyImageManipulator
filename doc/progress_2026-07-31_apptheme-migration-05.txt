@@ -1,0 +1,118 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-05.txt
+Aufgabentyp: [ST] — Schritt [6], DATEI 6 der AppTheme-Bereinigung (§21)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "weiter"
+
+*** Sichtpruefung waechst auf U1-U13. Weiterhin offen, jetzt sechs
+    Dateien. EIN Programmstart hakt alles ab. ***
+
+
+MIGRIERT: NewImageDialog.java   17 Literale -> 1
+--------------------------------------------------------------------------
+  Font PLAIN 11 5x  -> AppTheme.FONT_BASE
+  Font PLAIN 9      -> AppTheme.FONT_XS
+  Color(50,50,50) 3x-> AppColors.BG_INPUT          (aus TextToolbar)
+  Color(55,55,55)   -> AppColors.BTN_TOGGLE_OFF    (aus TextToolbar)
+  Color(90,90,90)   -> AppColors.BORDER_PAGE       (neu)
+  Color(0,120,220,170) -> AppColors.MARGIN_GUIDE   (neu, ABGELEITET)
+  Color(0,140,255)  -> AppColors.MARGIN_LABEL      (neu)
+  BasicStroke(1f) 3x-> AppTheme.STROKE_HAIRLINE
+
+  Font 6->0 · Color 7->0 · Stroke 4->1
+  Rest: der gestrichelte Stroke mit dash-Array (wie in UIBuilder).
+
+*** ERSTE WIEDERVERWENDUNG UEBER DATEIGRENZEN: BG_INPUT und
+    BTN_TOGGLE_OFF stammen aus der TextToolbar-Migration und passten hier
+    ohne Aenderung. Genau dafuer sind Token da — ab der zweiten Datei
+    zahlt sich die Arbeit aus. ***
+
+
+ZWEI FUNDE, DIE ERKLAERUNG BRAUCHEN
+--------------------------------------------------------------------------
+1) DER LEHRBUCHFALL FUER alpha()
+   new Color(0, 120, 220, 170) ist EXAKT AppColors.ACCENT_ACTIVE
+   (0,120,220) mit Alpha 170.
+   §21 verlangt: "Alpha-Varianten werden ABGELEITET, nie als zweites
+   RGB-Tripel getippt."
+   -> MARGIN_GUIDE wird in AppColors aus ACCENT_ACTIVE berechnet:
+        new Color(ACCENT_ACTIVE.getRed(), ACCENT_ACTIVE.getGreen(),
+                  ACCENT_ACTIVE.getBlue(), 170)
+      Aendert jemand den Akzent, zieht die Randlinie mit.
+   *** Bewusst NICHT AppTheme.alpha(...) im Zeichenpfad aufgerufen: das
+       erzeugt bei jedem Neuzeichnen ein Color-Objekt. Als Konstante
+       abgeleitet ist es einmal berechnet. ***
+
+2) *** VERMUTLICHER TIPPFEHLER, NICHT KORRIGIERT ***
+   new Color(0, 140, 255)  fuer die Randmass-Beschriftung
+   AppColors.ACCENT ist  (0, 150, 255)
+   Differenz: 10 im Gruenkanal. Sichtbar ist das kaum, gewollt wirkt es
+   aber auch nicht — vermutlich hat sich jemand vertippt.
+
+   ENTSCHEIDUNG: UNVERAENDERT als eigenes Token MARGIN_LABEL uebernommen.
+   Begruendung: diese Migration ist WERTERHALTEND. Eine Angleichung an
+   ACCENT waere eine Design-Entscheidung, keine Aufraeumarbeit — und sie
+   gehoert dem User, nicht mir. Das Javadoc des Tokens sagt genau das und
+   nennt den Weg: Token loeschen, ACCENT einsetzen.
+   *** Haette ich "aufgeraeumt", waere eine unbelegte Aenderung im
+       Aussehen in einem Commit gelandet, der "werterhaltend" heisst. ***
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+Alle acht ersetzten Werte gegen die kompilierten Klassen geprueft —
+identisch, inklusive der abgeleiteten MARGIN_GUIDE (rgba 0,120,220,170).
+Build: exit 0, 335 .class — unveraendert.
+
+
+STAND DER BEREINIGUNG (ausserhalb der Token-Klassen)
+--------------------------------------------------------------------------
+                  Start    jetzt     Anteil erledigt
+  new Color        259      236          9 %
+  new Font         135      106         21 %
+  new BasicStroke   68       61         10 %
+
+  Sechs Dateien durch:
+    UIComponentFactory   2 Restliterale (parametrisiert)
+    UIBuilder            1 Restliteral  (dash-Stroke)
+    SelectiveAlphaEditor 2 Restliterale (Laufzeitfarben)
+    TextToolbar          0
+    BaseSidebarPanel     0
+    NewImageDialog       1 Restliteral  (dash-Stroke)
+
+  Token-Klassen: AppColors 36 Farben · AppTheme 19 Fonts, 4 Strokes
+
+*** DIE GROSSEN BROCKEN STEHEN NOCH: ElementLayerPanel 84 · CanvasPanel 58
+    · TranslationMapListPanel 27 · MapsPanel 26. Zusammen 195 der 403
+    verbleibenden Literale — knapp die Haelfte in vier Dateien. ***
+
+
+SICHTPRUEFUNG — JETZT U1-U13
+--------------------------------------------------------------------------
+  U1-U12 wie in den progress-Dateien 02 bis 04
+  neu:
+  U13 *** DIALOG "NEUE DATEI": Eingabefelder und Auswahllisten dunkel wie
+      vorher, Umschaltknoepfe (Hoch/Quer) im inaktiven Zustand dunkelgrau.
+      In der SEITENVORSCHAU: weisse Seite mit hellgrauem Umriss, blaue
+      GESTRICHELTE Randlinien halbdurchsichtig, vier runde blaue Griffe,
+      Randmasse ("12mm") in kleiner blauer Schrift.
+      Die gestrichelten Linien sind die aussagekraeftigste Stelle — dort
+      wurde eine abgeleitete Alpha-Farbe eingesetzt. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 6" wurde abgeschlossen: ja
+#   Die BEREINIGUNG INSGESAMT ist NICHT fertig — 403 Literale verbleiben,
+#   knapp die Haelfte davon in vier Dateien.
+# Naechster Schritt: SICHTPRUEFUNG U1-U13 (sechs Dateien aufgestaut).
+#   Danach: PageLayoutToolbar (21) oder TileGalleryPanel (20).
+#   ColorPickerPopup bleibt zurueckgestellt (berechnete Farben).
+#   ElementLayerPanel (84) / CanvasPanel (58) brauchen einen EIGENEN
+#   Termin — in einer Sitzung nicht sichtpruefbar.
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

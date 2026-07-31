@@ -83,4 +83,31 @@ public final class AppColors {
     public static final Color BG_SIDEBAR_HEADER = new Color(42, 42, 42);
     /** Listenfläche einer Seitenleiste unter der Kopfzeile. */
     public static final Color BG_SIDEBAR_LIST   = new Color(36, 36, 36);
+
+    // ── Ergänzt 2026-07-31, Migration von NewImageDialog ─────────────────────
+
+    /** Umriss der Seitenvorschau. Heller als {@link #BORDER} (70). */
+    public static final Color BORDER_PAGE   = new Color(90, 90, 90);
+
+    /**
+     * Gestrichelte Randlinien in der Seitenvorschau.
+     * <p><b>Abgeleitet</b> aus {@link #ACCENT_ACTIVE} statt als zweites
+     * RGB-Tripel getippt (§21). Ändert sich der Akzent, ändert sich die
+     * Randlinie mit.
+     */
+    public static final Color MARGIN_GUIDE  = new Color(
+            ACCENT_ACTIVE.getRed(), ACCENT_ACTIVE.getGreen(), ACCENT_ACTIVE.getBlue(), 170);
+
+    /**
+     * Beschriftung der Randmaße in der Seitenvorschau („12mm").
+     *
+     * <p><b>Achtung, vermutlich ein alter Tippfehler:</b> der Wert ist
+     * {@code (0,140,255)} und liegt damit <b>10 Grünwerte neben</b>
+     * {@link #ACCENT} {@code (0,150,255)}. Ein sichtbarer Unterschied ist das
+     * nicht, gewollt wirkt es aber auch nicht. <b>Unverändert übernommen</b> —
+     * die Migration ist werterhaltend, und eine Angleichung an {@code ACCENT}
+     * wäre eine Design-Entscheidung, keine Aufräumarbeit. Wer sie trifft,
+     * ersetzt dieses Token durch {@code ACCENT} und löscht es hier.
+     */
+    public static final Color MARGIN_LABEL  = new Color(0, 140, 255);
 }

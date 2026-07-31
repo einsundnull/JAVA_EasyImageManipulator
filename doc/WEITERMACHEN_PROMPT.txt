@@ -8,13 +8,12 @@ Details je Schritt: die progress_2026-07-30_*.txt.
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
-Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: FUENF Dateien
-sind durch (UIComponentFactory, SelectiveAlphaEditor, UIBuilder,
-TextToolbar, BaseSidebarPanel), 419 Literale ausserhalb der Token-Klassen
-verbleiben.
-*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U12 durch den User. Sie war
+Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: SECHS Dateien
+sind durch, 403 Literale ausserhalb der Token-Klassen verbleiben — knapp
+die Haelfte davon in nur vier Dateien.
+*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U13 durch den User. Sie war
     schon nach Datei 1 faellig und ist nicht erfolgt — deshalb deckt sie
-    jetzt fuenf Dateien ab. EIN Programmstart hakt alle zwoelf ab. ***
+    jetzt SECHS Dateien ab. EIN Programmstart hakt alle dreizehn ab. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -100,6 +99,15 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     bewusst an FONT_TITLE GEKOPPELT (gleiche Kopfzeile, gleiches Gewicht),
     das "+" bekam ein EIGENES Token (soll leichter wirken).
     -> progress_2026-07-31_apptheme-migration-04.txt
+[6e] AppTheme-Bereinigung, DATEI 6: NewImageDialog 17 -> 1. Erste
+    Wiederverwendung ueber Dateigrenzen (BG_INPUT, BTN_TOGGLE_OFF aus
+    TextToolbar). MARGIN_GUIDE wird aus ACCENT_ACTIVE ABGELEITET statt
+    getippt. *** Und ein vermutlicher Tippfehler gefunden und NICHT
+    korrigiert: die Randmass-Beschriftung ist (0,140,255), ACCENT ist
+    (0,150,255) - 10 Gruenwerte daneben. Unveraendert uebernommen, weil
+    die Migration werterhaltend ist; Angleichen waere eine
+    Design-Entscheidung des Users. ***
+    -> progress_2026-07-31_apptheme-migration-05.txt
 
 VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
   a) "referenzfrei" != "unbenutzt". Eine Klasse mit main() ist startbar.
@@ -124,17 +132,18 @@ OFFEN — nach Hebel sortiert
       SelectiveAlphaEditor       2 Restliterale (Laufzeitfarben)
       UIBuilder                  1 Restliteral  (dash-Stroke)
       TextToolbar           15 -> 0
-      BaseSidebarPanel      11 -> 0   <- groesster Hebel: 4 Panels erben
+      BaseSidebarPanel      11 -> 0   <- 4 Panels erben davon
+      NewImageDialog        17 -> 1 Restliteral  (dash-Stroke)
     VERBLEIBEND ausserhalb der Token-Klassen:
-      243 new Color · 112 new Font · 64 new BasicStroke
-    Token-Klassen: AppColors 33 Farben · AppTheme 20 Fonts, 5 Strokes
+      236 new Color · 106 new Font · 61 new BasicStroke
+    Token-Klassen: AppColors 36 Farben · AppTheme 19 Fonts, 4 Strokes
 
-    *** ZUERST: SICHTPRUEFUNG U1-U12 DURCH DEN USER (aufgestaut aus fuenf
+    *** ZUERST: SICHTPRUEFUNG U1-U13 DURCH DEN USER (aufgestaut aus SECHS
         Dateien; Listen in den progress_2026-07-31_*.txt). EIN Start des
-        Programms hakt alle zwoelf ab.
-        Die aussagekraeftigsten: U12 (Seitenleisten-Koepfe, betrifft vier
-        Panels), U9 (Ablageflaeche ohne Bild), U10 (Text-Werkzeugleiste),
-        U3 (Symbol-Knoepfe). ***
+        Programms hakt alle dreizehn ab.
+        Die aussagekraeftigsten: U12 (Seitenleisten-Koepfe, 4 Panels),
+        U13 (Dialog "Neue Datei" mit Seitenvorschau), U9 (Ablageflaeche
+        ohne Bild), U10 (Text-Werkzeugleiste), U3 (Symbol-Knoepfe). ***
 
     VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
       1. EINE Datei pro Schritt (Ausnahme: zwei Dateien, die sich eine
@@ -143,6 +152,10 @@ OFFEN — nach Hebel sortiert
       3. *** WEICHT EIN WERT AB: NICHT RUNDEN. Neues Token anlegen oder
          das Literal mit Begruendung stehen lassen. Runden aendert das
          Aussehen. Bisher 14 solcher Faelle -> 14 neue Token. ***
+      3a. *** ERST PRUEFEN, OB DIE FARBEN UEBERHAUPT TOKEN SIND. Ein
+         Farbwaehler ERZEUGT Farben (berechnete RGB, Alpha-Verlaeufe) -
+         die duerfen nicht aus einer Palette kommen. ColorPickerPopup ist
+         deshalb zurueckgestellt. ***
       3b. *** GLEICHES RGB HEISST NICHT GLEICHES TOKEN. Vor dem
          Wiederverwenden die BEDEUTUNG pruefen. In TextToolbar trat der
          Fall dreimal auf: (60,60,60) war wirklich BTN_BG und wurde
@@ -157,6 +170,12 @@ OFFEN — nach Hebel sortiert
          (Font.equals / Color.equals / getLineWidth). Vorlagen stehen in
          den beiden progress-Dateien vom 2026-07-31.
       5. Sichtpruefung durch den User, DANN die naechste Datei.
+      6. *** EINEN GEFUNDENEN SCHOENHEITSFEHLER NICHT NEBENBEI BEHEBEN.
+         In NewImageDialog liegt die Randmass-Farbe 10 Gruenwerte neben
+         ACCENT - vermutlich ein alter Tippfehler. Unveraendert als
+         eigenes Token uebernommen, mit Hinweis im Javadoc. Eine
+         Angleichung waere eine Design-Entscheidung des Users; sie haette
+         in einem Commit namens "werterhaltend" nichts zu suchen. ***
 
     *** EIN GRIFF, DER SICH GELOHNT HAT UND WIEDER PASST:
         UIBuilder liest ed.TOPBAR_BTN_W/H 33x. Statt 33 Aufrufstellen
@@ -176,16 +195,21 @@ OFFEN — nach Hebel sortiert
         Schachbrett). Ein Farbwaehler erzeugt Farben - die duerfen nicht
         aus einer Palette kommen. Nur 5 von 11 waeren Token gewesen. ***
 
-    NAECHSTE DATEI — EMPFEHLUNG: NewImageDialog (17) oder
-    PageLayoutToolbar (21). Beide in sich abgeschlossen.
+    NAECHSTE DATEI — EMPFEHLUNG: PageLayoutToolbar (21) oder
+    TileGalleryPanel (20). Beide in sich abgeschlossen.
+    *** DIE VIER GROSSEN BROCKEN STEHEN NOCH und machen knapp die HAELFTE
+        des Rests aus: ElementLayerPanel 84 · CanvasPanel 58 ·
+        TranslationMapListPanel 27 · MapsPanel 26 = 195 Literale.
+        Die brauchen einen EIGENEN Termin mit anschliessender
+        Sichtpruefung - in einer Sitzung nebenbei sind sie nicht
+        pruefbar. ***
     *** NICHT ElementLayerPanel (84) oder CanvasPanel (58) — in einer
         Sitzung nicht mehr sichtpruefbar; CanvasPanel ist zusaetzlich die
         God-Klasse (§22). ***
     Dichte der restlichen Dateien:
       ElementLayerPanel 84 · CanvasPanel 58 · TranslationMapListPanel 27 ·
       MapsPanel 26 · PageLayoutToolbar 21 · TileGalleryPanel 20 ·
-      PaintToolbar 20 · NewImageDialog 17 ·
-      ColorPickerPopup 11 (zurueckgestellt)
+      PaintToolbar 20 · ColorPickerPopup 11 (zurueckgestellt)
 
     NICHT ANFASSEN: benutzergewaehlte Werte (Primaer-/Sekundaerfarbe,
     canvasBg1/bg2, Kartenfarben, Text-Werkzeug-Font, strokeWidth). Die
@@ -281,6 +305,12 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
       merklich kleiner als das "x" daneben. Betrifft VIER Panels
       gleichzeitig, weil sie von BaseSidebarPanel erben - eine der
       wichtigsten Pruefungen der ganzen Bereinigung. ***
+  U13 *** DIALOG "NEUE DATEI": Eingabefelder dunkel, Umschaltknoepfe
+      (Hoch/Quer) inaktiv dunkelgrau. In der SEITENVORSCHAU: weisse Seite
+      mit hellgrauem Umriss, blaue GESTRICHELTE Randlinien
+      halbdurchsichtig, vier runde blaue Griffe, Randmasse in kleiner
+      blauer Schrift. Die gestrichelten Linien sind die Schluesselstelle -
+      dort wurde eine abgeleitete Alpha-Farbe eingesetzt. ***
   K1-K7 (Hilfe-Dialog) und B1-B4 (Buecher/Karten) stehen in den
   progress-Dateien vom 2026-07-30.
   Nichts davon ist durch den Compile-Verify abgedeckt.

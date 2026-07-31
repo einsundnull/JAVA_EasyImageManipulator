@@ -324,16 +324,16 @@ class NewImageDialog extends JDialog {
 	private JLabel lbl(String t) {
 		JLabel l = new JLabel(t);
 		l.setForeground(AppColors.TEXT);
-		l.setFont(new Font("SansSerif", Font.PLAIN, 11));
+		l.setFont(AppTheme.FONT_BASE);
 		return l;
 	}
 
 	private JTextField dimTF(String init) {
 		JTextField f = new JTextField(init, 6);
-		f.setBackground(new Color(50, 50, 50));
+		f.setBackground(AppColors.BG_INPUT);
 		f.setForeground(AppColors.TEXT);
 		f.setCaretColor(AppColors.TEXT);
-		f.setFont(new Font("SansSerif", Font.PLAIN, 11));
+		f.setFont(AppTheme.FONT_BASE);
 		f.setPreferredSize(new Dimension(80, 26));
 		f.setMaximumSize(new Dimension(80, 28));
 		return f;
@@ -341,9 +341,9 @@ class NewImageDialog extends JDialog {
 
 	private JComboBox<String> combo(String[] items, int w) {
 		JComboBox<String> c = new JComboBox<>(items);
-		c.setBackground(new Color(50, 50, 50));
+		c.setBackground(AppColors.BG_INPUT);
 		c.setForeground(AppColors.TEXT);
-		c.setFont(new Font("SansSerif", Font.PLAIN, 11));
+		c.setFont(AppTheme.FONT_BASE);
 		c.setPreferredSize(new Dimension(w, 26));
 		c.setMaximumSize(new Dimension(w, 28));
 		c.setFocusable(false);
@@ -352,9 +352,9 @@ class NewImageDialog extends JDialog {
 
 	private JToggleButton toggleBtn(String text) {
 		JToggleButton b = new JToggleButton(text);
-		b.setFont(new Font("SansSerif", Font.PLAIN, 11));
+		b.setFont(AppTheme.FONT_BASE);
 		b.setForeground(AppColors.TEXT);
-		b.setBackground(new Color(55, 55, 55));
+		b.setBackground(AppColors.BTN_TOGGLE_OFF);
 		b.setPreferredSize(new Dimension(95, 26));
 		b.setMaximumSize(new Dimension(95, 28));
 		b.setFocusable(false);
@@ -365,9 +365,9 @@ class NewImageDialog extends JDialog {
 		JSpinner s = new JSpinner(new SpinnerNumberModel(init, 0, 500, 1));
 		s.setPreferredSize(new Dimension(60, 26));
 		s.setMaximumSize(new Dimension(60, 28));
-		s.setFont(new Font("SansSerif", Font.PLAIN, 11));
+		s.setFont(AppTheme.FONT_BASE);
 		if (s.getEditor() instanceof JSpinner.DefaultEditor de) {
-			de.getTextField().setBackground(new Color(50, 50, 50));
+			de.getTextField().setBackground(AppColors.BG_INPUT);
 			de.getTextField().setForeground(AppColors.TEXT);
 			de.getTextField().setCaretColor(AppColors.TEXT);
 		}
@@ -470,8 +470,8 @@ class NewImageDialog extends JDialog {
 			// Page
 			g2.setColor(Color.WHITE);
 			g2.fillRect(d[0], d[1], d[2], d[3]);
-			g2.setColor(new Color(90, 90, 90));
-			g2.setStroke(new BasicStroke(1f));
+			g2.setColor(AppColors.BORDER_PAGE);
+			g2.setStroke(AppTheme.STROKE_HAIRLINE);
 			g2.drawRect(d[0], d[1], d[2]-1, d[3]-1);
 
 			// Margin guide lines (dashed blue)
@@ -482,7 +482,7 @@ class NewImageDialog extends JDialog {
 			int rightX = d[0] + d[2] - (int)(mRightMm * PX_PER_MM * sc);
 			float[] dash = {4f, 3f};
 			g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
-			g2.setColor(new Color(0, 120, 220, 170));
+			g2.setColor(AppColors.MARGIN_GUIDE);
 			g2.drawLine(d[0],   topY,  d[0]+d[2], topY);
 			g2.drawLine(d[0],   botY,  d[0]+d[2], botY);
 			g2.drawLine(leftX,  d[1],  leftX,  d[1]+d[3]);
@@ -491,7 +491,7 @@ class NewImageDialog extends JDialog {
 			// Handles
 			int[][] pts = handles(d);
 			if (pts != null) {
-				g2.setStroke(new BasicStroke(1f));
+				g2.setStroke(AppTheme.STROKE_HAIRLINE);
 				for (int i = 0; i < 4; i++) {
 					g2.setColor(dragging == i ? AppColors.ACCENT_HOVER : AppColors.ACCENT);
 					g2.fillOval(pts[i][0]-HR, pts[i][1]-HR, HR*2, HR*2);
@@ -501,9 +501,9 @@ class NewImageDialog extends JDialog {
 			}
 
 			// Margin labels
-			g2.setColor(new Color(0, 140, 255));
-			g2.setFont(new Font("SansSerif", Font.PLAIN, 9));
-			g2.setStroke(new BasicStroke(1f));
+			g2.setColor(AppColors.MARGIN_LABEL);
+			g2.setFont(AppTheme.FONT_XS);
+			g2.setStroke(AppTheme.STROKE_HAIRLINE);
 			if (topY  > d[1]      + 4)  g2.drawString(mTopMm    + "mm", d[0]+2,     topY-2);
 			if (botY  < d[1]+d[3] - 4)  g2.drawString(mBottomMm + "mm", d[0]+2,     botY+10);
 			if (leftX > d[0]      + 20) g2.drawString(mLeftMm   + "mm", leftX+2,    d[1]+11);
