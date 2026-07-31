@@ -161,7 +161,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         this.callbacks = callbacks;
         this.filePreloadCallback = filePreloadCallback;
         setLayout(new BorderLayout());
-        setBackground(new Color(36, 36, 36));
+        setBackground(AppColors.BG_SIDEBAR_LIST);
         setPreferredSize(new Dimension(GALLERY_W, 0));
         setMaximumSize(new Dimension(GALLERY_W, Integer.MAX_VALUE));
         setBorder(BorderFactory.createCompoundBorder(
@@ -184,7 +184,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
         // ── Select-All / Deselect-All (initially hidden) ──────────────────────
         actionRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 4));
-        actionRow.setBackground(new Color(42, 42, 42));
+        actionRow.setBackground(AppColors.BG_SIDEBAR_HEADER);
         actionRow.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER));
         JButton selectAllBtn   = galleryBtn("Alle");
         JButton deselectAllBtn = galleryBtn("Keine");
@@ -197,7 +197,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         // ── North: header + action row ────────────────────────────────────────
         JPanel north = new JPanel();
         north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
-        north.setBackground(new Color(42, 42, 42));
+        north.setBackground(AppColors.BG_SIDEBAR_HEADER);
         north.add(sidebarHeader);
         north.add(actionRow);
         add(north, BorderLayout.NORTH);
@@ -219,7 +219,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
         }
         tilesContainer = new ScrollableTilesContainer();
         tilesContainer.setLayout(new BoxLayout(tilesContainer, BoxLayout.Y_AXIS));
-        tilesContainer.setBackground(new Color(36, 36, 36));
+        tilesContainer.setBackground(AppColors.BG_SIDEBAR_LIST);
         tilesContainer.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
 
         // ── Drop target: accept Layer drags and file-list drops ─────────────
@@ -235,7 +235,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         galleryScroll.setBorder(null);
-        galleryScroll.getViewport().setBackground(new Color(36, 36, 36));
+        galleryScroll.getViewport().setBackground(AppColors.BG_SIDEBAR_LIST);
         galleryScroll.getVerticalScrollBar().setUnitIncrement(14);
         applyDarkScrollBar(galleryScroll.getVerticalScrollBar());
         BaseSidebarPanel.installMiddleMouseDragPan(galleryScroll, tilesContainer);
@@ -913,7 +913,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 g2.setColor(AppColors.TILE_PLACEHOLDER);
                 g2.fillRoundRect(3, thumbTop, w - 6, THUMB_H, 4, 4);
                 g2.setColor(AppColors.TEXT_MUTED);
-                g2.setFont(new Font("SansSerif", Font.PLAIN, 11));
+                g2.setFont(AppTheme.FONT_BASE);
                 String ph = "Lädt…";
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(ph, (w - fm.stringWidth(ph)) / 2,
@@ -922,7 +922,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
 
             // ── Filename label ────────────────────────────────────────────────
             String name = imageFile.getName();
-            g2.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            g2.setFont(AppTheme.FONT_SM);
             g2.setColor(hover ? AppColors.TEXT : AppColors.TEXT_MUTED);
             FontMetrics fm = g2.getFontMetrics();
             // Truncate
@@ -936,7 +936,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             boolean isUnlinked = showAll && linkedScene != null &&
                                  !imageFile.getParentFile().equals(linkedScene);
 
-            g2.setStroke(new BasicStroke(2f));
+            g2.setStroke(AppTheme.STROKE_MEDIUM);
             if (isActive && isDirty) {
                 g2.setColor(AppColors.DANGER);
                 g2.drawRoundRect(0, 0, w - 2, TILE_H - 2, 8, 8);
@@ -952,10 +952,10 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 g2.setColor(AppColors.SUCCESS);           // green – selected / active
                 g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (isInSelection) {
-                g2.setColor(new Color(255, 220, 0));      // yellow – multi-selection
+                g2.setColor(AppColors.SELECTION_MULTI);      // yellow – multi-selection
                 g2.drawRoundRect(1, 1, w - 3, TILE_H - 3, 8, 8);
             } else if (hover) {
-                g2.setStroke(new BasicStroke(1f));
+                g2.setStroke(AppTheme.STROKE_HAIRLINE);
                 g2.setColor(AppColors.BORDER);
                 g2.drawRoundRect(0, 0, w - 2, TILE_H - 2, 8, 8);
             }
@@ -983,18 +983,18 @@ public class TileGalleryPanel extends BaseSidebarPanel {
     // Dark scrollbar – also used by SelectiveAlphaEditor for the main viewport
     // =========================================================================
     public static void applyDarkScrollBar(JScrollBar bar) {
-        bar.setBackground(new Color(30, 30, 30));
+        bar.setBackground(AppColors.BG_DARK);
         bar.setUI(new DarkScrollBarUI());
     }
 
     public static class DarkScrollBarUI extends BasicScrollBarUI {
         @Override protected void configureScrollBarColors() {
-            thumbColor            = new Color(75, 75, 75);
-            thumbDarkShadowColor  = new Color(30, 30, 30);
-            thumbHighlightColor   = new Color(90, 90, 90);
-            thumbLightShadowColor = new Color(55, 55, 55);
-            trackColor            = new Color(30, 30, 30);
-            trackHighlightColor   = new Color(40, 40, 40);
+            thumbColor            = AppColors.SCROLL_THUMB_BASE;
+            thumbDarkShadowColor  = AppColors.BG_DARK;
+            thumbHighlightColor   = AppColors.SCROLL_HIGHLIGHT;
+            thumbLightShadowColor = AppColors.SCROLL_SHADOW;
+            trackColor            = AppColors.BG_DARK;
+            trackHighlightColor   = AppColors.SCROLL_TRACK_HIGHLIGHT;
         }
         @Override protected JButton createDecreaseButton(int o) { return zeroBtn(); }
         @Override protected JButton createIncreaseButton(int o) { return zeroBtn(); }
@@ -1009,11 +1009,11 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             if (r.isEmpty()) return;
             Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(isThumbRollover() ? new Color(105, 105, 105) : new Color(70, 70, 70));
+            g2.setColor(isThumbRollover() ? AppColors.SCROLL_THUMB_HOVER : AppColors.SCROLL_THUMB);
             g2.fillRoundRect(r.x + 2, r.y + 2, r.width - 4, r.height - 4, 6, 6);
         }
         @Override protected void paintTrack(Graphics g, JComponent c, Rectangle r) {
-            g.setColor(new Color(30, 30, 30));
+            g.setColor(AppColors.BG_DARK);
             g.fillRect(r.x, r.y, r.width, r.height);
         }
     }
@@ -1029,7 +1029,7 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                 super.paintComponent(g);
             }
         };
-        b.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        b.setFont(AppTheme.FONT_SM);
         b.setForeground(AppColors.TEXT_MUTED);
         b.setFocusPainted(false);
         b.setBorderPainted(false);

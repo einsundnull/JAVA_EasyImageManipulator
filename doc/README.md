@@ -76,6 +76,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`progress_2026-07-31_apptheme-migration-03.txt`](progress_2026-07-31_apptheme-migration-03.txt) | Token-Bereinigung, **Datei 4**: `TextToolbar` (erste ohne Restliteral) |
 | [`progress_2026-07-31_apptheme-migration-04.txt`](progress_2026-07-31_apptheme-migration-04.txt) | Token-Bereinigung, **Datei 5**: `BaseSidebarPanel` (wirkt auf 4 Panels) |
 | [`progress_2026-07-31_apptheme-migration-05.txt`](progress_2026-07-31_apptheme-migration-05.txt) | Token-Bereinigung, **Datei 6**: `NewImageDialog` · abgeleitete Alpha-Farbe · Tippfehler-Befund |
+| [`progress_2026-07-31_apptheme-migration-06.txt`](progress_2026-07-31_apptheme-migration-06.txt) | Token-Bereinigung, **Datei 7**: `TileGalleryPanel` · Unterklasse tippte Basisklassen-Farben nach |
 | [`WEITERMACHEN_PROMPT_2026-07-30_archiv.txt`](WEITERMACHEN_PROMPT_2026-07-30_archiv.txt) | Vorgänger-Fassung mit dem vollen Verlauf der Schritte [1]–[4] |
 
 ## 7. Historisch — abgeschlossene Arbeiten (nicht als Ist-Stand lesen)

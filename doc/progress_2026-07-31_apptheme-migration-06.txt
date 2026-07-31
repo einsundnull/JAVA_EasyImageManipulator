@@ -1,0 +1,117 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-06.txt
+Aufgabentyp: [ST] — Schritt [6], DATEI 7 der AppTheme-Bereinigung (§21)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "weiter"
+
+*** Sichtpruefung waechst auf U1-U14, sieben Dateien aufgestaut. Der User
+    hat das Fortfahren mehrfach bestaetigt. EIN Programmstart hakt alles ab. ***
+
+
+MIGRIERT: TileGalleryPanel.java   21 Literale -> 0
+--------------------------------------------------------------------------
+GEWAEHLT WEGEN EINES BEFUNDS, nicht wegen der Groesse:
+
+*** TileGalleryPanel ERBT von BaseSidebarPanel — und tippte dessen
+    Kopf- und Listenfarbe FUENFMAL ERNEUT:
+      new Color(36,36,36) 3x   = BG_SIDEBAR_LIST   (gestern angelegt)
+      new Color(42,42,42) 2x   = BG_SIDEBAR_HEADER (gestern angelegt)
+    Eine Unterklasse, die die Farben ihrer Basisklasse noch einmal
+    hinschreibt, ist der Musterfall fuer §21: aendert jemand den
+    Sidebar-Kopf in der Basisklasse, blieb diese Kachel-Galerie zurueck.
+    Jetzt teilen sich beide dasselbe Token. ***
+
+WEITER WIEDERVERWENDET:
+  new Color(30,30,30) 4x -> AppColors.BG_DARK
+     Exakt derselbe Wert UND dieselbe Bedeutung ("dunkelste Flaeche"):
+     Scrollleisten-Bahn, Schattenkante, Leisten-Hintergrund. Kein neues
+     Token noetig.
+  Font PLAIN 11 -> FONT_BASE · Font PLAIN 10 2x -> FONT_SM
+  BasicStroke(2f) -> STROKE_MEDIUM · BasicStroke(1f) -> STROKE_HAIRLINE
+  drawRoundRect/fillRoundRect -> RADIUS_LG / RADIUS_MD
+
+NEU: SIEBEN TOKEN, davon SECHS als ZUSAMMENHAENGENDE GRUPPE
+  SCROLL_THUMB (70) · SCROLL_THUMB_HOVER (105) · SCROLL_THUMB_BASE (75) ·
+  SCROLL_HIGHLIGHT (90) · SCROLL_SHADOW (55) · SCROLL_TRACK_HIGHLIGHT (40)
+  *** Begruendung fuer die Gruppe: DarkScrollBarUI wird ueber
+      applyDarkScrollBar in der GANZEN Anwendung verwendet. Die sechs
+      Werte gehoeren zusammen — wer einen aendert, sollte die anderen
+      ansehen. Deshalb als Block mit gemeinsamem Kommentar. ***
+  SELECTION_MULTI (255,220,0) — Rahmen einer Kachel in der
+  Mehrfachauswahl. NICHT SELECTION (255,140,0, orange): das ist die
+  einzelne Auswahl. Zwei Zustaende, zwei Farben, zwei Token.
+
+  Font 3->0 · Color 16->0 · Stroke 2->0
+
+
+DREI WEITERE RGB-KOLLISIONEN, ALLE GETRENNT GEHALTEN
+--------------------------------------------------------------------------
+  SCROLL_THUMB     (70,70,70)  == BORDER          -> Rahmen ist kein Griff
+  SCROLL_HIGHLIGHT (90,90,90)  == BORDER_PAGE     -> Seitenumriss ist keine
+                                                     Bildlaufleiste
+  SCROLL_SHADOW    (55,55,55)  == BTN_TOGGLE_OFF  -> Schatten ist kein Knopf
+Alle drei im Nachweis-Programm bestaetigt (gleicher Wert, getrennte Token).
+*** Das sind inzwischen SECHS solcher Faelle in der Bereinigung. Die Regel
+    "gleiches RGB heisst nicht gleiches Token" ist nicht theoretisch — in
+    einer dunklen Oberflaeche liegen die Grautoene zwangslaeufig dicht
+    beieinander. ***
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+Alle Werte gegen die kompilierten Klassen geprueft — identisch.
+Build: exit 0, 335 .class — unveraendert.
+
+
+STAND DER BEREINIGUNG (ausserhalb der Token-Klassen)
+--------------------------------------------------------------------------
+                  Start    jetzt    erledigt
+  new Color        259      220       15 %
+  new Font         135      103       23 %
+  new BasicStroke   68       59       13 %
+
+  Sieben Dateien durch, VIER davon ohne jedes Restliteral:
+    UIComponentFactory   2 (parametrisiert)
+    UIBuilder            1 (dash-Stroke)
+    SelectiveAlphaEditor 2 (Laufzeitfarben)
+    TextToolbar          0
+    BaseSidebarPanel     0
+    NewImageDialog       1 (dash-Stroke)
+    TileGalleryPanel     0
+
+  Token-Klassen: AppColors 43 Farben · AppTheme 19 Fonts, 4 Strokes
+
+*** DIE VIER GROSSEN BROCKEN STEHEN UNVERAENDERT:
+    ElementLayerPanel 84 · CanvasPanel 58 · TranslationMapListPanel 27 ·
+    MapsPanel 26 = 195 Literale, gut die Haelfte des Rests.
+    Die brauchen einen EIGENEN Termin. ElementLayerPanel allein ist
+    groesser als die sieben bisherigen Dateien zusammen. ***
+
+
+SICHTPRUEFUNG — JETZT U1-U14
+--------------------------------------------------------------------------
+  U1-U13 wie in den progress-Dateien 02 bis 05
+  neu:
+  U14 *** BILDGALERIE (linke Seitenleiste): Kachel-Hintergrund und
+      Kopfzeile wie vorher; eine angeklickte Kachel gruen umrandet, eine
+      in der MEHRFACHAUSWAHL GELB umrandet; die dunkle Bildlaufleiste
+      rechts der Kacheln unveraendert, Griff wird beim Ueberfahren heller.
+      Die Bildlaufleiste ist die Schluesselstelle — sie wird ueber
+      applyDarkScrollBar auch an anderen Listen verwendet. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 7" wurde abgeschlossen: ja
+#   Die BEREINIGUNG INSGESAMT ist NICHT fertig — 382 Literale verbleiben.
+# Naechster Schritt: SICHTPRUEFUNG U1-U14 (sieben Dateien aufgestaut).
+#   Danach: PageLayoutToolbar (21) oder PaintToolbar (20).
+#   ColorPickerPopup bleibt zurueckgestellt (berechnete Farben).
+#   *** Fuer ElementLayerPanel (84) und CanvasPanel (58) einen eigenen
+#       Termin ansetzen — nicht nebenbei. ***
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

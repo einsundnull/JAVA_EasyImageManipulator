@@ -110,4 +110,35 @@ public final class AppColors {
      * ersetzt dieses Token durch {@code ACCENT} und löscht es hier.
      */
     public static final Color MARGIN_LABEL  = new Color(0, 140, 255);
+
+    // ── Ergänzt 2026-07-31, Migration von TileGalleryPanel ───────────────────
+
+    /**
+     * Rahmen einer Kachel, die zur Mehrfachauswahl gehört (gelb).
+     * <p>Nicht {@link #SELECTION} (orange) — das ist die <i>einzelne</i>
+     * Auswahl. Zwei Zustände, zwei Farben, zwei Token.
+     */
+    public static final Color SELECTION_MULTI = new Color(255, 220, 0);
+
+    // Dunkle Bildlaufleiste (DarkScrollBarUI). Eine zusammenhängende Gruppe:
+    // sie wird über TileGalleryPanel.applyDarkScrollBar in der ganzen
+    // Anwendung verwendet. Wer einen Wert ändert, sollte die anderen ansehen.
+    /** Griff der Bildlaufleiste, Ruhezustand (gezeichnet). */
+    public static final Color SCROLL_THUMB           = new Color( 70,  70,  70);
+    /** Griff unter dem Mauszeiger. */
+    public static final Color SCROLL_THUMB_HOVER     = new Color(105, 105, 105);
+    /** Grundfarbe des Griffs (Swing-Feld {@code thumbColor}). */
+    public static final Color SCROLL_THUMB_BASE      = new Color( 75,  75,  75);
+    /**
+     * Lichtkante des Griffs.
+     * <p>Gleiches RGB wie {@link #BORDER_PAGE}, aber eigenes Token — ein
+     * Seitenumriss ist keine Bildlaufleiste.
+     */
+    public static final Color SCROLL_HIGHLIGHT       = new Color( 90,  90,  90);
+    /** Schattenkante des Griffs. */
+    public static final Color SCROLL_SHADOW          = new Color( 55,  55,  55);
+    /** Aufgehellte Bahn (Swing-Feld {@code trackHighlightColor}). */
+    public static final Color SCROLL_TRACK_HIGHLIGHT = new Color( 40,  40,  40);
+    // Die Bahn selbst ist BG_DARK (30,30,30) — dieselbe Bedeutung
+    // („dunkelste Fläche"), deshalb kein eigenes Token.
 }
