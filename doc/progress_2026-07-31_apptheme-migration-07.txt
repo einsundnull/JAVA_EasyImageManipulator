@@ -1,0 +1,138 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-07.txt
+Aufgabentyp: [ST] — Schritt [6], DATEI 8 der AppTheme-Bereinigung (§21)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "weiter"
+
+*** Sichtpruefung waechst auf U1-U15, ACHT Dateien aufgestaut. ***
+
+
+*** ZWEITE DATEI, DIE AUS DER BEREINIGUNG FAELLT: PaintToolbar ***
+--------------------------------------------------------------------------
+PaintToolbar (20 Literale) war der andere Kandidat. Vorher hineingesehen:
+
+  Color.BLACK, new Color(128,0,0), new Color(0,128,0), new Color(0,0,128),
+  new Color(255,128,0), Color.RED, new Color(173,216,230), ... (24 Stueck)
+
+*** Das ist die MAL-PALETTE — die Farben, mit denen der Benutzer malt.
+    Inhalt, kein Oberflaechen-Design. Sie duerfen NICHT nach AppColors:
+    eine Palette-Aenderung wuerde sonst die Malfarben des Benutzers
+    umfaerben. Nur 4 Fonts + 1 Stroke waeren dort ueberhaupt Token. ***
+
+Damit sind ZWEI Dateien aus demselben Grund zurueckgestellt:
+  ColorPickerPopup  - erzeugt Farben (RGB-Komponenten, Alpha-Verlaeufe)
+  PaintToolbar      - haelt die Mal-Palette des Benutzers
+*** MERKSATZ FUER DEN NAECHSTEN: erst pruefen, ob die Farben ueberhaupt
+    Oberflaeche sind. Farbe als INHALT gehoert nie in eine Design-Palette. ***
+
+
+MIGRIERT: PageLayoutToolbar.java   21 Literale -> 4
+--------------------------------------------------------------------------
+  Color(0,120,220,180) -> AppColors.CONTENT_GUIDE       (abgeleitet)
+  Color(0,80,180, 45) 2x -> AppColors.LAYOUT_STRIPE_FILL (abgeleitet)
+  Color(0,80,180,120) 2x -> AppColors.LAYOUT_STRIPE_LINE (abgeleitet)
+  Color(0,80,180,160)    -> AppColors.LAYOUT_PAGENUM     (abgeleitet)
+  Font ITALIC 11  -> AppTheme.FONT_BASE_ITALIC
+  Font PLAIN 11 4x-> AppTheme.FONT_BASE
+  Font PLAIN 10 2x-> AppTheme.FONT_SM
+  Font PLAIN 9    -> AppTheme.FONT_XS
+  Font PLAIN 8    -> AppTheme.FONT_TINY
+  BasicStroke(1f) 2x -> AppTheme.STROKE_HAIRLINE
+
+  Font 12->3 · Color 6->0 · Stroke 3->1
+
+REST (begruendet):
+  3 Fonts mit BERECHNETER Groesse — Math.max(7, hh-2), Math.max(7, fh-2)
+    und fs skalieren mit der Vorschaugroesse. Kein Token moeglich;
+    zentralisiert ist die Familie (AppTheme.FAMILY).
+  1 gestrichelter Stroke mit dash-Array.
+
+
+EIN GRUNDTON, DREI STUFEN — SO IST §21 GEMEINT
+--------------------------------------------------------------------------
+(0,80,180) kam dreimal mit verschiedenen Alphas vor (45/120/160) und wurde
+NIE deckend benutzt. Statt drei RGB-Tripel:
+
+  LAYOUT_GUIDE = new Color(0, 80, 180)            <- einmal getippt
+  LAYOUT_STRIPE_FILL = alphaOf(LAYOUT_GUIDE,  45)
+  LAYOUT_STRIPE_LINE = alphaOf(LAYOUT_GUIDE, 120)
+  LAYOUT_PAGENUM     = alphaOf(LAYOUT_GUIDE, 160)
+
+NEU in AppColors: private static Color alphaOf(Color, int).
+*** Bewusst NICHT AppTheme.alpha(...): AppColors soll fuer seine eigenen
+    Konstanten nicht von der Schwesterklasse abhaengen. Die oeffentliche
+    AppTheme.alpha bleibt fuer Aufrufer ausserhalb. ***
+
+
+*** ZWEITER BEINAHE-TREFFER GEFUNDEN, WIEDER NICHT ANGEGLICHEN ***
+--------------------------------------------------------------------------
+  MARGIN_GUIDE  (Dialog "Neue Datei")  = ACCENT_ACTIVE + Alpha 170
+  CONTENT_GUIDE (Layout-Vorschau)      = ACCENT_ACTIVE + Alpha 180
+
+Zwei gestrichelte Hilfslinien mit demselben Grundton, zehn Alpha-Stufen
+auseinander. Sichtbar ist das praktisch nicht, gewollt wirkt es nicht.
+UNVERAENDERT uebernommen, im Javadoc vermerkt.
+*** Das ist der zweite Fund dieser Art (nach 140/150 im Gruenkanal). Beide
+    stehen jetzt dokumentiert da, statt still korrigiert oder still
+    uebersehen zu werden. Ob angeglichen wird, entscheidet der User. ***
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+Alle Werte gegen die kompilierten Klassen geprueft — identisch, inklusive
+der vier abgeleiteten Alpha-Farben.
+Build: exit 0, 335 .class — unveraendert.
+
+
+STAND DER BEREINIGUNG (ausserhalb der Token-Klassen)
+--------------------------------------------------------------------------
+                  Start    jetzt    erledigt
+  new Color        259      214       17 %
+  new Font         135       94       30 %
+  new BasicStroke   68       57       16 %
+
+  Acht Dateien durch, VIER ohne jedes Restliteral:
+    UIComponentFactory 2 · UIBuilder 1 · SelectiveAlphaEditor 2 ·
+    TextToolbar 0 · BaseSidebarPanel 0 · NewImageDialog 1 ·
+    TileGalleryPanel 0 · PageLayoutToolbar 4
+
+  Token-Klassen: AppColors 48 Farben · AppTheme 19 Fonts, 4 Strokes
+
+*** WAS BLEIBT — und wie es zerfaellt:
+      ElementLayerPanel 84 · CanvasPanel 58 · TranslationMapListPanel 27 ·
+      MapsPanel 26                                    = 195  (echte Arbeit)
+      PaintToolbar 20 · ColorPickerPopup 11           =  31  (ZURUECKGESTELLT,
+                                                              Farbe als Inhalt)
+      PaintEngine 8 und Kleinkram                     =  Rest
+    Von den 365 verbleibenden Literalen sind also rund 31 gar keine
+    Kandidaten. ***
+
+
+SICHTPRUEFUNG — JETZT U1-U15
+--------------------------------------------------------------------------
+  U1-U14 wie in den progress-Dateien 02 bis 06
+  neu:
+  U15 *** SEITENLAYOUT-LEISTE (Buchmodus, Knopf "SL"): in der Vorschau ein
+      gestricheltes blaues Rechteck um den Inhaltsbereich, blass blaue
+      Streifen fuer Kopf- und Fusszeile mit kraeftigerer Trennlinie, die
+      Seitenzahl-Markierung "N°" etwas kraeftiger als die Streifen.
+      Die DREI ABGESTUFTEN BLAUTOENE sind die Schluesselstelle — sie
+      stammen jetzt aus einem Grundton mit drei Alphas. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 8" wurde abgeschlossen: ja
+#   Die BEREINIGUNG INSGESAMT ist NICHT fertig.
+# Naechster Schritt: SICHTPRUEFUNG U1-U15 (acht Dateien aufgestaut).
+#   *** Danach kommen nur noch die vier grossen Brocken (195 Literale).
+#       Dafuer einen EIGENEN Termin ansetzen — die "kleinen, gut
+#       pruefbaren" Dateien sind aufgebraucht. ***
+#   Empfehlung fuer den Einstieg dort: MapsPanel (26) oder
+#   TranslationMapListPanel (27), NICHT ElementLayerPanel (84).
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

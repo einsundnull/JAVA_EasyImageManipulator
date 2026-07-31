@@ -141,4 +141,44 @@ public final class AppColors {
     public static final Color SCROLL_TRACK_HIGHLIGHT = new Color( 40,  40,  40);
     // Die Bahn selbst ist BG_DARK (30,30,30) — dieselbe Bedeutung
     // („dunkelste Fläche"), deshalb kein eigenes Token.
+
+    // ── Ergänzt 2026-07-31, Migration von PageLayoutToolbar ──────────────────
+
+    /**
+     * Grundton der Seitenlayout-Hilfslinien (Kopf-/Fußzeilen-Streifen,
+     * Seitenzahl). Wird <b>nie deckend</b> verwendet — nur über die drei
+     * abgeleiteten Varianten darunter. Ein eigener Ton, nicht {@link #ACCENT}:
+     * die Hilfslinien sollen hinter dem Bild zurücktreten.
+     */
+    public static final Color LAYOUT_GUIDE = new Color(0, 80, 180);
+
+    /** Füllung der Kopf-/Fußzeilen-Streifen (sehr blass). */
+    public static final Color LAYOUT_STRIPE_FILL = alphaOf(LAYOUT_GUIDE,  45);
+    /** Trennlinie der Kopf-/Fußzeilen-Streifen. */
+    public static final Color LAYOUT_STRIPE_LINE = alphaOf(LAYOUT_GUIDE, 120);
+    /** Seitenzahl-Markierung („N°"). */
+    public static final Color LAYOUT_PAGENUM     = alphaOf(LAYOUT_GUIDE, 160);
+
+    /**
+     * Gestricheltes Rechteck um den Inhaltsbereich in der Layout-Vorschau.
+     *
+     * <p><b>Achtung, zweiter Beinahe-Treffer:</b> abgeleitet aus
+     * {@link #ACCENT_ACTIVE} mit Alpha <b>180</b> — {@link #MARGIN_GUIDE} im
+     * Dialog „Neue Datei" ist derselbe Grundton mit Alpha <b>170</b>. Zwei
+     * gestrichelte Hilfslinien, zehn Alpha-Stufen auseinander; kaum sichtbar,
+     * gewollt wirkt es nicht. <b>Unverändert übernommen</b> — die Migration ist
+     * werterhaltend. Wer angleicht, trifft eine Design-Entscheidung.
+     */
+    public static final Color CONTENT_GUIDE = alphaOf(ACCENT_ACTIVE, 180);
+
+    /**
+     * Erzeugt eine transparente Variante — damit ein Grundton nur <b>einmal</b>
+     * als RGB-Tripel dasteht (§21).
+     *
+     * <p>Bewusst hier und nicht {@code AppTheme.alpha(...)}: diese Klasse soll
+     * für ihre eigenen Konstanten nicht von der Schwesterklasse abhängen.
+     */
+    private static Color alphaOf(Color c, int a) {
+        return new Color(c.getRed(), c.getGreen(), c.getBlue(), a);
+    }
 }

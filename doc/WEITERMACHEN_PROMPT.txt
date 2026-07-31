@@ -8,12 +8,15 @@ Details je Schritt: die progress_2026-07-30_*.txt.
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
-Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: SIEBEN Dateien
-sind durch, 382 Literale ausserhalb der Token-Klassen verbleiben — gut die
-Haelfte davon in nur vier Dateien.
-*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U14 durch den User. Sie war
+Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: ACHT Dateien
+sind durch, 365 Literale verbleiben — davon sind rund 31 gar keine
+Kandidaten (Farbe als INHALT, siehe unten) und 195 stecken in nur vier
+grossen Dateien.
+*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U15 durch den User. Sie war
     schon nach Datei 1 faellig und ist nie erfolgt — deshalb deckt sie
-    jetzt SIEBEN Dateien ab. EIN Programmstart hakt alle vierzehn ab. ***
+    jetzt ACHT Dateien ab. EIN Programmstart hakt alle fuenfzehn ab. ***
+*** DIE "KLEINEN, GUT PRUEFBAREN" DATEIEN SIND AUFGEBRAUCHT. Was bleibt,
+    braucht einen eigenen Termin. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -99,6 +102,12 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     bewusst an FONT_TITLE GEKOPPELT (gleiche Kopfzeile, gleiches Gewicht),
     das "+" bekam ein EIGENES Token (soll leichter wirken).
     -> progress_2026-07-31_apptheme-migration-04.txt
+[6g] AppTheme-Bereinigung, DATEI 8: PageLayoutToolbar 21 -> 4. Ein
+    Grundton (0,80,180) mit drei abgeleiteten Alpha-Stufen statt drei
+    RGB-Tripeln. Zweiter Beinahe-Treffer gefunden und NICHT angeglichen
+    (MARGIN_GUIDE Alpha 170 vs CONTENT_GUIDE Alpha 180, gleicher Grundton).
+    Rest: 3 Fonts mit BERECHNETER Groesse + 1 dash-Stroke.
+    -> progress_2026-07-31_apptheme-migration-07.txt
 [6f] AppTheme-Bereinigung, DATEI 7: TileGalleryPanel 21 -> 0. Befund:
     die Unterklasse tippte die Kopf- und Listenfarbe ihrer Basisklasse
     BaseSidebarPanel FUENFMAL erneut - jetzt dasselbe Token. Neu: die
@@ -133,24 +142,30 @@ OFFEN — nach Hebel sortiert
 
 [6] APPTHEME-BEREINIGUNG (§21)  [C], FREIGEGEBEN — LAEUFT, NICHT FERTIG
 
-    DURCH (je werterhaltend nachgewiesen), VIER davon ohne Restliteral:
-      UIComponentFactory    11 -> 2 (parametrisiert)
-      SelectiveAlphaEditor       -> 2 (Laufzeitfarben)
-      UIBuilder                  -> 1 (dash-Stroke)
-      TextToolbar           15 -> 0
-      BaseSidebarPanel      11 -> 0   <- 4 Panels erben davon
-      NewImageDialog        17 -> 1 (dash-Stroke)
-      TileGalleryPanel      21 -> 0   <- tippte Basisklassen-Farben nach
+    DURCH (je werterhaltend nachgewiesen), VIER ohne Restliteral:
+      UIComponentFactory 2 (parametrisiert) · UIBuilder 1 (dash-Stroke) ·
+      SelectiveAlphaEditor 2 (Laufzeitfarben) · TextToolbar 0 ·
+      BaseSidebarPanel 0 · NewImageDialog 1 · TileGalleryPanel 0 ·
+      PageLayoutToolbar 4 (3 berechnete Fonts + dash-Stroke)
     VERBLEIBEND ausserhalb der Token-Klassen:
-      220 new Color (-15 %) · 103 new Font (-23 %) · 59 new BasicStroke (-13 %)
-    Token-Klassen: AppColors 43 Farben · AppTheme 19 Fonts, 4 Strokes
+      214 new Color (-17 %) · 94 new Font (-30 %) · 57 new BasicStroke (-16 %)
+    Token-Klassen: AppColors 48 Farben · AppTheme 19 Fonts, 4 Strokes
 
-    *** ZUERST: SICHTPRUEFUNG U1-U14 DURCH DEN USER (aufgestaut aus SIEBEN
+    *** ZWEI DATEIEN SIND KEINE KANDIDATEN — FARBE ALS INHALT:
+          ColorPickerPopup (11)  erzeugt Farben: RGB-Komponenten,
+                                 Alpha-Verlaeufe, Schachbrett
+          PaintToolbar     (20)  haelt die MAL-PALETTE des Benutzers
+                                 (24 Swatches). Eine Palette-Aenderung
+                                 wuerde die Malfarben umfaerben.
+        Zusammen 31 der 365 verbleibenden Literale. NICHT migrieren.
+        MERKSATZ: erst pruefen, ob die Farben ueberhaupt Oberflaeche sind. ***
+
+    *** ZUERST: SICHTPRUEFUNG U1-U15 DURCH DEN USER (aufgestaut aus ACHT
         Dateien; Listen in den progress_2026-07-31_*.txt). EIN Start des
-        Programms hakt alle vierzehn ab.
-        Die aussagekraeftigsten: U14 (Galerie + dunkle Bildlaufleiste),
-        U12 (Seitenleisten-Koepfe, 4 Panels), U13 (Dialog "Neue Datei"),
-        U9 (Ablageflaeche ohne Bild), U3 (Symbol-Knoepfe). ***
+        Programms hakt alle fuenfzehn ab.
+        Die aussagekraeftigsten: U14 (Galerie + Bildlaufleiste),
+        U12 (Seitenleisten-Koepfe, 4 Panels), U15 (Seitenlayout-Vorschau),
+        U13 (Dialog "Neue Datei"), U9 (Ablageflaeche), U3 (Symbol-Knoepfe). ***
 
     VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
       1. EINE Datei pro Schritt (Ausnahme: zwei Dateien, die sich eine
@@ -204,15 +219,18 @@ OFFEN — nach Hebel sortiert
         Schachbrett). Ein Farbwaehler erzeugt Farben - die duerfen nicht
         aus einer Palette kommen. Nur 5 von 11 waeren Token gewesen. ***
 
-    NAECHSTE DATEI — EMPFEHLUNG: PageLayoutToolbar (21) oder
-    PaintToolbar (20). Beide in sich abgeschlossen.
-    *** DIE VIER GROSSEN BROCKEN STEHEN NOCH und machen gut die HAELFTE
-        des Rests aus: ElementLayerPanel 84 · CanvasPanel 58 ·
-        TranslationMapListPanel 27 · MapsPanel 26 = 195 Literale.
-        ElementLayerPanel allein ist groesser als die sieben bisher
-        migrierten Dateien zusammen. Die brauchen einen EIGENEN Termin mit
-        anschliessender Sichtpruefung - nebenbei sind sie nicht
-        pruefbar. CanvasPanel ist zusaetzlich die God-Klasse (§22). ***
+    *** ES BLEIBEN NUR NOCH DIE VIER GROSSEN:
+          ElementLayerPanel 84 · CanvasPanel 58 ·
+          TranslationMapListPanel 27 · MapsPanel 26   = 195 Literale
+        ElementLayerPanel allein ist groesser als die acht bisher
+        migrierten Dateien zusammen. CanvasPanel ist zusaetzlich die
+        God-Klasse (§22) - dort ausserdem §22 beachten: keine neue
+        Fachlogik, und die Token-Ersetzung nicht mit einer Umstrukturierung
+        vermischen.
+        DIESE VIER BRAUCHEN EINEN EIGENEN TERMIN mit anschliessender
+        Sichtpruefung. Nebenbei sind sie nicht pruefbar. ***
+    EINSTIEG DORT — EMPFEHLUNG: MapsPanel (26) oder
+    TranslationMapListPanel (27). NICHT mit ElementLayerPanel anfangen.
     *** NICHT ElementLayerPanel (84) oder CanvasPanel (58) — in einer
         Sitzung nicht mehr sichtpruefbar; CanvasPanel ist zusaetzlich die
         God-Klasse (§22). ***
@@ -315,6 +333,11 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
       merklich kleiner als das "x" daneben. Betrifft VIER Panels
       gleichzeitig, weil sie von BaseSidebarPanel erben - eine der
       wichtigsten Pruefungen der ganzen Bereinigung. ***
+  U15 *** SEITENLAYOUT-LEISTE (Buchmodus, Knopf "SL"): in der Vorschau ein
+      gestricheltes blaues Rechteck um den Inhaltsbereich, blass blaue
+      Streifen fuer Kopf-/Fusszeile mit kraeftigerer Trennlinie, "N°"
+      etwas kraeftiger. Die drei abgestuften Blautoene sind die
+      Schluesselstelle - ein Grundton mit drei Alphas. ***
   U14 *** BILDGALERIE (linke Seitenleiste): Kachel-Hintergrund und
       Kopfzeile wie vorher; angeklickte Kachel GRUEN umrandet, Kachel in
       der Mehrfachauswahl GELB; dunkle Bildlaufleiste unveraendert, Griff

@@ -155,7 +155,7 @@ class PageLayoutToolbar extends JPanel {
         // Page name indicator
         pageNameLabel = new JLabel("Keine Buchseite");
         pageNameLabel.setForeground(AppColors.TEXT_MUTED);
-        pageNameLabel.setFont(new Font("SansSerif", Font.ITALIC, 11));
+        pageNameLabel.setFont(AppTheme.FONT_BASE_ITALIC);
         pageNameLabel.setAlignmentY(Component.CENTER_ALIGNMENT);
         pageNameLabel.setPreferredSize(new Dimension(130, BTN_H));
         pageNameLabel.setMaximumSize(new Dimension(130, BTN_H));
@@ -184,7 +184,7 @@ class PageLayoutToolbar extends JPanel {
         formatCombo.setSelectedItem(layout.paperFormat);
         formatCombo.setBackground(AppColors.BTN_BG);
         formatCombo.setForeground(AppColors.TEXT);
-        formatCombo.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        formatCombo.setFont(AppTheme.FONT_BASE);
         formatCombo.setPreferredSize(new Dimension(66, BTN_H));
         formatCombo.setMaximumSize(new Dimension(66, BTN_H));
         formatCombo.setFocusable(false);
@@ -240,7 +240,7 @@ class PageLayoutToolbar extends JPanel {
         unitCombo.setSelectedIndex(unitIndex);
         unitCombo.setBackground(AppColors.BTN_BG);
         unitCombo.setForeground(AppColors.TEXT);
-        unitCombo.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        unitCombo.setFont(AppTheme.FONT_SM);
         unitCombo.setPreferredSize(new Dimension(44, BTN_H_SM));
         unitCombo.setMaximumSize(new Dimension(44, BTN_H_SM));
         unitCombo.setFocusable(false);
@@ -327,7 +327,7 @@ class PageLayoutToolbar extends JPanel {
                 super.paintComponent(g);
             }
         };
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        btn.setFont(AppTheme.FONT_BASE);
         btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false); btn.setBorderPainted(false);
         btn.setContentAreaFilled(false); btn.setOpaque(false);
@@ -363,7 +363,7 @@ class PageLayoutToolbar extends JPanel {
         g2.drawImage(c.workingImage, 0, 0, null);
 
         // Dashed content-area rectangle
-        g2.setColor(new Color(0, 120, 220, 180));
+        g2.setColor(AppColors.CONTENT_GUIDE);
         float[] dash = { 6f, 4f };
         g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
         g2.drawRect(mL, mT, w - mL - mR, h - mT - mB);
@@ -371,32 +371,32 @@ class PageLayoutToolbar extends JPanel {
         // Header stripe
         if (layout.headerVisible) {
             int hh = Math.max(4, mT / 2);
-            g2.setStroke(new BasicStroke(1f));
-            g2.setColor(new Color(0, 80, 180, 45));
+            g2.setStroke(AppTheme.STROKE_HAIRLINE);
+            g2.setColor(AppColors.LAYOUT_STRIPE_FILL);
             g2.fillRect(mL, mT - hh, w - mL - mR, hh);
-            g2.setColor(new Color(0, 80, 180, 120));
+            g2.setColor(AppColors.LAYOUT_STRIPE_LINE);
             g2.drawLine(mL, mT - hh, w - mR, mT - hh);
-            g2.setFont(new Font("SansSerif", Font.PLAIN, Math.max(7, hh - 2)));
+            g2.setFont(new Font(AppTheme.FAMILY, Font.PLAIN, Math.max(7, hh - 2)));
             g2.drawString("Kopfzeile", mL + 4, mT - 2);
         }
 
         // Footer stripe
         if (layout.footerVisible) {
             int fh = Math.max(4, mB / 2);
-            g2.setStroke(new BasicStroke(1f));
-            g2.setColor(new Color(0, 80, 180, 45));
+            g2.setStroke(AppTheme.STROKE_HAIRLINE);
+            g2.setColor(AppColors.LAYOUT_STRIPE_FILL);
             g2.fillRect(mL, h - mB, w - mL - mR, fh);
-            g2.setColor(new Color(0, 80, 180, 120));
+            g2.setColor(AppColors.LAYOUT_STRIPE_LINE);
             g2.drawLine(mL, h - mB + fh, w - mR, h - mB + fh);
-            g2.setFont(new Font("SansSerif", Font.PLAIN, Math.max(7, fh - 2)));
+            g2.setFont(new Font(AppTheme.FAMILY, Font.PLAIN, Math.max(7, fh - 2)));
             g2.drawString("Fußzeile", mL + 4, h - mB + fh - 2);
         }
 
         // Page-number indicator
         if (layout.pageNumberVisible) {
             int fs = Math.max(8, mB / 4);
-            g2.setColor(new Color(0, 80, 180, 160));
-            g2.setFont(new Font("SansSerif", Font.PLAIN, fs));
+            g2.setColor(AppColors.LAYOUT_PAGENUM);
+            g2.setFont(new Font(AppTheme.FAMILY, Font.PLAIN, fs));
             g2.drawString("N°", w - mR - fs * 2 - 2, h - mB + fs + 2);
         }
 
@@ -562,7 +562,7 @@ class PageLayoutToolbar extends JPanel {
         if (sp.getEditor() instanceof JSpinner.DefaultEditor de) {
             de.getTextField().setBackground(AppColors.BTN_BG);
             de.getTextField().setForeground(AppColors.TEXT);
-            de.getTextField().setFont(new Font("SansSerif", Font.PLAIN, 11));
+            de.getTextField().setFont(AppTheme.FONT_BASE);
         }
     }
 
@@ -601,7 +601,7 @@ class PageLayoutToolbar extends JPanel {
         p.setAlignmentY(Component.CENTER_ALIGNMENT);
         JLabel lbl = new JLabel(title);
         lbl.setForeground(AppColors.TEXT_MUTED);
-        lbl.setFont(new Font("SansSerif", Font.PLAIN, 9));
+        lbl.setFont(AppTheme.FONT_XS);
         lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
         p.add(lbl);
         p.add(Box.createVerticalStrut(2));
@@ -621,7 +621,7 @@ class PageLayoutToolbar extends JPanel {
             JTextComponent tf = de.getTextField();
             tf.setBackground(AppColors.BTN_BG);
             tf.setForeground(AppColors.TEXT);
-            tf.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            tf.setFont(AppTheme.FONT_BASE);
             if (tf instanceof JTextField jtf)
                 jtf.setHorizontalAlignment(SwingConstants.CENTER);
         }
@@ -638,7 +638,7 @@ class PageLayoutToolbar extends JPanel {
 
     private JToggleButton barToggle(String text, String tooltip) {
         JToggleButton btn = new JToggleButton(text);
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 8));
+        btn.setFont(AppTheme.FONT_TINY);
         btn.setForeground(AppColors.TEXT);
         btn.setBackground(AppColors.BTN_BG);
         btn.setOpaque(true); btn.setContentAreaFilled(true);
@@ -656,7 +656,7 @@ class PageLayoutToolbar extends JPanel {
     private JLabel mLabel(String text) {
         JLabel l = new JLabel(text);
         l.setForeground(AppColors.TEXT_MUTED);
-        l.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        l.setFont(AppTheme.FONT_SM);
         return l;
     }
 
