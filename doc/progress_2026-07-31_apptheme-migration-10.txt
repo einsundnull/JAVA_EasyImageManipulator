@@ -1,0 +1,122 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-10.txt
+Aufgabentyp: [ST] — Schritt [6], DATEI 11: CanvasPanel (die God-Klasse)
+Risiko:      [C] freigegeben -> werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "weiter"
+
+*** Sichtpruefung waechst auf U1-U18, ELF Dateien aufgestaut. ***
+
+
+*** EINE BEGRUENDETE ABWEICHUNG VON §21 — BITTE LESEN ***
+--------------------------------------------------------------------------
+§21 sagt: "Fehlt ein Token, wird es angelegt." Bisher hiess das immer:
+in AppColors. HIER NICHT. Grund, vor der Arbeit gemessen:
+
+  24 verschiedene Farbwerte in CanvasPanel
+  davon kommen 23 GENAU EINMAL vor
+
+Das sind Zustandsfarben NUR dieses Editors: Textauswahl-Fuellung,
+Gummiband, Marquee, Pfadpunkt-Rahmen, Rand-Baender der Seitenvorschau.
+Waeren sie nach AppColors gewandert, waere die Palette von 55 auf 78
+Eintraege gewachsen — 23 davon fuer keine andere Datei brauchbar. Wer dann
+"die Akzentfarbe" sucht, waedet durch COLOR_MARQUEE_FILL und
+COLOR_TEXTBOX_FILL_DIM.
+
+*** DIE DATEI HATTE DIE ANTWORT SCHON: seit laengerem gibt es dort einen
+    Block "Cached paint primitives (avoid per-frame allocation)" mit acht
+    file-lokalen Farb- und Stroke-Konstanten. Diese Konvention wurde
+    FORTGESETZT statt uebergangen. ***
+
+REGEL, wie sie sich hier ergibt und im Code steht:
+  Geteilte Design-Entscheidungen  -> AppColors / AppTheme
+  Einmalige Overlay-Zustaende einer Datei -> file-lokale Konstante
+Beides ist "ein Token an einer Stelle". Der Unterschied ist die Reichweite.
+-> Als Ergaenzung fuer §21 vorgeschlagen (siehe WEITERMACHEN).
+
+
+ZWEITER BEFUND: DIE DATEI BENUTZTE IHRE EIGENEN KONSTANTEN NICHT
+--------------------------------------------------------------------------
+  STROKE_1   (= 1f)   existierte — und 8x stand trotzdem new BasicStroke(1f)
+  STROKE_1_5 (= 1.5f) existierte — und 4x stand trotzdem new BasicStroke(1.5f)
+
+*** Diese 12 Allokationen lagen IN paintComponent. Bei jedem Neuzeichnen
+    wurde ein Stroke erzeugt, den es als Konstante daneben schon gab.
+    Der Kommentar ueber dem Block sagt woertlich "avoid per-frame
+    allocation" — genau das wurde unterlaufen. ***
+Dasselbe galt fuer die 15 Farben: sie standen im Zeichenpfad.
+
+ERGEBNIS: im Zeichenpfad von CanvasPanel wird jetzt KEINE Farbe und KEIN
+einfacher Stroke mehr erzeugt.
+
+
+MIGRIERT: CanvasPanel.java
+--------------------------------------------------------------------------
+  new Color im Zeichenpfad:      15  ->  0
+  new BasicStroke einfach:       14  ->  0   (8x1f, 4x1.5f, 1.2f, 0.5f, 2f)
+  Font SansSerif PLAIN 9         ->  AppTheme.FONT_XS
+
+  NEU file-lokal: 15 Farb-Konstanten + STROKE_1_2 + STROKE_0_5
+  AUS AppTheme bezogen: STROKE_1, STROKE_1_5, STROKE_2, STROKE_FREEPATH
+    *** Die lokalen STROKE_1/1_5 waren DUBLETTEN von AppTheme.
+        STROKE_HAIRLINE/THIN. Jetzt zeigen die lokalen Namen auf die
+        globalen Token — Namen bleiben, Wert kommt aus einer Quelle.
+        Typ dabei BasicStroke -> java.awt.Stroke; vorher geprueft, dass
+        sie nur an setStroke() uebergeben werden. ***
+  WIEDERVERWENDET: der Rahmen eines gewaehlten Pfadpunkts war (255,140,0)
+    = exakt AppColors.SELECTION, gleiche Bedeutung -> globales Token.
+
+REST (begruendet):
+  9 gestrichelte Strokes mit LOKALEN dash-Arrays (boxDash, dash) —
+    parametrisiert, keine Konstante moeglich
+  4 Fonts mit dynamischem Namen/Groesse (Text-Werkzeug des Benutzers)
+
+
+NACHWEIS DER WERTERHALTUNG
+--------------------------------------------------------------------------
+Wegwerf-Programm mit REFLECTION (die Konstanten sind privat), das alle 15
+Farben und 6 Strichstaerken gegen ihre urspruenglichen Literale prueft —
+alle identisch. Zusaetzlich bestaetigt, dass STROKE_1/1_5/2 dieselben
+Objekte sind wie AppTheme.STROKE_HAIRLINE/THIN/MEDIUM.
+Build: exit 0, 335 .class — unveraendert.
+
+*** §22 EINGEHALTEN: keine Zeile Fachlogik angefasst, keine Methode
+    verschoben, keine Struktur geaendert. Nur Literale durch Konstanten
+    ersetzt. Die Entflechtung von CanvasPanel bleibt ein eigener,
+    freigabepflichtiger Schritt [10]. ***
+
+
+SICHTPRUEFUNG — JETZT U1-U18
+--------------------------------------------------------------------------
+  U1-U17 wie in den progress-Dateien 02 bis 09
+  neu:
+  U18 *** DER CANVAS SELBST — die groesste Pruefung der Bereinigung.
+      Alles in einem Durchgang:
+        a) Text-Werkzeug: Textrahmen mit blasser Fuellung, Auswahl im Text
+           blau hinterlegt, Rahmen beim Aufziehen hell-lila
+        b) Layer mit UMSCHALT ziehen: Gummiband blau, gefuellt + gestrichelt
+        c) Alpha-Modus: markierte Bereiche ROT halbdurchsichtig
+        d) Auswahl-Rechteck: cyan gefuellt + cyan umrandet
+        e) Pfad-Werkzeug: cyan Verbindungslinien; Pfadpunkte weiss gefuellt
+           mit blauem Rand, GEWAEHLTER Punkt gelb gefuellt mit ORANGEM Rand
+        f) Buchmodus: Rand-Hilfslinien blau gestrichelt mit sehr blassen
+           Baendern
+      *** (e) ist die wichtigste Einzelstelle: dort wurde ein lokaler
+          Farbwert durch AppColors.SELECTION ersetzt. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 11" wurde abgeschlossen: ja
+# Naechster Schritt: SICHTPRUEFUNG U1-U18 (elf Dateien aufgestaut).
+#   *** DANACH BLEIBT NUR NOCH ElementLayerPanel (84) - der letzte und
+#       groesste Kandidat. Dort vorher pruefen, ob nach dem CanvasPanel-
+#       Muster file-lokale Konstanten angebracht sind (Layer-Overlays sind
+#       vermutlich ebenfalls Einmal-Zustaende). ***
+# FRAGE AN DEN USER: soll die §21-Ergaenzung "einmalige Overlay-Farben
+#   duerfen file-lokal bleiben" verbindlich in die GUIDELINES?
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

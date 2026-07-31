@@ -117,6 +117,16 @@ kennt nur Farben (Befund S3).
 - **Zwei Token mit gleichem RGB sind nicht automatisch dasselbe Token.** Vor
   dem Zusammenlegen prüfen, ob die *Bedeutung* dieselbe ist, und die
   Entscheidung als Kommentar festhalten.
+- **Vorgeschlagene Ergänzung (2026-07-31, noch nicht freigegeben):**
+  Eine Farbe, die **genau einmal** vorkommt und einen Zustand **nur einer
+  Datei** beschreibt (Overlay, Marquee, Griff-Zustand), darf eine
+  **file-lokale** `private static final`-Konstante bleiben statt in die
+  Palette zu wandern. Begründung aus der `CanvasPanel`-Migration: dort kamen
+  23 von 24 Farbwerten genau einmal vor — in `AppColors` wären das 23
+  Einträge gewesen, die keine andere Datei nutzen kann. Geteilte
+  Design-Entscheidungen gehören in die Palette, einmalige Overlays nicht.
+  Beides bleibt „ein Wert an einer Stelle"; der Unterschied ist die
+  Reichweite. **Diese Regel ist angewandt, aber noch nicht freigegeben.**
 - Farben, die zur **Laufzeit** vom User gewählt werden (Primär-/Sekundärfarbe,
   Canvas-Schachbrett `bg1`/`bg2`, Kartenfarben) sind **keine** Tokens. Sie
   gehören in `AppSettings` (§31) — das ist die dokumentierte Ausnahme.

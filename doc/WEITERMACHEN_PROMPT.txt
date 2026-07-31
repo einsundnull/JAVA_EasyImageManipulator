@@ -8,15 +8,17 @@ Details je Schritt: die progress_2026-07-30_*.txt.
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
-Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: ZEHN Dateien
-sind durch. Es bleiben nur noch ZWEI echte Kandidaten — CanvasPanel (58)
-und ElementLayerPanel (84). Alles andere im Rest ist Farbe als INHALT und
-wird NICHT migriert (siehe unten).
-*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U17 durch den User. Sie war
+Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) laeuft: ELF Dateien
+sind durch, darunter die God-Klasse CanvasPanel. Es bleibt nur noch EIN
+echter Kandidat — ElementLayerPanel (84). Alles andere im Rest ist Farbe
+als INHALT und wird NICHT migriert (siehe unten).
+*** OFFEN UND AUFGESTAUT: die SICHTPRUEFUNG U1-U18 durch den User. Sie war
     schon nach Datei 1 faellig und ist nie erfolgt — deshalb deckt sie
-    jetzt ZEHN Dateien ab. EIN Programmstart hakt alle siebzehn ab. ***
-*** DIE "KLEINEN, GUT PRUEFBAREN" DATEIEN SIND AUFGEBRAUCHT. Die beiden
-    verbliebenen brauchen je einen eigenen Termin. ***
+    jetzt ELF Dateien ab. EIN Programmstart hakt alle achtzehn ab.
+    U18 (der Canvas selbst) ist die groesste Einzelpruefung. ***
+*** OFFENE FRAGE AN DEN USER: soll die §21-Ergaenzung "einmalige
+    Overlay-Farben duerfen file-lokal bleiben" verbindlich werden?
+    Sie wurde in CanvasPanel bereits angewandt und begruendet. ***
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -102,6 +104,18 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     bewusst an FONT_TITLE GEKOPPELT (gleiche Kopfzeile, gleiches Gewicht),
     das "+" bekam ein EIGENES Token (soll leichter wirken).
     -> progress_2026-07-31_apptheme-migration-04.txt
+[6j] AppTheme-Bereinigung, DATEI 11: CanvasPanel (God-Klasse).
+    Im Zeichenpfad jetzt KEINE Farbe und KEIN einfacher Stroke mehr.
+    *** BEGRUENDETE ABWEICHUNG: 23 der 24 Farbwerte kamen genau EINMAL
+        vor - sie wurden FILE-LOKALE Konstanten, nicht AppColors-Eintraege.
+        Die Datei hatte diese Konvention bereits ("Cached paint
+        primitives"). ***
+    *** ZWEITER BEFUND: STROKE_1 und STROKE_1_5 existierten als
+        Konstanten - und 12x stand trotzdem new BasicStroke() daneben,
+        mitten in paintComponent. Der Kommentar darueber sagt "avoid
+        per-frame allocation". ***
+    §22 eingehalten: keine Fachlogik, keine Struktur angefasst.
+    -> progress_2026-07-31_apptheme-migration-10.txt
 [6i] AppTheme-Bereinigung, DATEI 10: TranslationMapListPanel, Schriften
     18 -> 6. *** KEINE Farbe angefasst: alle zehn new Color lesen aus
     AppSettings oder leiten aus benutzergewaehlten Kartenfarben ab. Die
@@ -155,19 +169,17 @@ OFFEN — nach Hebel sortiert
 
 [6] APPTHEME-BEREINIGUNG (§21)  [C], FREIGEGEBEN — LAEUFT, NICHT FERTIG
 
-    DURCH (je werterhaltend nachgewiesen), FUENF ohne Restliteral:
-      UIComponentFactory 2 · UIBuilder 1 · SelectiveAlphaEditor 2 ·
-      TextToolbar 0 · BaseSidebarPanel 0 · NewImageDialog 1 ·
-      TileGalleryPanel 0 · PageLayoutToolbar 4 · MapsPanel 0 ·
-      TranslationMapListPanel (nur Schriften, Farben sind Benutzerdaten)
-    VERBLEIBEND ausserhalb der Token-Klassen:
-      194 new Color (-25 %) · 76 new Font (-43 %) · 57 new BasicStroke (-16 %)
+    DURCH (je werterhaltend nachgewiesen), ELF Dateien:
+      UIComponentFactory · SelectiveAlphaEditor · UIBuilder · TextToolbar ·
+      BaseSidebarPanel · NewImageDialog · TileGalleryPanel ·
+      PageLayoutToolbar · MapsPanel · TranslationMapListPanel (nur
+      Schriften) · CanvasPanel (file-lokale Konstanten)
     Token-Klassen: AppColors 55 Farben · AppTheme 21 Fonts, 4 Strokes
 
-    *** DIE FONT-QUOTE LAEUFT DER FARB-QUOTE DAVON (43 % gegen 25 %).
-        Kein Zufall: Schriften sind fast immer Oberflaeche, Farben oft
-        Inhalt. Der Farb-Rest ist zu einem grossen Teil gar kein
-        Kandidat. ***
+    *** ES BLEIBT NUR NOCH EIN ECHTER KANDIDAT: ElementLayerPanel (84).
+        Vorher pruefen, ob dort das CanvasPanel-Muster passt - Layer-
+        Overlays sind vermutlich ebenfalls Einmal-Zustaende und gehoeren
+        dann file-lokal, nicht in die Palette. ***
 
     *** KEINE KANDIDATEN — FARBE ALS INHALT, NICHT MIGRIEREN:
           PaintToolbar            20  Mal-Palette des Benutzers
@@ -175,20 +187,16 @@ OFFEN — nach Hebel sortiert
           ColorPickerPopup        11  erzeugt Farben (Verlaeufe, RGB)
           PaintEngine              8  vermutlich ebenso - VOR einer
                                       Migration pruefen
-        Zusammen ~55 der 194 verbliebenen Farb-Literale.
         MERKSATZ: erst pruefen, ob die Farben ueberhaupt Oberflaeche sind.
-        Die Aehnlichkeit zweier Panels sagt darueber NICHTS - MapsPanel
-        und TranslationMapListPanel sehen gleich aus und liegen
-        entgegengesetzt. ***
+        Die Aehnlichkeit zweier Panels sagt darueber NICHTS. ***
 
-    *** ZUERST: SICHTPRUEFUNG U1-U17 DURCH DEN USER (aufgestaut aus ZEHN
+    *** ZUERST: SICHTPRUEFUNG U1-U18 DURCH DEN USER (aufgestaut aus ELF
         Dateien; Listen in den progress_2026-07-31_*.txt). EIN Start des
-        Programms hakt alle siebzehn ab.
-        Die aussagekraeftigsten: U17 (Knoepfe "✎"/"💬" zeigen ihr Zeichen),
-        U16 (Karten-Panel, Hover der farbigen Knoepfe), U14 (Galerie +
-        Bildlaufleiste), U12 (Seitenleisten-Koepfe, 4 Panels),
-        U15 (Seitenlayout-Vorschau), U13 (Dialog "Neue Datei"),
-        U9 (Ablageflaeche), U3 (Symbol-Knoepfe). ***
+        Programms hakt alle achtzehn ab.
+        Die aussagekraeftigsten: U18 (der Canvas selbst, sechs Teilpunkte),
+        U17 (Knoepfe "✎"/"💬"), U16 (Karten-Panel), U14 (Galerie +
+        Bildlaufleiste), U12 (Seitenleisten-Koepfe), U15 (Seitenlayout),
+        U13 (Dialog "Neue Datei"), U9 (Ablageflaeche). ***
 
     VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
       1. EINE Datei pro Schritt (Ausnahme: zwei Dateien, die sich eine
@@ -242,18 +250,13 @@ OFFEN — nach Hebel sortiert
         Schachbrett). Ein Farbwaehler erzeugt Farben - die duerfen nicht
         aus einer Palette kommen. Nur 5 von 11 waeren Token gewesen. ***
 
-    *** ES BLEIBEN NUR NOCH ZWEI ECHTE KANDIDATEN:
-          CanvasPanel        58  God-Klasse (§22)
-          ElementLayerPanel   84  groesster Brocken
-        ElementLayerPanel allein ist groesser als die zehn bisher
-        migrierten Dateien zusammen.
-        Bei CanvasPanel gilt §22 zusaetzlich: die Token-Ersetzung NICHT mit
-        einer Umstrukturierung vermischen - erst Tokens, spaeter Extraktion.
-        BEIDE BRAUCHEN EINEN EIGENEN TERMIN mit anschliessender
-        Sichtpruefung. Nebenbei sind sie nicht pruefbar. ***
-    Reihenfolge-Empfehlung: erst CanvasPanel (58), dann ElementLayerPanel
-    (84) - der groesste zuletzt, wenn die Token-Sammlung am
-    vollstaendigsten ist und am meisten wiederverwendet werden kann.
+    LETZTE DATEI: ElementLayerPanel (84). Groesser als alles bisher
+    Migrierte zusammen. Eigener Termin, anschliessend Sichtpruefung.
+    *** DORT ZUERST DIE FRAGE STELLEN, DIE BEI CanvasPanel ENTSCHEIDEND
+        WAR: wie oft kommt jeder Farbwert vor? Einmal-Werte gehoeren
+        file-lokal, geteilte in die Palette. Messen mit
+          grep -o "new Color([0-9, ]*)" <datei> | sort | uniq -c | sort -rn
+    ***
     *** NICHT ElementLayerPanel (84) oder CanvasPanel (58) — in einer
         Sitzung nicht mehr sichtpruefbar; CanvasPanel ist zusaetzlich die
         God-Klasse (§22). ***
@@ -356,6 +359,16 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
       merklich kleiner als das "x" daneben. Betrifft VIER Panels
       gleichzeitig, weil sie von BaseSidebarPanel erben - eine der
       wichtigsten Pruefungen der ganzen Bereinigung. ***
+  U18 *** DER CANVAS SELBST - groesste Einzelpruefung, alles in einem
+      Durchgang:
+        a) Text-Werkzeug: Textrahmen blass gefuellt, Textauswahl blau
+           hinterlegt, Rahmen beim Aufziehen hell-lila
+        b) Layer mit UMSCHALT ziehen: Gummiband blau, gefuellt+gestrichelt
+        c) Alpha-Modus: markierte Bereiche ROT halbdurchsichtig
+        d) Auswahl-Rechteck: cyan gefuellt + umrandet
+        e) Pfad-Werkzeug: cyan Linien; Punkte weiss mit blauem Rand,
+           GEWAEHLTER Punkt gelb mit ORANGEM Rand   <- wichtigste Stelle
+        f) Buchmodus: Rand-Hilfslinien blau gestrichelt, blasse Baender ***
   U17 *** UEBERSETZUNGS-KARTEN: die Knoepfe "✎" und "💬" muessen ihr
       ZEICHEN zeigen, nicht ein leeres Kaestchen - dort wurde die
       Schriftfamilie "Dialog" durch ein Token ersetzt. Ausserdem: die vom

@@ -80,6 +80,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`progress_2026-07-31_apptheme-migration-07.txt`](progress_2026-07-31_apptheme-migration-07.txt) | Token-Bereinigung, **Datei 8**: `PageLayoutToolbar` · ein Grundton, drei Alphas · zwei Dateien als „Farbe = Inhalt" zurückgestellt |
 | [`progress_2026-07-31_apptheme-migration-08.txt`](progress_2026-07-31_apptheme-migration-08.txt) | Token-Bereinigung, **Datei 9**: `MapsPanel` · zwei Knopf-Gruppen · dritte RGB-Kollision |
 | [`progress_2026-07-31_apptheme-migration-09.txt`](progress_2026-07-31_apptheme-migration-09.txt) | Token-Bereinigung, **Datei 10**: `TranslationMapListPanel` · nur Schriften, alle Farben sind Benutzerdaten |
+| [`progress_2026-07-31_apptheme-migration-10.txt`](progress_2026-07-31_apptheme-migration-10.txt) | Token-Bereinigung, **Datei 11**: `CanvasPanel` · file-lokale Konstanten statt Palette · ⏳ §21-Ergänzung zur Freigabe |
 | [`WEITERMACHEN_PROMPT_2026-07-30_archiv.txt`](WEITERMACHEN_PROMPT_2026-07-30_archiv.txt) | Vorgänger-Fassung mit dem vollen Verlauf der Schritte [1]–[4] |
 
 ## 7. Historisch — abgeschlossene Arbeiten (nicht als Ist-Stand lesen)

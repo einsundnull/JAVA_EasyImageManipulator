@@ -183,11 +183,15 @@ public class CanvasPanel extends JPanel {
 	// ── Cached paint primitives (avoid per-frame allocation in paintComponent) ──
 	private static final float[] SEL_DASH = { 5f, 3f };
 	private static final float[] DIM_DASH = { 3f, 3f };
-	private static final BasicStroke STROKE_1        = new BasicStroke(1f);
-	private static final BasicStroke STROKE_1_5      = new BasicStroke(1.5f);
+	// Breiten aus AppTheme (§21) - sie standen hier ein zweites Mal.
+	private static final java.awt.Stroke STROKE_1   = AppTheme.STROKE_HAIRLINE;
+	private static final java.awt.Stroke STROKE_1_5 = AppTheme.STROKE_THIN;
+	private static final java.awt.Stroke STROKE_2   = AppTheme.STROKE_MEDIUM;
+	private static final BasicStroke STROKE_1_2     = new BasicStroke(1.2f);
+	private static final BasicStroke STROKE_0_5     = new BasicStroke(0.5f);
 	private static final BasicStroke STROKE_SEL_DASH = new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, SEL_DASH, 0f);
 	private static final BasicStroke STROKE_DIM_DASH = new BasicStroke(1f,   BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, DIM_DASH, 0f);
-	private static final BasicStroke STROKE_FREEPATH = new BasicStroke(2f);
+	private static final java.awt.Stroke STROKE_FREEPATH = AppTheme.STROKE_MEDIUM;
 	private static final Color COLOR_HANDLE_HOV_FILL   = new Color(255, 220, 60);
 	private static final Color COLOR_HANDLE_HOV_BORDER = new Color(200, 140, 0);
 	private static final Color COLOR_ROT_HOV           = new Color(255, 180, 0);
@@ -196,6 +200,30 @@ public class CanvasPanel extends JPanel {
 	private static final Color COLOR_DIM_OUTLINE       = new Color(160, 160, 160, 140);
 	private static final Color COLOR_FREEPATH_LINE     = new Color(80, 160, 255, 200);
 	private static final Color COLOR_FREEPATH_START    = new Color(255, 200, 60);
+
+	// ── Overlay-Farben, 2026-07-31 aus dem Zeichenpfad hierher gezogen ──────
+	// BEWUSST FILE-LOKAL und nicht in AppColors: jede kommt genau EINMAL vor
+	// und beschreibt einen Zustand NUR dieses Editors. In der globalen Palette
+	// waeren es 15 Eintraege, die keine andere Datei benutzen kann - sie
+	// wuerden die Palette unbrauchbar machen. Geteilte Entscheidungen gehoeren
+	// nach AppColors, einmalige Overlays hierher (§21).
+	// Zweiter Grund: sie standen in paintComponent und wurden bei JEDEM
+	// Neuzeichnen neu erzeugt.
+	private static final Color COLOR_TEXTBOX_FILL_DIM = new Color(255, 255, 255,  15);
+	private static final Color COLOR_TEXTBOX_FILL     = new Color(255, 255, 255,  20);
+	private static final Color COLOR_TEXT_SEL_FILL    = new Color( 66, 135, 245, 120);
+	private static final Color COLOR_TEXTBOX_DRAWING  = new Color(180, 180, 255);
+	private static final Color COLOR_MARGIN_LINE      = new Color(  0, 120, 220, 200);
+	private static final Color COLOR_MARGIN_BAND      = new Color(  0, 120, 220,  18);
+	private static final Color COLOR_BAND_FILL        = new Color(100, 150, 255,  40);
+	private static final Color COLOR_BAND_OUTLINE     = new Color(100, 150, 255);
+	private static final Color COLOR_ALPHA_SEL        = new Color(255,   0,   0,  70);
+	private static final Color COLOR_MARQUEE_FILL     = new Color(  0, 200, 255,  60);
+	private static final Color COLOR_MARQUEE_OUTLINE  = new Color(  0, 200, 255);
+	private static final Color COLOR_PATH_LINE        = new Color(  0, 200, 255, 180);
+	private static final Color COLOR_PATH_PT_HOVER    = new Color(255, 255, 255, 200);
+	private static final Color COLOR_PATH_PT_SEL_FILL = new Color(255, 200,   0);
+	private static final Color COLOR_PATH_PT_BORDER   = new Color(  0, 150, 200);
 
 	// ── Canvas-submode draw overlay ───────────────────────────────────────────
 	/** Transparent scratch image used when drawing in Canvas sub-mode (becomes an Element on release). */
@@ -2793,12 +2821,12 @@ public class CanvasPanel extends JPanel {
 				// ── Wrapping mode: fixed bounds, word-wrap ──────────────────────────
 				boxW = (int)(textBoundingBox.width  * z);
 				boxH = (int)(textBoundingBox.height * z);
-				g2.setColor(new Color(255, 255, 255, 15));
+				g2.setColor(COLOR_TEXTBOX_FILL_DIM);
 				g2.fillRect(sx, sy, boxW, boxH);
 				g2.setColor(AppColors.ACCENT);
 				g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, boxDash, 0f));
 				g2.drawRect(sx, sy, boxW, boxH);
-				g2.setStroke(new BasicStroke(1f));
+				g2.setStroke(STROKE_1);
 
 				if (!textDrawingBox) {
 					int maxW = Math.max(1, boxW - TEXT_PADDING * 2);
@@ -2808,7 +2836,7 @@ public class CanvasPanel extends JPanel {
 					// Selection highlight
 					if (hasTextSel()) {
 						int sMin = selMin(), sMax = selMax();
-						g2.setColor(new Color(66, 135, 245, 120));
+						g2.setColor(COLOR_TEXT_SEL_FILL);
 						for (int li = 0; li < lines.size(); li++) {
 							TLine ln = lines.get(li);
 							int lSS = Math.max(sMin, ln.start()), lSE = Math.min(sMax, ln.end());
@@ -2834,9 +2862,9 @@ public class CanvasPanel extends JPanel {
 						int cx = sx + TEXT_PADDING + fm.stringWidth(ln.text().substring(0, off));
 						int cy = sy + TEXT_PADDING + li * lineH;
 						g2.setColor(textColor);
-						g2.setStroke(new BasicStroke(1.5f));
+						g2.setStroke(STROKE_1_5);
 						g2.drawLine(cx, cy, cx, cy + lineH - 1);
-						g2.setStroke(new BasicStroke(1f));
+						g2.setStroke(STROKE_1);
 					}
 				}
 			} else {
@@ -2855,12 +2883,12 @@ public class CanvasPanel extends JPanel {
 					textBoundingBox.width  = (int)Math.ceil(boxW / z);
 					textBoundingBox.height = (int)Math.ceil(boxH / z);
 				}
-				g2.setColor(new Color(255, 255, 255, 20));
+				g2.setColor(COLOR_TEXTBOX_FILL);
 				g2.fillRect(sx, sy, boxW, boxH);
-				g2.setColor(textDrawingBox ? new Color(180, 180, 255) : AppColors.ACCENT);
+				g2.setColor(textDrawingBox ? COLOR_TEXTBOX_DRAWING : AppColors.ACCENT);
 				g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, boxDash, 0f));
 				g2.drawRect(sx, sy, boxW, boxH);
-				g2.setStroke(new BasicStroke(1f));
+				g2.setStroke(STROKE_1);
 
 				if (!textDrawingBox) {
 					lastTextLines = lines; lastTextSx = sx; lastTextSy = sy; lastTextLineH = lineH;
@@ -2868,7 +2896,7 @@ public class CanvasPanel extends JPanel {
 					// Selection highlight
 					if (hasTextSel()) {
 						int sMin = selMin(), sMax = selMax();
-						g2.setColor(new Color(66, 135, 245, 120));
+						g2.setColor(COLOR_TEXT_SEL_FILL);
 						for (int li = 0; li < lines.size(); li++) {
 							TLine ln = lines.get(li);
 							int lSS = Math.max(sMin, ln.start()), lSE = Math.min(sMax, ln.end());
@@ -2893,9 +2921,9 @@ public class CanvasPanel extends JPanel {
 						int cx = sx + TEXT_PADDING + fm.stringWidth(ln.text().substring(0, off));
 						int cy = sy + TEXT_PADDING + li * lineH;
 						g2.setColor(textColor);
-						g2.setStroke(new BasicStroke(1.5f));
+						g2.setStroke(STROKE_1_5);
 						g2.drawLine(cx, cy, cx, cy + lineH - 1);
-						g2.setStroke(new BasicStroke(1f));
+						g2.setStroke(STROKE_1);
 					}
 				}
 			}
@@ -2914,12 +2942,12 @@ public class CanvasPanel extends JPanel {
 				int sR = (int) Math.round((imgW - mR) * zoom);
 				int sB = (int) Math.round((imgH - mB) * zoom);
 				float[] dash = { 6f, 4f };
-				g2.setColor(new Color(0, 120, 220, 200));
+				g2.setColor(COLOR_MARGIN_LINE);
 				g2.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, dash, 0f));
 				g2.drawRect(sL, sT, Math.max(0, sR - sL), Math.max(0, sB - sT));
-				g2.setStroke(new BasicStroke(1f));
+				g2.setStroke(STROKE_1);
 				// Semi-transparent margin bands
-				g2.setColor(new Color(0, 120, 220, 18));
+				g2.setColor(COLOR_MARGIN_BAND);
 				g2.fillRect(0,   0,   cw, sT);           // top band
 				g2.fillRect(0,   sB,  cw, ch - sB);      // bottom band
 				g2.fillRect(0,   sT,  sL, sB - sT);      // left band
@@ -2933,16 +2961,16 @@ public class CanvasPanel extends JPanel {
 			int by = Math.min(elemBandStart.y, elemBandEnd.y);
 			int bw = Math.abs(elemBandEnd.x - elemBandStart.x);
 			int bh = Math.abs(elemBandEnd.y - elemBandStart.y);
-			g2.setColor(new Color(100, 150, 255, 40));
+			g2.setColor(COLOR_BAND_FILL);
 			g2.fillRect(bx, by, bw, bh);
 			float[] dash = { 5f, 3f };
-			g2.setColor(new Color(100, 150, 255));
+			g2.setColor(COLOR_BAND_OUTLINE);
 			g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 0f));
 			g2.drawRect(bx, by, bw, bh);
 		}
 
 		// Selections overlay
-		g2.setColor(new Color(255, 0, 0, 70));
+		g2.setColor(COLOR_ALPHA_SEL);
 		for (Rectangle r : callbacks.getSelectedAreas()) {
 			int sx = (int) Math.round(r.x * callbacks.getZoom());
 			int sy = (int) Math.round(r.y * callbacks.getZoom());
@@ -2952,7 +2980,7 @@ public class CanvasPanel extends JPanel {
 		}
 
 		g2.setColor(Color.RED);
-		g2.setStroke(new BasicStroke(1.2f));
+		g2.setStroke(STROKE_1_2);
 		for (Rectangle r : callbacks.getSelectedAreas()) {
 			int sx = (int) Math.round(r.x * callbacks.getZoom());
 			int sy = (int) Math.round(r.y * callbacks.getZoom());
@@ -2969,7 +2997,7 @@ public class CanvasPanel extends JPanel {
 				int sy = (int) Math.round(aSel.y * callbacks.getZoom());
 				int sw = (int) Math.round(aSel.width  * callbacks.getZoom());
 				int sh = (int) Math.round(aSel.height * callbacks.getZoom());
-				g2.setStroke(new BasicStroke(1f));
+				g2.setStroke(STROKE_1);
 				for (Rectangle hr : callbacks.handleRects(new Rectangle(sx, sy, sw, sh))) {
 					g2.setColor(Color.WHITE);
 					g2.fillRect(hr.x, hr.y, hr.width, hr.height);
@@ -2985,11 +3013,11 @@ public class CanvasPanel extends JPanel {
 			int y = Math.min(callbacks.getSelectionStart().y, callbacks.getSelectionEnd().y);
 			int w = Math.abs(callbacks.getSelectionEnd().x - callbacks.getSelectionStart().x);
 			int h = Math.abs(callbacks.getSelectionEnd().y - callbacks.getSelectionStart().y);
-			g2.setColor(new Color(0, 200, 255, 60));
+			g2.setColor(COLOR_MARQUEE_FILL);
 			g2.fillRect((int) Math.round(x * callbacks.getZoom()), (int) Math.round(y * callbacks.getZoom()),
 					(int) Math.round(w * callbacks.getZoom()), (int) Math.round(h * callbacks.getZoom()));
-			g2.setColor(new Color(0, 200, 255));
-			g2.setStroke(new BasicStroke(1.5f));
+			g2.setColor(COLOR_MARQUEE_OUTLINE);
+			g2.setStroke(STROKE_1_5);
 			g2.drawRect((int) Math.round(x * callbacks.getZoom()), (int) Math.round(y * callbacks.getZoom()),
 					(int) Math.round(w * callbacks.getZoom()), (int) Math.round(h * callbacks.getZoom()));
 		}
@@ -3011,7 +3039,7 @@ public class CanvasPanel extends JPanel {
 			g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, dash, 6f));
 			g2.drawRect(fx, fy, fw, fh);
 
-			g2.setStroke(new BasicStroke(1f));
+			g2.setStroke(STROKE_1);
 			for (Rectangle hr : callbacks.handleRects(new Rectangle(fx, fy, fw, fh))) {
 				g2.setColor(Color.WHITE);
 				g2.fillRect(hr.x, hr.y, hr.width, hr.height);
@@ -3065,7 +3093,7 @@ public class CanvasPanel extends JPanel {
 		if (round) g2.drawOval(x, y, d, d); else g2.drawRect(x, y, d, d);
 
 		// Reset to avoid leaking stroke/AA settings
-		g2.setStroke(new BasicStroke(1f));
+		g2.setStroke(STROKE_1);
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 	}
 
@@ -3078,7 +3106,7 @@ public class CanvasPanel extends JPanel {
 		int step = Math.max(1, (int) Math.round(GRID_PX * zoom));
 		int screenW = (int) Math.round(W * zoom);
 		int screenH = (int) Math.round(H * zoom);
-		g2.setStroke(new BasicStroke(0.5f));
+		g2.setStroke(STROKE_0_5);
 		// Minor lines (every cell)
 		g2.setColor(new java.awt.Color(255, 255, 255, 30));
 		for (int x = 0; x <= screenW; x += step) g2.drawLine(x, 0, x, screenH);
@@ -3234,8 +3262,8 @@ public class CanvasPanel extends JPanel {
 		int pointRadius = 8;  // Pixel radius for point rendering
 
 		// ── Draw lines connecting points ──
-		g2.setColor(new Color(0, 200, 255, 180));  // Cyan
-		g2.setStroke(new BasicStroke(1.5f));
+		g2.setColor(COLOR_PATH_LINE);  // Cyan
+		g2.setStroke(STROKE_1_5);
 		for (int i = 0; i < points.size() - 1; i++) {
 			Point3D p1 = points.get(i);
 			Point3D p2 = points.get(i + 1);
@@ -3272,26 +3300,26 @@ public class CanvasPanel extends JPanel {
 
 			if (isHovered && !isSelected) {
 				// Hover: only a thin dashed outline, no fill
-				g2.setColor(new Color(255, 255, 255, 200));
+				g2.setColor(COLOR_PATH_PT_HOVER);
 				g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
 						10f, new float[]{3f, 3f}, 0f));
 				g2.drawOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
 			} else {
 				// Normal / selected: filled circle with border
-				Color fillColor  = isSelected ? new Color(255, 200, 0) : Color.WHITE;
-				Color borderColor = isSelected ? new Color(255, 140, 0) : new Color(0, 150, 200);
+				Color fillColor  = isSelected ? COLOR_PATH_PT_SEL_FILL : Color.WHITE;
+				Color borderColor = isSelected ? AppColors.SELECTION : COLOR_PATH_PT_BORDER;
 
 				g2.setColor(fillColor);
 				g2.fillOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
 
 				g2.setColor(borderColor);
-				g2.setStroke(isSelected ? new BasicStroke(2f) : new BasicStroke(1.5f));
+				g2.setStroke(isSelected ? STROKE_2 : STROKE_1_5);
 				g2.drawOval(px - drawRadius, py - drawRadius, drawRadius * 2, drawRadius * 2);
 			}
 
 			// Point index label
 			g2.setColor(Color.BLACK);
-			g2.setFont(new Font("SansSerif", Font.PLAIN, 9));
+			g2.setFont(AppTheme.FONT_XS);
 			g2.drawString(String.valueOf(i), px + drawRadius + 3, py - 2);
 		}
 	}
