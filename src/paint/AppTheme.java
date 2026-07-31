@@ -72,6 +72,24 @@ public final class AppTheme {
     /** 11 pt kursiv — Platzhalter-/Hinweistext. */
     public static final Font FONT_BASE_ITALIC = new Font(FAMILY, Font.ITALIC, 11);
 
+    // ── Ergänzt 2026-07-31 bei der Migration von UIComponentFactory ───────────
+    // Diese vier Werte kamen dort als Literal vor und passten auf KEIN
+    // bestehendes Token. Sie wurden angelegt statt gerundet — Runden hätte das
+    // Aussehen verändert (§21).
+
+    /** 13 pt fett — Titelzeile eines Dialogs. */
+    public static final Font FONT_LG_BOLD = new Font(FAMILY, Font.BOLD, 13);
+    /** 16 pt — Beschriftung der quadratischen Umschaltknöpfe der oberen Leiste. */
+    public static final Font FONT_XL      = new Font(FAMILY, Font.PLAIN, 16);
+    /**
+     * 16 pt aus der Familie <b>Dialog</b> — für Knöpfe, deren Beschriftung ein
+     * Symbol/Unicode-Zeichen ist. Bewusst nicht {@link #FAMILY}: „Dialog" deckt
+     * mehr Symbole ab, SansSerif zeigt sonst Ersatzkästchen.
+     */
+    public static final Font FONT_SYMBOL  = new Font("Dialog", Font.PLAIN, 16);
+    /** 30 pt — Pfeil der großen Navigationsknöpfe über dem Bild. */
+    public static final Font FONT_NAV     = new Font(FAMILY, Font.PLAIN, 30);
+
     // ── Linienstärken ─────────────────────────────────────────────────────────
     /** 1 px — Trennlinien, Raster, einfache Rahmen (häufigster Wert). */
     public static final Stroke STROKE_HAIRLINE = new BasicStroke(1f);

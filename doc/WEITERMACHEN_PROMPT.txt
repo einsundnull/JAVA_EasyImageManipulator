@@ -1,11 +1,17 @@
 ==============================================================================
 WEITERMACHEN_PROMPT.txt  —  TransparencyTool
-Stand: 2026-07-30. BEREINIGTE FASSUNG.
+Stand: 2026-07-31. BEREINIGTE FASSUNG.
 Die ausfuehrliche Vorgaenger-Fassung mit dem vollen Verlauf der Schritte
 [1]-[4] liegt in doc/WEITERMACHEN_PROMPT_2026-07-30_archiv.txt.
 Details je Schritt: die progress_2026-07-30_*.txt.
 ==============================================================================
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
+
+*** WO WIR STEHEN, IN EINEM SATZ ***
+Schritt [6] (AppTheme-Bereinigung, [C], freigegeben) ist ANGEFANGEN:
+Datei 1 von n ist fertig (UIComponentFactory), 453 Literale ausserhalb der
+Token-Klassen verbleiben. OFFEN ist zuerst die SICHTPRUEFUNG U1-U5 durch
+den User, danach die naechste Datei.
 
 LIES ZUERST (Reihenfolge ist verbindlich):
   1. ../JAVA_GUIDELINES_UNIVERSAL.md   (Workspace-Ebene, gilt fuer ALLE
@@ -61,10 +67,20 @@ ERLEDIGT AM 2026-07-30 (Kurzfassung)
     ../JavaDemos/ ausgelagert, Root-paint/ (60 .class) geloescht.
 [5] AppTheme angelegt — additiv, 0 Aufrufer, kein Wert geaendert.
     -> progress_2026-07-30_apptheme.txt
-[7] BOOKS_ROOT + cardfolders ueber AppPaths; Ablageort nachweislich gleich.
+[7] BOOKS_ROOT + cardfolders ueber AppPaths; Ablageort nachweislich gleich
+    (getCanonicalPath-Vergleich, 5 Buecher + 2 Kartenordner erreichbar).
+    *** books/ und settings/cardfolders/ entstehen weiterhin ERST BEIM
+        ERSTEN ZUGRIFF, nicht beim Start. Nicht "vereinheitlichen". ***
     -> progress_2026-07-30_apppaths-books.txt
-[8] KeyBindings-Registry + Hilfe-Dialog (Umschalt+F1 und Knopf).
+[8] KeyBindings-Registry + Hilfe-Dialog (Umschalt+F1 und Knopf), 53 Eintraege.
+    *** Die Umschalt+F1-Abfrage steht VOR der F1-Abfrage im Dispatcher.
+        Wer sie verschiebt, macht die Hilfe unerreichbar. ***
+    *** Beschreibungen sind JTextArea, KEIN JLabel: umbrechen statt
+        abschneiden (§25). Nicht "vereinfachen". ***
     -> progress_2026-07-30_keybindings.txt
+[6a] AppTheme-Bereinigung, DATEI 1: UIComponentFactory (11 -> 2 Literale),
+    werterhaltend per Wertvergleich nachgewiesen. 8 neue Token.
+    -> progress_2026-07-31_apptheme-migration-01.txt
 
 VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
   a) "referenzfrei" != "unbenutzt". Eine Klasse mit main() ist startbar.
@@ -82,83 +98,58 @@ VIER LEHREN, DIE NICHT VERLOREN GEHEN DUERFEN:
 OFFEN — nach Hebel sortiert
 ==============================================================================
 
-[6] APPTHEME ANWENDEN: DIE BEREINIGUNG  (§21)  [C], BRAUCHT FREIGABE
-    Der additive Teil ist fertig: AppTheme existiert (12 Fonts, STROKE_*,
-    RADIUS_*, PAD_*/GAP_*, BTN_W/H, alpha(), pad()), hat 0 Aufrufer und
-    aendert keinen bestehenden Wert. Offen ist die Abloesung der Literale:
-    454 new Color · 162 new Font · 110 new BasicStroke.
+[6] APPTHEME-BEREINIGUNG (§21)  [C], FREIGEGEBEN — ANGEFANGEN, NICHT FERTIG
+    *** DATEI 1 VON n IST FERTIG: UIComponentFactory (2026-07-31).
+        11 Literale -> 2 (die zwei verbliebenen sind PARAMETRISIERT und
+        koennen kein Token werden). 8 neue Token angelegt.
+        -> progress_2026-07-31_apptheme-migration-01.txt ***
 
-    *** VORGEHEN IST PFLICHT: EINE DATEI PRO SCHRITT, MIT SICHTPRUEFUNG.
-        Nicht in einem Rutsch. Jede Migration ist WERTERHALTEND — Literal
-        raus, Token mit DEMSELBEN Wert rein. ***
-    *** WEICHT EIN WERT AB (Font 14, Radius 16, Stroke 2.5): NICHT auf das
-        naechste Token runden. Entweder neues Token anlegen oder das Literal
-        mit Begruendung stehen lassen. Runden aendert das Aussehen. ***
+    *** ZUERST: SICHTPRUEFUNG U1-U5 DURCH DEN USER. ***
+        Das ist ein [C]-Schritt; ohne Sichtpruefung ist die naechste Datei
+        ein unbelegtes Risiko. U3 (Symbol-Knoepfe zeigen ihr Zeichen) und
+        U4 (Pfeil-Knoepfe halbdurchsichtig) sind die aussagekraeftigsten.
 
-    SINNVOLLER ANFANG: UIComponentFactory — der StyleGuide-Anker tippt selbst
-    7x new Font, und BUTTON_WIDTH/HEIGHT (36) steht dort UND als
-    TOPBAR_BTN_W/H in SelectiveAlphaEditor doppelt -> AppTheme.BTN_W/BTN_H.
-    Danach nach Dichte: ElementLayerPanel (64 Farben) ·
-    TranslationMapListPanel (18 Fonts) · PageLayoutToolbar (12) ·
-    CanvasPanel (24 Farben) · MapsPanel (20).
+    VORGEHEN FUER JEDE WEITERE DATEI — PFLICHT:
+      1. EINE Datei pro Schritt. Nicht mehrere.
+      2. Literal raus, Token mit DEMSELBEN Wert rein. Werterhaltend.
+      3. *** WEICHT EIN WERT AB: NICHT RUNDEN. Neues Token anlegen oder
+         das Literal mit Begruendung stehen lassen. Runden aendert das
+         Aussehen. In Datei 1 waren es 8 solcher Faelle (BOLD 13,
+         PLAIN 16, Dialog 16, PLAIN 30, vier Alpha-Farben). ***
+      4. Nachweisen, nicht behaupten: kleines Wegwerf-Programm gegen die
+         KOMPILIERTEN Klassen, das jedes Token gegen das ersetzte Literal
+         vergleicht (Font.equals / Color.equals). Vorlage steht im
+         progress-File von Datei 1.
+      5. Sichtpruefung durch den User, DANN die naechste Datei.
+
+    *** DIE KENNZAHL "new Color( im Projekt" IST IRREFUEHREND.
+        Durch Datei 1 fiel sie NICHT (284 -> 284): vier Literale sind aus
+        UIComponentFactory verschwunden und vier in AppColors ENTSTANDEN.
+        Ein Token IST ein new Color(...) — nur an einer Stelle.
+        RICHTIG GEMESSEN wird AUSSERHALB der Token-Klassen: ***
+          Stand 2026-07-31:  255 Color · 130 Font · 68 BasicStroke
+          in den Token-Klassen (erwuenscht): 27 · 17 · 5
+        Auch irrefuehrend: die Startzahlen 454/162/110 der Ist-Analyse
+        stammen aus dem GANZEN src-Baum, inklusive der seither
+        ausgelagerten Projekte. Nicht vergleichbar.
+
+    NAECHSTE DATEI — EMPFEHLUNG: SelectiveAlphaEditor + UIBuilder zusammen.
+      Sie teilen TOPBAR_BTN_W/H (=36), das seit Datei 1 doppelt zu
+      AppTheme.BTN_W/BTN_H ist. Klein, und es schliesst eine angefangene
+      Doppelung. UIBuilder hat 9 Literale.
+    *** NICHT mit ElementLayerPanel (84) oder CanvasPanel (58) anfangen —
+        das ist in einer Sitzung nicht mehr sichtpruefbar. CanvasPanel ist
+        ausserdem die God-Klasse (§22). ***
+    Dichte der restlichen Dateien:
+      ElementLayerPanel 84 · CanvasPanel 58 · TranslationMapListPanel 27 ·
+      MapsPanel 26 · PageLayoutToolbar 21 · TileGalleryPanel 20 ·
+      PaintToolbar 20 · NewImageDialog 17 · TextToolbar 15 ·
+      ColorPickerPopup 11 · BaseSidebarPanel 11 · UIBuilder 9
 
     NICHT ANFASSEN: benutzergewaehlte Werte (Primaer-/Sekundaerfarbe,
-    bg1/bg2, Kartenfarben, Text-Werkzeug-Font, strokeWidth). Die gehoeren in
-    AppSettings (§31). Ein Token ist eine Design-Entscheidung, keine
+    bg1/bg2, Kartenfarben, Text-Werkzeug-Font, strokeWidth). Die gehoeren
+    in AppSettings (§31). Ein Token ist eine Design-Entscheidung, keine
     Benutzereinstellung.
-
-[7] *** ERLEDIGT 2026-07-30: BOOKS_ROOT + CARDFOLDERS ueber AppPaths [B] ***
-    NEU AppPaths.getBooksDir() + getCardFoldersDir().
-    BookController.BOOKS_ROOT (hartkodiert aus user.home) ist ENTFALLEN;
-    getBooksRoot() delegiert. CardListStore delegiert ebenfalls, sein
-    falsches Javadoc (Pfad ohne settings/) ist korrigiert.
-    Die 3 Aufrufstellen blieben unberuehrt — der Pfad war sauber gekapselt.
-    Build 329 .class, unveraendert.
-
-    *** ABLAGEORT NACHWEISLICH UNVERAENDERT: getCanonicalPath-Vergleich
-        alt vs. neu gegen die echten Daten -> identisch, 5 Buecher und
-        2 Kartenordner weiterhin erreichbar. Die Aenderung behebt nur den
-        Fall des umgeleiteten/nicht-englischen Profils. ***
-    *** books/ und settings/cardfolders/ entstehen weiterhin ERST BEIM
-        ERSTEN ZUGRIFF (Getter), nicht beim Start wie die uebrigen
-        Verzeichnisse. Nicht "vereinheitlichen" — sonst bekommen Nutzer
-        ohne Buecher/Karten leere Ordner. ***
-    -> RUNTIME-VERIFY B1-B4 in progress_2026-07-30_apppaths-books.txt
-       (B1/B3 sind die wichtigen: keine Daten verschwunden).
-
-[8] *** ERLEDIGT 2026-07-30: KEYBINDINGS-REGISTRY + HILFE-DIALOG [B] ***
-    NEU KeyBindings.java      Registry: 6 Scopes, 53 Eintraege, 5 Ablaeufe
-    NEU KeyBindingsDialog.java  eine durchgehende Liste, keine Reiter, kein
-                              Suchfeld; ESC schliesst; ueber
-                              UIComponentFactory.createBaseDialog (§20)
-    KeyboardShortcutManager   Umschalt+F1 im globalen Dispatcher
-    UIBuilder                 Knopf "?" rechts in der oberen Leiste
-    GELOESCHT doc/Shortcut Table.txt (kannte 13 von 53 Belegungen)
-    Build 329 -> 335 .class.
-
-    ENTSCHEIDUNGEN DES USERS: eine Liste statt Reiter · kein Suchfeld ·
-    deutsche Beschriftung (Strg/Umschalt/Entf) · Umschalt+F1 UND Knopf.
-    F1 bleibt beim Zweitfenster.
-
-    *** DIE UMSCHALT+F1-ABFRAGE STEHT VOR DER F1-ABFRAGE IM DISPATCHER.
-        Wer sie verschiebt, macht die Hilfe unerreichbar — F1 schluckt
-        den Fall sonst. ***
-    *** Beschreibungen sind JTextArea, KEIN JLabel: §25 verlangt
-        umbrechen statt abschneiden. Nicht "vereinfachen". ***
-    *** KeyBindingsDialog ist der ERSTE NUTZER von AppTheme. Neuer Code
-        ohne new Font/new Color — so ist §21 gemeint. ***
-
-    DREI FUNDE AUS DER BESTANDSAUFNAHME, die vorher NIRGENDS standen:
-      - Strg + Rad auf einem TEXT-Layer aendert die SCHRIFTGROESSE statt
-        zu zoomen
-      - Alt + T festhalten + Rad aendert die DECKKRAFT des Bild-Layers
-      - Waehrend der Textbearbeitung lenkt CanvasPanel Strg+A/C/X/V/Z,
-        Esc, Enter und Entf auf den TEXT um (eigener Scope TEXT, Strg+Z
-        hat dort einen EIGENEN Verlauf)
-
-    -> RUNTIME-VERIFY K1-K7 in progress_2026-07-30_keybindings.txt.
-       *** K3 ist die wichtigste: F1 ALLEIN muss weiterhin das
-           Zweitfenster oeffnen. ***
 
 [9] BASEDIALOG + CONFIRMDIALOG  (§20)  [C], NUR MIT FREIGABE
     12 Klassen erben direkt von JFrame/JDialog/JWindow, JOptionPane in
@@ -220,6 +211,18 @@ OFFENER RUNTIME-VERIFY (GUI, nur der User kann das)
   R4  java -cp bin PathAnimator.PathEditor                (../PathAnimator)
   R5  java -cp bin paint.DemoWorksheetEditor2             (../JavaDemos)
   R6  Alle vier Projekte in Eclipse importierbar (File > Import > Existing)
+
+  *** OFFEN UND VORRANGIG (blockiert die naechste Datei in [6]): ***
+  U1  Dialog oeffnen: Titelleiste dunkel wie vorher, Titelschrift fett
+  U2  Quadratische Knoepfe oben: Groesse 36x36, Rundung, Schrift wie vorher
+  U3  Umschaltknoepfe mit SYMBOL-Beschriftung zeigen ihr Zeichen korrekt
+      (Familie "Dialog" - bei falscher Familie erschiene ein Kaestchen)
+  U4  Grosse Pfeil-Knoepfe ueber dem Bild: Pfeilgroesse gleich, Hintergrund
+      halbdurchsichtig, heller beim Ueberfahren, blass wenn nichts zu
+      blaettern ist
+  U5  Buch-Umschaltknopf (blaeulich) unveraendert
+  K1-K7 (Hilfe-Dialog) und B1-B4 (Buecher/Karten) stehen in den
+  progress-Dateien vom 2026-07-30.
   Nichts davon ist durch den Compile-Verify abgedeckt.
 
 ==============================================================================

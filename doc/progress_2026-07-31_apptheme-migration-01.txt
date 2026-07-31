@@ -1,0 +1,147 @@
+==============================================================================
+progress_2026-07-31_apptheme-migration-01.txt
+Aufgabentyp: [ST] — Schritt [6], ERSTE Datei der AppTheme-Bereinigung (§21)
+Risiko:      [C] vom User freigegeben ("Task 6")
+              -> tatsaechlich werterhaltend, per Wertvergleich nachgewiesen
+==============================================================================
+
+PROMPT: "Task 6 und danach WEITERMACHEN_PROMPT.txt aktualisieren, damit ich
+         nach einem /clear weitermachen kann."
+
+
+MIGRIERT: UIComponentFactory.java  (der StyleGuide-Anker)
+--------------------------------------------------------------------------
+  Literale in dieser Datei:  11  ->  2
+  Die verbliebenen 2 sind PARAMETRISIERT und koennen kein Token werden.
+
+ERSETZT:
+  new Color(35,35,35)          -> AppColors.BG_TITLEBAR        (neu)
+  new Color(0,0,0,30)          -> AppColors.NAV_BG_DISABLED    (neu)
+  new Color(255,255,255,55)    -> AppColors.NAV_BG_HOVER       (neu)
+  new Color(0,0,0,110)         -> AppColors.NAV_BG             (neu)
+  Font SansSerif BOLD 13       -> AppTheme.FONT_LG_BOLD        (neu)
+  Font SansSerif PLAIN 12      -> AppTheme.FONT_MD             (vorhanden)
+  Font Dialog PLAIN 16         -> AppTheme.FONT_SYMBOL         (neu)
+  Font SansSerif PLAIN 16      -> AppTheme.FONT_XL             (neu)
+  Font SansSerif PLAIN 30      -> AppTheme.FONT_NAV            (neu)
+  BUTTON_WIDTH/HEIGHT = 36     -> AppTheme.BTN_W / BTN_H
+  fillRoundRect(... 8, 8)      -> AppTheme.RADIUS_LG
+  fillRoundRect(... 12, 12)    -> AppTheme.RADIUS_XXL
+
+*** ACHT NEUE TOKEN, WEIL DIE WERTE AUF KEINES PASSTEN.
+    NICHT GERUNDET. Die eigene Regel aus §21 lautet: einen abweichenden
+    Wert (BOLD 13, PLAIN 16, PLAIN 30) NIE auf das naechste Token runden —
+    das aendert das Aussehen. Also angelegt. ***
+
+*** DIE DOPPELUNG IST WEG: 36 stand als BUTTON_WIDTH/HEIGHT hier UND als
+    TOPBAR_BTN_W/H in SelectiveAlphaEditor. Jetzt eine Quelle.
+    SelectiveAlphaEditor.TOPBAR_BTN_W/H existiert noch und wird von
+    UIBuilder benutzt — das ist die naechste Datei. ***
+
+
+NACHWEIS DER WERTERHALTUNG (nicht behauptet, gemessen)
+--------------------------------------------------------------------------
+Wegwerf-Programm gegen die KOMPILIERTEN Klassen, das jedes Token gegen das
+ersetzte Literal vergleicht (Font.equals / Color.equals, nicht Textvergleich):
+
+  FONT_LG_BOLD   SansSerif BOLD 13     = identisch
+  FONT_MD        SansSerif PLAIN 12    = identisch
+  FONT_SYMBOL    Dialog PLAIN 16       = identisch
+  FONT_XL        SansSerif PLAIN 16    = identisch
+  FONT_NAV       SansSerif PLAIN 30    = identisch
+  BG_TITLEBAR    rgba( 35, 35, 35,255) = identisch
+  NAV_BG_DISABLED rgba(  0,  0,  0, 30)= identisch
+  NAV_BG_HOVER   rgba(255,255,255, 55) = identisch
+  NAV_BG         rgba(  0,  0,  0,110) = identisch
+  BTN_W / BTN_H  36 / 36               = identisch
+  RADIUS_LG / XXL 8 / 12               = identisch
+  AppTheme.FAMILY "SansSerif"          = identisch
+
+  >>> ALLE WERTE IDENTISCH.
+
+Build: exit 0, 335 .class — unveraendert.
+
+
+DREI DINGE BLEIBEN BEWUSST LITERAL (im Javadoc der Klasse begruendet)
+--------------------------------------------------------------------------
+  1. styledLabel(text, SIZE, color, style) und htmlLabel(html, color, SIZE)
+     bekommen die Groesse als PARAMETER. Daraus kann kein Token werden.
+     Zentralisiert ist dort nur die Familie -> new Font(AppTheme.FAMILY, ...).
+  2. centeredColumnPanel(vp, hp, bp) bekommt die Abstaende als Parameter.
+  3. createEmptyBorder(0, 5, 0, 5): 5 px passt auf KEIN PAD_*-Token
+     (PAD_MD = 4, PAD_LG = 6). Nicht gerundet. Bleibt, bis der Wert oefter
+     auftaucht und ein eigenes Token verdient.
+
+
+*** EINE KENNZAHL, DIE IN DIE IRRE FUEHRT — WICHTIG FUER DEN NAECHSTEN ***
+--------------------------------------------------------------------------
+Die Projektzahl "new Color(" ist durch diese Migration NICHT gefallen:
+                        284  ->  284
+Grund: 4 Literale sind aus UIComponentFactory verschwunden und 4 sind in
+AppColors ENTSTANDEN. Ein Token IST ein new Color(...) — nur an genau
+einer Stelle.
+
+*** WER DEN FORTSCHRITT MESSEN WILL, ZAEHLT LITERALE AUSSERHALB DER
+    TOKEN-KLASSEN (AppColors.java, AppTheme.java): ***
+
+    Stand 2026-07-31 nach dieser Migration:
+      new Color ausserhalb:        255
+      new Font ausserhalb:         130
+      new BasicStroke ausserhalb:   68
+    In den Token-Klassen (erwuenscht): 27 Farben, 17 Fonts, 5 Strokes.
+
+AUCH IRREFUEHREND: die Startzahlen 454/162/110 aus der Ist-Analyse wurden
+ueber den GANZEN src-Baum gemessen — inklusive spriteanimator, PathAnimator
+und der Demos, die seither ausgelagert sind. Sie sind mit den heutigen
+Zahlen NICHT vergleichbar.
+
+
+NAECHSTE DATEIEN NACH DICHTE (Literale je Datei)
+--------------------------------------------------------------------------
+  ElementLayerPanel        84      <- groesster Brocken
+  CanvasPanel              58      (God-Klasse, §22 - Vorsicht)
+  TranslationMapListPanel  27
+  MapsPanel                26
+  PageLayoutToolbar        21
+  TileGalleryPanel         20
+  PaintToolbar             20
+  NewImageDialog           17
+  TextToolbar              15
+  ColorPickerPopup         11
+  BaseSidebarPanel         11
+  UIBuilder                 9
+
+EMPFEHLUNG FUER DIE NAECHSTE: SelectiveAlphaEditor + UIBuilder zusammen —
+sie teilen TOPBAR_BTN_W/H, das jetzt schon doppelt zu AppTheme.BTN_W/H ist.
+Klein, und es schliesst die angefangene Doppelung.
+NICHT mit ElementLayerPanel anfangen: 84 Literale in einer Sitzung sind
+nicht mehr sichtpruefbar.
+
+
+RUNTIME-VERIFY (GUI, User) — HIER IST ER PFLICHT, DAS IST EIN [C]-SCHRITT
+--------------------------------------------------------------------------
+  U1  Ein Dialog (z. B. "Neue Datei") oeffnet sich: TITELLEISTE dunkel wie
+      vorher, Titelschrift fett
+  U2  Die quadratischen Knoepfe der oberen Leiste: gleiche GROESSE (36x36),
+      gleiche Eckenrundung, gleiche Schrift
+  U3  Die Umschaltknoepfe mit Symbol-Beschriftung zeigen ihr Zeichen
+      korrekt (Font "Dialog" - bei falscher Familie erschiene ein Kaestchen)
+  U4  Die grossen Pfeil-Knoepfe ueber dem Bild: Pfeil gleich gross,
+      Hintergrund halbdurchsichtig, heller beim Ueberfahren, blass wenn
+      es nichts zu blaettern gibt
+  U5  Buch-Umschaltknopf (blaeulich) unveraendert
+  *** U3 und U4 sind die aussagekraeftigsten: dort wurden Familie bzw.
+      Alpha-Farben ersetzt. ***
+
+
+==============================================================================
+# PD.txt aktualisiert: nein (kein [BT])
+# progress.txt aktualisiert: ja (diese Datei)
+# WEITERMACHEN_PROMPT.txt aktualisiert: ja
+# Die Aufgabe "Schritt [6], Datei 1 von n" wurde abgeschlossen: ja
+#   Die BEREINIGUNG INSGESAMT ist NICHT fertig - 453 Literale ausserhalb
+#   der Token-Klassen verbleiben.
+# Naechster Schritt: Sichtpruefung U1-U5 durch den User. DANACH erst die
+#   naechste Datei (Empfehlung: SelectiveAlphaEditor + UIBuilder).
+# "/clear" + WEITERMACHEN_PROMPT.txt empfohlen: ja
+==============================================================================

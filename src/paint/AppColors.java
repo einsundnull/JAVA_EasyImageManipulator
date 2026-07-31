@@ -32,4 +32,17 @@ public final class AppColors {
     public static final Color TILE_DEFAULT_BG= new Color(48, 48, 48);
     public static final Color TILE_PLACEHOLDER= new Color(55, 55, 55);
     public static final Color SELECTION      = new Color(255, 140, 0);
+
+    // ── Ergänzt 2026-07-31 bei der Migration von UIComponentFactory (§21) ────
+    // Alle vier standen dort als Inline-Literal. Werte unverändert übernommen.
+
+    /** Titelleiste eines Dialogs. Dunkler als BG_PANEL, heller als HANDLE_BAR_TOP. */
+    public static final Color BG_TITLEBAR    = new Color(35, 35, 35);
+
+    /** Runder Navigationsknopf über dem Bild (Vor/Zurück): Grundzustand. */
+    public static final Color NAV_BG          = new Color(0, 0, 0, 110);
+    /** Navigationsknopf unter dem Mauszeiger. */
+    public static final Color NAV_BG_HOVER    = new Color(255, 255, 255, 55);
+    /** Navigationsknopf, wenn es nichts zu blättern gibt. */
+    public static final Color NAV_BG_DISABLED = new Color(0, 0, 0, 30);
 }
