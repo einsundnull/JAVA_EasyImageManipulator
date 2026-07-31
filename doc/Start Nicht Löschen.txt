@@ -1,0 +1,5 @@
+Lies:
+C:\Users\pc\eclipse-workspace\TransparencyTool\doc\GUIDELINES.md
+C:\Users\pc\eclipse-workspace\TransparencyTool\doc\GUIDELINES_VORSCHLAG_2026-07-27.md
+C:\Users\pc\eclipse-workspace\TransparencyTool\doc\Prompt_Handling.txt
+C:\Users\pc\eclipse-workspace\TransparencyTool\doc\WEITERMACHEN_PROMPT.txt

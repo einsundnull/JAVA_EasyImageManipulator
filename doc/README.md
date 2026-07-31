@@ -14,6 +14,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`../../JAVA_GUIDELINES_UNIVERSAL.md`](../../JAVA_GUIDELINES_UNIVERSAL.md) | **Zuerst.** Projektneutrale Standards für alle Java-Projekte (§0–§15) |
 | [`GUIDELINES.md`](GUIDELINES.md) | Projekt-Steckbrief + TransparencyTool-Regeln §20–§33 |
 | [`Prompt_Handling.txt`](Prompt_Handling.txt) | Task-Workflow: `[BT]`/`[ST]`, Risikoklassen, Abschluss-Block |
+| [`../../PROMPT_Schwachstellen-Audit.md`](../../PROMPT_Schwachstellen-Audit.md) | **Wiederverwendbarer Audit-Prompt** (alle Java-Projekte): Schwachstellen finden, bewerten, tabellieren |
 | [`WEITERMACHEN_PROMPT.txt`](WEITERMACHEN_PROMPT.txt) | **Aktueller Stand + offene Schritte.** Einstieg nach `/clear` |
 
 ## 2. Verträge & Formate — ändern heißt: erst hier ändern

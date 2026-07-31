@@ -1,11 +1,34 @@
 ==============================================================================
 WEITERMACHEN_PROMPT.txt  —  TransparencyTool
-Stand: 2026-07-31. BEREINIGTE FASSUNG.
+Stand: 2026-07-31, Abend. BEREINIGTE FASSUNG.
 Die ausfuehrliche Vorgaenger-Fassung mit dem vollen Verlauf der Schritte
 [1]-[4] liegt in doc/WEITERMACHEN_PROMPT_2026-07-30_archiv.txt.
 Details je Schritt: die progress_2026-07-30_*.txt.
 ==============================================================================
 Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
+
+==============================================================================
+*** NAECHSTE AUFGABE: SCHWACHSTELLEN-AUDIT ***
+==============================================================================
+Der User will das Programm systematisch auf Schwachstellen untersuchen
+(Bugs, Nebenlaeufigkeit, Lecks, Endlosschleifen, Datenverlust, ...) und die
+Befunde in einer bewerteten Tabelle sammeln - ZUM SPAETEREN LOESEN, nicht
+sofort reparieren.
+
+FERTIGER PROMPT DAFUER (wiederverwendbar, auch fuer andere Projekte):
+    ../PROMPT_Schwachstellen-Audit.md
+
+*** DAS AUDIT REPARIERT NICHTS. Es sammelt und bewertet. Reparaturen sind
+    danach einzelne, freigabepflichtige Schritte. ***
+
+GRAPHIFY VORHER? Ja, aber nur GEZIELT: graphify-out/ existiert, ist aber
+vom 2026-07-30 und kennt AppTheme, KeyBindings und KeyBindingsDialog noch
+nicht. Ein gezielter Update dieser drei Dateien genuegt - KEIN Voll-Rebuild
+und NIEMALS `graphify update .` (Scope-Falle).
+*** Der Graph findet KEINE Fehler. Er dient der Priorisierung (welche
+    Klasse hat die groesste Reichweite) und dem Auffinden aller
+    Aufrufstellen. Das eigentliche Suchen ist Lesearbeit. ***
+
 
 *** WO WIR STEHEN, IN EINEM SATZ ***
 *** SCHRITT [6] IST INHALTLICH ABGESCHLOSSEN. ZWOELF Dateien migriert,
@@ -14,7 +37,8 @@ Aktive PD.txt: KEINE. Alle bisherigen Schritte liefen als [ST].
     ist Farbe als INHALT (Mal-Palette, Kartenfarben, Farbwaehler) oder
     Streubesitz mit 1-5 Fundstellen ohne Hebel. ***
 
-*** ES FEHLT NUR NOCH DIE SICHTPRUEFUNG U1-U19 durch den User. Sie war
+*** ES FEHLT NUR NOCH DIE SICHTPRUEFUNG U1-U19 durch den User.
+    (Sie blockiert das Audit NICHT - beides ist unabhaengig.) Sie war
     schon nach Datei 1 faellig und ist nie erfolgt — sie deckt jetzt ZWOELF
     Dateien ab. EIN Programmstart hakt alle neunzehn ab. Danach ist [6]
     formal schliessbar.
@@ -265,25 +289,36 @@ OFFEN — nach Hebel sortiert
 
 ==============================================================================
 DOKUMENTIERTE ALTLASTEN (gefuehrt, kein Auftrag — Univ. §0)
+*** FUER DAS SCHWACHSTELLEN-AUDIT: die mit [!] markierten sind bereits
+    belegte Befunde und gehoeren OHNE ERNEUTE SUCHE in die Tabelle. ***
 ==============================================================================
-  - AppSettings liest/schreibt OHNE Encoding (FileReader/FileWriter) ->
+  - [!] AppSettings liest/schreibt OHNE Encoding (FileReader/FileWriter) ->
     Plattform-Kodierung statt UTF-8. Betrifft Umlaute in recentFiles/
     recentProjects. [C]: bereits geschriebene Dateien wuerden anders gelesen.
+    -> Audit-Kategorie "Kodierung/Locale".
   - ImageIO.write in 9 Dateien -> Bild-Persistenz liegt nicht in der
     io-Schicht (Befund S5).
   - 5 handgeschriebene JSON-Serializer ohne gemeinsamen Writer (AppSettings,
     ProjectManager, MapManager, CardListStore, book.JsonStorage). Ein NEUER
     Typ bekommt keinen sechsten (§31).
-  - TextWriter schreibt jede Datei zweimal (Original + src/->bin/-Kopie per
-    Pfad-replace). Haengt an der Eclipse-Ordnerstruktur.
-  - toggleVis ruft pushUndo() PRO ELEMENT statt pro Aktion -> n Undo-Schritte
-    statt einem (§29).
+  - [!] TextWriter schreibt jede Datei zweimal (Original + src/->bin/-Kopie
+    per Pfad-replace). Haengt an der Eclipse-Ordnerstruktur.
+    -> Audit-Kategorien "Persistenz" und "Pfade".
+  - [!] toggleVis ruft pushUndo() PRO ELEMENT statt pro Aktion -> n
+    Undo-Schritte statt einem (§29). -> Audit-Kategorie "Korrektheit".
   - GameSceneWriter schreibt PathLayer nicht; #Paths: wird referenziert, aber
     nicht gelesen — im Vertrag §23 als Luecke dokumentiert.
   - Karten-/Listendaten: bis §33 umgesetzt ist, greifen Panels teilweise noch
     direkt auf Dateien zu. NEUE Direktzugriffe sind verboten.
   - bin/ ist in Git (Build-Ausgabe wird mitversioniert). Vorgefunden, nicht
     bewertet.
+  - [!] TextToSpeech / CardTtsPlayer starten PowerShell mit einer temporaeren
+    .ps1-Datei und uebergeben Kartentext. -> Audit-Kategorie "Einschleusung":
+    pruefen, ob Text mit Anfuehrungszeichen oder Sonderzeichen den Befehl
+    verlassen kann.
+  - [!] ImageIO.write in 9 Dateien und mehrere FileWriter OHNE erkennbares
+    atomares Speichern -> Audit-Kategorie "Datenverlust": was passiert bei
+    Absturz oder vollem Datentraeger mitten im Schreiben?
   - src/paint/JAVA_EasyImageManipulator-Push.sh liegt im Quellbaum. Kein
     Dokument, sondern das Deploy-Skript und offenbar der Ausloeser der
     automatischen "WhiteBoard Update"-Commits. NICHT verschieben, ohne den
