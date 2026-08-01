@@ -1,0 +1,160 @@
+==============================================================================
+progress_2026-08-01_paint-icons-umsetzung.txt
+PD: Task_2026-08-01_0900_PaintToolbar-Icons.txt, Schritte [2/6] bis [6/6]
+Kategorie [BT] · Risiko [B] · Mockup: doc/Schema_PaintToolbar_Icons.txt
+==============================================================================
+
+PROMPT
+--------------------------------------------------------------------------
+Fortsetzung von progress_2026-08-01_paint-icons-vorschlag.txt. Der User hat
+die vier Freigabefragen beantwortet — alle vier wie empfohlen:
+  F1 Route B (gezeichnete Icons) · F2 Beschriftung in BEIDEN Leisten ·
+  F3 Kuerzel nachruesten als EIGENER Task, Klammern jetzt entfernen ·
+  F4 Icons zeigen die Malfarbe.
+
+
+ZUSAMMENFASSUNG
+--------------------------------------------------------------------------
+NEU:      src/paint/PaintIcons.java        (34 gezeichnete Symbole)
+GEAENDERT: src/paint/PaintToolbar.java     (Knopf-Fabriken, Beschriftungen)
+          src/paint/AppTheme.java          (+3 Stroke-Token)
+          src/paint/AppColors.java         (+5 Icon-Token)
+NICHT GEAENDERT: WandPanel.java — es ruft toolbar.buildToolButton(t) und
+          pack(); die groesseren Knoepfe wirken dort von selbst. Das war
+          keine Absicht des Entwurfs, sondern ein Geschenk der bestehenden
+          Struktur — der Callbacks-/Fabrik-Aufbau nach §22 hat sich bezahlt
+          gemacht.
+
+BUILD:    javac exit 0 · 344 .class in einem LEEREN Verzeichnis
+          (vorher 335; +9 = PaintIcons samt Action/Painter/PaintColors/
+          VectorIcon/GlyphIcon und den beiden neuen anonymen Klassen)
+          Quelldateien src/paint: 106 -> 107
+
+
+DIE ENTSCHEIDENDE MESSUNG (aus Schritt [1], hier die Folge)
+--------------------------------------------------------------------------
+🪣 U+1FAA3 ist in KEINER der sechs geprueften Schriftfamilien darstellbar.
+Deshalb Route B. Der Fuelleimer wird jetzt gezeichnet: gekippter Eimer,
+Buegel, Oeffnungsellipse, austretender Tropfen — Fuellung in der
+PRIMAERFARBE des Benutzers.
+
+
+WAS GEBAUT WURDE
+--------------------------------------------------------------------------
+1. PaintIcons — Entwurfsraster 24x24, beim Zeichnen skaliert.
+   - 24 Werkzeug-Symbole + 9 Aktions-Symbole + Glyph-Icon.
+   - Die ELF Zauberstab-/Schere-Varianten sind eine FAMILIE:
+     Grundform (Zauberstab bzw. Schere) verkleinert nach links oben,
+     Varianten-Abzeichen unten rechts auf dunkler Scheibe.
+   *** DIE ABZEICHEN ZEICHNEN IN EINEM EIGENEN FELD 0…10, nicht im
+       24er-Raster (badgeZone). Dadurch aendert ein Verschieben oder
+       Vergroessern des Feldes GENAU EINE Stelle statt elf Abzeichen. ***
+   *** DIE DUNKLE SCHEIBE UNTER DEM ABZEICHEN IST KEIN SCHMUCK: ohne sie
+       verschwimmt es auf dem blauen Hintergrund des AUSGEWAEHLTEN
+       Knopfes (BTN_ACTIVE). ***
+
+2. PaintIcons.glyph(...) — Zeichen als Icon.
+   Zweck ist nicht das Zeichnen, sondern die GLEICHBEHANDLUNG: ein Knopf
+   kann nur EINEN Text tragen. Soll unter dem Symbol eine Beschriftung
+   stehen, muss das Symbol ein Icon sein. Nur so behalten ↩ ↪ ↔ ↕ ↺ ↻ ⊞
+   ihr Zeichen (Univ. §0) UND bekommen trotzdem eine Beschriftung.
+   *** Schriftfamilie "Dialog" ueber AppTheme.FONT_SYMBOL, NICHT die
+       UI-Schrift: "Segoe UI" stellt von 59 geprueften Symbolzeichen nur
+       SECHS dar. Wer das "vereinheitlicht", leert diese Knoepfe. ***
+
+3. PaintToolbar — Knopf-Fabriken auf Icon + Beschriftung umgestellt.
+   toolBtn/toggleBtn/iconBtn nehmen jetzt ein Icon; die Beschriftung steht
+   UNTER dem Symbol (BOTTOM/CENTER).
+
+4. Farbige Icons: PaintToolbar.iconColors liest den LIVE-Zustand
+   (primaryColor/secondaryColor), kein Schattenfeld.
+   *** UND DESHALB EIN TRICHTER: cb.onColorChanged(...) stand an SECHS
+       Stellen. Alle sechs rufen jetzt fireColorChanged(), das zusaetzlich
+       refreshColorIcons() ausloest. Sechs Aufrufpaare zu pflegen waere
+       die Stelle gewesen, an der die siebte vergessen wird — dieselbe
+       Ueberlegung wie bei B01/§13 (Feststellung an der Wurzel statt
+       Meldepflicht je Bedienweg). ***
+
+
+DIE TOOLTIP-LUEGE IST BESEITIGT
+--------------------------------------------------------------------------
+"Stift (P)", "Fuelleimer (F)", "Linie (L)", "Ellipse (E)", "Rechteck (R)",
+"Radierer (X)", "Pipette (I)", "Auswahl (S)", "Text (T)", "Pfad (K)",
+"Freihand-Pfad (J)", "Verwischen (M)" -> Klammern entfernt.
+Belegt: `grep -rn 'setActiveTool("' src/paint/` = NULL Treffer; `R` allein
+ist mit "90 Grad drehen" belegt (KeyboardShortcutManager:51).
+*** DAS NACHRUESTEN IST EIN EIGENER TASK und braucht ZUERST Eintraege in
+    KeyBindings.ALL, dann Handler (§25). P/R/S/T sind teils vergeben, die
+    Belegung muss also neu entschieden werden. ***
+
+
+WIE GEPRUEFT WURDE — OHNE DAS PROGRAMM ZU STARTEN
+--------------------------------------------------------------------------
+Zwei Wegwerf-Programme im scratchpad (NICHT eingecheckt), die gegen die
+KOMPILIERTEN Klassen laufen und eine PNG schreiben:
+  a) paint.IconContactSheet — alle 34 Icons im Raster auf einem
+     50x50-Knopf in den echten Leistenfarben.
+  b) paint.ToolbarPreview   — die ECHTE PaintToolbar und das ECHTE
+     WandPanel, ueber printAll(g) in eine PNG gerendert.
+*** DIESES VORGEHEN HAT DREI FEHLER GEFUNDEN, DIE IM QUELLTEXT NICHT ZU
+    SEHEN WAREN (8.1-8.3 im Schema): vier ununterscheidbare Abzeichen,
+    abgeschnittene Beschriftungen durch Swings Vorgabe-Rand, und zwei
+    Knoepfe namens "Spiegeln". Beide Programme benutzen ImageFileWriter
+    (§34) — auch ein Wegwerf-Bild wird ueber den einen Schreibweg
+    geschrieben. Sie liegen in paint/, weil ImageFileWriter
+    package-private ist. ***
+*** ES ERSETZT DIE SICHTPRUEFUNG NICHT. Was ein gerendertes Standbild
+    nicht zeigt: Hover, Auswahlzustand, Farbwechsel zur Laufzeit,
+    Bildlauf. Dafuer P1-P9. ***
+
+
+REGELN, DIE EINGEHALTEN WURDEN
+--------------------------------------------------------------------------
+  §21  PaintIcons enthaelt NULL `new Color(` / `new Font(` /
+       `new BasicStroke(` (Gegenprobe per grep; der einzige Treffer ist ein
+       Kommentar, der erklaert, warum an einer Stelle KEIN BasicStroke
+       erzeugt wird). Neue Token: AppTheme.STROKE_ICON / _ICON_FINE /
+       _ICON_DASH · AppColors.ICON_LINE / _LINE_MUTED / _FILL /
+       _CHECKER_LIGHT / _CHECKER_DARK.
+       ICON_LINE ist bewusst an TEXT GEKOPPELT statt neu getippt — das
+       Icon ersetzt die Beschriftung und ist damit der Vordergrund.
+       Die Malfarben sind KEINE Tokens (§21-Ausnahme) und kommen aus dem
+       Toolbar-Zustand.
+  §24  Gezeichnet wird auf g.create(), der Aufrufer bekommt seinen
+       Graphics2D-Zustand unveraendert zurueck. Antialiasing an einer
+       Stelle (VectorIcon).
+  §13  Keine Allokation je Zeichnung: die Formen sind wiederverwendete
+       statische Kratzflaechen (L/E/R/RR/P), EDT-only und als solche
+       kommentiert. Die weiche AA-Kante ist aus gestaffelten FLAECHEN
+       gebaut, nicht aus Linien wachsender Breite — letzteres haette je
+       Stufe ein BasicStroke erzeugt.
+  §22  Die Zeichenlogik liegt in PaintIcons, NICHT in weiteren 300 Zeilen
+       PaintToolbar.
+  Univ. §0  ↩ ↪ ↔ ↕ ↺ ↻ ⊞ ✂ behalten ihr Zeichen. Sie sind konventionell,
+       eindeutig und ueberall darstellbar.
+
+
+NICHT GEAENDERT — dokumentiert, nicht heimlich mitgenommen
+--------------------------------------------------------------------------
+  - DREI `new Font(...)` in PaintToolbar (miniLabel Z.1024, styledCombo
+    Z.1042, buildReplaceWandConfig Z.666 — letztere Methode ist
+    @SuppressWarnings("unused")). Alle drei haetten ein exaktes
+    AppTheme-Gegenstueck. Sie gehoeren nicht zu dieser Aufgabe, und die
+    Datei steht unter "NICHT MEHR MIGRIEREN — FARBE ALS INHALT".
+  - Die 28er-Mal-Palette, ColorPickerPopup, PaintEngine: Farbe als INHALT.
+  - Werkzeug-Tastenkuerzel: eigener Task (siehe oben).
+
+
+RUNTIME-VERIFY  P1-P9  (OFFEN, gehoert dem User)
+--------------------------------------------------------------------------
+Volle Liste in doc/Schema_PaintToolbar_Icons.txt, Abschnitt 7.
+Die vier wichtigsten:
+  P4  *** WANDPANEL OEFFNEN (Knopf "Staebe"): alle ELF Knoepfe ohne
+      Tooltip auseinanderhalten. WICHTIGSTE PRUEFUNG DES TASKS. ***
+  P5  Ring-aussen/Ring-innen (eckig) und AA-aussen/AA-innen (rund) im
+      Vorbeigehen unterscheidbar.
+  P1  Kein leeres Kaestchen (Tofu) auf irgendeinem Knopf — betrifft die
+      acht Knoepfe, die weiterhin ein Zeichen tragen.
+  P7  Primaerfarbe wechseln -> Fuelleimer, Pipette und Farbtausch faerben
+      sich mit (prueft den fireColorChanged-Trichter).
+==============================================================================

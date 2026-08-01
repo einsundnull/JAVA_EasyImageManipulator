@@ -54,7 +54,7 @@
 | Bild-Persistenz (§34) | **`ImageFileWriter.writePng(...)` ist der einzige Weg, ein Bild zu schreiben.** Kein `ImageIO.write` außerhalb dieser Klasse |
 | Format-Verträge (Univ. §7) | **Szenen-Format ↔ GameII** → §23 |
 | Settings (Univ. §12) | **`AppSettings`** (Singleton) → `%APPDATA%\TransparencyTool\settings\default.txt` (Inhalt: JSON, siehe §31) |
-| Shortcut-Registry (Univ. §11) | **`KeyBindings.ALL`** (53 Einträge) + **`KeyBindings.GUIDE`**; Dialog `KeyBindingsDialog`, Taste **Umschalt+F1** und Knopf „?“ → §25 |
+| Shortcut-Registry (Univ. §11) | **`KeyBindings.ALL`** (79 Einträge, sieben Scopes) + **`KeyBindings.TOOL_KEYS`** (25 Werkzeug-Tasten, seit 2026-08-01) + **`KeyBindings.GUIDE`**; Dialog `KeyBindingsDialog`, Taste **Umschalt+F1** und Knopf „?“ → §25 |
 | Mess-Anzeige (Univ. §13) | **keine** — bewusst, siehe §26 |
 | Graphify-Scope (Univ. §1) | Scan-Root **`src/`** (schließt `bin/`, `doc/`, `resources/` ohne Filter aus), code-only. Graph ist eingecheckt: 2479 Knoten / 6369 Kanten / 123 Communities, 0 Tokens |
 
@@ -282,6 +282,24 @@ Es gibt **keinen** Hilfe-Dialog (Befund S6).
 - **`Shortcut Table.txt` ist am 2026-07-30 gelöscht.** Sie war handgepflegt
   und kannte 13 von 53 Belegungen. Eine zweite Liste neben der Registry ist
   die Ursache des Problems, nicht die Lösung. Historie in Git.
+- **Werkzeug-Kürzel stehen in `KeyBindings.TOOL_KEYS`, nicht in drei Listen
+  [B]** (seit 2026-08-01). Diese eine Tabelle speist die Zeilen des Dialogs,
+  die Verdrahtung in `KeyboardShortcutManager.setupToolKeys` **und** das
+  Kürzel im Tooltip (`comboFor`). **Eine Taste wird nirgends ein zweites Mal
+  getippt** — die handgepflegte Zweitliste im Tooltip war die Ursache des
+  Befunds, der den Task ausgelöst hat („Stift (P)" ohne jeden Handler, und
+  `R` drehte in Wahrheit das Bild).
+  - `R` bleibt beim Drehen; das Rechteck trägt deshalb `V` („Viereck").
+  - **Die Taste wählt, sie schaltet nicht ab** — anders als der Knopf.
+  - `Umschalt` macht die Variante (`Umschalt+G`, `Umschalt+B`,
+    `Umschalt+5`, `Umschalt+6`), nicht eine weitere freie Taste.
+- **Einfache Buchstaben brauchen einen Wachposten [A].** Belegungen der
+  `InputMap WHEN_IN_FOCUSED_WINDOW` feuern auf `KEY_PRESSED`, die
+  Texteingabe des `CanvasPanel` erst in `keyTyped()` — ein Buchstabe löst
+  sonst **beides** aus (nachgewiesen: ein „r" im Text drehte das Bild).
+  `toolKeysActive()` fragt das **an einer Stelle** ab, zusammen mit der
+  Sichtbarkeit der Mal-Leiste — keine Meldepflicht je Handler (Univ. §13).
+  **Wer eine neue Taste ohne Modifikator vergibt, hängt sie dort ein.**
 - **Konflikte werden geführt, nicht verschwiegen.** Aktuell in der Registry
   sichtbar: `Strg+Rad` bedeutet **zweierlei** (zoomen; auf einem Text-Layer
   dagegen Schriftgröße), und `Enter`/`Esc`/`Strg+A`/`Strg+Z` unterscheiden

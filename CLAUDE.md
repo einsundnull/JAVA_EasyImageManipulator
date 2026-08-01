@@ -37,9 +37,12 @@ javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.ja
 ```
 `-encoding UTF-8` ist **Pflicht** — die Quelldateien enthalten Unicode (Pfeile,
 Symbole, Umlaute). Ohne die Option: „unmappable character".
-**Erwartet: exit 0, 335 `.class`** in einem **leeren** Zielverzeichnis
-(nachgemessen 2026-07-31). Ein von Eclipse mitgepflegtes `bin/` enthält
-**337** — Eclipse übersetzt alle drei `book`-Klassen, der `javac`-Befehl nur
+**Erwartet: exit 0, 347 `.class`** in einem **leeren** Zielverzeichnis
+(nachgemessen 2026-08-01 — 335 vor `PaintIcons`, das mit seinen inneren Typen
+neun mitbrachte; 344 vor den Werkzeug-Kürzeln, die drei mitbrachten: den
+`record ToolKey` und zwei anonyme `AbstractAction`). Keine neue Quelldatei.
+Ein von Eclipse mitgepflegtes `bin/` enthält
+zwei mehr — Eclipse übersetzt alle drei `book`-Klassen, der `javac`-Befehl nur
 die von `paint` aus erreichbare. Wer eine Zahl notiert, schreibt dazu,
 **womit** gemessen wurde.
 
@@ -57,9 +60,9 @@ Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
 **Deploy:** `bash src/paint/JAVA_EasyImageManipulator-Push.sh` →
 `https://github.com/einsundnull/JAVA_EasyImageManipulator.git`
 
-> **Quellbaum:** nur noch `paint` (106 Dateien) + `book` (3) +
+> **Quellbaum:** nur noch `paint` (107 Dateien) + `book` (3) +
 > `module-info.java`. (105 → 106 am 2026-07-31: `TextToSpeech` gelöscht,
-> `ImageFileWriter` angelegt.) Am 2026-07-30 ausgelagert, weil ohne Bezug zu `paint`:
+> `ImageFileWriter` angelegt; 106 → 107 am 2026-08-01: `PaintIcons`.) Am 2026-07-30 ausgelagert, weil ohne Bezug zu `paint`:
 > `com.spriteanimator` → `../SpriteAnimator/`, `PathAnimator` →
 > `../PathAnimator/`, die startbaren Prototypen (`Demo`, `DemoWorksheetEditor{,2}`,
 > `AutoGrowingPillFieldDemo` + `SmartLabel`) → `../JavaDemos/`.
@@ -79,7 +82,7 @@ Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
 
 Swing-Werkzeug zum Bearbeiten von Bildern und Szenen. **Zwei unabhängige
 Canvases** nebeneinander, vier Modi, ein Zweitfenster für die Vorschau.
-Alles liegt im Package `paint` (106 Klassen, flach) plus `book` (3 Klassen).
+Alles liegt im Package `paint` (107 Klassen, flach) plus `book` (3 Klassen).
 
 ### Das Hauptfenster ist ein Orchestrator, keine God-Klasse
 
@@ -327,6 +330,51 @@ abgeschlossen): `UIComponentFactory` · `SelectiveAlphaEditor` · `UIBuilder` ·
 **125 `new Color(`** (vorher 259), **62 `new Font(`** (135) und
 **34 `new BasicStroke(`** (68) — nachgemessen, jeweils rund die Hälfte weniger.
 
+### Werkzeug-Symbole: `PaintIcons` (seit 2026-08-01)
+
+**Die Symbole der Paint-Leiste werden gezeichnet, nicht getippt.**
+`PaintIcons` liefert `javax.swing.Icon`-Objekte, die ihre Form mit
+`Graphics2D` auf einem 24×24-Entwurfsraster beschreiben; `PaintToolbar` und
+`WandPanel` setzen sie per `setIcon(...)`, die **Beschriftung steht darunter**.
+
+> **Warum gezeichnet:** gemessen mit `Font.canDisplayUpTo()` über 59
+> Kandidaten in sechs Familien — `SansSerif`/`Dialog` zeigen 58 davon, aber
+> **🪣 U+1FAA3 (Fülleimer) in keiner einzigen**, auch nicht in „Segoe UI
+> Emoji". Ein Glyph-Tausch konnte das namentlich gewünschte Symbol nicht
+> liefern. Und **„Segoe UI" kennt von den 59 Zeichen nur sechs** — die
+> Knopfschrift darf nie auf die UI-Schrift umgestellt werden.
+
+Die **elf Zauberstab-/Schere-Varianten sind eine Familie**: gemeinsame
+Grundform links oben, Varianten-Abzeichen rechts unten (`badgeZone`, eigenes
+Koordinatenfeld 0…10). Vorher zeigten elf Knöpfe im `WandPanel`-Raster
+zusammen nur **vier** Zeichen — sechsmal „⚡", dreimal „✂", je einmal „◠"/„◡".
+
+> **Nicht „vereinheitlichen":** Ring-außen/innen sind **eckig**, AA-außen/innen
+> **rund**. Im ersten Entwurf waren alle vier eckig und sahen zu viert wie
+> dasselbe blaue Quadrat aus. Es braucht **zwei Umrisse**, nicht zwei kleine
+> Unterschiede. Ebenso bleibt die dunkle Scheibe unter dem Abzeichen — ohne
+> sie verschwimmt es auf dem blauen Hintergrund des *ausgewählten* Knopfes.
+
+**Zeichen behalten** (Univ. §0, sie sind eindeutig): ↩ ↪ ↔ ↕ ↺ ↻ ⊞ ✂. Damit
+sie trotzdem eine Beschriftung tragen können, gibt es `PaintIcons.glyph(...)`
+— ein Knopf kann nur *einen* Text haben, also muss auch ein Zeichen als Icon
+vorliegen.
+
+Fülleimer, Pipette und die beiden Farbradierer zeigen die **aktuelle
+Malfarbe**. Sie lesen den Live-Zustand der Leiste; deshalb laufen alle
+Farbänderungen über **einen** Trichter, `PaintToolbar.fireColorChanged()`
+(vorher stand `cb.onColorChanged(...)` an sechs Stellen).
+
+> **Die Tooltips versprachen einmal Tastenkürzel, die es nicht gab** —
+> „Stift (P)", „Fülleimer (F)" usw., ohne Registry und ohne Handler, während
+> `R` in Wahrheit *90° drehen* auslöste. Die Klammerangaben wurden am
+> 2026-08-01 entfernt und **noch am selben Tag durch echte Kürzel ersetzt**
+> (Abschnitt „Tastatur"). Das Kürzel im Tooltip stammt seither aus
+> `KeyBindings.comboFor(tool)` — **abgeleitet, nicht getippt**.
+
+Spezifikation und Befunde: `doc/Schema_PaintToolbar_Icons.txt`,
+Umsetzung `doc/progress_2026-08-01_paint-icons-umsetzung.txt`.
+
 Der Rest ist bewusst **nicht** migriert: `PaintToolbar`, `ColorPickerPopup`,
 `PaintEngine` und die Kartenfarben führen Farbe als **Inhalt**, nicht als
 Oberfläche; der Rest ist Streubesitz mit 1–5 Fundstellen je Datei. In
@@ -349,10 +397,42 @@ F1 wird **nicht** freigeräumt, die Zweitfenster-Belegung ist eingeübt.
 Die Umschalt+F1-Abfrage steht im Dispatcher **vor** der F1-Abfrage; wer sie
 verschiebt, macht die Hilfe unerreichbar.
 
-**`KeyBindings.ALL` ist die Registry** (53 Einträge, sechs Scopes) —
+**`KeyBindings.ALL` ist die Registry** (79 Einträge, sieben Scopes) —
 `KeyBindingsDialog` zeigt sie über **Umschalt+F1** oder den Knopf „?“ rechts
 in der oberen Leiste. **Neue Taste oder Geste → zuerst Registry-Eintrag, dann
 Handler** (§25); der Dialog enthält keinen eigenen Text.
+
+**Werkzeug-Kürzel (seit 2026-08-01):** P Stift · F Füllen · L Linie ·
+E Ellipse · V Rechteck · G Radierer · I Pipette · A Auswahl · T Text ·
+B Pfad · W Wischen; `Umschalt` macht die Variante (`Umschalt+G` radiert mit
+der Sekundärfarbe, `Umschalt+B` ist der Freihand-Pfad, `Strg+G` der
+Farbtausch). **Z** blendet das Zauberstab-Raster ein, dessen elf Werkzeuge
+auf **1–9** liegen (`Umschalt+5`/`Umschalt+6` für die Innen-Varianten) — in
+genau der Reihenfolge, in der die Knöpfe im Raster stehen.
+
+> **Die Belegung steht vollständig in `KeyBindings.TOOL_KEYS`** — einer
+> Tabelle mit drei Verbrauchern: den Zeilen des Hilfe-Dialogs, der
+> Verdrahtung in `KeyboardShortcutManager.setupToolKeys` und dem Kürzel im
+> Tooltip (`KeyBindings.comboFor`). **Nirgends wird eine Taste ein zweites
+> Mal getippt.** Genau das war der Fehler davor: handgepflegte
+> Klammer-Kürzel im Tooltip, die kein Handler bediente.
+>
+> **`R` ist kein Werkzeug-Kürzel** — es dreht das Bild. Deshalb trägt das
+> Rechteck `V` („Viereck"). Wer das angleicht, nimmt dem Drehen seine Taste.
+>
+> **Die Taste wählt, sie schaltet nicht ab.** Der Knopf schaltet beim zweiten
+> Klick auf „kein Werkzeug"; bei einer Taste sähe dasselbe wie „nichts
+> passiert" aus.
+
+> **Einfache Buchstaben und die Textbearbeitung beißen sich — das war ein
+> vorhandener Fehler.** Belegungen der `InputMap WHEN_IN_FOCUSED_WINDOW`
+> feuern auf `KEY_PRESSED`, die Texteingabe des `CanvasPanel` nimmt Zeichen
+> aber erst in `keyTyped()` entgegen. Ein „r" im Text drehte deshalb zugleich
+> das Bild um 90 Grad (am 2026-08-01 mit einem Wegwerf-Programm
+> nachgewiesen). Der Wachposten `KeyboardShortcutManager.toolKeysActive()`
+> fragt jetzt **an einer Stelle** `CanvasPanel.isEditingText()` und die
+> Sichtbarkeit der Mal-Leiste ab — keine Meldepflicht je Handler (Univ. §13).
+> `R`, `Umschalt+R` und `Umschalt+V` hängen mit drin.
 
 > Zwei Gesten, die man nicht errät und die vorher nirgends standen:
 > **`Strg`+Rad auf einem Text-Layer** ändert die Schriftgröße statt zu zoomen,

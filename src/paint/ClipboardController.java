@@ -281,7 +281,16 @@ class ClipboardController {
 		return null;
 	}
 
-	private void copyToSystemClipboard(BufferedImage img) {
+	/**
+	 * Legt ein Bild in die System-Zwischenablage.
+	 *
+	 * <p>Seit 2026-08-01 paketsichtbar statt privat: das Kontextmenü des
+	 * Layer-Panels („Kopieren“) braucht denselben Weg. <b>Sichtbarkeit
+	 * erweitert statt Logik kopiert</b> — ein zweiter
+	 * {@code TransferableImage}-Aufruf wäre die Stelle, an der später eine
+	 * von beiden Fassungen den Alphakanal anders behandelt.
+	 */
+	void copyToSystemClipboard(BufferedImage img) {
 		if (img == null)
 			return;
 		try {

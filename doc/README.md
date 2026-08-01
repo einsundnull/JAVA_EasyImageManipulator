@@ -59,14 +59,21 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`TextLayer_Implementation_Documentation.md`](TextLayer_Implementation_Documentation.md) | TextLayer |
 | [`F6_FEATURE.md`](F6_FEATURE.md) | F6 „auf Canvas anwenden" |
 | [`Schema_ButtonLeiste_Top_with_Books.txt`](Schema_ButtonLeiste_Top_with_Books.txt) | ASCII-Mockup der oberen Leiste (Buch-Modus) |
+| [`Schema_PaintToolbar_Icons.txt`](Schema_PaintToolbar_Icons.txt) | **Symbole der Paint-Leiste** (2026-08-01, freigegeben und umgesetzt) — Befund, Vorschlagstabelle, Zauberstab-Familie · **Abschnitt 8: was die Sichtprüfung am Entwurf geändert hat** |
 | [`HowImagesForScenesAreLoaded.txt`](HowImagesForScenesAreLoaded.txt) · [`Preload.txt`](Preload.txt) | Bild-/Preload-Pfade |
 | [`SplitCanvas.txt`](SplitCanvas.txt) · [`SplitCanvas II.txt`](<SplitCanvas II.txt>) | Konzept der zwei Canvases |
 
 ## 5. Tastatur (§25)
 
 > **Die Wahrheit steht seit 2026-07-30 im Code: `paint.KeyBindings.ALL`.**
-> 53 Einträge, sichtbar im Programm über **Umschalt+F1** oder den Knopf „?“.
-> Neue Taste oder Geste → **zuerst** Registry-Eintrag, dann Handler.
+> 79 Einträge in sieben Scopes, sichtbar im Programm über **Umschalt+F1**
+> oder den Knopf „?“. Neue Taste oder Geste → **zuerst** Registry-Eintrag,
+> dann Handler.
+>
+> **Die Werkzeug-Kürzel liegen in `KeyBindings.TOOL_KEYS`** (seit
+> 2026-08-01) — einer Tabelle, aus der sich Dialogzeilen, Verdrahtung *und*
+> Tooltip speisen. Eine Taste wird nirgends ein zweites Mal getippt; genau
+> die zweite, handgepflegte Liste war der Fehler davor.
 
 | Datei | Rolle |
 |---|---|
@@ -110,6 +117,11 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`Task_2026-07-31_2300_B01-fileCache-deckeln.txt`](Task_2026-07-31_2300_B01-fileCache-deckeln.txt) | **PD** zu B01 · Messung, Politik-Entscheidung, Umsetzung · abgeschlossen |
 | [`progress_2026-07-31_B01-filecache-deckeln.txt`](progress_2026-07-31_B01-filecache-deckeln.txt) | **B01 repariert:** Historie inaktiver Dateien wird gekürzt · **die Messung hat die Lösung geändert** — nicht die Eintragszahl war das Problem, sondern die Undo-Stacks (606 MB je Eintrag) · Verify **B1–B7** |
 | [`progress_2026-07-31_claudemd-korrektur.txt`](progress_2026-07-31_claudemd-korrektur.txt) | **`CLAUDE.md` gegen den gemessenen Ist-Stand korrigiert** (Univ. §9) · sechs Widersprüche, jede Zahl einzeln nachgemessen · gröbster: „`AppTheme` noch nirgends benutzt" bei 154 Verwendungen |
+| [`Task_2026-08-01_0900_PaintToolbar-Icons.txt`](Task_2026-08-01_0900_PaintToolbar-Icons.txt) | **PD** zu den Paint-Leisten-Symbolen · 6 Schritte + 3 Zwischenschritte · abgeschlossen |
+| [`progress_2026-08-01_paint-icons-vorschlag.txt`](progress_2026-08-01_paint-icons-vorschlag.txt) | **Befund:** elf Knöpfe zeigen vier Zeichen · 🪣 ist in **keiner** Schriftfamilie darstellbar (gemessen) · **die Tooltips versprachen Tastenkürzel, die es nicht gibt** |
+| [`Task_2026-08-01_0957_Werkzeug-Kuerzel.txt`](Task_2026-08-01_0957_Werkzeug-Kuerzel.txt) | **PD** zu den Werkzeug-Kürzeln · 6 Schritte · abgeschlossen |
+| [`progress_2026-08-01_werkzeug-kuerzel.txt`](progress_2026-08-01_werkzeug-kuerzel.txt) | **Werkzeug-Kürzel nachgerüstet** · `TOOL_KEYS` als einzige Quelle für Dialog, Verdrahtung und Tooltip · **Befund: ein „r" im Text drehte zugleich das Bild** — einfache Buchstaben feuern vor der Texteingabe · Verify **W1–W9** |
+| [`progress_2026-08-01_paint-icons-umsetzung.txt`](progress_2026-08-01_paint-icons-umsetzung.txt) | **`PaintIcons` gebaut und verdrahtet** · Zauberstab-Familie aus Grundform + Abzeichen · **wie ohne Programmstart geprüft wurde — und welche drei Fehler das fand** · Verify **P1–P9** |
 | [`WEITERMACHEN_PROMPT_2026-07-30_archiv.txt`](WEITERMACHEN_PROMPT_2026-07-30_archiv.txt) | Vorgänger-Fassung mit dem vollen Verlauf der Schritte [1]–[4] |
 
 ## 7. Historisch — abgeschlossene Arbeiten (nicht als Ist-Stand lesen)

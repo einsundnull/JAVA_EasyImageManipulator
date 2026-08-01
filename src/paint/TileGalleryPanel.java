@@ -101,8 +101,18 @@ public class TileGalleryPanel extends BaseSidebarPanel {
          * like what is visible on screen.
          */
         default java.awt.image.BufferedImage getCompositeForFile(File f) { return null; }
-        /** Called when the user requests a rename (right-click → Umbenennen). No-op by default. */
+        /** Called when the user requests a rename (context menu → Umbenennen). No-op by default. */
         default void onRenameRequested(File file) {}
+        /**
+         * Füllt das Rechtsklick-Menü für {@code file}.
+         *
+         * <p>Das Panel baut das Menü und zeigt es an; <b>was darin steht,
+         * entscheidet der Verdrahter</b> — Bildliste, Szenenliste und
+         * Seitenliste können dasselbe Panel sein und trotzdem verschiedene
+         * Aktionen anbieten (§22: das Panel kennt keine Dateilogik).
+         * Fügt niemand etwas hinzu, erscheint kein Menü.
+         */
+        default void onContextMenu(File file, ContextMenu menu) {}
     }
 
     // ── Callback for preloading ───────────────────────────────────────────────
@@ -680,6 +690,12 @@ public class TileGalleryPanel extends BaseSidebarPanel {
             // TilePanel is a drag SOURCE only; incoming drops must reach tilesContainer.
             setDropTarget(null);
 
+            // Rechtsklick-Menü. Der Inhalt kommt vom Verdrahter (§22), das
+            // Panel liefert nur die Kachel und die Datei. Der Auslöser prüft
+            // isPopupTrigger in pressed UND released und schweigt, wenn
+            // gezogen wurde — Rechts-Ziehen bleibt Drag-to-Copy (§25).
+            ContextMenu.install(this, (e, menu) -> callbacks.onContextMenu(imageFile, menu));
+
             addMouseListener(new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent e) {
                     dragStart       = e.getPoint();
@@ -691,14 +707,10 @@ public class TileGalleryPanel extends BaseSidebarPanel {
                     callbacks.onDragEnded();
                 }
                 @Override public void mouseClicked(MouseEvent e) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
-                        javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
-                        javax.swing.JMenuItem renameItem = new javax.swing.JMenuItem("Umbenennen");
-                        renameItem.addActionListener(ae -> callbacks.onRenameRequested(imageFile));
-                        popup.add(renameItem);
-                        popup.show(TilePanel.this, e.getX(), e.getY());
-                        return;
-                    }
+                    // Der Rechtsklick gehört dem Kontextmenü (siehe
+                    // ContextMenu.install weiter unten) und darf hier keine
+                    // Kachel auswählen.
+                    if (SwingUtilities.isRightMouseButton(e)) return;
                     // Clear clicked state from other tiles and set this one
                     for (TilePanel t : tiles) {
                         if (t != TilePanel.this) {

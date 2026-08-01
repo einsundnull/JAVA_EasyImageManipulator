@@ -1,0 +1,207 @@
+==============================================================================
+Task_2026-08-01_0957_Werkzeug-Kuerzel.txt        (PD, [BT])
+TransparencyTool — Tastenkuerzel fuer die Mal-Werkzeuge
+==============================================================================
+INITIALER PROMPT: "Werkzeug-Kuerzel"
+
+HERKUNFT: WEITERMACHEN_PROMPT, Befund 3 des Paint-Icons-Tasks (2026-08-01).
+Die Tooltips versprachen Kuerzel (P)(F)(L)(E)(R)(X)(I)(S)(T)(K)(J)(M), die es
+NIE GAB. Die Klammern sind am 2026-08-01 entfernt worden; das Nachruesten war
+ausdruecklich als EIGENER Task zurueckgestellt (§25: zuerst Registry, dann
+Handler; die Belegung muss NEU entschieden werden).
+
+REGELN, DIE DIESEN TASK BESTIMMEN:
+  §25   Neue Taste -> ZUERST Eintrag in KeyBindings.ALL, DANN Handler.
+        Kein stiller Shortcut. Konflikte werden GEFUEHRT, nicht verschwiegen.
+        Neue Funktion = ein GUIDE-Absatz, sonst in der UI nicht auffindbar.
+  §22   Keine neue Fachlogik in CanvasPanel.
+  Univ. §0  Bestehendes nicht umbauen, nur weil es die Regel erlaubt.
+
+==============================================================================
+0. IST-STAND — GEMESSEN, NICHT GESCHAETZT
+==============================================================================
+0.1 WAS ES SCHON GIBT (die Pflichtfrage aus F01/I01: "gibt es die Loesung
+    schon?" — hier lautet die Antwort TEILWEISE JA):
+      PaintToolbar.setActiveTool(PaintEngine.Tool)   PaintToolbar.java:236
+        -> setzt activeTool, ruft cb.onToolChanged(tool) UND synchronisiert
+           alle Knopf-Zustaende. Genau das, was ein Handler braucht.
+        -> AUFRUFER EXISTIEREN BEREITS: CanvasPanel:794/2407/2594/2636
+           (Rueckfall auf SELECT) und AppLifecycleController:123
+           (Wiederherstellen aus den Settings).
+      PaintToolbar.toggleWandPanel()                 PaintToolbar.java:352
+        -> oeffnet/schliesst das WandPanel. Knopf "Staebe" ruft es.
+    *** DER HANDLER IST DESHALB EIN EINZEILER JE TASTE. Gebaut werden muss
+        nichts — nur verdrahtet und registriert. ***
+
+0.2 WIE VIELE WERKZEUGE (PaintEngine.Tool, 25 Werte):
+      14 in der Hauptleiste: PENCIL FLOODFILL LINE CIRCLE RECT ERASER
+         ERASER_BG ERASER_COLOR EYEDROPPER SELECT TEXT PATH FREE_PATH SMEAR
+      11 im WandPanel-Raster (PaintToolbar.isWandTool): WAND_I..IV,
+         WAND_REPLACE_OUTER/INNER, WAND_AA_OUTER/INNER, CUT_COLOR,
+         CUT_UNTIL_COLOR, CUT_SAME_COLOR
+
+0.3 WELCHE TASTEN BELEGT SIND (aus KeyboardShortcutManager ausgelesen,
+    nicht aus einem Dokument abgeschrieben):
+      OHNE Modifikator:  R (90 Grad drehen) · Esc · Entf · Rueck · Enter
+      Mit Strg:          C X V A Z Y S (+ Umschalt-/Alt-Varianten)
+      Mit Umschalt:      R (gegen Uhrzeigersinn) · V (Sichtbarkeit)
+      Umschalt+Alt:      A
+      Global:            F1-F7 · Umschalt+F1 · Alt+T · Alt+P
+    *** ERGEBNIS: JEDER EINFACHE BUCHSTABE AUSSER `R` IST FREI. Die alte
+        Tooltip-Liste war also bis auf `R` sogar kollisionsfrei — sie war
+        nur nirgends verdrahtet. ***
+
+0.4 *** BEFUND, DER DEN ENTWURF BESTIMMT — EINFACHE BUCHSTABEN UND DIE
+    TEXTBEARBEITUNG BEISSEN SICH: ***
+    Die Textbearbeitung im CanvasPanel nimmt druckbare Zeichen in
+    keyTyped() entgegen (CanvasPanel:1707-1717) und verbraucht sie DORT.
+    Die Kuerzel des Hauptfensters haengen aber in der InputMap
+    WHEN_IN_FOCUSED_WINDOW und feuern auf KEY_PRESSED — also FRUEHER.
+    Ein "P" waehrend des Tippens wuerde damit das Werkzeug wechseln UND
+    als Buchstabe im Text landen.
+    *** DAS IST KEIN NEUES PROBLEM, SONDERN EIN VORHANDENES: `R` ist heute
+        schon so belegt. Wer in einen Text ein "r" tippt, dreht
+        moeglicherweise sein Bild um 90 Grad. Das ist zu pruefen (Schritt
+        [1]) und gehoert in denselben Handler-Wachposten. ***
+    Vorhandener Zustand fuer die Abfrage: textBoundingBox != null &&
+    !textDrawingBox (CanvasPanel:1612, :1708). Ein oeffentliches
+    isEditingText() fehlt und ist [B] — eine Abfrage, keine Fachlogik (§22).
+
+0.5 WAS DER TASTENDRUCK TUN SOLL, WENN DAS WERKZEUG SCHON AKTIV IST:
+    Der KNOPF schaltet ab (PaintToolbar:440 setzt activeTool = null).
+    Fuer die TASTE ist Abschalten die schlechtere Wahl: zweimal dieselbe
+    Taste sieht dann wie "nichts passiert" aus. VORSCHLAG: die Taste
+    WAEHLT immer, sie schaltet nie ab. Der Unterschied gehoert in die
+    Beschreibung der Registry.
+
+==============================================================================
+1. VORGESCHLAGENE BELEGUNG  (ENTSCHEIDUNG DES USERS — siehe Abschnitt 3)
+==============================================================================
+Mnemonik am DEUTSCHEN Etikett (die Oberflaeche ist deutsch, §25), Varianten
+eines Werkzeugs als Umschalt-Familie, `R` bleibt beim Drehen.
+
+  P   Stift          (Pinsel)
+  F   Fuellen        (Fuelleimer)
+  L   Linie
+  E   Ellipse
+  V   Rechteck       (Viereck — `R` ist mit Drehen belegt)
+  G   Radierer       (Radiergummi)
+  Umschalt+G  Rad. Farbe    (Radierer mit Sekundaerfarbe — dieselbe Familie)
+  Strg+G      Farbtausch    (Farbradierer — dieselbe Familie)
+  I   Pipette        (durchgaengige Konvention in Bildprogrammen)
+  A   Auswahl
+  T   Text
+  B   Pfad           (Bezier)
+  Umschalt+B  Freihand-Pfad (dieselbe Familie)
+  W   Wischen
+  Z   Zauberstab-Panel oeffnen/schliessen  -> toggleWandPanel()
+
+  *** DIE ELF ZAUBERSTAB-WERKZEUGE BEKOMMEN BEWUSST KEINE EIGENE TASTE. ***
+  Elf zusaetzliche Kuerzel fuer selten benutzte Varianten waeren elf
+  Belegungen, die niemand behaelt — und sie wuerden den freien Tastenraum
+  aufbrauchen. EINE Taste oeffnet das Raster, dort wird geklickt. Das ist
+  auch der Zustand, den die gezeichneten Icons vom 2026-08-01 gerade
+  bedienbar gemacht haben.
+
+  KOLLISIONS-GEGENPROBE gegen 0.3: P F L E V G I A T B W Z sind samt der
+  drei Varianten frei. KEINE Ueberschneidung. Strg+G ist frei.
+
+  BEDINGUNG (kommt als `condition` in die Registry):
+    - wirkt nur, solange die Mal-Leiste sichtbar ist (Malmodus)
+    - wirkt NICHT waehrend der Textbearbeitung  -> Schritt [2]
+
+==============================================================================
+2. SCHRITTE
+==============================================================================
+[1/6]  [B]  Haiku ungeeignet — Messschritt, Ergebnis entscheidet [2]
+       Belegen, ob `R` waehrend der Textbearbeitung heute wirklich dreht.
+       Wegwerf-Programm oder Runtime-Verify durch den User. Ergebnis in die
+       progress-Datei. KEIN Code.
+
+[2/6]  [B]  Sonnet
+       CanvasPanel.isEditingText() ergaenzen (oeffentliche Abfrage auf den
+       vorhandenen Zustand, KEINE Fachlogik, §22) und im Hauptfenster einen
+       Wachposten bereitstellen, der bei aktiver Textbearbeitung UND bei
+       unsichtbarer Mal-Leiste keine Werkzeug-Taste durchlaesst.
+       *** Univ. §13-Muster: EINE Feststellung an der Wurzel, keine
+           Meldepflicht je Handler. ***
+
+[3/6]  [B]  Sonnet    *** REIHENFOLGE IST PFLICHT (§25): DIESER SCHRITT VOR [4] ***
+       15 Eintraege in KeyBindings.ALL, Scope WINDOW, mit `condition`
+       ("nur im Malmodus, nicht waehrend der Textbearbeitung").
+       Dazu der Vermerk, dass die Taste waehlt und nicht abschaltet.
+
+[4/6]  [B]  Sonnet
+       Verdrahtung in KeyboardShortcutManager: je Taste ein im.put + am.put,
+       das ueber den Wachposten aus [2] auf
+       ed.paintToolbar.setActiveTool(...) bzw. toggleWandPanel() geht.
+
+[5/6]  [B]  Haiku moeglich (reiner Text), Sonnet sicherer
+       GUIDE-Absatz in KeyBindings.GUIDE ("Werkzeug mit der Tastatur
+       wechseln") — ohne ihn ist die Funktion in der UI nicht auffindbar.
+       Tooltips in PaintToolbar.toolInfo wieder mit Kuerzel versehen —
+       *** DIESMAL WAHR. *** Javadoc-Kopf von toolInfo (PaintToolbar:786)
+       entsprechend berichtigen, er beschreibt heute den Zustand "es gibt
+       keine Kuerzel".
+
+[6/6]  [B]  Sonnet
+       Build (344 -> 344 .class erwartet, keine neue Klasse), CLAUDE.md +
+       doc/GUIDELINES.md-Steckbrief nachziehen (Univ. §9), progress-Datei
+       mit Runtime-Verify-Liste W1-W9, WEITERMACHEN_PROMPT aktualisieren.
+
+UNNOETIGE SCHRITTE, BEWUSST NICHT IM PLAN (Univ. §0):
+  - Kein Mockup/Schema: der KeyBindingsDialog bekommt Zeilen, kein neues
+    Layout. §9 verlangt ein Schema fuer LAYOUTS, nicht fuer Inhalte.
+  - Keine Umstellung der Knopf-Logik in PaintToolbar. Der Knopf darf
+    weiter abschalten; nur die Taste tut es nicht.
+  - Keine eigenen Kuerzel fuer die elf Zauberstaebe (Begruendung in 1.).
+  - Kein Anfassen von WandPanel.
+
+MODEL-STRATEGIE: [1] und [2] tragen die Denkarbeit, [3]-[5] sind mechanisch.
+Ein /clear vor [6] lohnt nicht — der Task ist klein genug.
+
+==============================================================================
+3. FRAGEN AN DEN USER — VOR [2] ZU BEANTWORTEN
+==============================================================================
+  Q1  Belegung wie in Abschnitt 1 (einfache Buchstaben) oder lieber
+      Alt+Buchstabe (kollidiert nie mit Text, ist aber umstaendlicher und
+      Alt+T/Alt+P sind schon vergeben)?   -> Empfehlung: Abschnitt 1
+  Q2  Nur die 14 Werkzeuge der Hauptleiste + Z fuer das Zauberstab-Panel,
+      oder doch alle 25?                  -> Empfehlung: 14 + Z
+  Q3  `R` waehrend der Textbearbeitung (Befund 0.4): im selben Zug mit
+      absichern, oder unangetastet lassen und nur als Altlast fuehren?
+      -> Empfehlung: mit absichern, es ist derselbe Wachposten und
+         andernfalls repariert man dieselbe Datei zweimal
+
+==============================================================================
+4. FORTSCHRITT
+==============================================================================
+[1/6] abgeschlossen — R-Befund BELEGT (KeyOrderProbe): beides feuert
+[2/6] abgeschlossen — CanvasPanel.isEditingText() + Wachposten
+[3/6] abgeschlossen — Registry (als TOOL_KEYS, siehe Abweichung unten)
+[4/6] abgeschlossen — Verdrahtung iteriert ueber TOOL_KEYS
+[5/6] abgeschlossen — GUIDE-Absatz + Tooltips aus comboFor()
+[6/6] abgeschlossen — Build 347 .class, ToolKeyProbe bestanden, Doku
+
+ANTWORTEN DES USERS: Q1 einfache Buchstaben · Q2 ALLE 25 Werkzeuge ·
+Q3 R-Befund mitabsichern.
+
+*** ABWEICHUNG VOM PLAN IN [3], BEWUSST UND BESSER ***
+Geplant waren 26 handgeschriebene Zeilen in KeyBindings.ALL und daneben
+26 Zeilen Verdrahtung mit denselben Tasten — also GENAU DIE ZWEITE LISTE,
+deren Auseinanderlaufen diesen Task ueberhaupt ausgeloest hat.
+Stattdessen: EINE Tabelle KeyBindings.TOOL_KEYS mit drei Verbrauchern
+(Dialogzeilen, Verdrahtung, Tooltip). Der Fehler "Tooltip verspricht eine
+Taste, die es nicht gibt" ist damit strukturell unmoeglich, nicht nur
+diesmal behoben. ToolKeyProbe Abschnitt C prueft es zusaetzlich.
+
+ZWEI DINGE, DIE IM PLAN NICHT STANDEN UND NOETIG WAREN:
+  - PaintToolbar.setWandPanelVisible(): mit der Taste Z gibt es einen
+    ZWEITEN Bedienweg; die Knopf-Synchronisierung stand vorher nur im
+    ActionListener und haette gelogen (Univ. §12).
+  - Eine Zauberstab-Taste oeffnet das Raster mit, sonst ist die Wahl
+    unsichtbar (die elf Knoepfe existieren nur dort).
+
+OFFEN: nur Runtime-Verify W1-W9 (User), Liste in
+doc/progress_2026-08-01_werkzeug-kuerzel.txt.
+==============================================================================

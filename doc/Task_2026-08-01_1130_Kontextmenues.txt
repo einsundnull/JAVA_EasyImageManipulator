@@ -1,0 +1,123 @@
+==============================================================================
+Task_2026-08-01_1130_Kontextmenues.txt   (PD)
+TransparencyTool — vollstaendige Rechtsklick-Menues fuer Galerie und Layer
+==============================================================================
+
+INITIALER PROMPT
+------------------------------------------------------------------------------
+"Wenn ich mit Rechtsklick auf ein Bild oder ein Layer klicke, wird nur
+'umbenennen' angezeigt. Ich moechte aber ein vollstaendiges sinnvolles Menue
+wie (loeschen, umbenennen, speichern, speichern unter ... (mit File-Chooser),
+kopieren, etc.. Alles Best Practice. Mache mir einen Vorschlag, wie das zu
+erreichen ist."
+
+EINSTUFUNG: [BT] — Modell (evtl.), Vertrag (evtl.), drei Panels, ein neues
+Geruest. Entwurf und Befunde: doc/Schema_Kontextmenue.txt.
+
+*** SCHRITT [3] STARTET ERST NACH FREIGABE DES SCHEMAS UND DER ANTWORTEN
+    AUF Q1-Q4 (Univ. §9, Mockup-First). ***
+
+
+ANZAHL DER SCHRITTE: 9  (davon 2 nur bei entsprechender Antwort)
+------------------------------------------------------------------------------
+[1/9] BEFUND + REDUNDANZ-AUDIT                                [B]  Sonnet
+      Alle Popup-Fundstellen messen, Konflikte mit belegten Maus-Gesten
+      belegen, Callbacks-Bestand je Panel auflisten.
+      *** ERGEBNIS: nur EINE Fundstelle mit EINEM Eintrag -> das
+          Redundanz-Audit nach §2 ist trivial und wird im Protokoll
+          erledigt, nicht als eigene Datei. ***
+
+[2/9] SCHEMA + FREIGABE                                       [B]  Sonnet
+      doc/Schema_Kontextmenue.txt: drei Menue-Mockups, Architektur,
+      §20-Kollision, Q1-Q4, Verify C1-C10.
+      -> WARTET AUF DEN USER.
+
+[3/9] KEYBINDINGS ZUERST                                      [B]  Haiku ok
+      Registry-Eintraege VOR jedem Handler (§25):
+        - MOUSE_UI: "Rechtsklick auf Kachel = Kontextmenue"
+        - WINDOW/GALLERY: F2 = Umbenennen, Entf = Loeschen
+        - ein GUIDE-Absatz ("neue Funktion = ein Absatz", sonst in der UI
+          nicht auffindbar)
+      *** Und comboFor(...) muss die Kuerzel liefern koennen — die
+          Menue-Spalte wird ABGELEITET, nie getippt. Genau die zweite
+          handgepflegte Liste war der Fehler des Icons-Tasks. ***
+
+[4/9] ContextMenu-GERUEST                                     [B]  Sonnet
+      Neue Datei paint/ContextMenu.java, additiv, beim Anlegen 0 Aufrufer
+      (Muster: AppTheme am 2026-07-30). Deklarativ, gestylt aus
+      AppColors/AppTheme, enabledIf statt Verstecken, Haekchen aus dem
+      LIVE-Zustand (Univ. §12).
+      *** isPopupTrigger in mousePressed UND mouseReleased, nicht
+          mouseClicked — sonst bricht Drag-to-Copy oder das Menue bleibt
+          unter Windows aus. ***
+      *** HAIKU HIER NICHT: die Trigger-Logik ist die Stelle, an der zwei
+          registrierte Gesten kollidieren. ***
+
+[5/9] GALERIE-MENUE VERDRAHTEN                                [A]  Sonnet
+      TileGalleryPanel + GalleryCallbacksFactory. Neue Callback-Methoden
+      als `default`, damit keine anonyme Klasse bricht.
+      "Speichern unter" ruft den VORHANDENEN Weg (SaveController:265),
+      geschrieben wird ueber ImageFileWriter (§34).
+
+[6/9] LAYER-MENUE VERDRAHTEN                                  [A]  Sonnet
+      ElementLayerPanel. ZEHN von elf Eintraegen sind reine Verdrahtung —
+      die Callbacks existieren bereits (Zeilen 75-107).
+      Die sieben Knoepfe BLEIBEN; das Menue ist ein zweiter Bedienweg.
+
+[7/9] SZENEN-/BUCHSEITEN-MENUE                                [B]  Haiku ok
+      Dasselbe Geruest, schlanker Satz. Rein additiv.
+
+[8/9] LOESCHEN-RUECKFRAGE (nur bei Q3 = "mit Rueckfrage")     [C]  Sonnet
+      Kleiner ConfirmDialog auf UIComponentFactory.createBaseDialog
+      (§20 — kein neues JOptionPane). Datei in den Papierkorb, nicht
+      endgueltig.
+      *** BERUEHRT DEN OFFENEN SCHRITT [9] DER WEITERMACHEN_PROMPT.txt.
+          Er entsteht hier an einem echten Bedarf statt auf Vorrat — die
+          volle BaseDialog-Extraktion bleibt davon unberuehrt. ***
+
+[9/9] LAYER-NAME (nur bei Q2 = ja)                            [C]  Opus
+      Namensfeld + withName() in Layer und ALLEN VIER Unterklassen (§29),
+      Ersetzen in activeElements UND selectedElements, optionaler
+      Schluessel im Szenenformat.
+      *** ZUERST doc/SCENE_FORMAT_READ_WRITE.md aendern, dann Code, und
+          Eintrag in die WEITERMACHEN_PROMPT.txt BEIDER Projekte
+          (Univ. §7, §23). Rueckwaertskompatibel: alte Szenen laden
+          unveraendert, ein Layer ohne Namen schreibt den Schluessel
+          NICHT. ***
+
+
+UNNOETIGE SCHRITTE — MARKIERT UND BEGRUENDET (Univ. §0)
+------------------------------------------------------------------------------
+  - TranslationMapListPanel:510 auf das Geruest migrieren. Es ist ein
+    Aufklapper an einem Knopf, kein Kontextmenue; es funktioniert und ist
+    bereits ueber AppTheme gestylt.
+  - Die sieben Knoepfe des Layer-Panels durch das Menue ERSETZEN. Sie sind
+    mit EINEM Klick erreichbar, das Menue braucht drei. Das waere langsamer
+    und ein Rueckschritt in der Bedienung.
+  - Eine Basisklasse statt einer Factory fuer das Menue. Ein JPopupMenu hat
+    kein Verhalten zum Erben (§2 zielt auf Fenster).
+  - CanvasPanel anfassen, solange Q1 = "kein Canvas-Menue" (§22).
+
+
+MODEL-STRATEGIE (Token sparen, ohne Kontext zu verlieren)
+------------------------------------------------------------------------------
+  HAIKU-BLOCK ZUERST: [3] und [7] sind mechanisch (Tabellen-Eintraege,
+  zweites Menue nach fertigem Muster) — dort ist Haiku sicher.
+  *** NICHT MIT HAIKU: [4] (Gesten-Kollision), [8] (§20-Grenzfall),
+      [9] (Format-Vertrag + Unveraenderlichkeit). ***
+  Nach [7] lohnt sich "/clear" + WEITERMACHEN_PROMPT.txt: [8]/[9] sind
+  eigenstaendig und brauchen den Verdrahtungs-Kontext nicht.
+
+
+FORTSCHRITT
+------------------------------------------------------------------------------
+[1/9] abgeschlossen
+[2/9] abgeschlossen — WARTET AUF FREIGABE (Q1-Q4)
+[3/9] offen
+[4/9] offen
+[5/9] offen
+[6/9] offen
+[7/9] offen
+[8/9] offen  (entfaellt bei Q3 = "ohne Rueckfrage")
+[9/9] offen  (entfaellt bei Q2 = "nein/spaeter")
+==============================================================================

@@ -10,6 +10,7 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.Insets;
 import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.Window;
@@ -21,6 +22,7 @@ import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -30,6 +32,7 @@ import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSlider;
 import javax.swing.JToggleButton;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 
 /**
@@ -46,6 +49,37 @@ public class PaintToolbar extends JPanel {
 
     // ── Constants ─────────────────────────────────────────────────────────────
     public static final int BTN_SIZE  = 50;
+
+    /**
+     * Knopfmaß im {@link WandPanel}-Raster.
+     * <p>Breiter und höher als {@link #BTN_SIZE}, weil dort Grundform,
+     * Varianten-Abzeichen <i>und</i> Beschriftung nebeneinander Platz finden
+     * müssen. Das Raster ist ein eigenes Fenster — der Platz kostet nichts.
+     */
+    public static final int WAND_BTN_W = 66;
+    public static final int WAND_BTN_H = 64;
+
+    /**
+     * Breite der Werkzeugknöpfe der Hauptleiste — <b>breiter als hoch</b>.
+     * <p>Die Höhe bleibt {@link #BTN_SIZE}, damit {@link #TOOLBAR_H}
+     * unverändert bleibt; die Breite richtet sich nach der längsten
+     * Beschriftung („Rad. Farbe", „Farbtausch" — je zehn Zeichen). Bei 50 px
+     * standen dort „Rad. Fa…" und „Farbtau…", und eine abgeschnittene
+     * Beschriftung erklärt so wenig wie gar keine. Die Leiste ist waagerecht
+     * scrollbar, die zusätzliche Breite kostet also nichts.
+     */
+    public static final int TOOL_BTN_W = 58;
+
+    /**
+     * Randloser Innenabstand der Knöpfe.
+     * <p><b>Nicht weglassen:</b> Swing gibt einem {@code JButton} von sich aus
+     * {@code Insets(2,14,2,14)}. Bei 50 px Knopfkante bleiben davon 22 px für
+     * die Beschriftung übrig — „Stift" wurde damit als „S…" gezeichnet. Der
+     * Knopf malt seinen Hintergrund ohnehin selbst, ein Rand ist also nicht
+     * nur unnötig, sondern schädlich. Eine geteilte Konstante, weil sonst je
+     * Knopf ein Objekt entstünde.
+     */
+    private static final Insets BTN_INSETS = new Insets(0, 0, 0, 0);
     public static final int SWATCH_W  = 22;
     public static final int SWATCH_H  = 22;
     private static final int PAL_COLS = 14;
@@ -132,6 +166,26 @@ public class PaintToolbar extends JPanel {
 
     // ── Wand panel (floating window) ──────────────────────────────────────────
     private WandPanel wandPanel;
+    /** Knopf „Stäbe" — von {@link #setWandPanelVisible(boolean)} nachgeführt. */
+    private JToggleButton wandPanelBtn;
+
+    /**
+     * Farbquelle der Werkzeug-Icons — liest den <b>Live-Zustand</b> der Leiste.
+     *
+     * <p>Fülleimer, Pipette und die beiden Farbradierer zeigen die Farbe, mit
+     * der sie arbeiten. Deshalb wird hier bewusst kein Wert kopiert: die
+     * Methoden greifen bei jeder Zeichnung auf {@code primaryColor} bzw.
+     * {@code secondaryColor} zu. Ein mitgeführtes Schattenfeld würde beim
+     * zweiten Bedienweg (Palette gegen Farbwähler) auseinanderlaufen —
+     * dieselbe Falle wie bei den Einstellungen (§31).
+     *
+     * <p>Damit die Icons das auch <i>zeigen</i>, ruft jede Farbänderung
+     * {@link #refreshColorIcons()}.
+     */
+    private final PaintIcons.PaintColors iconColors = new PaintIcons.PaintColors() {
+        @Override public Color primary()   { return primaryColor;   }
+        @Override public Color secondary() { return secondaryColor; }
+    };
 
     // =========================================================================
     // Constructor
@@ -171,7 +225,7 @@ public class PaintToolbar extends JPanel {
                 colorPrimaryPreview.setBackground(c);
                 syncAlphaSlider();
             }
-            cb.onColorChanged(primaryColor, secondaryColor);
+            fireColorChanged();
         });
 
         setVisible(false);
@@ -198,7 +252,7 @@ public class PaintToolbar extends JPanel {
         primaryColor = c;
         colorPrimaryPreview.setBackground(c);
         syncAlphaSlider();
-        cb.onColorChanged(primaryColor, secondaryColor);
+        fireColorChanged();
     }
 
     // Setter für Settings-Restore – aktualisieren immer auch die UI-Widgets
@@ -213,13 +267,13 @@ public class PaintToolbar extends JPanel {
         primaryColor = c;
         if (colorPrimaryPreview != null) colorPrimaryPreview.setBackground(c);
         syncAlphaSlider();
-        cb.onColorChanged(primaryColor, secondaryColor);
+        fireColorChanged();
     }
 
     public void setSecondaryColor(Color c) {
         secondaryColor = c;
         if (colorSecondaryPreview != null) colorSecondaryPreview.setBackground(c);
-        cb.onColorChanged(primaryColor, secondaryColor);
+        fireColorChanged();
     }
 
     public void setStrokeWidth(int w) {
@@ -298,12 +352,25 @@ public class PaintToolbar extends JPanel {
     }
 
     public void toggleWandPanel() {
+        setWandPanelVisible(!getWandPanel().isVisible());
+    }
+
+    /**
+     * Blendet das Zauberstab-Raster ein oder aus — <b>der einzige Weg</b>, damit
+     * der Knopf „Stäbe" nie etwas anderes anzeigt als den echten Zustand.
+     *
+     * <p>Seit den Werkzeug-Kürzeln (2026-08-01) gibt es zwei Bedienwege: den
+     * Knopf und die Taste {@code Z}. Stünde die Knopf-Synchronisierung wie
+     * vorher nur im {@code ActionListener}, zeigte der Knopf nach einem
+     * Tastendruck den falschen Zustand — dieselbe Falle wie bei den
+     * Einstellungen (Univ. §12: aus dem Live-Zustand ableiten, nicht
+     * mitführen).
+     */
+    public void setWandPanelVisible(boolean visible) {
         WandPanel p = getWandPanel();
-        if (p.isVisible()) p.setVisible(false);
-        else {
-            p.syncFromToolbar();
-            p.setVisible(true);
-        }
+        if (visible) p.syncFromToolbar();
+        p.setVisible(visible);
+        if (wandPanelBtn != null) wandPanelBtn.setSelected(p.isVisible());
     }
 
     public void setRulerSelected(boolean selected) { if (rulerBtn != null) rulerBtn.setSelected(selected); }
@@ -350,8 +417,10 @@ public class PaintToolbar extends JPanel {
     // ── Undo / Redo ───────────────────────────────────────────────────────────
     private JPanel buildUndoRedo() {
         JPanel p = hBox();
-        JButton undo = iconBtn("↩", "Rückgängig (Strg+Z)");
-        JButton redo = iconBtn("↪", "Wiederholen (Strg+Y)");
+        // ↩ ↪ bleiben als Zeichen: konventionell, eindeutig, überall
+        // darstellbar. Sie zu ersetzen wäre ein unnötiger Schritt (Univ. §0).
+        JButton undo = iconBtn(PaintIcons.glyph("↩"), "Zurück", "Rückgängig (Strg+Z)");
+        JButton redo = iconBtn(PaintIcons.glyph("↪"), "Vor",    "Wiederholen (Strg+Y)");
         undo.addActionListener(e -> cb.onUndo());
         redo.addActionListener(e -> cb.onRedo());
         p.add(undo);
@@ -375,8 +444,18 @@ public class PaintToolbar extends JPanel {
 
     /** Public so WandPanel can create identical tool buttons in its own container. */
     JToggleButton buildToolButton(PaintEngine.Tool tool) {
-        String[] st = symbolAndTip(tool);
-        JToggleButton btn = toolBtn(st[0], st[1]);
+        String[] st = toolInfo(tool);
+        boolean badged = PaintIcons.isBadged(tool);
+        // Das Kürzel wird AUS DER REGISTRY GEHOLT, nie in den Tooltip getippt
+        // (§25). Bis zum 2026-08-01 standen hier Klammer-Kürzel, die kein
+        // Handler bediente — „(R)" drehte in Wahrheit das Bild.
+        String combo = KeyBindings.comboFor(tool);
+        String tip   = combo.isEmpty() ? st[1] : st[1] + "  ·  Taste " + combo;
+        JToggleButton btn = toolBtn(
+                PaintIcons.forTool(tool, iconColors),
+                st[0], tip,
+                badged ? WAND_BTN_W : TOOL_BTN_W,
+                badged ? WAND_BTN_H : BTN_SIZE);
         btn.addActionListener(e -> {
             if (activeTool == tool) {
                 activeTool = null;
@@ -463,7 +542,7 @@ public class PaintToolbar extends JPanel {
                         primaryColor = withAlpha(c, alphaSlider.getValue());
                         colorPrimaryPreview.setBackground(primaryColor);
                     }
-                    cb.onColorChanged(primaryColor, secondaryColor);
+                    fireColorChanged();
                 }
             });
             p.add(swatch);
@@ -494,7 +573,7 @@ public class PaintToolbar extends JPanel {
             alphaLabel.setText(String.valueOf(a));
             primaryColor = withAlpha(primaryColor, a);
             colorPrimaryPreview.setBackground(primaryColor);
-            cb.onColorChanged(primaryColor, secondaryColor);
+            fireColorChanged();
         });
 
         p.add(miniLabel("* Staerke")); p.add(strokeSlider); p.add(strokeLabel);
@@ -530,9 +609,9 @@ public class PaintToolbar extends JPanel {
     // ── Antialiasing toggle ───────────────────────────────────────────────────
     private JPanel buildAntialias() {
         JPanel p = hBox();
-        aaBtn = toggleBtn("AA", "Antialiasing ein/aus (weiche Kanten)");
+        aaBtn = toggleBtn(PaintIcons.forAction(PaintIcons.Action.ANTIALIAS),
+                          "Glätten", "Antialiasing ein/aus (weiche Kanten)");
         aaBtn.setSelected(true); // on by default
-        aaBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
         aaBtn.addActionListener(e -> {
             antialias = aaBtn.isSelected();
             cb.onAntialiasingChanged(antialias);
@@ -568,12 +647,14 @@ public class PaintToolbar extends JPanel {
     // ── Wand panel toggle (opens the floating WandPanel) ─────────────────────
     private JPanel buildWandPanelToggle() {
         JPanel p = hBox();
-        JToggleButton btn = toggleBtn("⚡",
+        // Zauberstab MIT ZAHNRAD: der Knopf öffnet die Einstellungen der
+        // Zauberstäbe, er ist selbst keiner. Vorher trug er dasselbe „⚡"
+        // wie sechs Werkzeuge.
+        JToggleButton btn = toggleBtn(PaintIcons.forAction(PaintIcons.Action.WAND_PANEL),
+                "Stäbe",
                 "Zauberstab-Panel ein-/ausblenden · alle Zauberstäbe, Toleranz, Band-Breite, Farbquelle");
-        btn.addActionListener(e -> {
-            toggleWandPanel();
-            btn.setSelected(wandPanel != null && wandPanel.isVisible());
-        });
+        wandPanelBtn = btn;
+        btn.addActionListener(e -> toggleWandPanel());   // synchronisiert sich selbst
         p.add(btn);
         return p;
     }
@@ -620,14 +701,21 @@ public class PaintToolbar extends JPanel {
     private JPanel buildTransforms() {
         JPanel p = hBox();
 
-        JButton flipH   = iconBtn("↔",   "Horizontal spiegeln");
-        JButton flipV   = iconBtn("↕",   "Vertikal spiegeln");
-        JButton rot90cw = iconBtn("↻",   "90° im Uhrzeigersinn");
-        JButton rot90cc = iconBtn("↺",   "90° gegen Uhrzeigersinn");
-        JButton rot45cw = iconBtn("↷",   "45° im Uhrzeigersinn");
-        JButton rot45cc = iconBtn("↶",   "45° gegen Uhrzeigersinn");
-        JButton rotFree = iconBtn("⟳°",  "Drehen (freier Winkel) …");
-        JButton scale   = iconBtn("⤡",   "Skalieren …");
+        // ↔ ↕ ↺ ↻ behalten ihr Zeichen (Univ. §0). Die 45°-Drehungen, der
+        // freie Winkel und das Skalieren bekommen ein gezeichnetes Symbol:
+        // „↷" war von „↻" kaum zu unterscheiden, „⟳°" hatte das Gradzeichen
+        // als Text angeklebt, „⤡" war ein bloßer Diagonalpfeil.
+        // Beide Knöpfe „Spiegeln" zu nennen macht die Beschriftung wertlos —
+        // dann unterscheidet sie wieder nur das Zeichen, und genau das war
+        // der Ausgangsbefund.
+        JButton flipH   = iconBtn(PaintIcons.glyph("↔"), "Waagr.",    "Horizontal spiegeln");
+        JButton flipV   = iconBtn(PaintIcons.glyph("↕"), "Senkr.",    "Vertikal spiegeln");
+        JButton rot90cw = iconBtn(PaintIcons.glyph("↻"), "90° ↻",     "90° im Uhrzeigersinn");
+        JButton rot90cc = iconBtn(PaintIcons.glyph("↺"), "90° ↺",     "90° gegen Uhrzeigersinn");
+        JButton rot45cw = iconBtn(PaintIcons.forAction(PaintIcons.Action.ROTATE_45_CW),  "45° ↻", "45° im Uhrzeigersinn");
+        JButton rot45cc = iconBtn(PaintIcons.forAction(PaintIcons.Action.ROTATE_45_CCW), "45° ↺", "45° gegen Uhrzeigersinn");
+        JButton rotFree = iconBtn(PaintIcons.forAction(PaintIcons.Action.ROTATE_FREE),   "Winkel", "Drehen (freier Winkel) …");
+        JButton scale   = iconBtn(PaintIcons.forAction(PaintIcons.Action.SCALE),         "Skal.",  "Skalieren …");
 
         flipH  .addActionListener(e -> cb.onFlipHorizontal());
         flipV  .addActionListener(e -> cb.onFlipVertical());
@@ -652,9 +740,12 @@ public class PaintToolbar extends JPanel {
     // ── Clipboard ─────────────────────────────────────────────────────────────
     private JPanel buildClipboard() {
         JPanel p = hBox();
-        JButton cut   = iconBtn("✂", "Ausschneiden (Strg+X)");
-        JButton copy  = iconBtn("⎘", "Kopieren (Strg+C)");
-        JButton paste = iconBtn("⎗", "Einfügen (Strg+V)");
+        // „⎘" und „⎗" sind außerhalb von Unicode-Tabellen unbekannt und werden
+        // gezeichnet. Die Schere bleibt — sie ist eindeutig, seit die drei
+        // CUT_-Werkzeuge im WandPanel ein Abzeichen tragen.
+        JButton cut   = iconBtn(PaintIcons.glyph("✂"),                     "Ausschn.", "Ausschneiden (Strg+X)");
+        JButton copy  = iconBtn(PaintIcons.forAction(PaintIcons.Action.COPY),  "Kopieren", "Kopieren (Strg+C)");
+        JButton paste = iconBtn(PaintIcons.forAction(PaintIcons.Action.PASTE), "Einfügen", "Einfügen (Strg+V)");
         cut  .addActionListener(e -> cb.onCut());
         copy .addActionListener(e -> cb.onCopy());
         paste.addActionListener(e -> cb.onPaste());
@@ -668,8 +759,9 @@ public class PaintToolbar extends JPanel {
     private JPanel buildViewToggles() {
         JPanel p = hBox();
 
-        JToggleButton grid  = toggleBtn("⊞", "Raster ein-/ausblenden");
-        rulerBtn = toggleBtn("⌇", "Lineal ein-/ausblenden");
+        // „⊞" bleibt (Univ. §0). „⌇" ging: eine Wellenlinie bedeutet kein Lineal.
+        JToggleButton grid  = toggleBtn(PaintIcons.glyph("⊞"), "Raster", "Raster ein-/ausblenden");
+        rulerBtn = toggleBtn(PaintIcons.forAction(PaintIcons.Action.RULER), "Lineal", "Lineal ein-/ausblenden");
         JToggleButton ruler = rulerBtn;
         grid .addActionListener(e -> cb.onToggleGrid(grid.isSelected()));
         ruler.addActionListener(e -> cb.onToggleRuler(ruler.isSelected()));
@@ -709,51 +801,73 @@ public class PaintToolbar extends JPanel {
         return String.format("#%02X%02X%02X", c.getRed(), c.getGreen(), c.getBlue());
     }
 
-    private String[] symbolAndTip(PaintEngine.Tool tool) {
+    /**
+     * Beschriftung und Tooltip eines Werkzeugs — {@code {Beschriftung, Tooltip}}.
+     *
+     * <p>Das <b>Symbol</b> steht seit dem 2026-08-01 nicht mehr hier, sondern in
+     * {@link PaintIcons}; diese Methode liefert nur noch Text. Vorher trug sie
+     * beides, und dabei standen sechsmal „⚡" und dreimal „✂" nebeneinander.
+     *
+     * <p><b>Das Kürzel steht ebenfalls nicht hier.</b> Bis zum 2026-08-01
+     * trugen die Tooltips von Hand gepflegte Klammer-Kürzel („Stift (P)"),
+     * die kein Handler bediente — und {@code R} war in Wahrheit mit
+     * „90° drehen" belegt. Wer dem Tooltip folgte, drehte sein Bild.
+     *
+     * <p>Seit dem Task <i>Werkzeug-Kürzel</i> (2026-08-01) sind die Tasten
+     * echt, und {@link #buildToolButton} hängt sie über
+     * {@link KeyBindings#comboFor} an den Tooltip an — <b>abgeleitet aus der
+     * Registry, nicht getippt</b> (§25). Eine zweite Liste neben der Registry
+     * ist die Ursache des Problems, nicht die Lösung.
+     */
+    private String[] toolInfo(PaintEngine.Tool tool) {
         return switch (tool) {
-            case PENCIL     -> new String[]{ "P", "Stift (P)"      };
-            case FLOODFILL  -> new String[]{ "F", "Fuelleimer (F)" };
-            case LINE       -> new String[]{ "/", "Linie (L)"      };
-            case CIRCLE     -> new String[]{ "O", "Ellipse (E)"    };
-            case RECT       -> new String[]{ "R", "Rechteck (R)"   };
-            case ERASER       -> new String[]{ "⌫", "Radierer – Transparent (X) · Rechtsklick = mit Sekundärfarbe radieren" };
-            case ERASER_BG    -> new String[]{ "⬜", "Radierer – Sekundärfarbe: malt mit Sekundärfarbe statt Transparent" };
-            case ERASER_COLOR -> new String[]{ "⌧", "Farbradierer (MS-Paint) · Ersetzt Primärfarbe durch Sekundärfarbe – andere Farben bleiben unberührt" };
-            case EYEDROPPER -> new String[]{ "✦", "Pipette (I)"    };
-            case SELECT     -> new String[]{ "⬚", "Auswahl (S)"    };
-            case TEXT       -> new String[]{ "A", "Text (T)"       };
-            case PATH       -> new String[]{ "≈", "Pfad (K)"       };
-            case FREE_PATH  -> new String[]{ "✏", "Freihand-Pfad (J)"  };
-            case WAND_I     -> new String[]{ "⚡",
-                "Zauberstab I – Region anderer Farbe (1) · Klick → Pfad um den flutgefüllten Bereich bis zur nächsten Farbgrenze" };
-            case WAND_II    -> new String[]{ "⚡",
-                "Zauberstab II – bis Zielfarbe (2) · Klick → Pfad, stoppt bei Sekundärfarbe" };
-            case WAND_III   -> new String[]{ "⚡",
-                "Zauberstab III – Transparent (3) · Klick → flutgefüllte Region wird alpha=0" };
-            case WAND_IV    -> new String[]{ "⚡",
-                "Zauberstab IV – Inwards Collapse (4) · Freihand-Polygon zeichnen, engt sich bis auf Inhalt zusammen" };
-            case WAND_REPLACE_OUTER -> new String[]{ "⚡",
+            case PENCIL     -> new String[]{ "Stift",    "Stift — freihändig malen" };
+            case FLOODFILL  -> new String[]{ "Füllen",   "Fülleimer — zusammenhängende Fläche mit der Primärfarbe füllen" };
+            case LINE       -> new String[]{ "Linie",    "Gerade Linie" };
+            case CIRCLE     -> new String[]{ "Ellipse",  "Ellipse" };
+            case RECT       -> new String[]{ "Rechteck", "Rechteck" };
+            // Drei Radierer, drei verschiedene Wirkungen — die Beschriftung
+            // muss sie trennen, nicht bloß numerieren.
+            case ERASER       -> new String[]{ "Radierer",   "Radierer – Transparent · Rechtsklick = mit Sekundärfarbe radieren" };
+            case ERASER_BG    -> new String[]{ "Rad. Farbe", "Radierer – Sekundärfarbe: malt mit Sekundärfarbe statt Transparent" };
+            case ERASER_COLOR -> new String[]{ "Farbtausch", "Farbradierer (MS-Paint) · Ersetzt Primärfarbe durch Sekundärfarbe – andere Farben bleiben unberührt" };
+            case EYEDROPPER -> new String[]{ "Pipette",  "Pipette — Farbe vom Bild aufnehmen" };
+            case SELECT     -> new String[]{ "Auswahl",  "Auswahl — Rechteck aufziehen" };
+            case TEXT       -> new String[]{ "Text",     "Text" };
+            case PATH       -> new String[]{ "Pfad",     "Pfad — Bézierkurve mit Kontrollpunkten" };
+            case FREE_PATH  -> new String[]{ "Freihand", "Freihand-Pfad" };
+            case SMEAR      -> new String[]{ "Wischen",  "Verwischen" };
+
+            case WAND_I     -> new String[]{ "Region",
+                "Zauberstab I – Region anderer Farbe · Klick → Pfad um den flutgefüllten Bereich bis zur nächsten Farbgrenze" };
+            case WAND_II    -> new String[]{ "bis Farbe",
+                "Zauberstab II – bis Zielfarbe · Klick → Pfad, stoppt bei Sekundärfarbe" };
+            case WAND_III   -> new String[]{ "Transp.",
+                "Zauberstab III – Transparent · Klick → flutgefüllte Region wird alpha=0" };
+            case WAND_IV    -> new String[]{ "Collapse",
+                "Zauberstab IV – Inwards Collapse · Freihand-Polygon zeichnen, engt sich bis auf Inhalt zusammen" };
+            case WAND_REPLACE_OUTER -> new String[]{ "Ring auß.",
                 "Zauberstab Replace Outer · n-Pixel-Ring AUSSERHALB der angeklickten Fläche wird überschrieben" };
-            case WAND_REPLACE_INNER -> new String[]{ "⚡",
+            case WAND_REPLACE_INNER -> new String[]{ "Ring inn.",
                 "Zauberstab Replace Inner · n-Pixel-Ring INNERHALB der angeklickten Fläche wird überschrieben" };
-            case WAND_AA_OUTER -> new String[]{ "◠",
+            case WAND_AA_OUTER -> new String[]{ "AA außen",
                 "Zauberstab AA Outer · n-Pixel-Ring AUSSERHALB wird antialiased eingeblendet (weiche Kante)" };
-            case WAND_AA_INNER -> new String[]{ "◡",
+            case WAND_AA_INNER -> new String[]{ "AA innen",
                 "Zauberstab AA Inner · n-Pixel-Ring INNERHALB wird antialiased eingeblendet (weiche Kante)" };
-            case CUT_COLOR -> new String[]{ "✂",
+            case CUT_COLOR -> new String[]{ "Farbe",
                 "Ausschneiden – Zielfarbe: alle Pixel die der Sekundärfarbe entsprechen werden pixelgenau transparent (global, kein Flood-Fill)" };
-            case CUT_UNTIL_COLOR -> new String[]{ "✂",
+            case CUT_UNTIL_COLOR -> new String[]{ "bis Farbe",
                 "Ausschneiden – bis Zielfarbe: Flood-Fill vom Klickpunkt, stoppt an Sekundärfarbe, schneidet die Region pixelgenau aus" };
-            case CUT_SAME_COLOR -> new String[]{ "✂",
+            case CUT_SAME_COLOR -> new String[]{ "gleiche",
                 "Ausschneiden – gleiche Farbe: Flood-Fill vom Klickpunkt, stoppt an jeder anderen Farbe, schneidet nur die angeklickte Farbregion aus" };
-            case SMEAR      -> new String[]{ "~", "Verwischen (M)"  };
         };
     }
 
     // ── Widget factories ──────────────────────────────────────────────────────
 
-    JToggleButton toolBtn(String symbol, String tooltip) {
-        JToggleButton btn = new JToggleButton(symbol) {
+    /** Werkzeug-Umschalter: Icon oben, Beschriftung darunter. */
+    JToggleButton toolBtn(Icon icon, String caption, String tooltip, int w, int h) {
+        JToggleButton btn = new JToggleButton(caption) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -761,61 +875,136 @@ public class PaintToolbar extends JPanel {
                          : getModel().isRollover() ? AppColors.BTN_HOVER
                          : AppColors.BTN_BG;
                 g2.setColor(bg);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), AppTheme.RADIUS_LG, AppTheme.RADIUS_LG);
                 if (isSelected()) {
                     g2.setColor(AppColors.ACCENT);
-                    g2.setStroke(new BasicStroke(2f));
-                    g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 8, 8);
+                    g2.setStroke(AppTheme.STROKE_MEDIUM);
+                    g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3,
+                                     AppTheme.RADIUS_LG, AppTheme.RADIUS_LG);
                 }
                 super.paintComponent(g);
             }
         };
-        styleBtn(btn, symbol, tooltip);
+        styleBtn(btn, icon, tooltip, w, h);
         return btn;
     }
 
-    JToggleButton toggleBtn(String symbol, String tooltip) {
-        JToggleButton btn = new JToggleButton(symbol) {
+    /**
+     * Ein/Aus-Schalter, der nur Text trägt — z. B. „◯ Closed" im
+     * {@link WandPanel}.
+     *
+     * <p><b>Die Breite richtet sich nach der Beschriftung</b>, mindestens
+     * {@link #BTN_SIZE}. Fest 50 px breit stand hier „…" statt „◯ Closed" —
+     * ein Schalter, dessen Aufschrift man nicht lesen kann, ist genau das
+     * Problem, das diese Umstellung beheben soll.
+     */
+    JToggleButton toggleBtn(String caption, String tooltip) {
+        JToggleButton btn = newToggleBtn(caption);
+        styleBtn(btn, null, tooltip, BTN_SIZE, BTN_SIZE);
+        btn.setFont(AppTheme.FONT_SM_BOLD);
+        int w = Math.max(BTN_SIZE,
+                btn.getFontMetrics(btn.getFont()).stringWidth(caption) + AppTheme.PAD_XL * 2);
+        Dimension d = new Dimension(w, BTN_SIZE);
+        btn.setPreferredSize(d);
+        btn.setMaximumSize(d);
+        btn.setMinimumSize(d);
+        return btn;
+    }
+
+    /** Ein/Aus-Schalter mit Icon und Beschriftung. */
+    JToggleButton toggleBtn(Icon icon, String caption, String tooltip) {
+        JToggleButton btn = newToggleBtn(caption);
+        styleBtn(btn, icon, tooltip, BTN_SIZE, BTN_SIZE);
+        return btn;
+    }
+
+    private JToggleButton newToggleBtn(String text) {
+        return new JToggleButton(text) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(isSelected()            ? AppColors.ACCENT_ACTIVE
                            : getModel().isRollover() ? AppColors.BTN_HOVER
                            : AppColors.BTN_BG);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), AppTheme.RADIUS_LG, AppTheme.RADIUS_LG);
                 super.paintComponent(g);
             }
         };
-        styleBtn(btn, symbol, tooltip);
-        return btn;
     }
 
-    private JButton iconBtn(String symbol, String tooltip) {
-        JButton btn = new JButton(symbol) {
+    /** Auslöse-Knopf mit Icon und Beschriftung. */
+    private JButton iconBtn(Icon icon, String caption, String tooltip) {
+        JButton btn = new JButton(caption) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(getModel().isRollover() ? AppColors.BTN_HOVER : AppColors.BTN_BG);
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), AppTheme.RADIUS_LG, AppTheme.RADIUS_LG);
                 super.paintComponent(g);
             }
         };
-        styleBtn(btn, symbol, tooltip);
+        styleBtn(btn, icon, tooltip, BTN_SIZE, BTN_SIZE);
         return btn;
     }
 
-    private void styleBtn(AbstractButton btn, String symbol, String tooltip) {
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 18));
+    /**
+     * Gemeinsames Aussehen aller Knöpfe der Leiste.
+     *
+     * <p><b>Die Beschriftung steht unter dem Symbol, nicht daneben</b>
+     * ({@code BOTTOM}/{@code CENTER}). Das ist der Kern der Umstellung vom
+     * 2026-08-01: der Prompt lautete „ersetzen <i>oder ergänzen</i>", und in
+     * einer Reihe gleichartiger Werkzeuge trägt die Beschriftung mehr zur
+     * Erkennbarkeit bei als jedes Symbol. Der Platz war vorhanden — 50 px
+     * Knopfkante fassen 30 px Symbol und eine 9-pt-Zeile.
+     */
+    private void styleBtn(AbstractButton btn, Icon icon, String tooltip, int w, int h) {
+        if (icon != null) btn.setIcon(icon);
+        btn.setFont(AppTheme.FONT_XS);
         btn.setForeground(AppColors.TEXT);
+        btn.setVerticalTextPosition(SwingConstants.BOTTOM);
+        btn.setHorizontalTextPosition(SwingConstants.CENTER);
+        btn.setVerticalAlignment(SwingConstants.CENTER);
+        btn.setIconTextGap(1);
+        btn.setMargin(BTN_INSETS);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setOpaque(false);
-        btn.setPreferredSize(new Dimension(BTN_SIZE, BTN_SIZE));
-        btn.setMaximumSize(new Dimension(BTN_SIZE, BTN_SIZE));
-        btn.setMinimumSize(new Dimension(BTN_SIZE, BTN_SIZE));
+        btn.setPreferredSize(new Dimension(w, h));
+        btn.setMaximumSize(new Dimension(w, h));
+        btn.setMinimumSize(new Dimension(w, h));
         btn.setToolTipText(tooltip);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    /**
+     * Zeichnet die Werkzeug-Icons neu, nachdem sich eine Malfarbe geändert hat.
+     *
+     * <p>Nur nötig, weil {@link #iconColors} den Live-Zustand liest (Fülleimer,
+     * Pipette, Farbradierer). <b>Es gibt keine Meldepflicht pro Bedienweg</b> —
+     * die Methode wird an den wenigen Stellen gerufen, an denen eine Farbe
+     * überhaupt gesetzt wird, und zeichnet dann pauschal alles neu. Eine
+     * Liste „welches Icon hängt an welcher Farbe" wäre die nächste Stelle,
+     * an der ein Fall vergessen wird (Univ. §13).
+     */
+    /**
+     * Meldet eine geänderte Malfarbe — <b>der einzige Weg dafür</b>.
+     *
+     * <p>Vorher stand {@code cb.onColorChanged(...)} an sechs Stellen
+     * (Farbwähler, Palette, Alpha-Regler und drei Setter für den
+     * Einstellungs-Restore). Seit die Icons die Farbe <i>zeigen</i>, muss
+     * jede dieser Stellen zusätzlich neu zeichnen lassen. Ein Trichter statt
+     * sechs Aufrufpaaren: sonst ist die nächste hinzukommende Stelle genau
+     * die, an der das Neuzeichnen vergessen wird.
+     */
+    private void fireColorChanged() {
+        cb.onColorChanged(primaryColor, secondaryColor);
+        refreshColorIcons();
+    }
+
+    private void refreshColorIcons() {
+        toolButtons.values().forEach(AbstractButton::repaint);
+        if (wandPanel != null) wandPanel.repaint();
     }
 
     private JLabel swatchLabel(Color c) {

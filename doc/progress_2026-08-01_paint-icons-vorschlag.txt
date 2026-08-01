@@ -1,0 +1,131 @@
+==============================================================================
+progress_2026-08-01_paint-icons-vorschlag.txt
+PD: Task_2026-08-01_0900_PaintToolbar-Icons.txt, Schritt [1/6]
+Kategorie [BT] · Risiko [B] (nur Dokumente) · KEIN CODE GEAENDERT
+==============================================================================
+
+PROMPT
+--------------------------------------------------------------------------
+Guidelines in fester Reihenfolge lesen (JAVA_GUIDELINES_UNIVERSAL, GUIDELINES,
+Prompt_Handling, WEITERMACHEN_PROMPT, README), dann:
+"In der Paint-Menue-Leiste sehe ich oft nicht, was die einzelnen Symbole und
+Buchstaben wirklich bedeuten. Finde Symbole nach best practice, die die
+vorhandenen ersetzen oder ergaenzen koennten (z.B. Fuelleimer fuer Floodfill,
+Pinsel oder Pencil fuer normales paint, besseres Symbol fuer Pfad usw.)"
+
+
+ZUSAMMENFASSUNG
+--------------------------------------------------------------------------
+Der Prompt verlangt einen VORSCHLAG. Univ. §9 verlangt fuer geaenderte
+UI-Layouts ohnehin erst ein Schema-Mockup und eine Freigabe. Beides deckt
+sich, also wurde kein Code angefasst.
+
+Angelegt:
+  doc/Schema_PaintToolbar_Icons.txt         (Mockup + Vorschlagstabelle)
+  doc/Task_2026-08-01_0900_PaintToolbar-Icons.txt   (PD, 6 Schritte)
+  doc/progress_2026-08-01_paint-icons-vorschlag.txt (diese Datei)
+
+
+DREI BEFUNDE, JEDER GEMESSEN
+--------------------------------------------------------------------------
+B-1  MEHRFACHBELEGUNG IST DIE URSACHE, NICHT "haessliche Symbole".
+     Ausgezaehlt in PaintToolbar.symbolAndTip() (Z. 712-751):
+     "⚡" steht auf SECHS Werkzeugen (WAND_I..IV, REPLACE_OUTER,
+     REPLACE_INNER) plus dem Panel-Umschalter = sieben Knoepfe.
+     "✂" steht auf DREI Werkzeugen (CUT_COLOR, CUT_UNTIL_COLOR,
+     CUT_SAME_COLOR) plus "Ausschneiden" = vier Knoepfe.
+     *** WORST CASE IST DAS WANDPANEL-GITTER (WandPanel.java:56-75):
+         ELF Knoepfe im 3x4-Raster zeigen zusammen VIER verschiedene
+         Zeichen. Dort ist ohne Tooltip kein Knopf identifizierbar.
+         Wer nur die Hauptleiste huebscher macht und dieses Gitter
+         auslaesst, hat das Problem des Users nicht angefasst. ***
+
+B-2  DER NAMENTLICH GEWUENSCHTE FUELLEIMER IST ALS GLYPH NICHT MOEGLICH.
+     Messmethode: Wegwerf-Programm mit Font.canDisplayUpTo() ueber 59
+     Kandidaten in sechs Familien (SansSerif, Dialog, Segoe UI Symbol,
+     Segoe UI Emoji, Arial Unicode MS, Segoe UI).
+     Ergebnis: die Java-Logikfonts "SansSerif"/"Dialog" zeigen 58 von 59
+     Zeichen — die EINE Ausnahme ist 🪣 U+1FAA3 BUCKET, in KEINER der
+     sechs Familien darstellbar, auch nicht in Segoe UI Emoji.
+     *** DAS ENTSCHEIDET DIE ROUTENWAHL. Ein blosser Glyph-Tausch kann
+         den Hauptwunsch des Prompts nicht erfuellen -> Empfehlung sind
+         gezeichnete Vektor-Icons (eigene Klasse PaintIcons). ***
+     NEBENERGEBNIS, FESTHALTEN: "Segoe UI" (ohne "Symbol") kennt nur 6 der
+     59 Zeichen. Die heutige Wahl new Font("SansSerif",...) in
+     PaintToolbar:808 ist RICHTIG. Wer sie je auf die UI-Schrift
+     "vereinheitlicht", leert die halbe Leiste.
+
+B-3  NEBENBEFUND, NICHT ERFRAGT, ABER BELEGT: DIE TOOLTIPS LUEGEN.
+     Sie versprechen Kuerzel — "Stift (P)", "Fuelleimer (F)", "Linie (L)",
+     "Ellipse (E)", "Rechteck (R)", "Radierer (X)", "Pipette (I)",
+     "Auswahl (S)", "Text (T)", "Pfad (K)", "Freihand-Pfad (J)",
+     "Verwischen (M)".
+     Gegenprobe: `grep -rn 'setActiveTool("' src/paint/` -> NULL Treffer.
+     Kein Eintrag in KeyBindings.ALL, kein Handler im
+     KeyboardShortcutManager.
+     *** SCHLIMMER: `R` allein IST belegt, mit "90 Grad drehen"
+         (KeyboardShortcutManager:51); die `S`-Varianten mit Speichern.
+         Wer dem Tooltip glaubt und R drueckt, dreht sein Bild. ***
+     Damit sind auch die Knopf-Buchstaben P/F/O/R/A erklaert: sie sind
+     KEIN Kuerzel-Hinweis, sondern Platzhalter, die nie ersetzt wurden.
+     -> Als Frage 3 im Schema an den User gegeben. Reparatur gehoert in
+        einen EIGENEN Task: es ist eine Belegungsentscheidung (§25 verlangt
+        zuerst den Registry-Eintrag), keine Symbolfrage.
+
+
+VORSCHLAEGE, DIE GEMACHT WURDEN
+--------------------------------------------------------------------------
+Drei Routen, im Schema mit Vor- und Nachteilen:
+  A  Unicode-Glyphen tauschen                      klein, [B]
+  B  gezeichnete Vektor-Icons (`PaintIcons`)       Aufwand M   << Empfehlung
+  C  Beschriftung UNTER das Symbol                 unabhaengig von A/B
+
+Kern des Vorschlags ist die ZAUBERSTAB-FAMILIE: elf Varianten lassen sich
+nicht durch elf verschiedene Symbole trennen. Best practice (Photoshop,
+Affinity, Inkscape) ist EINE Grundform (Zauberstab bzw. Schere) plus ein
+kleines Abzeichen unten rechts fuer die Variante — plus Text darunter.
+
+*** DIE PAARE aussen/innen SIND DER PRUEFSTEIN. WAND_AA_OUTER/INNER sind
+    heute ◠ gegen ◡: spiegelbildliche Icons unterscheidet niemand im
+    Vorbeigehen. Der Vorschlag zeigt deshalb NICHT dieselbe Form gespiegelt,
+    sondern dieselbe Flaeche mit dem Ring an anderer STELLE, und zusaetzlich
+    Text. Wer nur eines von beidem umsetzt, verkleinert das Problem, loest
+    es aber nicht. ***
+
+Der Prompt sagt "ersetzen ODER ERGAENZEN" — Route C ist genau das Ergaenzen,
+und sie ist die wirksamste Einzelmassnahme. Der Platz ist da: BTN_SIZE 50 =
+26 px Symbol + 2 Luft + 10 px Text + Rand.
+
+
+TATSAECHLICHE LOESUNG
+--------------------------------------------------------------------------
+Fuer Schritt [1/6]: die drei Dokumente oben. Kein Code, kein Build.
+Die Umsetzung ([3]-[5]) beginnt erst nach Beantwortung der vier Fragen.
+
+
+WAS BEWUSST NICHT VORGESCHLAGEN WURDE
+--------------------------------------------------------------------------
+  - ↩ ↪ (Undo/Redo), ↔ ↕ (Spiegeln), ↺ ↻ (90 Grad), ⊞ (Raster) bleiben.
+    Sie sind konventionell, eindeutig und ueberall darstellbar. Sie zu
+    tauschen waere ein unnoetiger Schritt (Univ. §0).
+  - Keine Migration von PaintToolbar nach AppTheme. Die Datei steht in
+    WEITERMACHEN_PROMPT.txt ausdruecklich unter "NICHT MEHR MIGRIEREN —
+    FARBE ALS INHALT" (die 28er-Palette ist die Mal-Palette des Benutzers).
+    Fuer NEUEN Code in [3]-[5] gilt §21 trotzdem voll.
+  - Keine Emoji als Loesung. 🖌 🖊 🎨 💧 📏 sind zwar darstellbar, rendern
+    aber FARBIG mit eigener Grundlinie — neben monochromen Symbolen in
+    einer dunklen Leiste ergibt das kein einheitliches Bild.
+
+
+RUNTIME-VERIFY  P1-P9
+--------------------------------------------------------------------------
+Erst nach der Umsetzung faellig, volle Liste in Abschnitt 7 des Schemas.
+Die zwei wichtigsten:
+  P4  WandPanel oeffnen (⚡-Knopf): alle ELF Knoepfe ohne Tooltip
+      auseinanderzuhalten.   *** WICHTIGSTE PRUEFUNG DES TASKS ***
+  P5  Ring-aussen/Ring-innen und AA-aussen/AA-innen im Vorbeigehen
+      unterscheidbar, nicht erst beim genauen Hinsehen.
+  P1  Kein leeres Kaestchen (Tofu) auf irgendeinem Knopf.
+
+
+==============================================================================

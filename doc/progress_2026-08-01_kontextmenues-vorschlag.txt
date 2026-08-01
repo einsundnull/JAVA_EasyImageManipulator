@@ -1,0 +1,92 @@
+==============================================================================
+progress_2026-08-01_kontextmenues-vorschlag.txt
+Schritte [1/9] und [2/9] der PD Task_2026-08-01_1130_Kontextmenues.txt
+KEIN CODE GEAENDERT.
+==============================================================================
+
+PROMPT
+------------------------------------------------------------------------------
+Rechtsklick auf Bild/Layer zeigt nur "Umbenennen". Gewuenscht: vollstaendiges
+Menue (loeschen, umbenennen, speichern, speichern unter mit File-Chooser,
+kopieren, ...), Best Practice. Vorschlag erbeten.
+
+ZUSAMMENFASSUNG
+------------------------------------------------------------------------------
+Ist-Stand gemessen (Textsuche ueber src/ nach JPopupMenu / isPopupTrigger /
+BUTTON3), Konflikte mit belegten Maus-Gesten belegt, Entwurf als ASCII-Mockup
+geschrieben, PD angelegt. Vier Entscheidungen liegen beim User.
+
+  ERGEBNIS -> doc/Schema_Kontextmenue.txt   (Mockup + Befunde + Q1-Q4)
+  PD       -> doc/Task_2026-08-01_1130_Kontextmenues.txt
+
+DIE FUENF BEFUNDE, JEDER GEMESSEN
+------------------------------------------------------------------------------
+1. ES GIBT IM GANZEN QUELLBAUM GENAU ZWEI JPopupMenu.
+   TileGalleryPanel:695 (ein Eintrag "Umbenennen") und
+   TranslationMapListPanel:510 (Sprach-Aufklapper, kein Kontextmenue).
+
+2. *** DAS LAYER-PANEL HAT UEBERHAUPT KEIN KONTEXTMENUE. *** Ein Rechtsklick
+   auf eine Layer-Kachel tut heute NICHTS. Die Funktionen liegen
+   ausschliesslich auf den sieben farbigen Knoepfen der Kachel.
+   -> Fuer Layer heisst die Aufgabe "anschliessen", nicht "bauen": ZEHN von
+      elf Eintraegen existieren als Callback (ElementLayerPanel:75-107).
+      DRITTES MAL DIESELBE LEHRE nach F01 und I01.
+
+3. *** RECHTSKLICK AUF DEM CANVAS IST VOLL BELEGT ***: Strg+Rechts = Zoom
+   (CanvasPanel:336), Rechts = Snap-Drag oder Malen mit der SEKUNDAERFARBE
+   (:368). Ein Canvas-Kontextmenue per einfachem Rechtsklick wuerde das
+   Malen zerstoeren. -> Frage Q1 an den User.
+
+4. Der heutige Trigger ist technisch falsch: mouseClicked +
+   isRightMouseButton. Swing-Konvention ist e.isPopupTrigger() in
+   mousePressed UND mouseReleased (unter Windows feuert er beim Loslassen).
+   Der Entwurf korrigiert das — und muss dabei die registrierte Geste
+   "Rechts-Ziehen in Sidebars = Drag-to-Copy" (§25) heil lassen.
+
+5. *** "UMBENENNEN" FUER EINEN LAYER GIBT ES NICHT UND KANN ES NICHT OHNE
+   MODELLAENDERUNG GEBEN. *** Layer.java:65 hat nur displayName() (abstrakt,
+   abgeleitet) — kein Namensfeld, kein withName(). Ein echter Name braucht
+   ein final-Feld in Layer + vier Unterklassen (§29) UND einen optionalen
+   Schluessel im Szenenformat — das ist der VERTRAG MIT GameII (§23/§7).
+   Deshalb eigener Schritt [C], nicht Teil der Grundausstattung. -> Q2.
+
+WAS DER ENTWURF VORSCHLAEGT (Kurzfassung, Details im Schema)
+------------------------------------------------------------------------------
+  - EIN deklaratives Geruest paint/ContextMenu.java (additiv, 0 Aufrufer
+    beim Anlegen), gestylt aus AppColors/AppTheme — ein ungestyltes
+    JPopupMenu ist hellgrau, derselbe Systembruch wie JOptionPane.
+  - Drei Menues: Galerie-Kachel (12 Eintraege), Layer-Kachel (11),
+    Szene/Buchseite (5).
+  - Eintraege werden DEAKTIVIERT, nicht versteckt.
+  - Die Kuerzel-Spalte wird aus KeyBindings ABGELEITET, nie getippt (§25).
+  - Aktionen bleiben in den Controllern; die Panels sehen nur ihr
+    Callbacks-Interface (§22).
+
+VORSCHLAEGE, DIE VERWORFEN WURDEN
+------------------------------------------------------------------------------
+  - Die sieben Layer-Knoepfe durch das Menue ersetzen: waere langsamer
+    (ein Klick vs. drei) und ein Bedienungs-Rueckschritt.
+  - Eine Basisklasse statt einer Factory fuers Menue: ein JPopupMenu hat
+    kein Verhalten zum Erben; §2 zielt auf Fenster.
+  - TranslationMapListPanel migrieren: unnoetiger Schritt (Univ. §0).
+
+DIE §20-KOLLISION, DIE EINE ENTSCHEIDUNG BRAUCHT
+------------------------------------------------------------------------------
+  "Loeschen" ist zerstoerend. Ohne Rueckfrage geht nicht, weil Befund D01
+  gilt: DAS UNDO-BAND SPEICHERT NUR workingImage — Element-Operationen sind
+  gar nicht rueckgaengig zu machen. Mit Rueckfrage per JOptionPane verstoesst
+  gegen §20. Bleibt der ConfirmDialog aus dem offenen Schritt [9] — hier in
+  kleiner Form, an einem echten Bedarf statt auf Vorrat. -> Q3.
+
+TATSAECHLICHE LOESUNG
+------------------------------------------------------------------------------
+  Noch keine — [1] und [2] sind Befund und Entwurf. Es wurde KEIN Code
+  geaendert, kein Build ausgefuehrt (nichts zu bauen).
+
+RUNTIME-VERIFY
+------------------------------------------------------------------------------
+  C1-C10 stehen im Schema, Abschnitt 7. Sie werden erst nach [5]/[6] faellig.
+  Die beiden wichtigsten sind KONFLIKT-Pruefungen, keine Neuerungs-Pruefungen:
+    C1  Galerie-Kachel RECHTS ZIEHEN -> kopiert weiter, KEIN Menue
+    C2  Auf dem Canvas mit Rechts malen -> Sekundaerfarbe malt weiter
+==============================================================================

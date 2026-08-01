@@ -6,9 +6,185 @@ Die ausfuehrliche Vorgaenger-Fassung mit dem vollen Verlauf der Schritte
 Details je Schritt: die progress_2026-07-30_*.txt / progress_2026-07-31_*.txt.
 ==============================================================================
 Aktive PD.txt: KEINE.
-  Zuletzt: Task_2026-07-31_2300_B01-fileCache-deckeln.txt -> ALLE FUENF
+  Zuletzt: Task_2026-08-01_0957_Werkzeug-Kuerzel.txt -> ALLE SECHS SCHRITTE
+  ABGESCHLOSSEN, nur Runtime-Verify W1-W9 offen (User).
+  Davor: Task_2026-08-01_0900_PaintToolbar-Icons.txt -> ALLE SECHS
+  SCHRITTE ABGESCHLOSSEN (plus drei Zwischenschritte), nur Runtime-Verify
+  P1-P9 offen (User).
+  Davor: Task_2026-07-31_2300_B01-fileCache-deckeln.txt -> ALLE FUENF
   SCHRITTE ABGESCHLOSSEN, nur Runtime-Verify B1-B7 offen (User).
   Davor: Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt (S1-S12 offen).
+
+==============================================================================
+*** NEU 2026-08-01: WERKZEUG-KUERZEL — ERLEDIGT ***
+==============================================================================
+PD:         doc/Task_2026-08-01_0957_Werkzeug-Kuerzel.txt   (6/6 fertig)
+PROTOKOLL:  doc/progress_2026-08-01_werkzeug-kuerzel.txt
+
+Der offene Rest des Icons-Tasks ist damit zu: die Tooltips versprechen
+wieder Kuerzel — DIESMAL WAHR.
+
+BELEGUNG (Entscheidung des Users: einfache Buchstaben, ALLE 25 Werkzeuge):
+  P Stift · F Fuellen · L Linie · E Ellipse · V Rechteck · G Radierer ·
+  I Pipette · A Auswahl · T Text · B Pfad · W Wischen
+  Umschalt macht die Variante: Umschalt+G, Umschalt+B, Strg+G Farbtausch
+  Z blendet das Zauberstab-Raster ein; darin 1-9, Umschalt+5 / Umschalt+6
+    fuer die Innen-Varianten — in der Reihenfolge des Rasters
+
+*** DER BEFUND, DER DEN ENTWURF BESTIMMT HAT — UND EIN ECHTER FEHLER WAR:
+    EIN "r" IM TEXT DREHTE ZUGLEICH DAS BILD UM 90 GRAD. ***
+    Belegungen der InputMap WHEN_IN_FOCUSED_WINDOW feuern auf KEY_PRESSED,
+    die Texteingabe des CanvasPanel nimmt Zeichen erst in keyTyped()
+    entgegen - also spaeter. Und CanvasPanel.keyPressed verbraucht einfache
+    Buchstaben nicht. GEMESSEN mit einem Wegwerf-Programm, nicht
+    hergeleitet. Betroffen waren R, Umschalt+R, Umschalt+V; sie haengen
+    jetzt mit im Wachposten.
+
+*** VIER DINGE, DIE NICHT "VEREINFACHT" WERDEN DUERFEN ***
+ 1. KeyBindings.TOOL_KEYS ist die EINZIGE Quelle - Dialogzeilen,
+    Verdrahtung UND Tooltip lesen daraus. Wer irgendwo eine Taste ein
+    zweites Mal tippt, stellt genau den Fehler wieder her, der diesen Task
+    ausgeloest hat (luegende Tooltips). ToolKeyProbe Abschnitt C prueft,
+    dass die ANGEZEIGTE Beschriftung zum echten keyCode passt.
+ 2. `R` IST KEIN WERKZEUG-KUERZEL und wird keines. Deshalb traegt das
+    Rechteck `V` ("Viereck"). Wer angleicht, nimmt dem Drehen seine Taste.
+ 3. DIE TASTE WAEHLT, SIE SCHALTET NICHT AB. Der Knopf darf weiter
+    abschalten. Zweimal dieselbe Taste saehe sonst wie "nichts passiert" aus.
+ 4. PaintToolbar.setWandPanelVisible() ist kein Umweg: mit `Z` gibt es einen
+    ZWEITEN Bedienweg, und die Knopf-Synchronisierung stand vorher nur im
+    ActionListener. Sie haette nach jedem Tastendruck gelogen (Univ. §12:
+    aus dem Live-Zustand ableiten, nicht mitfuehren).
+
+EIN WACHPOSTEN AN DER WURZEL, keine Meldepflicht je Handler (Univ. §13):
+KeyboardShortcutManager.toolKeysActive() = Mal-Leiste sichtbar UND kein
+Text in Bearbeitung. CanvasPanel.isEditingText() ist die neue Abfrage
+(reine Zustandsfrage, keine Fachlogik - §22 eingehalten).
+
+*** EINE ZAUBERSTAB-TASTE OEFFNET DAS RASTER MIT. Entscheidung, keine
+    Nebenwirkung: die elf Knoepfe existieren NUR dort, sonst waere die Wahl
+    unsichtbar. Wer das zurueckdreht, muss die Sichtbarkeit anders loesen. ***
+
+BUILD: 347 .class (vorher 344; record ToolKey + zwei anonyme Actions).
+       KEINE neue Quelldatei - src/paint bleibt bei 107.
+REGISTRY: KeyBindings.ALL jetzt 79 Eintraege in SIEBEN Scopes (neu: TOOL).
+       Die Bedingung steht EINMAL im Scope-Titel statt 26-mal in den Zeilen.
+
+RUNTIME-VERIFY W1-W9 OFFEN (User), volle Liste in der progress-Datei.
+  W1  *** WICHTIGSTE PRUEFUNG: Textrahmen aufziehen und "raster" tippen.
+      Es muss "raster" DASTEHEN - Bild dreht sich NICHT, Werkzeug wechselt
+      NICHT. Vorher drehte das "r" das Bild. ***
+  W5  Z oeffnet/schliesst das Raster - der Knopf "Staebe" muss MITGEHEN.
+  W7  Buch-/Szenen-/Alpha-Modus: P, 5, Z tun NICHTS.
+  W9  Tooltip endet mit "· Taste P" - und die Taste stimmt.
+
+==============================================================================
+*** NEU 2026-08-01: PAINT-LEISTE, SYMBOLE — ERLEDIGT ***
+==============================================================================
+SCHEMA:     doc/Schema_PaintToolbar_Icons.txt   (FREIGEGEBEN UND UMGESETZT)
+PD:         doc/Task_2026-08-01_0900_PaintToolbar-Icons.txt  (6/6 fertig)
+PROTOKOLL:  doc/progress_2026-08-01_paint-icons-vorschlag.txt  (Befund)
+            doc/progress_2026-08-01_paint-icons-umsetzung.txt  (Umsetzung)
+
+NEU: src/paint/PaintIcons.java — 34 GEZEICHNETE Symbole (Vektor, kein Text).
+GEAENDERT: PaintToolbar (Knopf-Fabriken + Beschriftungen), AppTheme (+3
+Stroke-Token), AppColors (+5 Icon-Token).
+*** WandPanel.java WURDE NICHT ANGEFASST — es ruft buildToolButton() und
+    pack(), die groesseren Knoepfe wirken von selbst. Der Callbacks-/
+    Fabrik-Aufbau nach §22 hat sich hier bezahlt gemacht. ***
+BUILD: 344 .class (vorher 335) · src/paint 106 -> 107 Dateien.
+
+DIE VIER FREIGABEN DES USERS: Route B (gezeichnet) · Beschriftung in BEIDEN
+Leisten · Kuerzel nachruesten als EIGENER Task, Klammern jetzt raus
+(dieser Task ist am 2026-08-01 ERLEDIGT, siehe ganz oben) ·
+Icons zeigen die Malfarbe.
+
+*** VIER DINGE, DIE NICHT "VEREINFACHT" WERDEN DUERFEN ***
+ 1. Ring-aussen/innen sind ECKIG, AA-aussen/innen RUND. Im ersten Entwurf
+    waren alle vier eckig mit betontem Rand und sahen zu viert wie DASSELBE
+    BLAUE QUADRAT aus - also der Ausgangsfehler in neuer Form. Es braucht
+    ZWEI UMRISSE, nicht zwei kleine Unterschiede.
+ 2. Die dunkle Scheibe unter dem Abzeichen ist kein Schmuck: ohne sie
+    verschwimmt es auf dem blauen Hintergrund des AUSGEWAEHLTEN Knopfes.
+ 3. PaintIcons.glyph() ist kein Umweg. Ein Knopf kann nur EINEN Text tragen -
+    soll unter dem Symbol eine Beschriftung stehen, MUSS auch ein Zeichen als
+    Icon vorliegen. Nur so behalten ↩ ↪ ↔ ↕ ↺ ↻ ⊞ ✂ ihr Zeichen (Univ. §0)
+    UND bekommen trotzdem eine Beschriftung.
+    *** Schriftfamilie "Dialog", NICHT die UI-Schrift: "Segoe UI" stellt von
+        59 geprueften Symbolzeichen nur SECHS dar. ***
+ 4. PaintToolbar.BTN_INSETS = Insets(0,0,0,0). Swings Vorgabe ist
+    Insets(2,14,2,14) und frisst 28 der 50 px - aus "Stift" wurde "S…".
+
+*** DIE TOOLTIP-LUEGE IST BESEITIGT: die Klammer-Kuerzel (P)(F)(L)(E)(R)
+    (X)(I)(S)(T)(K)(J)(M) sind raus. Sie versprachen Tasten, die es nicht
+    gibt - und `R` allein ist mit "90 Grad drehen" belegt.
+    *** NACHGERUESTET AM 2026-08-01 IM FOLGE-TASK (siehe ganz oben):
+        die Kuerzel sind jetzt echt und stehen in KeyBindings.TOOL_KEYS.
+        `R` blieb beim Drehen, das Rechteck traegt `V`. *** ***
+
+*** WIE GEPRUEFT WURDE, OHNE DAS PROGRAMM ZU STARTEN — das Verfahren lohnt
+    die Wiederverwendung: zwei Wegwerf-Programme im scratchpad rendern
+    gegen die KOMPILIERTEN Klassen eine PNG (alle Icons im Raster; und die
+    ECHTE Leiste + das ECHTE WandPanel per printAll). Das hat DREI Fehler
+    gefunden, die im Quelltext nicht zu sehen waren. Beide schreiben ueber
+    ImageFileWriter (§34) und liegen deshalb in package paint.
+    ES ERSETZT DIE SICHTPRUEFUNG NICHT: Hover, Auswahlzustand, Farbwechsel
+    zur Laufzeit und Bildlauf zeigt ein Standbild nicht. ***
+
+RUNTIME-VERIFY P1-P9 OFFEN (User), Liste im Schema Abschnitt 7.
+  P4  *** WandPanel oeffnen (Knopf "Staebe"): alle ELF Knoepfe ohne Tooltip
+      auseinanderhalten. WICHTIGSTE PRUEFUNG. Vorher zeigten sie zusammen
+      nur VIER Zeichen. ***
+  P5  Ring-aussen/innen und AA-aussen/innen im Vorbeigehen unterscheidbar.
+  P1  Kein leeres Kaestchen (Tofu) auf den acht Knoepfen mit Zeichen.
+  P7  Primaerfarbe wechseln -> Fuelleimer/Pipette/Farbtausch faerben sich mit.
+
+NICHT NEBENBEI GEAENDERT (dokumentiert, Univ. §0): DREI `new Font(...)` in
+PaintToolbar (miniLabel, styledCombo, buildReplaceWandConfig) haben ein
+exaktes AppTheme-Gegenstueck, gehoeren aber nicht zu dieser Aufgabe.
+
+DREI BEFUNDE, JEDER GEMESSEN (Stand des Befunds, alle drei behoben):
+  1. MEHRFACHBELEGUNG ist die Ursache, nicht "haessliche Symbole".
+     "⚡" steht auf SECHS Werkzeugen + dem Panel-Umschalter, "✂" auf DREI
+     + "Ausschneiden".
+     *** WORST CASE: das WandPanel-Gitter (WandPanel.java:56-75) zeigt auf
+         ELF Knoepfen zusammen nur VIER verschiedene Zeichen. Wer nur die
+         Hauptleiste huebscher macht und dieses Gitter auslaesst, hat das
+         Problem des Users NICHT angefasst. ***
+  2. DER NAMENTLICH GEWUENSCHTE FUELLEIMER IST ALS GLYPH UNMOEGLICH.
+     Gemessen mit Font.canDisplayUpTo() ueber 59 Zeichen x 6 Familien:
+     SansSerif/Dialog zeigen 58 von 59 — die EINE Ausnahme ist 🪣 U+1FAA3,
+     in KEINER Familie darstellbar, auch nicht in Segoe UI Emoji.
+     -> Deshalb lautet die Empfehlung: gezeichnete Icons (Klasse
+        PaintIcons), nicht Glyph-Tausch.
+     *** NEBENERGEBNIS, FESTHALTEN: "Segoe UI" (ohne "Symbol") kennt nur
+         6 der 59 Zeichen. new Font("SansSerif",...) in PaintToolbar:808
+         ist RICHTIG — wer es je auf die UI-Schrift "vereinheitlicht",
+         leert die halbe Leiste. ***
+  3. *** DIE TOOLTIPS LUEGEN. *** Sie versprechen Kuerzel (P)(F)(L)(E)(R)
+     (X)(I)(S)(T)(K)(J)(M) fuer die Werkzeuge. Gegenprobe
+     `grep -rn 'setActiveTool("' src/paint/` -> NULL Treffer: kein
+     KeyBindings-Eintrag, kein Handler. Schlimmer: `R` allein IST belegt,
+     mit "90 Grad drehen" (KeyboardShortcutManager:51). Wer dem Tooltip
+     glaubt und R drueckt, DREHT SEIN BILD.
+     -> Frage 3 an den User. Kuerzel nachruesten ist ein EIGENER Task
+        (§25: zuerst Registry, dann Handler; P/R/S/T sind teils vergeben).
+        Bis dahin sind mindestens die Klammerangaben zu entfernen.
+
+VIER FRAGEN, DIE DER USER BEANTWORTEN MUSS (Schema, Abschnitt 5):
+  1. Route A (Glyphen tauschen) oder B (gezeichnete Icons)?  -> Empf. B
+  2. Beschriftung unter dem Symbol — nur WandPanel oder auch Hauptleiste?
+     -> Empf. beides; im WandPanel ist es der eigentliche Fix
+  3. Tooltip-Kuerzel nachruesten (a) oder Klammern entfernen (b)? -> Empf. a
+  4. Icons in der aktuellen Malfarbe einfaerben? -> Empf. ja fuer
+     Fuelleimer/Pipette/Farbradierer. ACHTUNG §21: benutzergewaehlte
+     Farben sind KEINE Tokens.
+
+*** NICHT ANFASSEN (Univ. §0): ↩ ↪ ↔ ↕ ↺ ↻ ⊞ sind eindeutig und
+    konventionell. Ein Symbol zu tauschen, das niemand missversteht, ist
+    ein unnoetiger Schritt. ***
+*** PaintToolbar wird NICHT nach AppTheme migriert — die Datei steht unten
+    unter "FARBE ALS INHALT". Fuer NEUEN Code in [3]-[5] gilt §21 trotzdem
+    voll. "Beruehrter Code" heisst hier nicht "die ganze Datei". ***
 
 ==============================================================================
 *** SCHWACHSTELLEN-AUDIT IST DURCHGEFUEHRT (2026-07-31) ***
@@ -231,8 +407,12 @@ offen - NIEMALS `graphify update .` (Scope-Falle).
     Was den Fortschritt jetzt bremst, ist NICHT fehlende Arbeit, sondern
     der aufgestaute RUNTIME-VERIFY: U1-U19 (Sichtpruefung), X1-X13
     (Schliessen), T1-T9 (Vorlesen), S1-S12 (Speichern), D1-D6 (Undo),
-    B1-B7 (Speicher). Nur der User kann das. Ein einziger
-    Programmdurchlauf hakt den groessten Teil ab. ***
+    B1-B7 (Speicher), P1-P9 (Symbole), W1-W9 (Werkzeug-Kuerzel).
+    Nur der User kann das. Ein einziger Programmdurchlauf hakt den
+    groessten Teil ab. ***
+*** ANFANGEN MIT W1: Textrahmen aufziehen, "raster" tippen. Es ist die
+    einzige Pruefung, die einen ECHTEN, vorher vorhandenen Fehler
+    nachweist statt nur eine Neuerung. ***
 
 *** SCHRITT [6] IST INHALTLICH ABGESCHLOSSEN. ZWOELF Dateien migriert,
     rund die HAELFTE aller Literale beseitigt (Color -51 %, Font -54 %,
@@ -285,7 +465,10 @@ LIES ZUERST (Reihenfolge ist verbindlich):
 
 BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
        -encoding UTF-8 ist PFLICHT (Unicode im Quelltext).
-       ERWARTET: exit 0, 335 .class in einem LEEREN Zielverzeichnis
+       ERWARTET: exit 0, 347 .class in einem LEEREN Zielverzeichnis
+       (335 vor PaintIcons, das mit seinen inneren Typen neun mitbrachte;
+        344 vor den Werkzeug-Kuerzeln, die drei mitbrachten: record ToolKey
+        + zwei anonyme AbstractAction. Beides 2026-08-01, Clean-Build.)
        *** NACHGEMESSEN 2026-07-31 (Clean-Build in ein Wegwerf-Verzeichnis):
            javac 335 · Eclipse-bin/ 337. Die Differenz von ZWEI ist kein
            Fehler: Eclipse uebersetzt alle DREI book-Klassen, der
@@ -297,9 +480,9 @@ RUN:   java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEd
 
 STRUKTUR: Projekt-Root = nur CLAUDE.md · src/ = nur Java + Deploy-Skript ·
           doc/ = alle Dokumente (flach, Wegweiser in README.md)
-          src/paint 106 .java + book 3 + module-info
+          src/paint 107 .java + book 3 + module-info
           (106 -> 105: TextToSpeech geloescht; 105 -> 106: ImageFileWriter
-           angelegt. Beides 2026-07-31.)
+           angelegt. Beides 2026-07-31. 106 -> 107: PaintIcons, 2026-08-01.)
 GRAPH:    graphify-out/ ist eingecheckt. 2479 Knoten / 6369 Kanten /
           123 Communities, code-only, 0 LLM-Tokens.
 

@@ -1,5 +1,7 @@
 package paint;
 
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.util.List;
 
 /**
@@ -26,10 +28,16 @@ final class KeyBindings {
 
     private KeyBindings() {}
 
+    private static final int SHIFT = InputEvent.SHIFT_DOWN_MASK;
+    private static final int CTRL  = InputEvent.CTRL_DOWN_MASK;
+
     /** Wo eine Belegung gilt. Die Reihenfolge ist die Anzeigereihenfolge. */
     enum Scope {
         GLOBAL   ("Global — wirkt in jedem Fenster"),
         WINDOW   ("Hauptfenster — wenn das Hauptfenster den Fokus hat"),
+        // Die Bedingung steht EINMAL im Titel statt 26-mal in den Zeilen:
+        // jede Belegung dieses Abschnitts trägt dieselbe.
+        TOOL     ("Werkzeug wählen — nur bei sichtbarer Mal-Leiste, nicht während der Textbearbeitung"),
         CANVAS   ("Zeichenfläche"),
         TEXT     ("Textbearbeitung — überschreibt die Belegung darüber"),
         MOUSE    ("Maus auf der Zeichenfläche"),
@@ -59,7 +67,12 @@ final class KeyBindings {
     // ─────────────────────────────────────────────────────────────────────────
     // Tastatur und Maus
     // ─────────────────────────────────────────────────────────────────────────
-    static final List<KeyBinding> ALL = List.of(
+    /**
+     * Alles außer den Werkzeug-Tasten. <b>Nicht direkt benutzen</b> — die
+     * vollständige Liste ist {@link #ALL}; sie hängt die aus {@link #TOOL_KEYS}
+     * erzeugten Einträge an.
+     */
+    private static final List<KeyBinding> BASE = List.of(
 
         // ── Global: KeyboardShortcutManager, KeyEventDispatcher ──────────────
         new KeyBinding(Scope.GLOBAL, "F1",  "Zweitfenster ein- oder ausblenden"),
@@ -87,13 +100,20 @@ final class KeyBindings {
         new KeyBinding(Scope.WINDOW, "Strg + Alt + S", "In die Originaldatei speichern"),
         new KeyBinding(Scope.WINDOW, "Strg + Umschalt + S", "Kopie speichern, Layer eingebrannt"),
         new KeyBinding(Scope.WINDOW, "Strg + Alt + Umschalt + S", "Originaldatei speichern, Layer eingebrannt"),
-        new KeyBinding(Scope.WINDOW, "R", "Um 90 Grad im Uhrzeigersinn drehen"),
-        new KeyBinding(Scope.WINDOW, "Umschalt + R", "Um 90 Grad gegen den Uhrzeigersinn drehen"),
-        new KeyBinding(Scope.WINDOW, "Umschalt + V", "Sichtbarkeit der gewählten Layer umschalten"),
+        // Die drei einfachen Buchstaben-Belegungen des Fensters wirken seit dem
+        // 2026-08-01 NICHT mehr während der Textbearbeitung. Vorher drehte ein
+        // „r" mitten im Text das Bild um 90 Grad (siehe Scope TOOL).
+        new KeyBinding(Scope.WINDOW, "R", "Um 90 Grad im Uhrzeigersinn drehen", "nicht während der Textbearbeitung"),
+        new KeyBinding(Scope.WINDOW, "Umschalt + R", "Um 90 Grad gegen den Uhrzeigersinn drehen", "nicht während der Textbearbeitung"),
+        new KeyBinding(Scope.WINDOW, "Umschalt + V", "Sichtbarkeit der gewählten Layer umschalten", "nicht während der Textbearbeitung"),
         new KeyBinding(Scope.WINDOW, "Esc", "Schwebende Auswahl abbrechen, sonst Layer-Auswahl aufheben, sonst Rahmen aufheben"),
         new KeyBinding(Scope.WINDOW, "Entf", "Inhalt der Auswahl löschen oder gewählte Layer entfernen"),
         new KeyBinding(Scope.WINDOW, "Rücktaste", "Alles außerhalb der Auswahl löschen — der Außenbereich wird durchsichtig"),
         new KeyBinding(Scope.WINDOW, "Enter", "Schwebende Auswahl festlegen oder gewählte Layer auf den Canvas brennen"),
+
+        // ── Werkzeuge: NICHT hier, sondern in TOOL_KEYS ──────────────────────
+        // Die Einträge des Scopes TOOL entstehen weiter unten aus TOOL_KEYS —
+        // damit Anzeige, Verdrahtung UND Tooltip aus EINER Tabelle stammen.
 
         // ── Zeichenfläche ────────────────────────────────────────────────────
         new KeyBinding(Scope.CANVAS, "+  bzw.  Umschalt + =", "Neuen Pfadpunkt hinter dem gewählten einfügen", "nur wenn ein Pfadpunkt gewählt ist"),
@@ -124,8 +144,121 @@ final class KeyBindings {
         new KeyBinding(Scope.MOUSE, "Doppelklick ins Leere", "Neue Seite anlegen", "nur im Buchmodus"),
 
         // ── Maus in den Seitenleisten ────────────────────────────────────────
-        new KeyBinding(Scope.MOUSE_UI, "Rechts ziehen", "Datei in eine andere Liste kopieren")
+        new KeyBinding(Scope.MOUSE_UI, "Rechts ziehen", "Datei in eine andere Liste kopieren"),
+        // Die beiden folgenden teilen sich die Taste mit der Zeile darüber —
+        // das Menü erscheint erst beim LOSLASSEN und nur, wenn NICHT gezogen
+        // wurde. Der Konflikt ist gewollt und wird hier geführt, nicht
+        // verschwiegen (§25).
+        new KeyBinding(Scope.MOUSE_UI, "Rechts klicken",
+                "Menü der Kachel: öffnen, kopieren, speichern unter, umbenennen, löschen",
+                "in den Bild-, Szenen- und Seitenlisten; nicht beim Ziehen"),
+        new KeyBinding(Scope.MOUSE_UI, "Rechts klicken",
+                "Menü des Layers: duplizieren, sichtbar schalten, exportieren, einbrennen, löschen",
+                "im Layer-Panel; nicht beim Ziehen")
     );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Werkzeug-Tasten — EINE Tabelle für drei Verbraucher
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Eine Werkzeug-Taste.
+     *
+     * @param tool        das Werkzeug, das die Taste wählt
+     * @param keyCode     {@code KeyEvent.VK_*}
+     * @param modifiers   {@code InputEvent.*_DOWN_MASK}, 0 für keine
+     * @param combo       deutsche Beschriftung für Dialog und Tooltip
+     * @param description was das Werkzeug tut — ganzer Satz
+     */
+    record ToolKey(PaintEngine.Tool tool, int keyCode, int modifiers,
+                   String combo, String description) {}
+
+    /**
+     * Die Belegung der Werkzeuge — <b>die einzige Quelle</b>.
+     *
+     * <p>Drei Verbraucher lesen daraus, und keiner tippt sie nach:
+     * <ul>
+     *   <li>{@link #ALL} — die Zeilen des Hilfe-Dialogs</li>
+     *   <li>{@code KeyboardShortcutManager.setupToolKeys} — die Verdrahtung</li>
+     *   <li>{@code PaintToolbar.toolInfo} — das Kürzel im Tooltip</li>
+     * </ul>
+     *
+     * <p><b>Genau das war der Fehler, der diesen Task ausgelöst hat:</b> die
+     * Tooltips trugen von Hand gepflegte Kürzel „(P)", „(F)", „(R)" — ohne
+     * Registry, ohne Handler, und {@code R} war in Wahrheit mit „90 Grad
+     * drehen" belegt. Wer dem Tooltip folgte, drehte sein Bild. Eine zweite
+     * Liste neben der Registry ist die Ursache des Problems, nicht die Lösung
+     * (§25).
+     *
+     * <p><b>{@code R} fehlt absichtlich</b> — es dreht das Bild und bleibt
+     * dabei. Deshalb trägt das Rechteck {@code V} („Viereck").
+     *
+     * <p><b>Die Taste wählt, sie schaltet nicht ab.</b> Der Knopf schaltet beim
+     * zweiten Klick auf „kein Werkzeug"; bei einer Taste sähe dasselbe wie
+     * „nichts passiert" aus.
+     */
+    static final List<ToolKey> TOOL_KEYS = List.of(
+        // ── Hauptleiste ──────────────────────────────────────────────────────
+        new ToolKey(PaintEngine.Tool.PENCIL,       KeyEvent.VK_P, 0,     "P", "Stift — freihändig malen"),
+        new ToolKey(PaintEngine.Tool.FLOODFILL,    KeyEvent.VK_F, 0,     "F", "Fülleimer — zusammenhängende Fläche füllen"),
+        new ToolKey(PaintEngine.Tool.LINE,         KeyEvent.VK_L, 0,     "L", "Linie"),
+        new ToolKey(PaintEngine.Tool.CIRCLE,       KeyEvent.VK_E, 0,     "E", "Ellipse"),
+        new ToolKey(PaintEngine.Tool.RECT,         KeyEvent.VK_V, 0,     "V", "Rechteck — Merkhilfe „Viereck“, weil R das Bild dreht"),
+        new ToolKey(PaintEngine.Tool.ERASER,       KeyEvent.VK_G, 0,     "G", "Radierer — Merkhilfe „Gummi“; radiert auf durchsichtig"),
+        new ToolKey(PaintEngine.Tool.ERASER_BG,    KeyEvent.VK_G, SHIFT, "Umschalt + G", "Radierer mit Sekundärfarbe statt durchsichtig"),
+        new ToolKey(PaintEngine.Tool.ERASER_COLOR, KeyEvent.VK_G, CTRL,  "Strg + G", "Farbtausch — ersetzt die Primär- durch die Sekundärfarbe"),
+        new ToolKey(PaintEngine.Tool.EYEDROPPER,   KeyEvent.VK_I, 0,     "I", "Pipette — Farbe vom Bild aufnehmen"),
+        new ToolKey(PaintEngine.Tool.SELECT,       KeyEvent.VK_A, 0,     "A", "Auswahl — Rechteck aufziehen"),
+        new ToolKey(PaintEngine.Tool.TEXT,         KeyEvent.VK_T, 0,     "T", "Text"),
+        new ToolKey(PaintEngine.Tool.PATH,         KeyEvent.VK_B, 0,     "B", "Pfad — Bézierkurve mit Kontrollpunkten"),
+        new ToolKey(PaintEngine.Tool.FREE_PATH,    KeyEvent.VK_B, SHIFT, "Umschalt + B", "Freihand-Pfad"),
+        new ToolKey(PaintEngine.Tool.SMEAR,        KeyEvent.VK_W, 0,     "W", "Wischen"),
+
+        // ── Zauberstab-Raster: die Zifferreihe in GENAU der Reihenfolge, in
+        //    der die Knöpfe im Raster stehen (WandPanel.buildToolGrid).
+        //    Die Paare außen/innen teilen sich eine Ziffer über Umschalt —
+        //    dieselbe Familienlogik wie G/Umschalt+G und B/Umschalt+B.
+        new ToolKey(PaintEngine.Tool.WAND_I,             KeyEvent.VK_1, 0,     "1", "Zauberstab I — Region anderer Farbe"),
+        new ToolKey(PaintEngine.Tool.WAND_II,            KeyEvent.VK_2, 0,     "2", "Zauberstab II — bis zur Sekundärfarbe"),
+        new ToolKey(PaintEngine.Tool.WAND_III,           KeyEvent.VK_3, 0,     "3", "Zauberstab III — Region durchsichtig machen"),
+        new ToolKey(PaintEngine.Tool.WAND_IV,            KeyEvent.VK_4, 0,     "4", "Zauberstab IV — Polygon nach innen zusammenziehen"),
+        new ToolKey(PaintEngine.Tool.WAND_REPLACE_OUTER, KeyEvent.VK_5, 0,     "5", "Ring außerhalb der Fläche überschreiben"),
+        new ToolKey(PaintEngine.Tool.WAND_REPLACE_INNER, KeyEvent.VK_5, SHIFT, "Umschalt + 5", "Ring innerhalb der Fläche überschreiben"),
+        new ToolKey(PaintEngine.Tool.WAND_AA_OUTER,      KeyEvent.VK_6, 0,     "6", "Ring außerhalb weich einblenden (Antialiasing)"),
+        new ToolKey(PaintEngine.Tool.WAND_AA_INNER,      KeyEvent.VK_6, SHIFT, "Umschalt + 6", "Ring innerhalb weich einblenden (Antialiasing)"),
+        new ToolKey(PaintEngine.Tool.CUT_COLOR,          KeyEvent.VK_7, 0,     "7", "Ausschneiden — alle Pixel der Sekundärfarbe"),
+        new ToolKey(PaintEngine.Tool.CUT_UNTIL_COLOR,    KeyEvent.VK_8, 0,     "8", "Ausschneiden — vom Klickpunkt bis zur Sekundärfarbe"),
+        new ToolKey(PaintEngine.Tool.CUT_SAME_COLOR,     KeyEvent.VK_9, 0,     "9", "Ausschneiden — zusammenhängende Fläche gleicher Farbe")
+    );
+
+    /** Taste, die das Zauberstab-Raster ein- und ausblendet — kein Werkzeug. */
+    static final int  WAND_PANEL_KEY   = KeyEvent.VK_Z;
+    static final String WAND_PANEL_COMBO = "Z";
+
+    /**
+     * Das Kürzel eines Werkzeugs, oder {@code ""} wenn es keines hat.
+     * Für den Tooltip in {@code PaintToolbar} — <b>abgeleitet, nicht getippt</b>.
+     */
+    static String comboFor(PaintEngine.Tool tool) {
+        for (ToolKey tk : TOOL_KEYS)
+            if (tk.tool() == tool) return tk.combo();
+        return "";
+    }
+
+    /**
+     * Alle Belegungen — {@link #BASE} plus die aus {@link #TOOL_KEYS} erzeugten
+     * Werkzeug-Zeilen plus die Taste fürs Zauberstab-Raster.
+     */
+    static final List<KeyBinding> ALL = buildAll();
+
+    private static List<KeyBinding> buildAll() {
+        List<KeyBinding> out = new java.util.ArrayList<>(BASE);
+        for (ToolKey tk : TOOL_KEYS)
+            out.add(new KeyBinding(Scope.TOOL, tk.combo(), tk.description()));
+        out.add(new KeyBinding(Scope.TOOL, WAND_PANEL_COMBO,
+                "Zauberstab-Raster ein- oder ausblenden"));
+        return List.copyOf(out);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Anleitung — kurze Abläufe in Klick-Reihenfolge
@@ -138,6 +271,24 @@ final class KeyBindings {
             "Mit gedrückter linker Taste ein Rechteck aufziehen",
             "Strg + C — der Ausschnitt wird sofort ein eigener Layer",
             "Layer verschieben oder skalieren; Enter brennt ihn auf den Canvas")),
+
+        new GuideEntry("Das Werkzeug mit der Tastatur wechseln", List.of(
+            "In den Malmodus wechseln — die Mal-Leiste muss sichtbar sein",
+            "P Stift · F Füllen · L Linie · E Ellipse · V Rechteck · G Radierer",
+            "I Pipette · A Auswahl · T Text · B Pfad · W Wischen",
+            "Umschalt macht die Variante: Umschalt+G radiert mit der Sekundärfarbe, Umschalt+B ist der Freihand-Pfad",
+            "Z blendet das Zauberstab-Raster ein; darin liegen die Werkzeuge auf 1 bis 9",
+            "Die Taste wählt immer — abschalten lässt sich ein Werkzeug nur über seinen Knopf",
+            "Während der Textbearbeitung sind alle diese Tasten stumm; dort schreiben sie Text")),
+
+        new GuideEntry("Eine Datei oder einen Layer über das Kontextmenü bearbeiten", List.of(
+            "Rechtsklick auf eine Kachel der Bildliste — das Menü öffnet sich beim Loslassen",
+            "Öffnen, in den anderen Canvas öffnen, kopieren, als Layer einfügen",
+            "„Speichern unter …“ fragt nach dem Ziel; ist die Datei gerade offen, wird der bearbeitete Stand geschrieben",
+            "Umbenennen, duplizieren, löschen — Löschen fragt nach und legt die Datei in den Papierkorb",
+            "Rechtsklick auf eine Layer-Kachel bietet dieselben Funktionen wie die farbigen Knöpfe der Kachel",
+            "Graue Einträge sind in dieser Lage nicht möglich — sie verschwinden nicht, damit sie auffindbar bleiben",
+            "Wer die Kachel mit gedrückter rechter Taste ZIEHT, kopiert sie weiterhin; ein Menü erscheint dann nicht")),
 
         new GuideEntry("Etwas durchsichtig machen", List.of(
             "In den Alpha-Modus wechseln (obere Leiste)",

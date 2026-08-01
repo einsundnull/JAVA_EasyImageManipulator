@@ -1,0 +1,303 @@
+==============================================================================
+Schema_Kontextmenue.txt  —  Rechtsklick-Menues fuer Galerie, Layer, Szenen
+Stand: 2026-08-01.  ENTWURF — BRAUCHT FREIGABE (Univ. §9, Mockup-First).
+Kein Code geaendert.
+==============================================================================
+
+0. AUFTRAG DES USERS
+------------------------------------------------------------------------------
+"Rechtsklick auf ein Bild oder ein Layer zeigt nur 'Umbenennen'. Ich moechte
+ein vollstaendiges sinnvolles Menue (loeschen, umbenennen, speichern,
+speichern unter... mit File-Chooser, kopieren, etc.). Alles Best Practice."
+
+
+1. BEFUND — GEMESSEN, NICHT HERGELEITET
+------------------------------------------------------------------------------
+Textsuche ueber src/ nach JPopupMenu / isPopupTrigger / BUTTON3:
+
+  ES GIBT IM GANZEN QUELLBAUM GENAU ZWEI POPUP-MENUES.
+
+  a) TileGalleryPanel.java:695-700  — EIN Eintrag: "Umbenennen".
+     Das ist das Menue, das der User meint. Es haengt an mouseClicked +
+     isRightMouseButton.
+     *** Es bedient DREI Panels: Bildgalerie, Szenen-Galerie und
+         Buchseiten-Galerie. Der Empfaenger ist je nach Panel ein anderer:
+         GalleryCallbacksFactory:272 (Seite), :354 (Buch),
+         ScenesController:164 (Szene). Ein Menue, drei Bedeutungen. ***
+  b) TranslationMapListPanel.java:510 — Sprachauswahl an einem Knopf.
+     Kein Kontextmenue, sondern ein Aufklapper. Nicht betroffen.
+
+  *** DAS LAYER-PANEL HAT UEBERHAUPT KEIN KONTEXTMENUE. ***
+  ElementLayerPanel bietet seine Funktionen ausschliesslich ueber die
+  Knopfreihe auf der Kachel an (sieben farbige Knoepfe, Zeilen 415-610):
+  Export, Einbrennen, Loeschen, Drehung zuruecksetzen, Sichtbarkeit,
+  Mausdurchlaessigkeit, Uebersetzungskarte. Ein Rechtsklick dort tut heute
+  NICHTS. Wer "Layer" sagt, meint also nicht "zu wenige Eintraege", sondern
+  "gar keines".
+
+  DARAUS FOLGT DIE FORM DER LOESUNG: die Layer-Funktionen SIND DA. Fuer das
+  Layer-Menue ist die Arbeit "anschliessen", nicht "bauen" — dieselbe Lehre
+  wie bei F01 (Dialog existierte ohne Aufrufer) und I01 (CardTtsPlayer).
+  Neu zu bauen ist nur das Geruest und die Datei-Aktionen der Galerie.
+
+
+2. ZWEI KONFLIKTE, DIE DEN ENTWURF BESTIMMEN
+------------------------------------------------------------------------------
+K1  *** RECHTSKLICK AUF DEM CANVAS IST VOLL BELEGT. ***
+    CanvasPanel:336  Strg+Rechts-Ziehen = Zoom (Google-Earth-Stil)
+    CanvasPanel:368  Rechts = Snap-Drag ODER Malen mit der SEKUNDAERFARBE
+    CanvasPanel:857  Rechts-Loslassen beendet den Zoom
+    Ein Kontextmenue auf dem Canvas per einfachem Rechtsklick wuerde das
+    Malen mit der Sekundaerfarbe zerstoeren. -> FRAGE Q1.
+
+K2  RECHTS-ZIEHEN IN DEN SEITENLEISTEN IST EINE REGISTRIERTE GESTE
+    (§25: "Rechtsklick-Drag in Sidebars = Drag-to-Copy").
+    Das Menue darf erst erscheinen, wenn NICHT gezogen wurde.
+    *** Und der heutige Weg ist technisch falsch: mouseClicked +
+        isRightMouseButton. Unter Windows ist der Popup-Trigger das
+        LOSLASSEN, und die Plattformabfrage heisst e.isPopupTrigger().
+        Der Entwurf benutzt isPopupTrigger in mousePressed UND
+        mouseReleased — das ist die Swing-Konvention und vertraegt sich
+        mit Drag-to-Copy. ***
+
+
+3. DER ENTWURF — DREI MENUES, EIN GERUEST
+------------------------------------------------------------------------------
+Grundsaetze (alle drei Menues):
+  - EINTRAEGE WERDEN DEAKTIVIERT, NICHT VERSTECKT. Ein Menue, das je nach
+    Zustand die Hoehe wechselt, macht Eintraege unauffindbar.
+  - DAS KUERZEL RECHTS WIRD ABGELEITET, NIE GETIPPT — aus KeyBindings
+    (§25). Genau die handgepflegte Zweitliste war der Fehler, der den
+    Werkzeug-Kuerzel-Task ausgeloest hat.
+  - Der erste Eintrag ist die Standardaktion des Doppelklicks (fett).
+  - Trennlinien gruppieren: Oeffnen | Zwischenablage | Speichern |
+    Name/Loeschen | Umgebung.
+  - Zerstoerendes steht UNTEN und nie neben Harmlosem.
+  - Farben/Schriften aus AppColors/AppTheme (§21). Ein ungestyltes
+    JPopupMenu ist hellgrau — derselbe Systembruch wie JOptionPane (§20).
+
+
+3.1  GALERIE-KACHEL (Bilddatei)   Rechtsklick auf eine Kachel der Bildgalerie
+------------------------------------------------------------------------------
+  +-------------------------------------------+
+  | *Oeffnen*                           Enter |   in den aktiven Canvas
+  | In Canvas II oeffnen                      |   deaktiviert, wenn = aktiv
+  +-------------------------------------------+
+  | Kopieren                           Strg+C |   Bild in die Zwischenablage
+  | Als Layer einfuegen                       |   in den aktiven Canvas
+  +-------------------------------------------+
+  | Speichern                          Strg+S |   nur aktiv wenn geaendert
+  | Speichern unter ...          Strg+Umsch+S |   JFileChooser
+  | Duplizieren                               |   "<name> Kopie.png"
+  +-------------------------------------------+
+  | Umbenennen                             F2 |   vorhanden
+  | Loeschen                             Entf |   -> FRAGE Q3
+  +-------------------------------------------+
+  | Im Explorer zeigen                        |   Desktop.open(Ordner)
+  | Eigenschaften ...                         |   Pfad, Masse, Groesse, Datum
+  +-------------------------------------------+
+
+  *** "Speichern unter" IST SCHON DA: SaveController:265 fuehrt bereits
+      einen JFileChooser mit Ueberschreib-Ruecksprache. Der Menuepunkt ruft
+      ihn auf, er baut keinen zweiten. Und geschrieben wird ueber
+      ImageFileWriter (§34) — ImageIO.write steht nirgends sonst. ***
+  *** "Speichern" ist nur dann aktiv, wenn die Datei im dirtyFiles-Satz
+      steht oder in einem Canvas offen und geaendert ist. Sonst wuerde der
+      Eintrag ein Speichern versprechen, das nichts tut. ***
+
+
+3.2  LAYER-KACHEL   Rechtsklick auf eine Kachel des Layer-Panels
+------------------------------------------------------------------------------
+  +-------------------------------------------+
+  | *Bearbeiten*                  Doppelklick |   Bild: anderer Canvas
+  |                                           |   Text: Textmodus
+  +-------------------------------------------+
+  | Duplizieren                               |   insertLayerCopyAt (da)
+  | Kopieren                           Strg+C |
+  +-------------------------------------------+
+  | [x] Sichtbar                              |   Haekchen-Eintrag
+  | [ ] Mausdurchlaessig                      |   Haekchen-Eintrag
+  | Drehung zuruecksetzen                     |   nur ImageLayer, Winkel!=0
+  +-------------------------------------------+
+  | Als Bild exportieren ...                  |   exportElementAsImage (da)
+  | In den Canvas einbrennen                  |   burnElement (da)
+  | Als Uebersetzungskarte                    |   nur TextLayer
+  +-------------------------------------------+
+  | Umbenennen                             F2 |   *** NEU, siehe Q2 ***
+  | Loeschen                             Entf |   deaktiviert bei isPageFrame
+  +-------------------------------------------+
+
+  ZEHN VON ELF EINTRAEGEN SIND REINE VERDRAHTUNG. Die Callbacks existieren
+  bereits vollstaendig in ElementLayerPanel.Callbacks (Zeilen 75-107):
+  deleteElement, burnElement, exportElementAsImage, insertLayerCopyAt,
+  resetElementRotation, exportElementAsMap, toggleElementVisibility,
+  toggleElementMouseTransparent, openElementInOtherCanvas,
+  openTextLayerForEditing, isPageFrame.
+
+  *** DER ELFTE — "UMBENENNEN" — GEHT NICHT OHNE MODELLAENDERUNG.
+      Layer.java:65 hat nur displayName() (abstract, abgeleitet), KEIN
+      Namensfeld und kein withName(). Ein Layer-Name braucht:
+        - ein final-Feld + withName() in Layer und ALLEN VIER Unterklassen
+          (§29: unveraenderlich, jede Mutation gibt eine neue Instanz)
+        - Ersetzen in activeElements UND selectedElements (§29)
+        - Persistenz: ein optionaler Schluessel "-name:" im Szenenformat.
+          *** DAS IST DER VERTRAG MIT GameII (§23). Rueckwaertskompatibel
+              erweitern heisst: optional mit Default, alte Szenen laden
+              unveraendert, und SCENE_FORMAT_READ_WRITE.md wird ZUERST
+              geaendert, mit Eintrag in der WEITERMACHEN_PROMPT.txt
+              BEIDER Projekte (Univ. §7). ***
+      Deshalb ist Layer-Umbenennen ein EIGENER Schritt [C] und nicht Teil
+      der Grundausstattung. -> FRAGE Q2. ***
+
+  *** DIE KNOPFREIHE BLEIBT. Das Menue ist ein ZWEITER Bedienweg, kein
+      Ersatz — die Knoepfe sind eingeuebt und mit einem Klick erreichbar.
+      Wer sie entfernt, macht die Bedienung langsamer, nicht aufgeraeumter.
+      (Konsequenz: die Sichtbarkeits-Haekchen im Menue muessen aus dem
+      LIVE-ZUSTAND kommen, nicht mitgefuehrt werden — Univ. §12, derselbe
+      Fehler wie beim Zauberstab-Knopf.) ***
+
+
+3.3  SZENEN-KACHEL / BUCHSEITEN-KACHEL
+------------------------------------------------------------------------------
+  +-------------------------------------------+
+  | *Oeffnen*                           Enter |
+  +-------------------------------------------+
+  | Duplizieren                               |
+  +-------------------------------------------+
+  | Umbenennen                             F2 |   vorhanden
+  | Loeschen                             Entf |
+  +-------------------------------------------+
+  | Im Explorer zeigen                        |
+  +-------------------------------------------+
+
+  Bewusst schlank: eine Szene ist ein VERZEICHNIS (§23), "Speichern unter"
+  hiesse hier "Verzeichnis kopieren" und ist eine eigene Entscheidung.
+  Nicht in dieser Aufgabe.
+
+
+4. ARCHITEKTUR — WO WAS HINGEHOERT
+------------------------------------------------------------------------------
+NEU: paint/ContextMenu.java   (~150 Z., additiv, beim Anlegen 0 Aufrufer)
+
+  Ein DEKLARATIVES Geruest, kein Sammelbecken fuer Fachlogik:
+
+      ContextMenu.builder()
+          .item("Oeffnen", KeyBindings.comboFor("gallery.open"), () -> ...)
+          .item("Loeschen", ...).enabledIf(() -> !isPageFrame)
+          .check("Sichtbar", () -> !layer.isHidden(), () -> cb.toggle...)
+          .separator()
+          .showOn(component, e);
+
+  - Styling an EINER Stelle (AppColors/AppTheme, §21) — dunkel wie der Rest.
+  - Kuerzel-Spalte rechts, Text aus KeyBindings ABGELEITET (§25).
+  - enabledIf statt Verstecken (Grundsatz oben).
+  - Es kennt keine Fachlogik: jeder Eintrag bekommt ein Runnable.
+
+  *** §2 IST EINGEHALTEN, WEIL DIE REIHENFOLGE STIMMT: das Menue tritt in
+      DREI Panels auf (>=2), also ist eine gemeinsame Klasse faellig — und
+      davor steht das Redundanz-Audit, das dieser Abschnitt vorwegnimmt:
+      es gibt heute EINE Fundstelle mit EINEM Eintrag, also nichts zu
+      vereinheitlichen. Das Audit ist damit trivial und wird im
+      progress-Protokoll erledigt, statt als eigene Datei. ***
+  *** EINE FACTORY WAERE HIER RICHTIG UND EINE BASISKLASSE FALSCH: ein
+      JPopupMenu hat kein eigenes Verhalten (kein ESC, kein Resize, kein
+      Schliessen-Knopf), das man erben muesste. §2 verlangt die Basisklasse
+      fuer FENSTER, nicht fuer jedes Widget. ***
+
+DIE AKTIONEN LIEGEN IN DEN CONTROLLERN (§22), NICHT IM MENUE:
+  - Datei-Aktionen (Kopieren, Duplizieren, Loeschen, Explorer,
+    Eigenschaften) -> GalleryCallbacksFactory verdrahtet auf
+    SaveController / FileLoadController / ClipboardController.
+  - Layer-Aktionen -> die bestehenden ElementLayerPanel.Callbacks.
+  - Neue Callback-Methoden bekommen `default`-Implementierungen, damit
+    keine bestehende anonyme Klasse bricht (das Muster der beiden
+    Callbacks-Interfaces heute).
+  - *** KEIN SelectiveAlphaEditor-Feld in einem Panel. Panels sehen nur
+      ihr Callbacks-Interface. ***
+
+WAS NICHT PASSIERT (Univ. §0):
+  - CanvasPanel wird NICHT angefasst (§22), solange Q1 = "kein
+    Canvas-Menue".
+  - Die sieben Knoepfe im Layer-Panel werden NICHT umgebaut.
+  - TranslationMapListPanel:510 wird NICHT auf das Geruest migriert — es
+    ist ein Aufklapper an einem Knopf, kein Kontextmenue. Eine Migration
+    waere ein unnoetiger Schritt.
+
+
+5. §20-KOLLISION: DIE RUECKFRAGE BEIM LOESCHEN
+------------------------------------------------------------------------------
+"Loeschen" ist der einzige zerstoerende Eintrag. Es gibt drei Wege:
+
+  (a) OHNE Rueckfrage, dafuer mit Undo.
+      *** GEHT FUER LAYER HEUTE NICHT: Befund D01 — das Undo-Band
+          speichert NUR workingImage. Element-Operationen sind GAR NICHT
+          rueckgaengig zu machen. Ein "Loeschen" ohne Rueckfrage waere
+          endgueltiger Verlust per Rechtsklick. ***
+      Fuer DATEIEN gilt es auch nicht: eine geloeschte Datei kommt nicht
+      zurueck.
+  (b) MIT Rueckfrage ueber JOptionPane -> VERSTOSS GEGEN §20
+      ("keine neuen JOptionPane-Aufrufe").
+  (c) MIT Rueckfrage ueber einen ConfirmDialog -> der existiert nicht,
+      er ist der offene Schritt [9], [C], nur mit Freigabe.
+
+  EMPFEHLUNG: (c) fuer Dateien, und zwar in KLEINER FORM — ein
+  ConfirmDialog nur mit Ja/Nein, gebaut auf
+  UIComponentFactory.createBaseDialog (heute der einzige erlaubte Weg,
+  §20). Das ist genau der Baustein, den Schritt [9] ohnehin braucht, und
+  er entsteht hier an einem echten Bedarf statt auf Vorrat.
+  Dateien wandern zusaetzlich in den Papierkorb, wenn die Plattform es
+  hergibt (Desktop.moveToTrash) — sonst gibt es kein Zurueck.
+  -> FRAGE Q3.
+
+
+6. VIER FRAGEN AN DEN USER (vor Schritt [3])
+------------------------------------------------------------------------------
+Q1  "Rechtsklick auf ein Bild" — meinst du die Kachel in der GALERIE oder
+    das Bild auf dem CANVAS?
+    Auf dem Canvas ist Rechts belegt (Malen mit der Sekundaerfarbe,
+    Snap-Drag, Strg+Rechts = Zoom, K1 oben).
+    EMPFEHLUNG: Galerie + Layer jetzt; auf dem Canvas KEIN Menue, oder
+    falls doch gewuenscht, auf UMSCHALT+RECHTSKLICK — dann bleibt das
+    Malen unangetastet.
+
+Q2  Layer UMBENENNEN — soll der Layer einen echten, gespeicherten Namen
+    bekommen? Das aendert das Modell (Layer + 4 Unterklassen, §29) UND den
+    Szenen-Vertrag mit GameII (§23, optionaler Schluessel).
+    EMPFEHLUNG: als EIGENEN Schritt [C] hinterher, nicht in der ersten
+    Ausbaustufe. Bis dahin traegt das Layer-Menue kein "Umbenennen"
+    (lieber gar nicht als ein Eintrag, der nach dem Neuladen vergisst).
+
+Q3  LOESCHEN: mit Rueckfrage (dann entsteht hier der kleine ConfirmDialog
+    aus §20/[9]) oder ohne?
+    EMPFEHLUNG: mit Rueckfrage, plus Papierkorb statt endgueltig.
+    Grund: Layer-Loeschen ist wegen D01 nicht rueckgaengig zu machen.
+
+Q4  UMFANG: der Entwurf oben, oder schlanker?
+    EMPFEHLUNG: wie entworfen. "Eigenschaften" und "Im Explorer zeigen"
+    sind billig (je ~10 Zeilen) und beantworten die haeufigste Frage
+    ("wo liegt die Datei eigentlich?").
+
+
+7. RUNTIME-VERIFY C1-C10  (nur der User, §10 — "Build gruen" ist kein Verify)
+------------------------------------------------------------------------------
+  C1  *** WICHTIGSTE PRUEFUNG: In der Galerie eine Kachel RECHTS ZIEHEN.
+      Es muss weiter KOPIERT werden (Drag-to-Copy) und KEIN Menue
+      aufgehen. Das ist der Konflikt K2. ***
+  C2  *** ZWEITWICHTIGSTE: auf dem Canvas mit Rechts malen — die
+      Sekundaerfarbe muss weiter malen, kein Menue. Konflikt K1. ***
+  C3  Rechtsklick auf eine Galerie-Kachel: Menue erscheint AN DER
+      MAUSPOSITION, dunkel (nicht hellgrau), Kuerzel rechtsbuendig.
+  C4  Rechtsklick auf eine Layer-Kachel: Menue erscheint (heute: nichts).
+  C5  Layer-Menue: "Sichtbar" traegt ein Haekchen, das den ECHTEN Zustand
+      zeigt — Sichtbarkeit ueber den KNOPF umschalten, Menue erneut
+      oeffnen, Haekchen muss mitgegangen sein.
+  C6  Seitenrahmen-Layer (Buch/Szene): "Loeschen" ist GRAU, nicht
+      unsichtbar.
+  C7  Textlayer: "Als Uebersetzungskarte" aktiv; Bildlayer: grau.
+  C8  "Speichern unter ..." oeffnet den bekannten Dateidialog, Ergebnis
+      liegt am gewaehlten Ort, KEINE .part-Leiche daneben (§34).
+  C9  "Loeschen" auf einer Datei: Rueckfrage, danach ist die Kachel weg
+      UND die Datei im Papierkorb.
+  C10 Menue mit Esc schliessen, dann Doppelklick auf dieselbe Kachel —
+      die Kachel oeffnet normal (kein haengender Selektionszustand).
+==============================================================================

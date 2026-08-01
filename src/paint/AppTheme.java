@@ -120,6 +120,32 @@ public final class AppTheme {
     /** 3 px — starke Betonung, Fokusrahmen des aktiven Canvas. */
     public static final Stroke STROKE_THICK    = new BasicStroke(3f);
 
+    // ── Ergänzt 2026-08-01, Werkzeug-Icons (PaintIcons, §9-Schema) ────────────
+    /**
+     * 1,5 px mit runden Enden und Ecken — die Grundlinie der gezeichneten
+     * Werkzeug-Icons in {@link PaintIcons}.
+     *
+     * <p>Warum nicht {@link #STROKE_THIN}: dieselbe Breite, aber
+     * {@code CAP_BUTT}/{@code JOIN_MITER}. Bei einem 24-Einheiten-Icon
+     * franst ein Mitergehrungs-Eck sichtbar aus und ein stumpfes Linienende
+     * wirkt abgeschnitten. Zwei Token mit gleicher Breite sind nicht
+     * automatisch dasselbe Token (§21) — hier entscheidet die Form der Enden.
+     */
+    public static final Stroke STROKE_ICON = new BasicStroke(
+            1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
+
+    /** 1 px, runde Enden — feine Binnenzeichnung im Icon (Teilstriche, Funken). */
+    public static final Stroke STROKE_ICON_FINE = new BasicStroke(
+            1f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
+
+    /**
+     * 1,2 px gestrichelt (2 an, 2 aus) — Auswahlrahmen <i>innerhalb</i> eines
+     * Icons (Werkzeug „Auswahl", Zauberstab-Abzeichen „Region").
+     */
+    public static final Stroke STROKE_ICON_DASH = new BasicStroke(
+            1.2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f,
+            new float[] { 2f, 2f }, 0f);
+
     // ── Eckradien (fillRoundRect / drawRoundRect) ─────────────────────────────
     public static final int RADIUS_SM   =  4;
     /** 6 px — kleine Schaltflächen, Kacheln. */

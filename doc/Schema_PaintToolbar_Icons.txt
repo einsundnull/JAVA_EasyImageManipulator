@@ -1,0 +1,465 @@
+==============================================================================
+Schema_PaintToolbar_Icons.txt   —   FREIGEGEBEN UND UMGESETZT 2026-08-01
+Stand 2026-08-01 | Regel: Univ. §9 (Mockup-Pflicht), §3/§21 (Token-Quelle),
+                          §24 (Swing-Zeichenregeln), §25 (Registry)
+Betrifft: src/paint/PaintToolbar.java + src/paint/WandPanel.java
+Umsetzung: doc/progress_2026-08-01_paint-icons-umsetzung.txt
+PD:        doc/Task_2026-08-01_0900_PaintToolbar-Icons.txt
+==============================================================================
+
+ENTSCHEIDUNGEN DES USERS (2026-08-01) — alle vier wie empfohlen
+--------------------------------------------------------------------------
+  F1  ROUTE B: gezeichnete Vektor-Icons -> Klasse `PaintIcons`
+  F2  ROUTE C in BEIDEN: Beschriftung unter dem Symbol, Hauptleiste UND
+      WandPanel-Raster
+  F3  Kuerzel NACHRUESTEN, aber als EIGENER Task. Bis dahin sind die
+      Klammerangaben aus den Tooltips ENTFERNT — eine falsche Zusage ist
+      schlimmer als keine.
+  F4  Icons zeigen die Malfarbe: Fuelleimer, Pipette, beide Farbradierer.
+
+*** DREI DINGE, DIE ERST DIE SICHTPRUEFUNG ERGEBEN HAT — sie stehen in
+    Abschnitt 8 und sind der Grund, warum der Entwurf nicht der Endstand
+    ist. ***
+
+ANLASS (Prompt des Users, 2026-08-01)
+--------------------------------------------------------------------------
+"In der Paint-Menue-Leiste sehe ich oft nicht, was die einzelnen Symbole und
+Buchstaben wirklich bedeuten. Finde Symbole nach best practice, die die
+vorhandenen ersetzen oder ergaenzen koennten (z.B. einen Fuelleimer fuer
+Floodfill, Pinsel oder Pencil fuer normales paint, ein besseres Symbol fuer
+Pfad usw.)"
+
+*** KEIN CODE GEAENDERT. Dieses Dokument ist der Vorschlag. ***
+
+
+==============================================================================
+0. BEFUND — GEMESSEN, NICHT GESCHAETZT
+==============================================================================
+
+0.1  MEHRFACHBELEGTE GLYPHEN (die eigentliche Ursache)
+--------------------------------------------------------------------------
+Ausgezaehlt aus PaintToolbar.symbolAndTip() (Z. 712-751):
+
+  Glyph  Anzahl  Wo
+  -----  ------  ----------------------------------------------------------
+  "⚡"      7     WAND_I · WAND_II · WAND_III · WAND_IV ·
+                 WAND_REPLACE_OUTER · WAND_REPLACE_INNER   (6 Werkzeuge)
+                 + der Panel-Umschalter in der Leiste selbst (Z. 571)
+  "✂"      4     CUT_COLOR · CUT_UNTIL_COLOR · CUT_SAME_COLOR (3 Werkzeuge)
+                 + "Ausschneiden" in der Zwischenablage-Gruppe (Z. 655)
+  "◠"/"◡"  2     WAND_AA_OUTER / WAND_AA_INNER — spiegelbildlich, bei 18 px
+                 auf 50 px Knopf praktisch nicht zu unterscheiden
+
+*** DAS WANDPANEL-GITTER IST DER SCHLIMMSTE ORT: elf Knoepfe (3x4-Raster,
+    WandPanel.java:56-75) zeigen zusammen nur VIER verschiedene Zeichen.
+    Sechsmal ⚡, dreimal ✂, einmal ◠, einmal ◡. Ohne Tooltip ist dort
+    KEIN Knopf identifizierbar. Genau das beschreibt der Prompt. ***
+
+0.2  BUCHSTABEN-PLATZHALTER
+--------------------------------------------------------------------------
+  P · F · / · O · R · A   (PENCIL, FLOODFILL, LINE, CIRCLE, RECT, TEXT)
+
+Sie sehen aus wie Tastenkuerzel-Hinweise, weil die Tooltips "(P)", "(F)",
+"(L)", "(E)", "(R)", "(X)", "(I)", "(S)", "(T)", "(K)", "(J)", "(M)" nennen.
+
+*** ZWEITER BEFUND, VOM PROMPT NICHT ERFRAGT, ABER BELEGT:
+    DIESE KUERZEL EXISTIEREN NICHT.
+    Gegenprobe: `grep -rn 'setActiveTool("' src/paint/` -> null Treffer.
+    Kein KeyBindings-Eintrag, kein Handler im KeyboardShortcutManager.
+    Schlimmer: `R` allein IST belegt — mit "90 Grad drehen"
+    (KeyboardShortcutManager:51), `S`-Varianten mit Speichern.
+    Wer dem Tooltip glaubt und R drueckt, dreht sein Bild.
+    -> Die Buchstaben sind also nicht einmal ein Kuerzel-Hinweis. Sie sind
+       Platzhalter, die nie durch ein Symbol ersetzt wurden.
+    -> ENTSCHEIDUNG NOETIG (siehe Abschnitt 5, Frage 3): Kuerzel NACHRUESTEN
+       (dann gehoeren sie zuerst in KeyBindings.ALL, §25) oder die
+       Klammerangaben aus den Tooltips ENTFERNEN. Beides ist besser als der
+       heutige Zustand — er ist eine falsche Zusage. ***
+
+0.3  SCHRIFTABHAENGIGKEIT — GEMESSEN AUF DIESEM RECHNER
+--------------------------------------------------------------------------
+Messmethode: Wegwerf-Programm, `Font.canDisplayUpTo()` ueber 59 Kandidaten
+in sechs Familien (SansSerif, Dialog, Segoe UI Symbol, Segoe UI Emoji,
+Arial Unicode MS, Segoe UI). Java-Logikfonts "SansSerif"/"Dialog" fallen
+system-weit zurueck und zeigten 58 von 59 Zeichen.
+
+  *** DIE EINE AUSNAHME IST AUSGERECHNET DIE, DIE DER USER NAMENTLICH
+      GEWUENSCHT HAT: 🪣 (U+1FAA3 BUCKET, "Fuelleimer") ist in KEINER der
+      sechs Familien darstellbar. Auch nicht in Segoe UI Emoji.
+      Als Text-Glyph gaebe es dort ein leeres Kaestchen. ***
+
+  Weiter gilt: "Segoe UI" (ohne "Symbol") kennt nur 6 der 59 Zeichen —
+  wer die Knopfschrift je auf die UI-Schrift umstellt, leert die Leiste.
+  Die heutige Wahl `new Font("SansSerif", ...)` (Z. 808) ist also richtig
+  und darf nicht "vereinheitlicht" werden.
+
+  Emoji-Glyphen (🖌 🖊 🎨 💧 📏) sind zwar darstellbar, werden aber FARBIG
+  und mit eigener Grundlinie gerendert — neben monochromen Symbolen in einer
+  dunklen Leiste ergibt das kein einheitliches Bild.
+
+0.4  WAS HEUTE SCHON GUT IST — NICHT ANFASSEN
+--------------------------------------------------------------------------
+  - JEDER Knopf hat einen Tooltip, viele davon ausfuehrlich und praezise.
+    Die Bedeutung ist also dokumentiert; sie ist nur nicht SICHTBAR.
+  - ↩ ↪ (Undo/Redo), ↔ ↕ (Spiegeln), ↺ ↻ (90 Grad) sind eindeutig,
+    konventionell und ueberall darstellbar. KEIN Aenderungsbedarf.
+  - Die Knopfgroesse ist mit 50x50 grosszuegig (BTN_SIZE, Z. 48).
+    TOOLBAR_H ist BTN_SIZE + 55 = 105 — es ist Platz vorhanden.
+
+
+==============================================================================
+1. DIE ZWEI WEGE
+==============================================================================
+
+ROUTE A — bessere Unicode-Glyphen (klein, schnell)
+--------------------------------------------------------------------------
+  Nur die Zeichenketten in symbolAndTip() austauschen. Ein Eingriff,
+  eine Methode, kein neuer Typ.
+  + Aufwand sehr klein, Risiko [B], sofort sichtbar.
+  - Fuer Fuelleimer, Pinsel und die Zauberstab-Familie gibt es KEINE
+    passenden monochromen Glyphen (0.3). Die Mehrfachbelegung laesst sich
+    nur teilweise aufloesen — man landet wieder bei aehnlichen Zeichen.
+  - Das Aussehen haengt an der Schriftinstallation des Rechners.
+
+ROUTE B — gezeichnete Vektor-Icons (die Empfehlung)
+--------------------------------------------------------------------------
+  Eine neue Klasse `PaintIcons` liefert `javax.swing.Icon`-Objekte, die mit
+  Graphics2D gezeichnet werden. Der Knopf bekommt `setIcon(...)` statt Text.
+  + Ein Fuelleimer sieht aus wie ein Fuelleimer — unabhaengig von Schriften.
+  + Die elf Zauberstab-Varianten werden als FAMILIE unterscheidbar:
+    gleiche Grundform + unterschiedliches Abzeichen (Abschnitt 3).
+  + Farben kommen aus AppColors (§21), Strichstaerken aus AppTheme.
+  + Deterministisch: derselbe Rechner, dieselbe Darstellung, immer.
+  - Groesserer Eingriff: neue Klasse (~250-350 Z.), Aufwand M.
+
+ROUTE C — ERGAENZEN statt ersetzen (unabhaengig von A/B, sehr hoher Hebel)
+--------------------------------------------------------------------------
+  BESCHRIFTUNG UNTER DAS SYMBOL. Der Prompt sagt ausdruecklich "ersetzen
+  ODER ERGAENZEN" — und in einem Raster gleichartiger Varianten ist eine
+  Beschriftung die wirksamste Massnahme ueberhaupt, staerker als jedes
+  Symbol. Der Platz ist da:
+
+        50 px Knopfhoehe  =  26 px Symbol + 2 px Luft + 10 px Text
+                             (+ je 6 px Rand)
+
+  *** IM WANDPANEL-GITTER IST DAS DER EIGENTLICHE FIX. Elf Varianten
+      desselben Werkzeugs sind grafisch nicht sinnvoll zu trennen — dort
+      gehoert "Region", "bis Farbe", "Transp.", "Collapse", "Ring aus",
+      "Ring ein", "AA aus", "AA ein", "Farbe", "bis Farbe", "gleiche"
+      unter das Symbol. Das Gitter hat als eigenes Fenster Platz dafuer. ***
+
+  In der waagerechten Hauptleiste ist die Beschriftung optional
+  (Frage 2, Abschnitt 5).
+
+
+==============================================================================
+2. VORSCHLAGSTABELLE — HAUPTLEISTE
+==============================================================================
+Legende:  [!] = Mehrfachbelegung heute   [?] = Bedeutung nicht erkennbar
+
+WERKZEUGE (buildToolButtons, Z. 364-374)
+--------------------------------------------------------------------------
+ Werkzeug        heute  Problem  Route A (Glyph)  Route B (gezeichnet)
+ --------------  -----  -------  ---------------  ----------------------------
+ PENCIL           P     [?]      ✎  U+270E        Bleistift, diagonal, Spitze
+                                                  unten links, Strich in
+                                                  Primaerfarbe
+ FLOODFILL        F     [?]      ▨  (Notloesung)  *** FUELLEIMER: gekippter
+                                                  Eimer + Tropfen; Fuellung
+                                                  in Primaerfarbe ***
+ LINE             /     [?]      ╱  U+2571        Linie mit zwei Endpunkten
+ CIRCLE           O     [?]      ○  U+25CB        Ellipse, Umriss
+ RECT             R     [?]      □  U+25A1        Rechteck, Umriss
+ ERASER           ⌫     [?]      ⌫  (bleibt)      Radiergummi schraeg, mit
+                                                  Schachbrett-Spur (=transp.)
+ ERASER_BG        ⬜     [?]      ⬜ (bleibt)       Radiergummi mit Spur in
+                                                  SEKUNDAERfarbe
+ ERASER_COLOR     ⌧     [?]      ⌧  (bleibt)      Radiergummi + zwei Farbfelder
+                                                  (primaer -> sekundaer)
+ EYEDROPPER       ✦     [?]      💧 oder ✧        Pipette, schraeg, Tropfen
+                                                  in Primaerfarbe
+ SELECT           ⬚     ok       ⬚  (bleibt)      gestricheltes Rechteck
+                                                  + Ecken-Anfasser
+ TEXT             A     ok       A  (bleibt)      "A" mit Grundlinie
+ PATH             ≈     [?]      ❖ oder ⌒        *** BEZIER: Kurve mit zwei
+                                                  Kontrollpunkten und
+                                                  Tangentengriffen ***
+ FREE_PATH        ✏     [?]      ∿                Freihandkurve mit Stift
+                                                  an der Spitze
+ SMEAR            ~     [?]      ∿ / ◠            Finger/Wischspur, von
+                                                  scharf nach weich
+
+*** PATH und FREE_PATH sind heute ≈ und ✏ — also ausgerechnet vertauscht
+    lesbar: ✏ (Bleistift) sitzt auf dem PFAD-Werkzeug, waehrend das
+    eigentliche Stift-Werkzeug nur ein "P" traegt. Der Prompt nennt beides
+    ("Pinsel oder Pencil fuer normales paint", "besseres Symbol fuer Pfad").
+    In Route B sind die beiden klar getrennt: Bleistift vs. Bezierkurve. ***
+
+UEBRIGE GRUPPEN
+--------------------------------------------------------------------------
+ Funktion         heute  Bewertung
+ ---------------  -----  ---------------------------------------------------
+ Undo / Redo      ↩ ↪    OK, konventionell, bleibt
+ Spiegeln H/V     ↔ ↕    OK, bleibt
+ Drehen 90        ↻ ↺    OK, bleibt
+ Drehen 45        ↷ ↶    schwach unterscheidbar von 90 Grad;
+                         Route B: gleicher Kreispfeil, aber Winkel 45 statt
+                         90 gezeichnet + Gradzahl klein daneben
+ Drehen frei      ⟳°     Grad-Zeichen als Text angeklebt — Route B: Kreis-
+                         pfeil mit Winkelbogen und Auslassungspunkten
+ Skalieren        ⤡      Route B: Rechteck mit Eck-Anfasser und Diagonalpfeil
+ Ausschneiden     ✂     [!] kollidiert mit drei CUT_-Werkzeugen.
+                         Route B: Schere BLEIBT hier — die drei Werkzeuge im
+                         WandPanel bekommen stattdessen Abzeichen (Abschn. 3)
+ Kopieren         ⎘      [?] kaum bekannt. Vorschlag: ⧉ (zwei Blaetter)
+ Einfuegen        ⎗      [?] kaum bekannt. Route B: Klemmbrett
+ Antialiasing     AA     OK als Text — eine Abkuerzung, die im Bildbereich
+                         etabliert ist. Route B optional: harte vs. weiche
+                         Kante nebeneinander gezeichnet
+ Raster           ⊞      OK, bleibt
+ Lineal           ⌇     [?] eine Wellenlinie bedeutet kein Lineal.
+                         Vorschlag: gezeichnetes Lineal mit Teilstrichen
+ Zauberstab-Panel ⚡     [!] identisch mit sechs Werkzeugen.
+                         Vorschlag: Zauberstab + Zahnrad (= "Einstellungen
+                         der Zauberstaebe"), nicht der Zauberstab selbst
+
+
+==============================================================================
+3. DIE ZAUBERSTAB-FAMILIE — GRUNDFORM + ABZEICHEN
+==============================================================================
+Das ist der Kern des Vorschlags. Elf Varianten sind nicht durch elf
+verschiedene Symbole zu trennen; sie sind eine FAMILIE. Best practice dafuer
+(so machen es Photoshop, Affinity, Inkscape): EINE Grundform, die die
+Werkzeugklasse zeigt, plus ein kleines Abzeichen unten rechts, das die
+Variante zeigt.
+
+   Grundform "Zauberstab":  Stab diagonal + drei Funken
+   Grundform "Schere":      wie in der Zwischenablage-Gruppe
+
+  Werkzeug              Grundform   Abzeichen unten rechts     Text (Route C)
+  --------------------  ----------  -------------------------  --------------
+  WAND_I                Zauberstab  gestrichelte Blase         "Region"
+  WAND_II               Zauberstab  Blase + Stopp-Balken in
+                                    Sekundaerfarbe             "bis Farbe"
+  WAND_III              Zauberstab  Schachbrett (transparent)  "Transp."
+  WAND_IV               Zauberstab  vier Pfeile nach innen     "Collapse"
+  WAND_REPLACE_OUTER    Zauberstab  Flaeche + Ring AUSSEN
+                                    hervorgehoben              "Ring aus"
+  WAND_REPLACE_INNER    Zauberstab  Flaeche + Ring INNEN
+                                    hervorgehoben              "Ring ein"
+  WAND_AA_OUTER         Zauberstab  weiche Kante nach aussen   "AA aus"
+  WAND_AA_INNER         Zauberstab  weiche Kante nach innen    "AA ein"
+  CUT_COLOR             Schere      ein Farbfeld               "Farbe"
+  CUT_UNTIL_COLOR       Schere      Farbfeld + Stopp-Balken    "bis Farbe"
+  CUT_SAME_COLOR        Schere      zwei gleiche Farbfelder    "gleiche"
+
+*** DIE PAARE aussen/innen (REPLACE, AA) SIND DER PRUEFSTEIN. Sie sind
+    heute ◠ gegen ◡ — spiegelbildlich und damit die klassische Falle:
+    spiegelbildliche Icons unterscheidet niemand im Vorbeigehen. Deshalb
+    zeigen sie in Route B NICHT dieselbe Form gespiegelt, sondern
+    dieselbe Flaeche mit dem Ring an verschiedener STELLE — und tragen
+    zusaetzlich Text (Route C). Wer nur eines von beidem umsetzt, hat das
+    Problem nur verkleinert, nicht geloest. ***
+
+
+==============================================================================
+4. MOCKUP
+==============================================================================
+
+4.1  HAUPTLEISTE, heute (Ausschnitt Werkzeuge; jeder Knopf 50x50)
+--------------------------------------------------------------------------
+  +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+
+  |    | |    | |    | |    | |    | |    | |    | |    | |    | |    |
+  | P  | | F  | | /  | | O  | | R  | | ⌫  | | ⬜ | | ⌧  | | ✦  | | ⬚  |
+  |    | |    | |    | |    | |    | |    | |    | |    | |    | |    |
+  +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+
+   Stift  Fuell  Linie  Ellip  Recht  Radier Radier Farb-  Pipet  Auswahl
+                                             (bg)   radier
+
+4.2  HAUPTLEISTE, Vorschlag Route B + C
+--------------------------------------------------------------------------
+  +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+
+  | ✎  | | 🪣 | | ╱  | | ○  | | □  | | ▱  | | ▱  | | ▱  | | ⌇  | | ⌐┐ |   <- 26 px
+  |    | | ▮  | |    | |    | |    | | ▒  | | ▪  | | ▪▫ | | ●  | | └┘ |      gezeichnet
+  |Stift |Fuell |Linie |Kreis |Recht |Radier|Radier|Farb- |Pipet |Ausw. |   <- 10 px
+  +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+ +----+
+   (Die Zeichnung ist hier nur angedeutet — massgeblich ist Abschnitt 2.)
+
+4.3  WANDPANEL-GITTER, heute  (WandPanel.java:56, GridLayout(3,4,6,6))
+--------------------------------------------------------------------------
+  +--- Werkzeuge --------------------------------------+
+  |  +----+ +----+ +----+ +----+                       |
+  |  | ⚡ | | ⚡ | | ⚡ | | ⚡ |                        |
+  |  +----+ +----+ +----+ +----+                       |
+  |  +----+ +----+ +----+ +----+                       |
+  |  | ⚡ | | ⚡ | | ◠  | | ◡  |                       |
+  |  +----+ +----+ +----+ +----+                       |
+  |  +----+ +----+ +----+                              |
+  |  | ✂ | | ✂ | | ✂ |                                |
+  |  +----+ +----+ +----+                              |
+  +----------------------------------------------------+
+  *** ELF KNOEPFE, VIER VERSCHIEDENE ZEICHEN. ***
+
+4.4  WANDPANEL-GITTER, Vorschlag  (Grundform + Abzeichen + Text)
+--------------------------------------------------------------------------
+  +--- Werkzeuge --------------------------------------------+
+  |  +--------+ +--------+ +--------+ +--------+             |
+  |  |  ✧⁄    | |  ✧⁄    | |  ✧⁄    | |  ✧⁄    |             |
+  |  |    ⬚   | |    ▐   | |    ▨   | |    ⇲   |  <- Abzeichen
+  |  | Region | |bis Farbe| | Transp.| |Collapse|  <- Text    |
+  |  +--------+ +--------+ +--------+ +--------+             |
+  |  +--------+ +--------+ +--------+ +--------+             |
+  |  |  ✧⁄    | |  ✧⁄    | |  ✧⁄    | |  ✧⁄    |             |
+  |  |    ◍   | |    ◌   | |    ░   | |    ▒   |             |
+  |  |Ring aus| |Ring ein| | AA aus | | AA ein |             |
+  |  +--------+ +--------+ +--------+ +--------+             |
+  |  +--------+ +--------+ +--------+                        |
+  |  |   ✂    | |   ✂    | |   ✂    |                        |
+  |  |    ▪   | |    ▐   | |    ▪▪  |                        |
+  |  | Farbe  | |bis Farbe| |gleiche |                       |
+  |  +--------+ +--------+ +--------+                        |
+  +----------------------------------------------------------+
+  Knopfgroesse im Gitter: 64 x 62 (26 Symbol + 12 Abzeichen-Zone + 10 Text).
+  *** ELF KNOEPFE, ELF UNTERSCHEIDBARE ZUSTAENDE. ***
+
+
+==============================================================================
+5. FRAGEN AN DEN USER — VOR DER UMSETZUNG ZU KLAEREN
+==============================================================================
+
+ FRAGE 1  Route A (Glyphen tauschen, [B], klein) oder Route B (gezeichnete
+          Icons, [B]/[C], Aufwand M)?
+          EMPFEHLUNG: Route B. Der namentlich gewuenschte Fuelleimer ist als
+          Glyph auf diesem Rechner NICHT darstellbar (0.3) — Route A kann
+          den Hauptwunsch des Prompts nicht erfuellen.
+
+ FRAGE 2  Route C (Text unter dem Symbol) — nur im WandPanel-Gitter, oder
+          auch in der Hauptleiste?
+          EMPFEHLUNG: im WandPanel PFLICHT (dort liegt das Problem), in der
+          Hauptleiste ebenfalls — der Platz ist da (50 px Hoehe) und es ist
+          die einzige Massnahme, die OHNE Raten funktioniert.
+
+ FRAGE 3  Die nicht existierenden Tastenkuerzel in den Tooltips (0.2):
+          (a) Kuerzel NACHRUESTEN — dann zuerst Eintrag in KeyBindings.ALL,
+              dann Handler (§25). Achtung: R, S, T, P sind bereits belegt,
+              die Kuerzel muessten also neu vergeben werden.
+          (b) Klammerangaben aus den Tooltips ENTFERNEN.
+          EMPFEHLUNG: (a) — Werkzeugkuerzel sind in jedem Malprogramm
+          Standard und der Nutzen ist hoch. Aber als EIGENER Task, nicht
+          nebenbei: es ist eine Belegungsentscheidung, keine Symbolfrage.
+
+ FRAGE 4  Sollen die Icons die aktuelle PRIMAER-/SEKUNDAERFARBE zeigen
+          (Fuelleimer faerbt sich mit, Pipette zeigt den Tropfen in der
+          gewaehlten Farbe)?
+          EMPFEHLUNG: ja fuer Fuelleimer, Pipette und die beiden
+          Farbradierer — dort ist die Farbe die halbe Information.
+          Kostet einen repaint bei onColorChanged, sonst nichts.
+          *** ACHTUNG §21: das sind BENUTZERGEWAEHLTE Farben, also KEINE
+              Tokens. Sie kommen aus dem Toolbar-Zustand, nicht aus
+              AppColors. ***
+
+
+==============================================================================
+6. REGELN, DIE BEI DER UMSETZUNG GELTEN
+==============================================================================
+  §21  Keine `new Color(...)` / `new Font(...)` / `new BasicStroke(...)`
+       im neuen Code. Icon-Konturfarben kommen aus AppColors, Strichstaerken
+       aus AppTheme.STROKE_*. Fehlt ein Token, wird es ANGELEGT.
+       Ausnahme: die benutzergewaehlten Mal-Farben (Frage 4).
+  §24  Icons zeichnen in `Icon.paintIcon(...)`, Antialiasing ueber die eine
+       Stelle, Graphics2D-Zustand zuruecksetzen bzw. auf `g.create()`
+       arbeiten. KEINE Allokation pro Zeichnung (Univ. §13): Formen einmal
+       anlegen, nicht je Aufruf.
+  §22  PaintToolbar ist kein Ablageplatz fuer die Zeichenlogik. Die Icons
+       gehoeren in eine eigene Klasse (`PaintIcons`), nicht in weitere
+       300 Zeilen PaintToolbar.
+  §25  Wenn Frage 3 mit (a) beantwortet wird: ZUERST Registry, dann Handler.
+  §9   Dieses Dokument IST der Mockup. Umsetzung erst nach Freigabe.
+  Univ. §0  Was heute funktioniert und eindeutig ist (↩ ↪ ↔ ↕ ↺ ↻ ⊞), wird
+       NICHT angefasst. Ein Symbol zu tauschen, das niemand missversteht,
+       ist ein unnoetiger Schritt.
+
+
+==============================================================================
+7. RUNTIME-VERIFY (nach der Umsetzung, gehoert dem User)
+==============================================================================
+  P1  Paint-Modus oeffnen: jeder Werkzeugknopf zeigt ein Symbol, KEIN
+      leeres Kaestchen (Tofu). Betrifft besonders die Emoji-nahen Zeichen.
+  P2  Fuelleimer ist als Fuelleimer erkennbar, ohne den Tooltip zu lesen.
+  P3  Stift und Pfad sind NICHT mehr zu verwechseln (heute: ✏ sitzt auf
+      dem Pfad-Werkzeug).
+  P4  *** WANDPANEL OEFFNEN (⚡-Knopf): alle elf Knoepfe sind ohne Tooltip
+      auseinanderzuhalten. WICHTIGSTE PRUEFUNG. ***
+  P5  Die Paare Ring-aussen/Ring-innen und AA-aussen/AA-innen sind im
+      Vorbeigehen unterscheidbar — nicht nur beim genauen Hinsehen.
+  P6  Aktives Werkzeug bleibt als solches erkennbar (Rahmen in ACCENT,
+      PaintToolbar.toolBtn Z. 765-769) — das Icon darf den Zustand nicht
+      verdecken.
+  P7  Falls Frage 4 = ja: Primaerfarbe wechseln -> Fuelleimer und Pipette
+      faerben sich mit.
+  P8  Leiste horizontal scrollen und Mittelklick-Pan: unveraendert.
+  P9  Knopfgroessen: Werkzeugknoepfe sind jetzt 58x50 (Breite wegen der
+      Beschriftung, siehe 8.2). Die Leiste ist NICHT hoeher geworden —
+      TOOLBAR_H = 105 unveraendert.
+
+
+==============================================================================
+8. WAS DIE SICHTPRUEFUNG GEAENDERT HAT (nachgetragen 2026-08-01)
+==============================================================================
+Der Entwurf oben war der Plan. Drei Punkte davon haben NICHT funktioniert
+und wurden erst sichtbar, als die Icons wirklich gezeichnet waren. Sie
+stehen hier, damit niemand sie "zurueckvereinfacht".
+
+8.1  ABZEICHEN AUS VIER MERKMALEN — ZWEI WAREN ZU WENIG
+--------------------------------------------------------------------------
+Der Entwurf sah fuer Ring-aussen, Ring-innen, AA-aussen und AA-innen
+VIERMAL eine eckige Flaeche mit betontem Rand vor, unterschieden nur durch
+die LAGE des Rings. Gezeichnet sahen alle vier wie dasselbe blaue Quadrat
+aus — also genau der Ausgangsfehler in neuer Form.
+*** DIE LOESUNG WAR DIE SILHOUETTE, NICHT DAS INNENLEBEN:
+    Ring-Werkzeuge = ECKIG (harte Ersetzung),
+    AA-Werkzeuge   = RUND  (weicher Uebergang).
+    Zwei kleine Merkmale zu variieren reicht nicht; es braucht zwei
+    verschiedene UMRISSE. Wer die vier "vereinheitlicht", stellt den
+    Zustand von vorher wieder her. ***
+
+8.2  SWINGS VORGABE-RAND FRISST DIE BESCHRIFTUNG
+--------------------------------------------------------------------------
+Ein JButton hat von sich aus Insets(2,14,2,14). Bei 50 px Knopfkante
+bleiben 22 px fuer den Text — aus "Stift" wurde "S…", aus "Zurueck" "Z.".
+Zwei Eingriffe noetig:
+  a) PaintToolbar.BTN_INSETS = Insets(0,0,0,0) an JEDEM Knopf. Der Knopf
+     malt seinen Hintergrund selbst, ein Rand ist nicht nur unnoetig,
+     sondern schaedlich.
+  b) TOOL_BTN_W = 58 (Hoehe bleibt 50). Die laengsten Beschriftungen
+     ("Rad. Farbe", "Farbtausch") sind zehn Zeichen und passen bei 50 px
+     auch ohne Rand nicht. Die Leiste scrollt waagerecht — Breite kostet
+     nichts, TOOLBAR_H bleibt unveraendert.
+*** EINE ABGESCHNITTENE BESCHRIFTUNG ERKLAERT SO WENIG WIE GAR KEINE. ***
+
+8.3  ZWEI KNOEPFE HIESSEN BEIDE "SPIEGELN"
+--------------------------------------------------------------------------
+Waagerecht und senkrecht spiegeln bekamen dieselbe Beschriftung — dann
+unterscheidet sie wieder nur das Zeichen (↔ gegen ↕), und die ganze
+Massnahme laeuft leer. Jetzt "Waagr." und "Senkr.".
+*** MERKSATZ: eine Beschriftung, die fuer zwei Knoepfe gleich lautet, ist
+    keine Beschriftung. Beim Ergaenzen weiterer Knoepfe pruefen. ***
+
+8.4  NEBENBEFUND, BEHOBEN
+--------------------------------------------------------------------------
+Der Schalter "◯ Closed" im WandPanel stand auf einem festen 50-px-Knopf
+und zeigte nur "…" — schon vor dieser Aufgabe. Da er mitten in dem Panel
+sitzt, dessen Lesbarkeit hier hergestellt wird, richtet sich die Breite
+des reinen Text-Schalters jetzt nach seiner Aufschrift (mindestens
+BTN_SIZE).
+
+8.5  NICHT NEBENBEI BEHOBEN — bewusst
+--------------------------------------------------------------------------
+In PaintToolbar stehen weiterhin DREI `new Font(...)`: miniLabel (Z. 1024),
+styledCombo (Z. 1042) und buildReplaceWandConfig (Z. 666, Methode ist
+@SuppressWarnings("unused")). Alle drei haben ein exaktes AppTheme-Gegen-
+stueck (FONT_SM / FONT_BASE / FONT_SM_BOLD) und waeren werterhaltend zu
+ersetzen — aber sie gehoeren nicht zu dieser Aufgabe, und die Datei steht
+in WEITERMACHEN_PROMPT.txt unter "NICHT MEHR MIGRIEREN". Dokumentiert,
+nicht heimlich mitgeaendert (Univ. §0).
+==============================================================================

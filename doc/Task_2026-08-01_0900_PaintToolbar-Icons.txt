@@ -1,0 +1,134 @@
+==============================================================================
+Task_2026-08-01_0900_PaintToolbar-Icons.txt   (PD)
+Kategorie: [BT] — beruehrt PaintToolbar (931 Z.), WandPanel (222 Z.) und
+           legt eine neue Klasse an. Mockup-Pflicht (Univ. §9).
+Stand: 2026-08-01 | Schritt [1/6] abgeschlossen, [2/6] wartet auf FREIGABE
+==============================================================================
+
+INITIALER PROMPT
+--------------------------------------------------------------------------
+"In der Paint-Menue-Leiste gibt es das Problem, dass ich oft nicht sehe, was
+die einzelnen Symbole und Buchstaben wirklich bedeuten. Finde Symbole nach
+best practice, die die vorhandenen Symbole ersetzen oder ergaenzen koennten
+(z.B. einen Fuelleimer fuer Floodfill, Pinsel oder Pencil fuer normales
+paint, ein besseres Symbol fuer Pfad usw.)"
+
+VORSCHLAG / MOCKUP:  doc/Schema_PaintToolbar_Icons.txt
+
+
+SCHRITTE
+==============================================================================
+
+[1/6]  BEFUND ERHEBEN + MOCKUP SCHREIBEN                    [B]  ERLEDIGT
+       Mehrfachbelegungen auszaehlen, Glyph-Darstellbarkeit MESSEN,
+       Vorschlagstabelle und ASCII-Mockup anlegen.
+       Model: Opus/Sonnet (Messung + Entwurf).
+       ERGEBNIS: doc/Schema_PaintToolbar_Icons.txt.
+       Kernbefunde: 11 Knoepfe im WandPanel zeigen 4 Zeichen · 🪣 ist auf
+       diesem Rechner in KEINER Schriftfamilie darstellbar · die
+       Tooltip-Kuerzel (P)(F)(L)... existieren gar nicht.
+
+[2/6]  FREIGABE EINHOLEN (Fragen 1-4 im Schema)             [B]  << HIER
+       Route A/B, Beschriftung ja/nein, Kuerzel nachruesten oder
+       Tooltips korrigieren, Icons mit Malfarbe einfaerben ja/nein.
+       *** OHNE DIESE ANTWORTEN KEIN CODE. Univ. §9. ***
+       Model: keiner — Entscheidung des Users.
+
+[3/6]  PaintIcons ANLEGEN (nur bei Route B)                 [B]
+       Neue Klasse `PaintIcons`: statische Fabrikmethoden, die
+       `javax.swing.Icon` liefern. NICHTS wird verdrahtet — die Klasse hat
+       nach diesem Schritt null Aufrufer, genau wie AppTheme am 2026-07-30.
+       Dadurch ist der Schritt risikofrei und einzeln pruefbar.
+       Regeln: §21 (keine Literale), §24 (AA an einer Stelle, g.create()),
+       Univ. §13 (Formen einmal anlegen, nicht pro Zeichnung).
+       Model: Sonnet. NICHT Haiku — es ist Zeichenlogik mit vielen
+       Koordinaten, und Haiku neigt hier zum Erfinden.
+       ZWISCHENPRUEFUNG: ein Wegwerf-Fenster, das alle Icons in einem
+       Raster zeigt (nicht ins Projekt einchecken, in den scratchpad).
+
+[4/6]  HAUPTLEISTE UMSTELLEN                                [B]
+       symbolAndTip() liefert statt eines Strings ein Icon (+ Text, falls
+       Frage 2 = ja). buildToolButton / toolBtn / iconBtn / toggleBtn
+       entsprechend. Reihenfolge und Groessen bleiben.
+       *** NICHT ANFASSEN: ↩ ↪ ↔ ↕ ↺ ↻ ⊞ — sie sind eindeutig (Univ. §0). ***
+       Model: Sonnet.
+       Danach: SICHTPRUEFUNG P1-P3, P6, P8, P9 durch den User.
+
+[5/6]  WANDPANEL-GITTER UMSTELLEN                           [B]
+       Grundform + Abzeichen + Text (Schema Abschnitt 3 und 4.4).
+       Knopfgroesse im Gitter auf 64 x 62. GridLayout bleibt 3x4.
+       *** DAS IST DER EIGENTLICHE FIX. Wer nur [4] macht und [5] weglaesst,
+           hat das Hauptproblem nicht angefasst. ***
+       Model: Sonnet.
+       Danach: SICHTPRUEFUNG P4, P5 — die wichtigsten des ganzen Tasks.
+
+[6/6]  DOKU NACHZIEHEN                                      [B]
+       CLAUDE.md (Abschnitt "Farben, Fonts, Masse" bekommt PaintIcons),
+       doc/README.md (Wegweiser: Schema + progress),
+       Schema_PaintToolbar_Icons.txt auf "FREIGEGEBEN UND UMGESETZT".
+       Univ. §9: wer die Struktur aendert, korrigiert die Doku im selben
+       Schritt.
+       Model: Haiku genuegt (reines Nachtragen), Ergebnis gegenlesen.
+
+
+NICHT IN DIESEM TASK — bewusst
+==============================================================================
+  - TASTENKUERZEL NACHRUESTEN (Frage 3a). Fachlich verwandt, aber es ist
+    eine BELEGUNGSentscheidung: P, R, S, T sind teils schon vergeben, und
+    jede neue Taste gehoert zuerst in KeyBindings.ALL (§25). Eigener Task.
+    *** SOLANGE ER NICHT LAEUFT, IST DER TOOLTIP EINE FALSCHE ZUSAGE.
+        Mindestens die Klammerangaben gehoeren dann entfernt (Frage 3b) —
+        das waere ein Einzeiler in [4]. ***
+  - PaintToolbar in AppTheme migrieren. Die Datei steht in
+    WEITERMACHEN_PROMPT.txt ausdruecklich unter "NICHT MEHR MIGRIEREN —
+    FARBE ALS INHALT" (die 28er-Palette ist die Mal-Palette des Benutzers).
+    *** ABER: der NEUE Code in [3]-[5] unterliegt §21 voll. Beruehrter Code
+        heisst hier nicht "die ganze Datei". ***
+  - CanvasPanel/Werkzeug-Logik. Es aendert sich NUR die Darstellung der
+    Knoepfe, kein Werkzeugverhalten.
+
+
+ZWISCHENSCHRITTE, DIE ERST DIE SICHTPRUEFUNG ERGEBEN HAT
+==============================================================================
+[4.1/6]  VIER ABZEICHEN WAREN UNUNTERSCHEIDBAR                    [B] ERLEDIGT
+         Ring-aussen/innen und AA-aussen/innen sahen gezeichnet alle vier
+         wie dasselbe blaue Quadrat aus. Geloest ueber die SILHOUETTE:
+         Ring = eckig, AA = rund. Details: Schema 8.1.
+[4.2/6]  BESCHRIFTUNGEN ABGESCHNITTEN ("S…" statt "Stift")        [B] ERLEDIGT
+         Swings Vorgabe-Insets(2,14,2,14) frassen 28 der 50 px.
+         BTN_INSETS + TOOL_BTN_W = 58. Details: Schema 8.2.
+[4.3/6]  ZWEI KNOEPFE HIESSEN BEIDE "SPIEGELN"                    [B] ERLEDIGT
+         -> "Waagr." / "Senkr.". Details: Schema 8.3.
+
+
+FORTSCHRITT
+==============================================================================
+  [1/6]   abgeschlossen  (Befund + Mockup)
+  [2/6]   abgeschlossen  (Freigabe: alle vier Fragen wie empfohlen)
+  [3/6]   abgeschlossen  (PaintIcons, 34 Symbole, null Aufrufer)
+  [4/6]   abgeschlossen  (Hauptleiste)
+  [4.1/6] abgeschlossen
+  [4.2/6] abgeschlossen
+  [4.3/6] abgeschlossen
+  [5/6]   abgeschlossen  (WandPanel-Raster — es waren NULL Aenderungen an
+          WandPanel.java noetig: es ruft buildToolButton() und pack())
+  [6/6]   abgeschlossen  (Schema, CLAUDE.md, README.md, WEITERMACHEN)
+
+*** DIE AUFGABE IST INHALTLICH ABGESCHLOSSEN.
+    OFFEN IST NUR DER RUNTIME-VERIFY P1-P9 DURCH DEN USER. ***
+
+
+NAECHSTER SCHRITT
+==============================================================================
+Sichtpruefung P1-P9 (Schema Abschnitt 7). EIN Programmstart im Paint-Modus
+hakt alle neun ab; die wichtigste ist P4 (WandPanel oeffnen, elf Knoepfe
+ohne Tooltip auseinanderhalten).
+
+DANACH, falls gewuenscht: der eigene Task fuer die WERKZEUG-TASTENKUERZEL
+(Frage 3a). Er ist NICHT begonnen. Reihenfolge dort ist Pflicht:
+zuerst Eintraege in KeyBindings.ALL, dann Handler (§25) — und die Belegung
+muss neu entschieden werden, weil P/R/S/T teils vergeben sind.
+
+"/clear" + WEITERMACHEN_PROMPT.txt ist jetzt sinnvoll: der Task ist zu,
+der naechste Einstieg braucht nur den Stand, nicht diesen Verlauf.
+==============================================================================

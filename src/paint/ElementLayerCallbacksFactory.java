@@ -292,31 +292,59 @@ class ElementLayerCallbacksFactory {
 			// ── Case 4: TileGallery right-drag dropped onto ElementLayerPanel ─
 			@Override
 			public void insertFileAsLayerAt(File file, int visualIdx) {
-				CanvasInstance c = c();
-				if (c.workingImage == null)
+				insertFileAsLayer(ed, idx, file, visualIdx);
+			}
+
+			// ── Kontextmenü: Layer als Bild in die Zwischenablage ────────────
+			@Override
+			public void copyElementToClipboard(Layer el) {
+				BufferedImage img = ed.renderLayerToImage(el);
+				if (img == null) {
+					ed.showErrorDialog("Kopieren", "Dieser Layer lässt sich nicht als Bild darstellen.");
 					return;
-				try {
-					BufferedImage img = ImageIO.read(file);
-					if (img == null)
-						return;
-					img = ed.normalizeImage(img);
-					int[] size = ed.fitElementSize(img.getWidth(), img.getHeight(), c.workingImage.getWidth(),
-							c.workingImage.getHeight());
-					int cx = Math.max(0, (c.workingImage.getWidth() - size[0]) / 2);
-					int cy = Math.max(0, (c.workingImage.getHeight() - size[1]) / 2);
-					ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy, size[0], size[1]);
-					int insertIdx = ed.visualToInsertIndex(visualIdx, c.activeElements.size());
-					c.activeElements.add(insertIdx, layer);
-					c.selectedElements.clear();
-					c.selectedElements.add(layer);
-					ed.markDirty(idx);
-					if (c.canvasPanel != null)
-						c.canvasPanel.repaint();
-					SwingUtilities.invokeLater(() -> ed.refreshElementPanel());
-				} catch (Exception ex) {
-					ed.showErrorDialog("Fehler", "Bild konnte nicht geladen werden: " + ex.getMessage());
 				}
+				// Derselbe Weg wie Strg+C — nicht nachgebaut (§6).
+				ed.copyImageToSystemClipboard(img);
+				ToastNotification.show(ed, "Layer kopiert");
 			}
 		};
+	}
+
+	/**
+	 * Fügt das Bild aus {@code file} als neuen {@link ImageLayer} ein.
+	 *
+	 * <p>Am 2026-08-01 aus der anonymen Klasse herausgelöst, weil das
+	 * Kontextmenü der Bildliste („Als Layer einfügen“) dieselbe Arbeit
+	 * braucht. <b>Herausgelöst statt kopiert</b> — eine zweite Fassung wäre
+	 * die Stelle, an der später eine von beiden das Zentrieren oder das
+	 * {@code markDirty} verliert.
+	 *
+	 * @param visualIdx Einfügeposition in der Anzeige, 0 = ganz oben
+	 */
+	static void insertFileAsLayer(SelectiveAlphaEditor ed, int idx, File file, int visualIdx) {
+		CanvasInstance c = ed.ci(idx);
+		if (c.workingImage == null)
+			return;
+		try {
+			BufferedImage img = ImageIO.read(file);
+			if (img == null)
+				return;
+			img = ed.normalizeImage(img);
+			int[] size = SelectiveAlphaEditor.fitElementSize(img.getWidth(), img.getHeight(),
+					c.workingImage.getWidth(), c.workingImage.getHeight());
+			int cx = Math.max(0, (c.workingImage.getWidth() - size[0]) / 2);
+			int cy = Math.max(0, (c.workingImage.getHeight() - size[1]) / 2);
+			ImageLayer layer = new ImageLayer(c.nextElementId++, img, cx, cy, size[0], size[1]);
+			int insertIdx = SelectiveAlphaEditor.visualToInsertIndex(visualIdx, c.activeElements.size());
+			c.activeElements.add(insertIdx, layer);
+			c.selectedElements.clear();
+			c.selectedElements.add(layer);
+			ed.markDirty(idx);
+			if (c.canvasPanel != null)
+				c.canvasPanel.repaint();
+			SwingUtilities.invokeLater(() -> ed.refreshElementPanel());
+		} catch (Exception ex) {
+			ed.showErrorDialog("Fehler", "Bild konnte nicht geladen werden: " + ex.getMessage());
+		}
 	}
 }

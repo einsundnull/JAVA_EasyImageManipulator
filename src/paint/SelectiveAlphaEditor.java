@@ -389,6 +389,8 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 	void doCut()         { clipboardController.doCut(); }
 	void doCutOutside()  { clipboardController.doCutOutside(); }
 	void doPaste()       { clipboardController.doPaste(); }
+	/** Bild in die System-Zwischenablage — für das Kontextmenü des Layer-Panels. */
+	void copyImageToSystemClipboard(BufferedImage img) { clipboardController.copyToSystemClipboard(img); }
 
 	public Rectangle getActiveSelection() { return clipboardController.getActiveSelection(); }
 

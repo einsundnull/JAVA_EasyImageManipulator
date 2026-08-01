@@ -158,6 +158,21 @@ class ScenesController {
 			public void onRenameRequested(File sceneFile) {
 				renameSceneFile(sceneFile, idx);
 			}
+
+			// ── Rechtsklick-Menü der Szenenliste ─────────────────────────────
+			// *** BEWUSST SCHLANK. Eine Szene ist ein VERZEICHNIS
+			//     (<Name>/<Name>.txt + images/ + texts/ + paths/) und ihr
+			//     Format ist der Vertrag mit GameII (§23). „Kopieren" und
+			//     „Löschen" müssten das ganze Verzeichnis mitnehmen; ein
+			//     Menüpunkt, der nur die .txt anfasst, hinterließe eine
+			//     halbe Szene. Das ist eine eigene Aufgabe. ***
+			@Override
+			public void onContextMenu(File sceneFile, ContextMenu menu) {
+				FileActionsController.fillSlimMenu(sceneFile,
+						() -> onTileOpened(sceneFile),
+						() -> renameSceneFile(sceneFile, idx),
+						menu);
+			}
 		};
 	}
 

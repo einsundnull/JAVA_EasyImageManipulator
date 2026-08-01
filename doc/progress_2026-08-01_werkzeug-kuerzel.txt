@@ -1,0 +1,183 @@
+==============================================================================
+progress_2026-08-01_werkzeug-kuerzel.txt
+Werkzeug-Kuerzel fuer die Mal-Werkzeuge  —  [BT], PD:
+doc/Task_2026-08-01_0957_Werkzeug-Kuerzel.txt
+==============================================================================
+PROMPT: "Werkezeug-Kürzel"
+
+AUSGANGSLAGE: Der Paint-Icons-Task (2026-08-01) hatte die luegenden
+Klammer-Kuerzel (P)(F)(L)(E)(R)... aus den Tooltips ENTFERNT und das
+Nachruesten als eigenen Task zurueckgestellt (§25: zuerst Registry, dann
+Handler; die Belegung muss NEU entschieden werden).
+
+ENTSCHEIDUNGEN DES USERS (vor Schritt [2] eingeholt):
+  Q1 -> einfache Buchstaben (nicht Alt+Buchstabe)
+  Q2 -> ALLE 25 Werkzeuge, nicht nur die 14 der Hauptleiste
+  Q3 -> den R-Befund im selben Zug mitabsichern
+
+==============================================================================
+DER BEFUND, DER DEN ENTWURF BESTIMMT HAT  (Schritt [1/6])
+==============================================================================
+*** EINFACHE BUCHSTABEN UND DIE TEXTBEARBEITUNG BISSEN SICH — UND ZWAR
+    SCHON VOR DIESEM TASK. ***
+
+Die Belegungen des Hauptfensters haengen in der InputMap
+WHEN_IN_FOCUSED_WINDOW und feuern auf KEY_PRESSED. Die Textbearbeitung des
+CanvasPanel nimmt druckbare Zeichen aber erst in keyTyped() entgegen —
+also SPAETER. Und CanvasPanel.keyPressed (CanvasPanel:1611-1704) behandelt
+nur Esc / Enter / Ruecktaste / Entf / Strg-Kombis / Pfeiltasten; ein
+einfacher Buchstabe faellt UNVERBRAUCHT durch.
+
+GEMESSEN, NICHT HERGELEITET — Wegwerf-Programm KeyOrderProbe.java
+(scratchpad), minimaler Nachbau desselben Mechanismus:
+
+    Fokus auf der Zeichenflaeche: true
+    keyPressed  code=82 consumed=false
+    BILD GEDREHT (InputMap WHEN_IN_FOCUSED_WINDOW)
+    keyTyped -> Zeichen 'r' in den Text eingefuegt
+
+*** ERGEBNIS: WER IN EINEN TEXT EIN "r" TIPPTE, DREHTE ZUGLEICH SEIN BILD
+    UM 90 GRAD. *** Betroffen waren R, Umschalt+R und Umschalt+V. Das war
+    ein vorhandener Fehler, kein neuer — die neuen Werkzeug-Tasten haetten
+    ihn nur 26-fach vervielfacht.
+
+DARAUS FOLGTE DIE FORM DER LOESUNG: nicht 26 einzelne Abfragen, sondern
+EIN Wachposten an der Wurzel (Univ. §13 — keine Meldepflicht je Handler,
+jede vergessene Stelle waere ein Loch).
+
+==============================================================================
+BELEGUNG
+==============================================================================
+HAUPTLEISTE (14)
+  P  Stift        E  Ellipse       I  Pipette     B  Pfad
+  F  Fuellen      V  Rechteck      A  Auswahl     Umschalt+B  Freihand
+  L  Linie        G  Radierer      T  Text        W  Wischen
+                  Umschalt+G  Radierer Sekundaerfarbe
+                  Strg+G      Farbtausch
+
+ZAUBERSTAB-RASTER (11) — die Zifferreihe in GENAU der Reihenfolge, in der
+die Knoepfe im Raster stehen (WandPanel.buildToolGrid):
+  1 2 3 4  Zauberstab I-IV
+  5 / Umschalt+5   Ring aussen / innen
+  6 / Umschalt+6   AA aussen / innen
+  7 8 9    Ausschneiden: Farbe / bis Farbe / gleiche Farbe
+
+  Z  Zauberstab-Raster ein-/ausblenden
+
+*** WARUM `V` FUER DAS RECHTECK UND NICHT `R`: R dreht das Bild und bleibt
+    dabei. Merkhilfe "Viereck". Wer das je "korrigiert", nimmt dem Drehen
+    seine Taste. ***
+*** WARUM UMSCHALT DIE VARIANTE MACHT: G/Umschalt+G, B/Umschalt+B,
+    5/Umschalt+5, 6/Umschalt+6 — dieselbe Logik ueberall, statt vier
+    zusaetzlicher freier Tasten, die niemand behaelt. ***
+
+==============================================================================
+TATSAECHLICHE LOESUNG — WAS GEAENDERT WURDE
+==============================================================================
+KeyBindings.java
+  + Scope TOOL. *** Die Bedingung steht EINMAL im Scope-Titel statt 26-mal
+    in den Zeilen *** — der Dialog rendert scope.title als
+    Abschnittsueberschrift (KeyBindingsDialog:67).
+  + record ToolKey(tool, keyCode, modifiers, combo, description)
+  + TOOL_KEYS: 25 Eintraege — DIE EINZIGE QUELLE.
+  + comboFor(Tool), WAND_PANEL_KEY/_COMBO
+  ~ die bisherige Liste heisst jetzt BASE (private); ALL entsteht aus
+    BASE + den aus TOOL_KEYS erzeugten Zeilen + der Z-Zeile.
+  ~ R / Umschalt+R / Umschalt+V tragen jetzt die condition
+    "nicht waehrend der Textbearbeitung".
+  + GUIDE-Absatz "Das Werkzeug mit der Tastatur wechseln" (§25: ohne ihn
+    ist die Funktion in der UI nicht auffindbar).
+
+KeyboardShortcutManager.java
+  + setupToolKeys(im, am) — ITERIERT ueber KeyBindings.TOOL_KEYS.
+    *** KEINE zweite Liste. Genau die zweite, handgepflegte Liste war der
+        Fehler, der diesen Task ausgeloest hat. ***
+  + toolKey(...) — je Taste ein im.put/am.put ueber den Wachposten
+  + toolKeysActive() — Mal-Leiste sichtbar UND kein Text in Bearbeitung
+  + isEditingText()
+  ~ rotateCW / rotateCCW / toggleVis fragen isEditingText() ab
+
+CanvasPanel.java
+  + isEditingText() — oeffentliche Abfrage auf vorhandenen Zustand
+    (textBoundingBox != null && !textDrawingBox). KEINE Fachlogik, §22
+    eingehalten.
+
+PaintToolbar.java
+  + setWandPanelVisible(boolean) — der einzige Weg, das Raster zu zeigen;
+    fuehrt den Knopf "Staebe" mit. *** NOETIG, WEIL ES JETZT ZWEI BEDIENWEGE
+    GIBT (Knopf und Taste Z). Stuende die Synchronisierung wie vorher nur im
+    ActionListener, zeigte der Knopf nach einem Tastendruck den falschen
+    Zustand — dieselbe Falle wie bei den Einstellungen (Univ. §12: aus dem
+    Live-Zustand ableiten, nicht mitfuehren). ***
+  + Feld wandPanelBtn
+  ~ toggleWandPanel() delegiert an setWandPanelVisible()
+  ~ buildToolButton haengt das Kuerzel aus KeyBindings.comboFor(tool) an
+    den Tooltip — ABGELEITET, NICHT GETIPPT.
+  ~ Javadoc von toolInfo berichtigt (beschrieb den Zustand "es gibt keine
+    Kuerzel").
+
+*** EINE WERKZEUG-TASTE OEFFNET DAS RASTER MIT, wenn ein Zauberstab
+    gewaehlt wird: seine elf Knoepfe existieren NUR dort, sonst waere die
+    Wahl unsichtbar. Das ist eine Entscheidung, keine Nebenwirkung — wer
+    sie zurueckdreht, muss die Sichtbarkeit anders loesen. ***
+
+==============================================================================
+NACHWEIS — nicht behauptet
+==============================================================================
+BUILD: exit 0, 347 .class in einem LEEREN Verzeichnis (vorher 344).
+       Die drei neuen: record ToolKey + zwei anonyme AbstractAction.
+       Danach ebenso nach bin/ uebersetzt, exit 0.
+
+ToolKeyProbe.java (scratchpad, package paint, gegen die KOMPILIERTEN
+Klassen) — ALLE PRUEFUNGEN BESTANDEN:
+  A) jedes der 25 PaintEngine.Tool hat genau eine Taste, keine Dublette
+  B) keine zwei Werkzeuge teilen sich keyCode+modifiers
+  C) *** die angezeigte Beschriftung wird aus keyCode+modifiers
+     ZURUECKGERECHNET und verglichen *** — genau hier entstuende sonst
+     wieder eine luegende Anzeige, also der Fehler, den dieser Task behebt
+  D) KeyBindings.ALL hat im Scope TOOL 26 Zeilen (25 + Z), jede passend
+     zu ihrem TOOL_KEYS-Eintrag; comboFor() gegengeprueft
+  E) keine Kollision mit R / Umschalt+R / Umschalt+V
+
+*** WAS DER NACHWEIS NICHT ABDECKT: ob die Taste im laufenden Programm
+    ankommt. Die InputMap-Verdrahtung und der Wachposten sind nur zur
+    Laufzeit sichtbar. "Build gruen" ist kein Verify (Univ. §10). ***
+
+==============================================================================
+RUNTIME-VERIFY W1-W9  (OFFEN — nur der User kann das)
+==============================================================================
+  W1  *** WICHTIGSTE PRUEFUNG: Text-Werkzeug waehlen, Rahmen aufziehen und
+      "raster" tippen. Es muss "raster" DASTEHEN — und das Bild darf sich
+      NICHT drehen und das Werkzeug NICHT wechseln. Vor dieser Aenderung
+      drehte das "r" das Bild. ***
+  W2  Im Malmodus P/F/L/E/V/G/I/A/T/B/W druecken -> der jeweilige Knopf in
+      der Leiste wird blau, das Werkzeug wirkt auf dem Canvas.
+  W3  Umschalt+G, Strg+G, Umschalt+B -> die VARIANTE wird gewaehlt, nicht
+      das Grundwerkzeug.
+  W4  Dieselbe Taste zweimal -> das Werkzeug bleibt gewaehlt (die Taste
+      schaltet NICHT ab; nur der Knopf tut das). GEWOLLT.
+  W5  Z -> Zauberstab-Raster oeffnet, Z erneut -> schliesst. *** Der Knopf
+      "Staebe" muss dabei mitgehen — er war der Grund fuer
+      setWandPanelVisible(). ***
+  W6  1-9 und Umschalt+5 / Umschalt+6 -> der richtige Knopf im Raster wird
+      gewaehlt; ist das Raster zu, oeffnet es sich dabei.
+  W7  In den Buch-/Szenen-/Alpha-Modus wechseln (Mal-Leiste unsichtbar) ->
+      P, 5, Z tun NICHTS.
+  W8  Umschalt+F1 -> der Hilfe-Dialog zeigt den neuen Abschnitt "Werkzeug
+      waehlen" mit 26 Zeilen und den Anleitungs-Absatz. Beschreibungen
+      werden UMGEBROCHEN, nicht abgeschnitten.
+  W9  Ueber einem Werkzeug-Knopf stehenbleiben -> der Tooltip endet mit
+      "· Taste P" usw., und die Taste stimmt.
+
+==============================================================================
+NICHT GEMACHT — bewusst (Univ. §0)
+==============================================================================
+  - Kein Mockup/Schema: der Dialog bekommt Zeilen, kein neues Layout.
+  - Die Knopf-Logik in PaintToolbar bleibt, wie sie ist (der Knopf darf
+    weiter abschalten). Nur die Taste tut es nicht.
+  - WandPanel.java NICHT angefasst — die Knoepfe entstehen ueber
+    toolbar.buildToolButton() und bekommen die Tooltips von selbst. Zum
+    zweiten Mal zahlt sich der Callbacks-/Fabrik-Aufbau nach §22 aus.
+  - Die drei `new Font(...)` in PaintToolbar bleiben ungetauscht (schon im
+    Icons-Task als "nicht Teil dieser Aufgabe" vermerkt).
+==============================================================================

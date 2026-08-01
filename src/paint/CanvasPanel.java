@@ -266,6 +266,28 @@ public class CanvasPanel extends JPanel {
 	public Color getTextColor() { return textColor; }
 	public void setTextColor(Color c) { textColor = c; }
 
+	/**
+	 * Ob gerade Text getippt wird — reine Abfrage des vorhandenen Zustands,
+	 * keine Fachlogik (§22).
+	 *
+	 * <p><b>Wozu:</b> Die Belegungen des Hauptfensters hängen in der
+	 * {@code InputMap} {@code WHEN_IN_FOCUSED_WINDOW} und feuern auf
+	 * {@code KEY_PRESSED}. Die Textbearbeitung nimmt druckbare Zeichen aber
+	 * erst in {@code keyTyped()} entgegen — also <i>später</i>. Ein einfacher
+	 * Buchstabe löst deshalb <b>beides</b> aus: die Belegung des Fensters und
+	 * die Texteingabe. Nachgewiesen am 2026-08-01 mit einem Wegwerf-Programm
+	 * (Protokoll in {@code doc/progress_2026-08-01_werkzeug-kuerzel.txt}):
+	 * ein „r" im Text drehte zugleich das Bild um 90 Grad.
+	 *
+	 * <p>{@code KeyboardShortcutManager} fragt das vor jeder Belegung mit
+	 * einfachem Buchstaben oder Ziffer ab. <b>Nicht „vereinfachen":</b>
+	 * {@code textDrawingBox} bedeutet, dass der Rahmen gerade erst aufgezogen
+	 * wird — dann wird noch nicht getippt und die Sperre gilt nicht.
+	 */
+	public boolean isEditingText() {
+		return textBoundingBox != null && !textDrawingBox;
+	}
+
 	public void setHoveredElementId(int id) {
 		if (hoveredElementId == id) return;
 		hoveredElementId = id;

@@ -104,6 +104,8 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         void toggleElementVisibility(Layer el);
         /** Toggle mouse-transparency of a layer (tool-invisible). */
         void toggleElementMouseTransparent(Layer el);
+        /** Legt den gerenderten Layer als Bild in die System-Zwischenablage. */
+        default void copyElementToClipboard(Layer el) {}
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────────
@@ -391,6 +393,17 @@ public class ElementLayerPanel extends BaseSidebarPanel {
         private final Layer linkedLayerRef;
         private JLabel toImage, burn, del, resetRot, mapBtn, vis, mouseTrans, lbl;
 
+        /**
+         * Position dieser Kachel in der Anzeige, 0 = oberster Layer.
+         *
+         * <p>Wird aus dem Container gelesen statt beim Bauen mitgegeben: die
+         * Liste wird beim Umsortieren neu aufgebaut, ein mitgeführter Index
+         * wäre danach falsch.
+         */
+        private int visualIndex() {
+            return Math.max(0, tilesContainer.getComponentZOrder(this));
+        }
+
         LayerTile(Layer layer, boolean selected, boolean showAll, Layer linkedElement) {
             this.layer    = layer;
             this.selected = selected;
@@ -631,6 +644,56 @@ public class ElementLayerPanel extends BaseSidebarPanel {
 
             // Initial layout at TILE_W so children have valid bounds immediately
             doLayout();
+
+            // ── Rechtsklick-Menü ──────────────────────────────────────────────
+            // Ein ZWEITER Bedienweg neben der Knopfreihe, kein Ersatz: die
+            // Knöpfe sind mit EINEM Klick erreichbar, das Menü braucht drei.
+            // Es bietet dieselben Funktionen plus Duplizieren und Kopieren.
+            //
+            // *** „Umbenennen" fehlt hier ABSICHTLICH: Layer.displayName() ist
+            //     abgeleitet, es gibt kein Namensfeld. Ein Eintrag, der den
+            //     Namen nach dem Neuladen vergisst, wäre schlimmer als keiner.
+            //     Ein echter Layer-Name berührt das Modell (§29) UND den
+            //     Szenen-Vertrag mit GameII (§23) — eigener Task. ***
+            ContextMenu.install(this, (e, m) -> {
+                boolean isImage = layer instanceof ImageLayer;
+                boolean isText  = layer instanceof TextLayer;
+                boolean isPath  = layer instanceof PathLayer;
+                boolean frame   = cb.isPageFrame(layer);
+                boolean rotated = layer instanceof ImageLayer il2
+                        && Math.abs(il2.rotationAngle()) > 0.001;
+
+                m.itemBold("Bearbeiten", isImage || isText || isPath, () -> {
+                    if (layer instanceof PathLayer pl) openPathEditorDialog(pl);
+                    else if (isImage) cb.openElementInOtherCanvas(layer);
+                    else if (isText)  cb.openTextLayerForEditing(layer);
+                });
+
+                m.separator();
+                m.item("Duplizieren", true, () -> cb.insertLayerCopyAt(layer, visualIndex()));
+                m.item("Kopieren", true, () -> cb.copyElementToClipboard(layer));
+
+                m.separator();
+                // Häkchen aus dem LIVE-Zustand — das Menü wird bei jedem
+                // Rechtsklick neu gebaut, deshalb kann es nicht lügen, wenn
+                // die Sichtbarkeit über den Knopf umgeschaltet wurde (§12).
+                m.check("Sichtbar", !layer.isHidden(), true,
+                        () -> cb.toggleElementVisibility(layer));
+                m.check("Mausdurchlässig", layer.isMouseTransparent(), isImage || isText || isPath,
+                        () -> cb.toggleElementMouseTransparent(layer));
+                m.item("Drehung zurücksetzen", rotated, () -> cb.resetElementRotation(layer));
+
+                m.separator();
+                m.item("Als Bild exportieren", true, () -> cb.exportElementAsImage(layer));
+                m.item("In den Canvas einbrennen", !frame, () -> cb.burnElement(layer));
+                m.item("Als Übersetzungskarte", isText, () -> cb.exportElementAsMap(layer));
+
+                m.separator();
+                // Grau statt unsichtbar: ein Seitenrahmen ist dauerhaft, und
+                // ein Menü, das je nach Layer die Höhe wechselt, macht die
+                // übrigen Einträge unauffindbar.
+                m.item("Löschen", !frame, () -> cb.deleteElement(layer));
+            });
 
             // Tile click: select layer on canvas
             addMouseListener(new MouseAdapter() {

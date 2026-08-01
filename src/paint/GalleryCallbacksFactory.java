@@ -137,6 +137,21 @@ class GalleryCallbacksFactory {
 					return ed.elementController.renderCompositeForThumbnail(c);
 				return null;
 			}
+
+			// ── Rechtsklick-Menü der Bildliste ───────────────────────────────
+			// *** Bis 2026-08-01 hatte diese Liste als einzigen Menüpunkt
+			//     „Umbenennen" — und onRenameRequested war hier NICHT
+			//     überschrieben. Der Eintrag tat also nichts. ***
+			@Override
+			public void onContextMenu(File f, ContextMenu menu) {
+				FileActionsController.fillImageMenu(ed, idx, f,
+						() -> ed.ci(idx).tileGallery, menu);
+			}
+
+			@Override
+			public void onRenameRequested(File f) {
+				FileActionsController.rename(ed, f, () -> ed.ci(idx).tileGallery);
+			}
 		};
 	}
 
@@ -239,6 +254,18 @@ class GalleryCallbacksFactory {
 					return ed.elementController.renderCompositeForThumbnail(c);
 				return null;
 			}
+
+			// ── Rechtsklick-Menü der zweiten Bildliste ───────────────────────
+			@Override
+			public void onContextMenu(File f, ContextMenu menu) {
+				FileActionsController.fillImageMenu(ed, idx, f,
+						() -> ed.ci(idx).tileGallery2, menu);
+			}
+
+			@Override
+			public void onRenameRequested(File f) {
+				FileActionsController.rename(ed, f, () -> ed.ci(idx).tileGallery2);
+			}
 		};
 	}
 
@@ -278,6 +305,16 @@ class GalleryCallbacksFactory {
 					} catch (java.io.IOException ex) {
 						ed.showErrorDialog("Fehler", "Umbenennen fehlgeschlagen:\n" + ex.getMessage());
 					}
+				}
+				@Override public void onContextMenu(File pageFile, ContextMenu menu) {
+					// Schlank, weil eine Buchseite mehr ist als ihre PNG:
+					// Löschen und Kopieren müssten den Buch-Bestand mitführen
+					// (BookController) — das ist eine eigene Aufgabe, kein
+					// Nebenprodukt dieses Menüs.
+					FileActionsController.fillSlimMenu(pageFile,
+							() -> ed.loadFile(pageFile, idx),
+							currentBook[0] == null ? null : () -> onRenameRequested(pageFile),
+							menu);
 				}
 				@Override public void onFileElementDropped(File src, int insertIndex) {
 					if (currentBook[0] == null) return;
@@ -360,6 +397,14 @@ class GalleryCallbacksFactory {
 					if (!bookDir.renameTo(newDir)) { ed.showErrorDialog("Fehler", "Umbenennen fehlgeschlagen."); return; }
 					if (currentBook[0] != null && currentBook[0].equals(bookDir)) currentBook[0] = newDir;
 					listPanelRef[0].setFiles(BookController.listBooks(), currentBook[0]);
+				}
+				@Override public void onContextMenu(File bookDir, ContextMenu menu) {
+					// Ein Buch ist ein Verzeichnis mit Seiten und Layout —
+					// Löschen gehört zum BookController, nicht hierher.
+					FileActionsController.fillSlimMenu(bookDir,
+							() -> onTileOpened(bookDir),
+							() -> onRenameRequested(bookDir),
+							menu);
 				}
 			},
 			null, "Bücher", null,

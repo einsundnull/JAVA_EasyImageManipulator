@@ -153,18 +153,21 @@ class KeyboardShortcutManager {
 		am.put("rotateCW", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				if (isEditingText()) return;
 				ed.doRotate(90.0);
 			}
 		});
 		am.put("rotateCCW", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				if (isEditingText()) return;
 				ed.doRotate(-90.0);
 			}
 		});
 		am.put("toggleVis", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				if (isEditingText()) return;
 				CanvasInstance c = ed.ci();
 				if (c.workingImage == null)
 					return;
@@ -274,6 +277,8 @@ class KeyboardShortcutManager {
 			}
 		});
 
+		setupToolKeys(im, am);
+
 		// Global F1–F7 key dispatcher for secondary preview window
 		// Jede hier vergebene Taste MUSS in KeyBindings.ALL stehen (§25).
 		java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
@@ -332,5 +337,90 @@ class KeyboardShortcutManager {
 			}
 			return false;
 		});
+	}
+
+	// =========================================================================
+	// Werkzeug-Kürzel (§25) — Belegung steht in KeyBindings.ALL, Scope TOOL
+	// =========================================================================
+
+	/**
+	 * Verdrahtet die 25 Werkzeug-Tasten und {@code Z} für das Zauberstab-Raster.
+	 *
+	 * <p><b>Die Belegung steht in {@link KeyBindings#ALL}, Scope
+	 * {@code TOOL} — dort zuerst nachtragen, dann hier</b> (§25). Bis zum
+	 * 2026-08-01 versprachen die Tooltips Kürzel, die es nie gab.
+	 *
+	 * <p><b>Die Taste wählt, sie schaltet nicht ab.</b> Der Knopf schaltet beim
+	 * zweiten Klick auf „kein Werkzeug" ({@code PaintToolbar#buildToolButton});
+	 * bei einer Taste sähe dasselbe wie „nichts passiert" aus.
+	 */
+	private void setupToolKeys(InputMap im, ActionMap am) {
+		// *** KEINE zweite Liste. *** Die Belegung steht vollständig in
+		// KeyBindings.TOOL_KEYS; hier wird sie nur verdrahtet. Genau die
+		// zweite, handgepflegte Liste war der Fehler, der diesen Task
+		// ausgelöst hat (§25).
+		for (KeyBindings.ToolKey tk : KeyBindings.TOOL_KEYS)
+			toolKey(im, am, tk.keyCode(), tk.modifiers(), tk.tool());
+
+		// ── Das Raster selbst — kein Werkzeug, deshalb eigener Eintrag ────────
+		im.put(KeyStroke.getKeyStroke(KeyBindings.WAND_PANEL_KEY, 0), "toggleWandPanel");
+		am.put("toggleWandPanel", new AbstractAction() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if (!toolKeysActive()) return;
+				ed.paintToolbar.toggleWandPanel();
+			}
+		});
+	}
+
+	/** Eine Werkzeug-Taste: Belegung eintragen und mit dem Wachposten verdrahten. */
+	private void toolKey(InputMap im, ActionMap am, int keyCode, int modifiers,
+			PaintEngine.Tool tool) {
+		String name = "tool_" + tool + "_" + modifiers;
+		im.put(KeyStroke.getKeyStroke(keyCode, modifiers), name);
+		am.put(name, new AbstractAction() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if (!toolKeysActive()) return;
+				ed.paintToolbar.setActiveTool(tool);
+				// Die elf Zauberstäbe haben ihren Knopf NUR im Raster. Bliebe
+				// es zu, wäre die Wahl unsichtbar — genau der Zustand, den die
+				// gezeichneten Symbole am 2026-08-01 beseitigt haben.
+				if (PaintToolbar.isWandTool(tool))
+					ed.paintToolbar.setWandPanelVisible(true);
+			}
+		});
+	}
+
+	/**
+	 * Der Wachposten — <b>eine</b> Feststellung an der Wurzel statt einer
+	 * Meldepflicht je Handler (Univ. §13).
+	 *
+	 * <p>Werkzeug-Tasten wirken nur, solange die Mal-Leiste sichtbar ist
+	 * (angedockt oder schwebend). Sonst wären sie im Buch-, Szenen- und
+	 * Alpha-Modus stille Nebenwirkungen ohne sichtbaren Knopf.
+	 */
+	private boolean toolKeysActive() {
+		return ed.paintToolbar != null && ed.paintToolbar.isVisible() && !isEditingText();
+	}
+
+	/**
+	 * Ob der Benutzer gerade Text tippt.
+	 *
+	 * <p><b>Warum das nötig ist:</b> Belegungen der {@code InputMap}
+	 * {@code WHEN_IN_FOCUSED_WINDOW} feuern auf {@code KEY_PRESSED}, die
+	 * Texteingabe des {@code CanvasPanel} nimmt Zeichen aber erst in
+	 * {@code keyTyped()} entgegen — also später. Ein einfacher Buchstabe löst
+	 * deshalb <b>beides</b> aus. Am 2026-08-01 mit einem Wegwerf-Programm
+	 * nachgewiesen: ein „r" im Text drehte zugleich das Bild um 90 Grad.
+	 * Protokoll: {@code doc/progress_2026-08-01_werkzeug-kuerzel.txt}.
+	 *
+	 * <p>Deshalb fragen das <b>auch</b> die drei älteren Buchstaben-Belegungen
+	 * ab ({@code R}, {@code Umschalt+R}, {@code Umschalt+V}) — sie trugen den
+	 * Fehler schon vorher.
+	 */
+	private boolean isEditingText() {
+		CanvasInstance c = ed.ci();
+		return c != null && c.canvasPanel != null && c.canvasPanel.isEditingText();
 	}
 }

@@ -255,4 +255,33 @@ public final class AppColors {
      * colour") und musste von Hand gepflegt werden.
      */
     public static final Color HOVER_OUTLINE          = new Color(255, 200,  80);
+
+    // ── Werkzeug-Icons (PaintIcons, ergänzt 2026-08-01) ───────────────────────
+
+    /**
+     * Kontur der gezeichneten Werkzeug-Icons.
+     * <p><b>Bewusst an {@link #TEXT} gekoppelt, nicht als eigener Wert
+     * getippt:</b> das Icon <i>ersetzt</i> die Buchstaben-Beschriftung des
+     * Knopfes und ist damit dessen Vordergrund. Wer die Knopfschrift aufhellt,
+     * soll die Icons mit aufhellen — genau das leistet die Ableitung (§21).
+     */
+    public static final Color ICON_LINE = TEXT;
+
+    /** Zurückgenommene Binnenzeichnung im Icon (Hilfslinien, Schatten). */
+    public static final Color ICON_LINE_MUTED = TEXT_MUTED;
+
+    /** Flächenfüllung im Icon — angedeutet, nie deckend. */
+    public static final Color ICON_FILL = alphaOf(TEXT, 45);
+
+    /**
+     * Helles Feld des Schachbretts, mit dem ein Icon <i>Transparenz</i> zeigt
+     * (Radierer, Zauberstab III).
+     * <p>Eigene Token, obwohl grau: es ist die Bedeutung „durchsichtig", nicht
+     * „Fläche" — und das Paar muss auch dann kontrastieren, wenn die
+     * Panel-Farben sich ändern.
+     */
+    public static final Color ICON_CHECKER_LIGHT = new Color(150, 150, 150);
+
+    /** Dunkles Feld desselben Schachbretts. */
+    public static final Color ICON_CHECKER_DARK  = new Color( 95,  95,  95);
 }
