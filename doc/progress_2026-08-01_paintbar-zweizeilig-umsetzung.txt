@@ -1,0 +1,107 @@
+==============================================================================
+progress_2026-08-01_paintbar-zweizeilig-umsetzung.txt
+Schritte [3/7] bis [7/7] der PD Task_2026-08-01_1436_PaintToolbar-Zweizeilig.txt
+Typ [BT] · [4] ist [C], der Rest [B]
+==============================================================================
+
+PROMPT DES USERS
+  Umschaltbar: alle Knoepfe der Paint-Leiste in EINER Reihe (wie bisher)
+  oder umgebrochen; Zurueck/Vor dann ganz rechts in der zweiten Reihe.
+
+FREIGABE (Abschnitt 5 des Schemas)
+  F1 -> FREIER Umbruch, beliebig viele Reihen (gegen die Empfehlung "Deckel")
+  F2 -> mit Taste: Strg + Umschalt + R
+  F3 -> Knopf in der Gruppe "Ansicht"
+
+ZUSAMMENFASSUNG
+  Die Leiste kann umbrechen. Umgeschaltet wird ueber den Knopf "Umbruch"
+  (Gruppe Ansicht) oder Strg+Umschalt+R; der Zustand ueberlebt den Neustart.
+  Zurueck/Vor stehen im Umbruch-Modus rechtsbuendig in der LETZTEN Reihe.
+
+GEAENDERTE DATEIEN (7, keine neue Quelldatei)
+  PaintToolbar          Strip (Scrollable) · WrapRowsLayout · Separator ·
+                        setWrapRows/toggleWrapRows/isWrapRows ·
+                        toolbarHeight() · getPreferredSize() ·
+                        Knopf "Umbruch" · Callbacks.onPaintBarRowsChanged
+  PaintIcons            Action.ROW_WRAP + drawRowWrap
+  AppSettings           paintBarWrap (Feld, Lesen, Schreiben, Getter/Setter)
+  AppLifecycleController Wiederherstellen beim Start, Sichern beim Ende
+  PaintCallbacksFactory onPaintBarRowsChanged: speichern + Fenster packen
+  KeyBindings           ROW_WRAP_KEY/MODIFIERS/COMBO + Eintrag in ALL
+  KeyboardShortcutManager Verdrahtung mit Wachposten
+  SelectiveAlphaEditor  zwei TOOLBAR_H-Stellen + repackFloatingPaintBar()
+
+BUILD: 362 .class (vorher 357). Die fuenf: Strip, WrapRowsLayout, Separator
+       und zwei anonyme Klassen (ComponentAdapter, AbstractAction).
+       Clean-Build in ein LEERES Verzeichnis, javac, exit 0.
+REGISTRY: KeyBindings.ALL 81 -> 82 Eintraege.
+STRUKTUR: src/paint bleibt bei 111 Dateien.
+
+------------------------------------------------------------------------------
+GEMESSEN (nicht hergeleitet)
+------------------------------------------------------------------------------
+  Fensterbreite   Reihen   Hoehe    Zurueck/Vor rechte Kante
+      1588 px       2      120 px         1582  (letzte Reihe)
+      1200 px       3      174 px         1194  (letzte Reihe)
+      1024 px       3      174 px         1018  (letzte Reihe)
+  natuerliche Breite des Streifens: 2645 px (2592 vor dem neuen Knopf)
+
+------------------------------------------------------------------------------
+SECHS DINGE, DIE NICHT "VEREINFACHT" WERDEN DUERFEN
+------------------------------------------------------------------------------
+ 1. *** Strip.getScrollableTracksViewportWidth() IST DIE KERNZEILE. ***
+    Nur weil der Streifen im Umbruch-Modus die Breite des Sichtfensters
+    uebernimmt, bricht er ueberhaupt um. Ohne die Zusage bekaeme er seine
+    natuerlichen 2645 px und bliebe einreihig — mit einem Layout, das dann
+    "richtig" aussieht und trotzdem nichts tut.
+ 2. *** DER STREIFEN WIRD NICHT NEU GEBAUT. *** setWrapRows tauscht NUR den
+    LayoutManager. installMiddleMouseDragPan haengt seine Adapter rekursiv
+    an den Streifen UND alle Kinder — ein Neubau haette Rad-Bildlauf und
+    Mittelklick-Zug lautlos gekostet. Aus demselben Grund bleibt die
+    Kinder-Reihenfolge in beiden Modi identisch: Zurueck/Vor ist weiterhin
+    das ERSTE Kind, die Umbruch-Anordnung ueberspringt es und setzt es ans
+    rechte Ende der letzten Reihe.
+ 3. *** DER TRENNER HAT EINEN EIGENEN TYP (Separator). *** Die naheliegende
+    Erkennung "Panel mit drei Kindern" haette die Gruppe Zurueck/Vor
+    getroffen — sie hat ebenfalls genau drei Kinder (Knopf, Abstand, Knopf).
+    Der Anker waere zum Trenner geworden und am Zeilenanfang verschwunden.
+ 4. TOOLBAR_H BEHAELT DEN WERT 105 und meint weiterhin die einreihige
+    Leiste. Die aktuelle Hoehe liefert toolbarHeight(). Eine oeffentliche
+    Konstante, die je nach Schalter etwas anderes bedeutet, waere eine Falle.
+ 5. BEIDE TOOLBAR_H-STELLEN in SelectiveAlphaEditor sind umgestellt
+    (Andocken 414, Schweben 471). Wer nur eine umstellt, sieht die
+    abgeschnittene Reihe nur in einem der beiden Zustaende.
+ 6. DER KNOPF HEISST "Umbruch", NICHT "2 Reihen". Bei freiem Umbruch (F1)
+    waere "2 Reihen" bei drei Reihen eine luegende Beschriftung — genau die
+    Fehlerart, die am selben Tag schon zwei Tasks ausgeloest hat.
+
+------------------------------------------------------------------------------
+WIE GEPRUEFT WURDE, OHNE DAS PROGRAMM ZU STARTEN
+------------------------------------------------------------------------------
+  Zwei Wegwerf-Programme im scratchpad gegen die KOMPILIERTEN Klassen:
+  WrapProbe misst bei drei Fensterbreiten Reihenzahl, Hoehe und die Lage
+  jeder Gruppe und rendert die Leiste per printAll in eine PNG (Schreibweg
+  ImageFileWriter, §34); RegistryProbe zaehlt die Registry und zeigt den
+  neuen Eintrag.
+  Gefunden hat das Verfahren nichts Falsches mehr — der Nutzen lag diesmal
+  im BELEG: dass bei 1200 px wirklich drei Reihen entstehen, war die
+  Grundlage der Entscheidung F1 und stand vorher nur als Rechnung da.
+  *** ES ERSETZT DIE SICHTPRUEFUNG NICHT. ***
+
+------------------------------------------------------------------------------
+RUNTIME-VERIFY Z1-Z10 OFFEN (User), volle Liste im Schema Abschnitt 7
+------------------------------------------------------------------------------
+  Z1  *** WICHTIGSTE: Knopf "Umbruch" (oder Strg+Umschalt+R) -> Zurueck/Vor
+      stehen GANZ RECHTS in der letzten Reihe. ***
+  Z2  Zurueckschalten -> Leiste exakt wie vorher, Zurueck/Vor links.
+  Z3  Neu starten -> der gewaehlte Modus ist noch da.
+  Z4  Fenster schmaler ziehen -> die Leiste bekommt eine dritte Reihe und
+      wird hoeher (SO GEWOLLT, Antwort F1).
+  Z5  Alt+P (schwebend) -> Umbruch auch dort, nichts abgeschnitten.
+  Z6  Schwebend umschalten -> das Fenster passt seine Groesse an.
+  Z7  Einreihig: Rad scrollt weiter waagerecht, Mittelklick zieht weiter.
+  Z8  Taste Z / Knopf "Staebe" oeffnet das Raster unveraendert.
+  Z9  Werkzeug-Kuerzel wirken in beiden Modi; Strg+Umschalt+R tut im
+      Buch-/Szenen-/Alpha-Modus NICHTS (Wachposten).
+  Z10 Erststart ohne settings/default.txt -> EINE Reihe.
+==============================================================================

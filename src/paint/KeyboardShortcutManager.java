@@ -51,11 +51,24 @@ class KeyboardShortcutManager {
 		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, 0), "rotateCW");
 		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.SHIFT_DOWN_MASK), "rotateCCW");
 		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.SHIFT_DOWN_MASK), "toggleVis");
+		// Umbruch der Mal-Leiste — Belegung steht in KeyBindings, nicht hier (§25).
+		im.put(KeyStroke.getKeyStroke(KeyBindings.ROW_WRAP_KEY, KeyBindings.ROW_WRAP_MODIFIERS),
+				"togglePaintBarWrap");
 		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "escape");
 		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "deleteInside");
 		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), "deleteOutside");
 		im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "mergeElement");
 
+		am.put("togglePaintBarWrap", new AbstractAction() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// Derselbe Wachposten wie bei den Werkzeug-Tasten: ohne
+				// sichtbare Leiste gäbe es keinen Knopf, der die Wirkung
+				// zeigt (Univ. §13, eine Feststellung an der Wurzel).
+				if (ed.paintToolbar == null || !ed.paintToolbar.isVisible()) return;
+				ed.paintToolbar.toggleWrapRows();
+			}
+		});
 		am.put("copy", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {

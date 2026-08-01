@@ -411,7 +411,11 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			paintBarFloat.setVisible(false);
 			paintBarFloat.getContentPane().remove(paintToolbar);
 			// Restore docked prefSize so BorderLayout.SOUTH can stretch it again.
-			paintToolbar.setPreferredSize(new java.awt.Dimension(0, PaintToolbar.TOOLBAR_H));
+			// toolbarHeight(), NICHT die Konstante: im Umbruch-Modus hat die
+			// Leiste zwei oder mehr Reihen. Beide Stellen (hier und beim
+			// Abkoppeln) müssen es fragen — wer nur eine umstellt, sieht die
+			// abgeschnittene Reihe nur in einem der beiden Zustände.
+			paintToolbar.setPreferredSize(new java.awt.Dimension(0, paintToolbar.toolbarHeight()));
 			toolbarDockPanel.add(paintToolbar, java.awt.BorderLayout.SOUTH);
 			toolbarDockPanel.revalidate();
 			toolbarDockPanel.repaint();
@@ -468,7 +472,7 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			java.awt.Dimension screen = java.awt.Toolkit.getDefaultToolkit().getScreenSize();
 			int naturalW = paintToolbar.getLayout().preferredLayoutSize(paintToolbar).width;
 			int floatW   = Math.max(640, Math.min(naturalW + 16, screen.width - 80));
-			paintToolbar.setPreferredSize(new java.awt.Dimension(floatW, PaintToolbar.TOOLBAR_H));
+			paintToolbar.setPreferredSize(new java.awt.Dimension(floatW, paintToolbar.toolbarHeight()));
 			paintBarFloat.pack();
 
 			// Center on main window first time; remember position on reopen
@@ -481,6 +485,23 @@ public class SelectiveAlphaEditor extends JFrame implements RulerCallbacks {
 			paintBarFloating = true;
 			ToastNotification.show(this, "PaintBar: Floating");
 		}
+	}
+
+	/**
+	 * Passt das <b>schwebende</b> Leistenfenster an eine geänderte Reihenzahl an.
+	 *
+	 * <p>Ohne das bliebe es nach dem Umschalten in seiner alten Größe stehen —
+	 * bei mehr Reihen abgeschnitten, bei weniger mit einem leeren Streifen.
+	 * Angedockt ist nichts zu tun: dort genügt das {@code revalidate()} der
+	 * Leiste. Aufgerufen aus {@code PaintCallbacksFactory}, weil die Leiste
+	 * ihr Fenster nicht kennt (§22).
+	 */
+	void repackFloatingPaintBar() {
+		if (!paintBarFloating || paintBarFloat == null) return;
+		paintToolbar.setPreferredSize(new java.awt.Dimension(
+				paintToolbar.getWidth() > 0 ? paintToolbar.getWidth() : 640,
+				paintToolbar.toolbarHeight()));
+		paintBarFloat.pack();
 	}
 
 	private void setupKeyBindings()        { new KeyboardShortcutManager(this).setup(); }

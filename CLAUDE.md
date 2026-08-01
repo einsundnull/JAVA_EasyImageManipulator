@@ -37,12 +37,15 @@ javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.ja
 ```
 `-encoding UTF-8` ist **Pflicht** — die Quelldateien enthalten Unicode (Pfeile,
 Symbole, Umlaute). Ohne die Option: „unmappable character".
-**Erwartet: exit 0, 357 `.class`** in einem **leeren** Zielverzeichnis
+**Erwartet: exit 0, 363 `.class`** in einem **leeren** Zielverzeichnis
+(362 vor `PaintEngine.Anchor`, 2026-08-01)
 (nachgemessen 2026-08-01 — 335 vor `PaintIcons`, das mit seinen inneren Typen
 neun mitbrachte; 344 vor den Werkzeug-Kürzeln, die drei mitbrachten: den
 `record ToolKey` und zwei anonyme `AbstractAction`; 347 vor den
 Kontextmenüs, deren vier neue Dateien mit ihren inneren Typen zehn
-mitbrachten).
+mitbrachten; 357 vor dem Leisten-Umbruch, der fünf mitbrachte: `Strip`,
+`WrapRowsLayout`, `Separator` und zwei anonyme Klassen — **ohne** eine neue
+Quelldatei).
 Ein von Eclipse mitgepflegtes `bin/` enthält
 zwei mehr — Eclipse übersetzt alle drei `book`-Klassen, der `javac`-Befehl nur
 die von `paint` aus erreichbare. Wer eine Zahl notiert, schreibt dazu,
@@ -76,9 +79,26 @@ Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
 
 > **KnowledgeMap:** `graphify-out/` ist eingecheckt — `GRAPH_REPORT.md` für den
 > Überblick, `graph.html` im Browser, `graph.json` für Abfragen. Code-only
-> (Scan-Root `src/`). **Vorsicht:** externe Typen wie `JPanel` liegen als viele
-> Knoten vor; der Graph taugt für „wie hängt es zusammen", **nicht** für
-> „ist das tot" — dafür Textsuche.
+> (Scan-Root `src/`), **2731 Knoten / 6765 Kanten / 125 Communities**
+> (zweimal aufgefrischt am 2026-08-01, zuletzt nach dem Leisten-Umbruch,
+> 0 LLM-Tokens). **Vorsicht:** externe Typen wie
+> `JPanel` liegen als viele Knoten vor; der Graph taugt für „wie hängt es
+> zusammen", **nicht** für „ist das tot" — dafür Textsuche. Vier Communities
+> tragen `(dead parallel copy)` im Namen (Befund L02) — das ist eine
+> Beschriftung, **keine** Löschentscheidung; `ZoomState` liegt diesmal mit
+> dem *lebenden* `ZoomController` in einer Community und ist deshalb im
+> Namen nur als Beimischung vermerkt.
+> **Konstanten sind keine Knoten:** die AST-Extraktion erfasst Typen und
+> Methoden, keine `static final`-Felder. `ROW_WRAP` steht mit acht
+> Vorkommen in vier Dateien im Quelltext und hat **null** Knoten — Fragen
+> nach Tastenbelegungen, Token-Namen oder der Zahl der
+> `KeyBindings.ALL`-Einträge beantwortet der Graph **nicht**.
+> **Die Community-Zahl ist keine belastbare Größe** — Louvain schneidet bei
+> jedem Lauf anders (143 → 125 bei *wachsendem* Graphen); nach jedem Refresh
+> müssen alle Communities neu benannt werden.
+> **Beim Auffrischen:** `source_file` im Graphen zählt ab dem Projekt-Root,
+> `manifest.json` ab dem Scan-Root — mit der falschen Basis meldet das Pruning
+> „already clean" und löscht nichts (`doc/progress_2026-08-01_graphify-refresh.txt`).
 
 ---
 
@@ -226,6 +246,37 @@ hinaus.** Kein `* zoom` / `/ zoom` in Fachcode (§27). Ein drittes System —
 **Prozent-Koordinaten** — gehört GameII und existiert nur in
 `GameSceneReader/Writer`.
 
+### Papierformate: `book.PaperFormat` (eine Tabelle, seit 2026-08-01)
+
+**Alle** Formatauswahlen speisen sich aus `book.PaperFormat` — „Neue Datei",
+„Neues Blatt", „Neue Seite" und (neu) die Seitenlayout-Leiste über
+`PageLayout.FORMAT_NAMES`, das seither **abgeleitet** ist. 15 Formate:
+A0–A6, DIN lang, US-Postkarte, Foto 13×18, Letter, Legal, Tabloid,
+Executive, Half Letter.
+
+> Vorher gab es **zwei** Tabellen: `book.PaperFormat` (A0–A4 + US, ohne
+> A5/A6) und `PageLayout.FORMAT_MM` (A3–A6, ohne A0–A2). A5 und A6 waren im
+> Dialog „Neue Datei" nicht wählbar, A0–A2 nicht im Buchmodus, Postkarten
+> nirgends.
+
+> **Neue Formate werden angehängt, nie eingefügt.** Drei Dialoge indizierten
+> mit `values()` in ihre eigene Auswahlliste (einer mit festem
+> `setSelectedIndex(4)` für A4); ein Einfügen in der Mitte hätte jede
+> Auswahl verschoben. Sie gehen jetzt über `selectable()` und
+> `selectableIndexOf(...)` — sie indizieren in *dieselbe* Liste, die sie
+> anzeigen. Die acht `*_DOC`-Einträge sind **keine Formate**, sondern
+> Rand-Vorgaben; sie stehen nicht in `selectable()` und speisen die Vorlagen.
+
+> **Der Anzeigename ist Teil eines geschriebenen Formats** — er steht als
+> `paperFormat: A4` in jeder `page_NNN.layout`. `byDisplayName(...)` findet
+> deshalb ohne Rücksicht auf Groß-/Kleinschreibung *und* über den
+> enum-Namen, und `formatMm()` liefert für unbekannte Namen weiterhin
+> `null` statt zu werfen.
+
+> **Alle Formate sind im Hochformat deklariert**, das Querformat entsteht
+> durch Tauschen. „Ledger" wurde deshalb wieder gestrichen: es ist Tabloid
+> quer und war zeilengleich mit `TABLOID` (279 × 432 mm).
+
 ### `PaintEngine`
 
 Stateless, nur statische Methoden auf einem `BufferedImage`, reiner
@@ -233,6 +284,18 @@ Image-Space: Stift, Radierer, Linie, Kreis, Rechteck, Floodfill, Pipette,
 Crop/Paste, Flip, Rotate, Scale, `clearRegion`, `clearOutside`,
 `clearPolygon`. Kein Zoom, kein `Component`, kein UI-Zustand — das hält sie
 testbar.
+
+> **`scale(...)` und `resizeCanvas(...)` sind zwei verschiedene Dinge.**
+> `scale` streckt den Inhalt mit; `resizeCanvas` (seit 2026-08-01) lässt ihn
+> in Originalgröße an seiner `Anchor`-Position stehen, füllt neue Fläche
+> transparent und beschneidet überstehende. In MS Paint sind das „Größe
+> ändern" und die Ziehgriffe am Bildrand — die Unterscheidung fehlte dem
+> Projekt bis dahin ganz. Wer in `resizeCanvas` aus
+> `drawImage(img, dx, dy, null)` ein `drawImage(img, dx, dy, w, h, null)`
+> macht, hat wieder skaliert. `MAX_CANVAS_EDGE = 20000` deckelt die Kante
+> (20000² als ARGB sind 1,6 GB), und bei unveränderten Maßen kommt
+> **dieselbe Instanz** zurück — Absicht, weil der Ziehhandler die Methode
+> pro Mausbewegung aufruft.
 
 ### Schwebende Auswahl (MS-Paint-Stil)
 
@@ -379,6 +442,46 @@ Farbänderungen über **einen** Trichter, `PaintToolbar.fireColorChanged()`
 Spezifikation und Befunde: `doc/Schema_PaintToolbar_Icons.txt`,
 Umsetzung `doc/progress_2026-08-01_paint-icons-umsetzung.txt`.
 
+### Die Paint-Leiste kann umbrechen (seit 2026-08-01)
+
+Die Leiste ist **2645 px breit** — in kein Fenster passt sie in einer Reihe.
+Bisher gab es dafür nur den waagerechten Bildlauf; seit dem 2026-08-01 kann
+sie stattdessen **umbrechen**. Umgeschaltet wird über den Knopf **„Umbruch"**
+in der Gruppe „Ansicht" oder **`Strg+Umschalt+R`**; der Zustand liegt in
+`AppSettings.paintBarWrap` und überlebt den Neustart (§31). **Vorgabe ist die
+eine Reihe** — eine fehlende Einstellungsdatei ergibt exakt das alte
+Startverhalten.
+
+**Umgebrochen wird zwischen Gruppen, nie innerhalb einer**, und **`Zurück/Vor`
+steht rechtsbündig in der letzten Reihe** (Wunsch des Users). Wie viele Reihen
+entstehen, hängt an der Fensterbreite: gemessen 2 Reihen bei 1588 px, **3 bei
+1200 px**. Der freie Umbruch statt eines Deckels bei zwei Reihen ist eine
+Entscheidung des Users.
+
+> **`getScrollableTracksViewportWidth()` ist die Kernzeile.** Nur weil der
+> Streifen im Umbruch-Modus die Breite des Sichtfensters übernimmt, bricht er
+> überhaupt um; sonst bekäme er seine natürlichen 2645 px und bliebe einreihig.
+> Deshalb behält die Leiste ihr `JScrollPane` in **beiden** Modi.
+
+> **Der Streifen wird beim Umschalten nicht neu gebaut, nur anders ausgelegt.**
+> `installMiddleMouseDragPan` hängt seine Adapter rekursiv an den Streifen und
+> alle Kinder — ein Neubau kostete Rad-Bildlauf und Mittelklick-Zug lautlos.
+> Die Kinder-Reihenfolge ist in beiden Modi identisch; `Zurück/Vor` bleibt das
+> *erste* Kind, und `WrapRowsLayout` überspringt es und setzt es ans Ende.
+
+> **Ein Trenner ist ein eigener Typ (`Separator`), nicht „ein Panel mit drei
+> Kindern".** Die Gruppe `Zurück/Vor` hat ebenfalls genau drei Kinder — die
+> Zähl-Erkennung hätte ausgerechnet den Anker zum Trenner erklärt.
+
+> **`TOOLBAR_H` bleibt 105 und meint weiterhin die einreihige Leiste.** Die
+> *aktuelle* Höhe liefert `toolbarHeight()` (105 / 120 / 174 bei einer, zwei,
+> drei Reihen). `SelectiveAlphaEditor` fragt sie an **beiden** Stellen —
+> angedockt und schwebend; wer nur eine umstellt, sieht die abgeschnittene
+> Reihe nur in einem der beiden Zustände.
+
+Spezifikation, Messwerte und Verify-Liste: `doc/Schema_PaintToolbar_Zweizeilig.txt`,
+Umsetzung `doc/progress_2026-08-01_paintbar-zweizeilig-umsetzung.txt`.
+
 Der Rest ist bewusst **nicht** migriert: `PaintToolbar`, `ColorPickerPopup`,
 `PaintEngine` und die Kartenfarben führen Farbe als **Inhalt**, nicht als
 Oberfläche; der Rest ist Streubesitz mit 1–5 Fundstellen je Datei. In
@@ -464,7 +567,7 @@ F1 wird **nicht** freigeräumt, die Zweitfenster-Belegung ist eingeübt.
 Die Umschalt+F1-Abfrage steht im Dispatcher **vor** der F1-Abfrage; wer sie
 verschiebt, macht die Hilfe unerreichbar.
 
-**`KeyBindings.ALL` ist die Registry** (81 Einträge, sieben Scopes) —
+**`KeyBindings.ALL` ist die Registry** (82 Einträge, sieben Scopes) —
 `KeyBindingsDialog` zeigt sie über **Umschalt+F1** oder den Knopf „?“ rechts
 in der oberen Leiste. **Neue Taste oder Geste → zuerst Registry-Eintrag, dann
 Handler** (§25); der Dialog enthält keinen eigenen Text.
@@ -476,6 +579,11 @@ der Sekundärfarbe, `Umschalt+B` ist der Freihand-Pfad, `Strg+G` der
 Farbtausch). **Z** blendet das Zauberstab-Raster ein, dessen elf Werkzeuge
 auf **1–9** liegen (`Umschalt+5`/`Umschalt+6` für die Innen-Varianten) — in
 genau der Reihenfolge, in der die Knöpfe im Raster stehen.
+
+**`Strg+Umschalt+R`** bricht die Mal-Leiste um (Abschnitt darüber) — wirksam
+nur, solange die Leiste sichtbar ist. Taste, Modifikatoren und Beschriftung
+stehen an *einer* Stelle (`KeyBindings.ROW_WRAP_*`) und speisen Registry,
+Verdrahtung und Tooltip.
 
 > **Die Belegung steht vollständig in `KeyBindings.TOOL_KEYS`** — einer
 > Tabelle mit drei Verbrauchern: den Zeilen des Hilfe-Dialogs, der

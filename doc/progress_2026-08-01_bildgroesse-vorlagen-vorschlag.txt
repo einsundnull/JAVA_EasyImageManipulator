@@ -1,0 +1,203 @@
+==============================================================================
+progress_2026-08-01_bildgroesse-vorlagen-vorschlag.txt
+Schritt [1/9] der PD Task_2026-08-01_1702_Bildgroesse-und-Vorlagen.txt
+Typ: [BT] · Risiko [B] · KEIN CODE GEAENDERT — nur Befund
+==============================================================================
+
+PROMPT DES USERS (2026-08-01, 17:02):
+  "in MS-Paint kann ich die Groesse (Hoehe und Breite) des tatsaechlich
+   gezeichneten Bildes ueber Drag und ueber Eingabe aendern. Ich moechte das
+   in meiner App auch koennen. Weisst du, was ich meine?
+   Ich moechte ausserdem auf Button klick A4 vorlagen, mit 25px Rand links
+   und rechts sowie 25px oben und unten. Erstellt automatisch verschiedene
+   Papiergroessen (A0 bis A5, Postkartenformate und amerikanische Formate)
+   zum Waehlen. Ausserdem moechte ich Vorlagen abspeichern koennen."
+
+*** DIE PFLICHTFRAGE ZUERST (Lehre aus F01/I01/F02/Kontextmenues):
+    GIBT ES DIE LOESUNG SCHON?
+    Antwort diesmal DREIGETEILT — und genau das bestimmt den Zuschnitt:
+      Bildgroesse per Drag   -> NEIN, existiert nirgends.
+      Papierformate          -> JA, ZWEIMAL. Und die zwei Listen
+                                widersprechen sich.
+      Raender als Vorlage    -> JA, aber an den Buchmodus gebunden — und
+                                der zweite Weg BRENNT sie in die Pixel. ***
+
+------------------------------------------------------------------------------
+BEFUND 1 — "GROESSE AENDERN" GIBT ES, ABER NUR EINE VON ZWEI ARTEN
+------------------------------------------------------------------------------
+MS Paint kennt ZWEI verschiedene Operationen, die beide "Groesse" heissen:
+
+  (a) GROESSE AENDERN (Skalieren): Bild wird gestreckt/gestaucht, der
+      Inhalt waechst mit. In MS Paint: Menue "Groesse aendern", Prozent/Pixel.
+  (b) LEINWANDGROESSE (Canvas): Flaeche waechst oder wird beschnitten, der
+      Inhalt bleibt in Originalgroesse an Ort und Stelle. In MS Paint sind
+      das GENAU DIE DREI ZIEHGRIFFE unten/rechts/Ecke am Bildrand —
+      sie skalieren NICHT.
+
+  IST-ZUSTAND IM PROJEKT:
+    (a) EXISTIERT.  TransformController.doScale():196 — Dialog "Skalieren"
+        mit Breite/Hoehe/Prozent und Seitenverhaeltnis-Sperre, ruft
+        PaintEngine.scale(). Knopf "Skal." in der Mal-Leiste
+        (PaintToolbar:1004), verdrahtet ueber PaintCallbacksFactory:109.
+    (b) EXISTIERT NICHT.  Weder ein Dialog noch ein Griff noch eine
+        PaintEngine-Methode.
+
+*** DAS IST DIE KERNFRAGE F1 AN DEN USER. *** Der Satz "die Groesse des
+tatsaechlich gezeichneten Bildes ueber Drag und ueber Eingabe aendern"
+beschreibt in MS Paint (b) — die Ziehgriffe dort veraendern die Leinwand.
+"ueber Eingabe" kann aber BEIDES meinen, und (a) gibt es schon.
+GERATEN WIRD HIER NICHT.
+
+*** GEGENPROBE IN PaintEngine (Univ. §13: messen, nicht herleiten): ***
+  46 oeffentliche Methoden. KEINE aendert die Leinwandgroesse ohne zu
+  skalieren. Die naechstliegende ist cropRegion(img, r):330 — sie
+  BESCHNEIDET nur und klemmt das Rechteck vorher auf das Bild
+  (Math.min/Math.max, Z.331-333). *** SIE KANN NICHT VERGROESSERN. ***
+  Es fehlt also eine echte neue Methode, kein Umbenennen.
+
+------------------------------------------------------------------------------
+BEFUND 2 — ZWEI PAPIERFORMAT-TABELLEN, DIE SICH WIDERSPRECHEN
+------------------------------------------------------------------------------
+Der Wunsch "A0 bis A5, Postkarten, amerikanische Formate" trifft auf einen
+Bestand mit ZWEI unabhaengigen Listen:
+
+  book/PaperFormat.java (enum Format, 16 Eintraege)
+    A0 A1 A2 A3 A4 · LETTER LEGAL TABLOID
+    + acht "_DOC"-Varianten derselben Formate mit anderen Raendern
+    Traegt Raender (oben/unten/innen/aussen, Vorgabe 25/25/25/25 mm).
+    Benutzt von: NewImageDialog:93 (Auswahlliste) · BookController:304
+
+  paint/PageLayout.java (FORMAT_NAMES + FORMAT_MM, 6 Eintraege)
+    A3 A4 A5 A6 Letter Legal
+    Traegt KEINE Raender (die stehen als eigene Felder daneben).
+    Benutzt von: PageLayoutToolbar · HRulerPanel · VRulerPanel ·
+                 PageLayoutManifest · CanvasPanel (Rand-Overlay)
+
+  *** DER WIDERSPRUCH, GEMESSEN:
+      A5 und A6 gibt es NUR in PageLayout — im Dialog "Neue Datei" sind sie
+      NICHT waehlbar.
+      A0, A1, A2 und Tabloid gibt es NUR in PaperFormat — im Buchmodus sind
+      sie NICHT waehlbar.
+      POSTKARTENFORMATE GIBT ES IN KEINER VON BEIDEN. ***
+
+Das ist dasselbe Muster, das am 2026-08-01 schon zweimal zugeschlagen hat
+(luegende Tooltips, handgepflegte Kuerzel-Spalte): eine zweite Liste neben
+der ersten. Wer jetzt A5 und die Postkarten "einfach dazuschreibt", muss
+sich entscheiden, IN WELCHE — oder schreibt sie in beide und legt die
+dritte Fehlerquelle an.
+  -> Empfehlung: EINE Quelle, additiv. Details und Migrationsweg in
+     Schema_Bildgroesse_und_Vorlagen.txt, Abschnitt 3.
+
+------------------------------------------------------------------------------
+BEFUND 3 — DIE RAENDER WERDEN HEUTE IN DIE PIXEL GEBRANNT
+------------------------------------------------------------------------------
+NewFileController:70-79 — beim Erzeugen einer neuen Datei "mit Raendern"
+wird ein gestricheltes blaues Rechteck MIT g2.drawRect IN DAS BILD
+gezeichnet:
+
+    g2.setColor(new Color(0, 120, 220, 180));
+    g2.setStroke(new BasicStroke(1f, ... dash ...));
+    g2.drawRect(mL, mT, w - mL - mR, h - mT - mB);
+
+*** DIE LINIE IST DANACH BILDINHALT. *** Sie laesst sich nicht ausblenden,
+sie wird mitexportiert, sie steht im PNG, und wer die Raender spaeter
+aendert, hat zwei Rechtecke im Bild. Fuer eine "Vorlage" ist das die
+falsche Zusage.
+
+*** UND DIE RICHTIGE LOESUNG STEHT SCHON DA — FUENFTES MAL DIESELBE LEHRE:
+    CanvasPanel:2959-2984 zeichnet einen NICHT-DESTRUKTIVEN Rand-Overlay:
+    gestrichelte Linie plus halbdurchsichtige Baender, aus PageLayout
+    gerechnet, im Zeichenpfad, nichts davon im Bild.
+    ES IST NUR AN EINE BEDINGUNG GEBUNDEN: if (callbacks.isBookMode()).
+    Ausserdem zeigen HRulerPanel:146 und VRulerPanel dieselben Randmarken
+    im Lineal an. Die Arbeit heisst "anschliessen", nicht "bauen". ***
+
+------------------------------------------------------------------------------
+BEFUND 4 — "25 px RAND" IST VERMUTLICH NICHT GEMEINT, SONDERN 25 mm
+------------------------------------------------------------------------------
+Der Prompt sagt "25px Rand". Das ganze Projekt fuehrt Raender aber in
+MILLIMETERN:
+  PageLayout.marginLeft = 20 (mm) · NewImageDialog: vier Spinner in mm,
+  Beschriftung "25mm" · PaperFormat: Vorgabe 25/25/25/25 mm.
+
+Umrechnung im Projekt ist 96 dpi (PX_PER_MM = 96/25.4 = 3.7795):
+  *** 25 mm = 94 px.   25 px = 6,6 mm. ***
+Auf A4 (794 x 1123 px) waere ein 25-px-Rand ein Streifen von 6,6 mm — das
+ist schmaler als jeder Drucker-Randbereich und sieht auf dem Papier aus wie
+"kein Rand".
+
+*** BEMERKENSWERT: die Vorgabe von PaperFormat ist BEREITS 25 — nur eben
+    25 MILLIMETER. Die Zahl im Prompt stimmt also, die Einheit vermutlich
+    nicht. Das wird GEFRAGT (F2) und nicht stillschweigend korrigiert:
+    wer hier die Einheit raet, liefert eine Vorlage, die um den Faktor
+    3,8 danebenliegt. ***
+
+------------------------------------------------------------------------------
+BEFUND 5 — "VORLAGEN ABSPEICHERN" HAT EINEN HALBEN VORGAENGER
+------------------------------------------------------------------------------
+  DA IST SCHON:  PageLayoutManifest (Reader+Writer nach Univ. §6) schreibt
+                 genau diese Daten — Raender, Format, Ausrichtung,
+                 Kopf-/Fusszeile, Snap-Modus — als "key: value", UTF-8.
+  DA IST NICHT:  ein Ablageort fuer BENANNTE Vorlagen. Das Manifest liegt
+                 IMMER neben einer konkreten Seite (page_001.layout) und
+                 heisst wie sie. Eine Vorlage "Arbeitsblatt A4" ohne
+                 zugehoerige PNG kann es heute nicht geben.
+  AppPaths kennt projects/ settings/ lastProjects/ assets/ maps/ books/
+  settings/cardfolders/ — *** kein templates/. ***
+
+  -> Der fehlende Teil ist klein und genau umrissen: ein Verzeichnis in
+     AppPaths (§31: kein Pfad ausserhalb dieser Klasse) und EIN
+     Reader/Writer-Paar (§6). Das Format kann das des Manifests sein.
+     *** KEIN SECHSTER JSON-SERIALIZER (§31). ***
+
+------------------------------------------------------------------------------
+BEFUND 6 — NEBENBEFUND, NICHT TEIL DER AUFGABE: EIN TOTER ZWEITER
+            SKALIEREN-DIALOG
+------------------------------------------------------------------------------
+EditorDialogs.doScale():171-247 ist eine fast zeichengleiche Kopie von
+TransformController.doScale():196-282 — bis hin zu den Beschriftungen
+"Breite (px):" / "Hoehe (px):" / "Prozent:" und dem GridLayout(4,2,6,4).
+
+Textsuche ueber den ganzen Quellbaum nach "doScale" (Univ. §1: eine
+Loeschentscheidung wird NIE aus dem Graphen begruendet):
+  EditorDialogs.java:171          Definition
+  TransformController.java:196    Definition
+  SelectiveAlphaEditor.java:364   -> transformController.doScale()
+  PaintCallbacksFactory.java:109  -> ed.doScale()
+*** NULL Aufrufer fuer EditorDialogs.doScale. *** Der Unterschied ist nicht
+kosmetisch: die tote Kopie kennt weder die Auswahl (scaleInRegion) noch die
+Elemente. Wer sie fuer das Vorbild haelt, baut die schlechtere Variante nach.
+
+  -> GEFUEHRT, NICHT REPARIERT (Univ. §0). Gehoert zu L02 in die Liste der
+     referenzfreien Parallel-Implementierungen. Kein Auftrag.
+
+------------------------------------------------------------------------------
+BEFUND 7 — WOHIN DIE NEUE LOGIK GEHOERT
+------------------------------------------------------------------------------
+CanvasPanel hat 3299 Zeilen und ist die God-Klasse (§22). Ziehgriffe am
+Bildrand sind Maus-Eingabe + Hit-Test + Overlay — also genau die drei
+Dinge, von denen sie schon zu viel hat.
+
+  *** §22 IST HIER KEINE FORMALIE: neue Fachlogik landet NICHT in
+      CanvasPanel. *** Die Zeichnung des Griffs und die Trefferpruefung
+      muessen dort anfassen (es ist der Zeichenpfad), die ENTSCHEIDUNG, was
+      ein Zug bedeutet, gehoert in einen eigenen Controller.
+  Vorbild liegt daneben: die acht Skalierhandles der Elemente sind bereits
+  ueber callbacks.handleRects(...) ausgelagert (CanvasPanel:551, 727).
+  DERSELBE WEG, nicht ein zweiter.
+
+------------------------------------------------------------------------------
+WAS DARAUS FOLGT
+------------------------------------------------------------------------------
+1. Ohne Antwort auf F1 (Drag = Leinwand oder Skalieren?) ist die Haelfte der
+   Aufgabe nicht schreibbar. BLOCKIEREND.
+2. Ohne Antwort auf F2 (px oder mm?) ist die Vorlage um Faktor 3,8 unsicher.
+3. Die zwei Papierformat-Listen werden zusammengelegt, BEVOR neue Formate
+   dazukommen — sonst wird aus zwei Listen eine dritte.
+4. Raender gehoeren als Overlay auf das Bild, nicht in das Bild (F3).
+5. Vorlagen brauchen genau zwei neue Dinge: einen Ort (AppPaths) und ein
+   Reader/Writer-Paar (§6). Nicht mehr.
+
+MOCKUP UND FRAGEN:  doc/Schema_Bildgroesse_und_Vorlagen.txt
+PD:                 doc/Task_2026-08-01_1702_Bildgroesse-und-Vorlagen.txt
+==============================================================================

@@ -70,7 +70,13 @@ Text-Tool     fontName               String   "SansSerif"
 Canvas        bg1                    int RGB  (200,200,200)
               bg2                    int RGB  (160,160,160)
 
-View          showGrid               bool     false
+View          paintBarWrap           bool     false
+                 Knoepfe der Mal-Leiste umbrechen (true) statt in EINER
+                 Reihe mit waagerechtem Bildlauf zu zeigen (false).
+                 *** Fehlender Schluessel = false = das Startverhalten vor
+                     dem 2026-08-01. *** Umgeschaltet ueber den Knopf
+                     "Umbruch" in der Mal-Leiste oder Strg+Umschalt+R.
+              showGrid               bool     false
               showRuler              bool     true
               rulerUnit              String   "PX"
               filmstripVisible       bool     true

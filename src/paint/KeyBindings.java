@@ -31,6 +31,24 @@ final class KeyBindings {
     private static final int SHIFT = InputEvent.SHIFT_DOWN_MASK;
     private static final int CTRL  = InputEvent.CTRL_DOWN_MASK;
 
+    /**
+     * Umbruch der Mal-Leiste (2026-08-01) — Taste, Modifikatoren und
+     * Beschriftung an <b>einer</b> Stelle.
+     *
+     * <p>Aus dieser einen Angabe speisen sich der Eintrag in {@link #ALL}, die
+     * Verdrahtung im {@code KeyboardShortcutManager} <i>und</i> der Tooltip des
+     * Knopfes in der Leiste. Dieselbe Zusage wie bei
+     * {@link #TOOL_KEYS}: eine Taste wird nirgends ein zweites Mal getippt.
+     *
+     * <p><b>Warum {@code Strg + Umschalt + R}:</b> die einfachen Buchstaben
+     * sind seit dem 2026-08-01 Werkzeug-Kürzel, {@code R} allein dreht das
+     * Bild, und {@code F1–F7} sind vollständig vergeben. Frei war die
+     * Dreier-Kombination — {@code R} wie „Reihen".
+     */
+    static final int    ROW_WRAP_KEY       = KeyEvent.VK_R;
+    static final int    ROW_WRAP_MODIFIERS = CTRL | SHIFT;
+    static final String ROW_WRAP_COMBO     = "Strg + Umschalt + R";
+
     /** Wo eine Belegung gilt. Die Reihenfolge ist die Anzeigereihenfolge. */
     enum Scope {
         GLOBAL   ("Global — wirkt in jedem Fenster"),
@@ -106,6 +124,11 @@ final class KeyBindings {
         new KeyBinding(Scope.WINDOW, "R", "Um 90 Grad im Uhrzeigersinn drehen", "nicht während der Textbearbeitung"),
         new KeyBinding(Scope.WINDOW, "Umschalt + R", "Um 90 Grad gegen den Uhrzeigersinn drehen", "nicht während der Textbearbeitung"),
         new KeyBinding(Scope.WINDOW, "Umschalt + V", "Sichtbarkeit der gewählten Layer umschalten", "nicht während der Textbearbeitung"),
+        // Modifikator-Kombination mit Absicht: einfache Buchstaben sind seit
+        // dem 2026-08-01 Werkzeug-Kürzel, F1-F7 sind vollständig vergeben.
+        new KeyBinding(Scope.WINDOW, ROW_WRAP_COMBO,
+                "Knöpfe der Mal-Leiste umbrechen statt in einer Reihe scrollen",
+                "nur bei sichtbarer Mal-Leiste"),
         new KeyBinding(Scope.WINDOW, "Esc", "Schwebende Auswahl abbrechen, sonst Layer-Auswahl aufheben, sonst Rahmen aufheben"),
         new KeyBinding(Scope.WINDOW, "Entf", "Inhalt der Auswahl löschen oder gewählte Layer entfernen"),
         new KeyBinding(Scope.WINDOW, "Rücktaste", "Alles außerhalb der Auswahl löschen — der Außenbereich wird durchsichtig"),

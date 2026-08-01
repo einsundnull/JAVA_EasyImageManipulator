@@ -219,12 +219,10 @@ class NewFileController {
 
 	/** Creates a new sheet with paper format, orientation, and margin guides. */
 	void doNewBookSheet() {
-		PaperFormat.Format[] formats = PaperFormat.Format.values();
-		String[] formatLabels = new String[formats.length];
-		for (int i = 0; i < formats.length; i++)
-			formatLabels[i] = formats[i].toString();
-		JComboBox<String> formatCombo = new JComboBox<>(formatLabels);
-		formatCombo.setSelectedIndex(4);
+		// Auswahl und Zugriff über DIESELBE Liste (PaperFormat.selectable()).
+		java.util.List<PaperFormat.Format> formats = PaperFormat.selectable();
+		JComboBox<String> formatCombo = new JComboBox<>(PaperFormat.selectableLabels());
+		formatCombo.setSelectedIndex(PaperFormat.selectableIndexOf(PaperFormat.Format.A4));
 		formatCombo.setBackground(AppColors.BTN_BG);
 		formatCombo.setForeground(AppColors.TEXT);
 
@@ -265,7 +263,7 @@ class NewFileController {
 		okBtn.setForeground(Color.WHITE);
 
 		okBtn.addActionListener(e -> {
-			PaperFormat.Format selectedFormat = formats[formatCombo.getSelectedIndex()];
+			PaperFormat.Format selectedFormat = formats.get(formatCombo.getSelectedIndex());
 			boolean landscape = orientCombo.getSelectedIndex() == 1;
 			boolean withMargins = marginsCheckBox.isSelected();
 

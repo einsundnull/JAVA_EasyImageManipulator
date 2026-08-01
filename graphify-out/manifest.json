@@ -25,14 +25,14 @@
     "semantic_hash": "cfa2b5efd44c024f43eedf23c1b38b0a"
   },
   "paint/AppColors.java": {
-    "mtime": 1775863477.746,
-    "ast_hash": "82947a574c6411a0ca928f9fd167bc78",
-    "semantic_hash": "82947a574c6411a0ca928f9fd167bc78"
+    "mtime": 1785568366.1489232,
+    "ast_hash": "a1a2b8a927f62ef19c0f374faf6d3d68",
+    "semantic_hash": "a1a2b8a927f62ef19c0f374faf6d3d68"
   },
   "paint/AppLifecycleController.java": {
-    "mtime": 1776502772.4597912,
-    "ast_hash": "eace9c890dcc626003c3bc5c75ebd318",
-    "semantic_hash": "eace9c890dcc626003c3bc5c75ebd318"
+    "mtime": 1785589086.320327,
+    "ast_hash": "f7674cfd021cb7a5ac40d1d350595394",
+    "semantic_hash": "f7674cfd021cb7a5ac40d1d350595394"
   },
   "paint/AppMode.java": {
     "mtime": 1776066409.207868,
@@ -40,24 +40,24 @@
     "semantic_hash": "7e0676423628cf4965faa5df94f9ffc3"
   },
   "paint/AppPaths.java": {
-    "mtime": 1776166051.3122184,
-    "ast_hash": "03bf4ff3295f57bfeb7dd2ce560c7627",
-    "semantic_hash": "03bf4ff3295f57bfeb7dd2ce560c7627"
+    "mtime": 1785428782.7260156,
+    "ast_hash": "5e064e5e6ba1655a141b2042f5c7b550",
+    "semantic_hash": "5e064e5e6ba1655a141b2042f5c7b550"
   },
   "paint/AppSettings.java": {
-    "mtime": 1785401056.9541452,
-    "ast_hash": "a0dea6f94b164163bbf8a0259d6c59d8",
-    "semantic_hash": "a0dea6f94b164163bbf8a0259d6c59d8"
+    "mtime": 1785588227.8677154,
+    "ast_hash": "1fda6966fb327f145af1dd33ad7017a0",
+    "semantic_hash": "1fda6966fb327f145af1dd33ad7017a0"
   },
   "paint/BaseSidebarPanel.java": {
-    "mtime": 1776671536.1715589,
-    "ast_hash": "85cbd8aa5dc978042dddcf6eb757fc95",
-    "semantic_hash": "85cbd8aa5dc978042dddcf6eb757fc95"
+    "mtime": 1785502313.8031328,
+    "ast_hash": "e7da193a5d827fd34f5839028d71f4aa",
+    "semantic_hash": "e7da193a5d827fd34f5839028d71f4aa"
   },
   "paint/BookController.java": {
-    "mtime": 1776588037.6985934,
-    "ast_hash": "08170ea270020e0ebec32c2a4ffb485e",
-    "semantic_hash": "08170ea270020e0ebec32c2a4ffb485e"
+    "mtime": 1785528865.4399037,
+    "ast_hash": "1ba2f32fbe02f6794ffecb0de5c9daa0",
+    "semantic_hash": "1ba2f32fbe02f6794ffecb0de5c9daa0"
   },
   "paint/CanvasCallbacks.java": {
     "mtime": 1776684104.601534,
@@ -80,9 +80,9 @@
     "semantic_hash": "85d7608af587e283641df42a1fada38c"
   },
   "paint/CanvasPanel.java": {
-    "mtime": 1776706642.689038,
-    "ast_hash": "a91da77909be16dfaad68d9e413bbbbb",
-    "semantic_hash": "a91da77909be16dfaad68d9e413bbbbb"
+    "mtime": 1785571517.3877873,
+    "ast_hash": "7d64f1ab5afb9411409c506af2176eba",
+    "semantic_hash": "7d64f1ab5afb9411409c506af2176eba"
   },
   "paint/CanvasState.java": {
     "mtime": 1775915936.039,
@@ -105,9 +105,9 @@
     "semantic_hash": "60093278563408008d886f385494e9b9"
   },
   "paint/CardListStore.java": {
-    "mtime": 1776709384.2328427,
-    "ast_hash": "64ddaaf8e8210e4d387c5983e25e7b8d",
-    "semantic_hash": "64ddaaf8e8210e4d387c5983e25e7b8d"
+    "mtime": 1785428803.4757392,
+    "ast_hash": "3f37778555117bd70b8e85a0f040de0d",
+    "semantic_hash": "3f37778555117bd70b8e85a0f040de0d"
   },
   "paint/CardTextOptionsPopup.java": {
     "mtime": 1776713601.9046738,
@@ -115,14 +115,14 @@
     "semantic_hash": "b03568f2e32193d816eb48395c4ae830"
   },
   "paint/CardTtsPlayer.java": {
-    "mtime": 1776709970.5466895,
-    "ast_hash": "4673d9226bc9327579182a270ac206b0",
-    "semantic_hash": "4673d9226bc9327579182a270ac206b0"
+    "mtime": 1785527862.7843504,
+    "ast_hash": "e74307e6fe991c964ba3fe3858cbd68e",
+    "semantic_hash": "e74307e6fe991c964ba3fe3858cbd68e"
   },
   "paint/ClipboardController.java": {
-    "mtime": 1776636719.5900824,
-    "ast_hash": "9d2aa034db5bcdc1f95032bf0872de5a",
-    "semantic_hash": "9d2aa034db5bcdc1f95032bf0872de5a"
+    "mtime": 1785574545.8469784,
+    "ast_hash": "baf36fc1ab4c94722471c66463e109fc",
+    "semantic_hash": "baf36fc1ab4c94722471c66463e109fc"
   },
   "paint/ColorPickerPopup.java": {
     "mtime": 1776014124.7000747,
@@ -140,14 +140,14 @@
     "semantic_hash": "a1e4aa71bdbf44ef5b0a00b11d4232a6"
   },
   "paint/EditorDialogs.java": {
-    "mtime": 1776358037.7697566,
-    "ast_hash": "b6e36aecaa4766929a3dd905ade3390d",
-    "semantic_hash": "b6e36aecaa4766929a3dd905ade3390d"
+    "mtime": 1785526274.569736,
+    "ast_hash": "fbe00d1e13c850729cac4da662054fcc",
+    "semantic_hash": "fbe00d1e13c850729cac4da662054fcc"
   },
   "paint/ElementController.java": {
-    "mtime": 1776635800.4090114,
-    "ast_hash": "a385f396c5f2f6dc196c0d3e54294348",
-    "semantic_hash": "a385f396c5f2f6dc196c0d3e54294348"
+    "mtime": 1785529009.4498513,
+    "ast_hash": "8c383b7e412fd8e668263b9f4eb15d36",
+    "semantic_hash": "8c383b7e412fd8e668263b9f4eb15d36"
   },
   "paint/ElementEditController.java": {
     "mtime": 1776357437.525041,
@@ -155,14 +155,14 @@
     "semantic_hash": "2bb227f361c72615b8939337cde04f1f"
   },
   "paint/ElementLayerCallbacksFactory.java": {
-    "mtime": 1776603804.598134,
-    "ast_hash": "dd1ff055df86d6ebc77fd42960ed01e8",
-    "semantic_hash": "dd1ff055df86d6ebc77fd42960ed01e8"
+    "mtime": 1785575079.0525131,
+    "ast_hash": "b2922dce2c1ff2a6b72199901f645f9d",
+    "semantic_hash": "b2922dce2c1ff2a6b72199901f645f9d"
   },
   "paint/ElementLayerPanel.java": {
-    "mtime": 1776636029.8219142,
-    "ast_hash": "33dfabd4d108f4652206da9959eec82f",
-    "semantic_hash": "33dfabd4d108f4652206da9959eec82f"
+    "mtime": 1785574608.2554233,
+    "ast_hash": "2eef2190029e9507e6b07339480fbd1d",
+    "semantic_hash": "2eef2190029e9507e6b07339480fbd1d"
   },
   "paint/ElementLayerState.java": {
     "mtime": 1776635816.3933332,
@@ -170,9 +170,9 @@
     "semantic_hash": "6008ebeccecb488c58987b30be8869fc"
   },
   "paint/FileLoadController.java": {
-    "mtime": 1776637173.303481,
-    "ast_hash": "ed024ae65c7d96e794bf4284efb6e3b7",
-    "semantic_hash": "ed024ae65c7d96e794bf4284efb6e3b7"
+    "mtime": 1785531808.8716776,
+    "ast_hash": "7f34202d95ef9973de44f10281932a05",
+    "semantic_hash": "7f34202d95ef9973de44f10281932a05"
   },
   "paint/FileStateCache.java": {
     "mtime": 1776194787.1123428,
@@ -190,9 +190,9 @@
     "semantic_hash": "e6009d3d4eba483385bded188466194b"
   },
   "paint/GalleryCallbacksFactory.java": {
-    "mtime": 1776600529.6336796,
-    "ast_hash": "eabba48bd2c9d8c4d23671628a323527",
-    "semantic_hash": "eabba48bd2c9d8c4d23671628a323527"
+    "mtime": 1785574499.8385544,
+    "ast_hash": "e51850aa1d00de7b256be7856df64406",
+    "semantic_hash": "e51850aa1d00de7b256be7856df64406"
   },
   "paint/GameSceneReader.java": {
     "mtime": 1776500854.7620876,
@@ -225,9 +225,9 @@
     "semantic_hash": "a254471a5c15c48d18fb69620110f813"
   },
   "paint/KeyboardShortcutManager.java": {
-    "mtime": 1776600130.321835,
-    "ast_hash": "63874d76b084dfcc4b0b2b6a20c2ce89",
-    "semantic_hash": "63874d76b084dfcc4b0b2b6a20c2ce89"
+    "mtime": 1785589027.5298746,
+    "ast_hash": "7cd2d9cbc2395bcea90b8f4eaa1dc391",
+    "semantic_hash": "7cd2d9cbc2395bcea90b8f4eaa1dc391"
   },
   "paint/LastProjectsManager.java": {
     "mtime": 1776332873.3481507,
@@ -265,9 +265,9 @@
     "semantic_hash": "5309b4fe90980d0e4fc8fed172505ee6"
   },
   "paint/MapsPanel.java": {
-    "mtime": 1776541373.236335,
-    "ast_hash": "24f57b1f324809b8e72c6e87c4370f17",
-    "semantic_hash": "24f57b1f324809b8e72c6e87c4370f17"
+    "mtime": 1785527833.921818,
+    "ast_hash": "e0b80c6d0398457a210efca7605cadaa",
+    "semantic_hash": "e0b80c6d0398457a210efca7605cadaa"
   },
   "paint/ModeController.java": {
     "mtime": 1776587241.9885626,
@@ -275,9 +275,9 @@
     "semantic_hash": "905fd19eaa197ef8c1b1333116bbd413"
   },
   "paint/NewFileController.java": {
-    "mtime": 1776552300.691789,
-    "ast_hash": "284afe6d73f72ad47036a407f0064cb8",
-    "semantic_hash": "284afe6d73f72ad47036a407f0064cb8"
+    "mtime": 1785529010.0828497,
+    "ast_hash": "dfe13057ada0dffed356af4950ebedc2",
+    "semantic_hash": "dfe13057ada0dffed356af4950ebedc2"
   },
   "paint/NewFolderDialog.java": {
     "mtime": 1776539532.9101186,
@@ -285,9 +285,9 @@
     "semantic_hash": "0be1b208bad27264b76159a68ce784bb"
   },
   "paint/NewImageDialog.java": {
-    "mtime": 1776518324.0257895,
-    "ast_hash": "5eeaed227696699799b6c39fcaf0e21b",
-    "semantic_hash": "5eeaed227696699799b6c39fcaf0e21b"
+    "mtime": 1785503749.4996002,
+    "ast_hash": "9761c42f4682e87ebc3cf58b0ed2f55a",
+    "semantic_hash": "9761c42f4682e87ebc3cf58b0ed2f55a"
   },
   "paint/PageLayout.java": {
     "mtime": 1776539151.9613001,
@@ -300,14 +300,14 @@
     "semantic_hash": "a5f23c14d86314bcd1a3b15d0e789044"
   },
   "paint/PageLayoutToolbar.java": {
-    "mtime": 1776540840.2219994,
-    "ast_hash": "b4d427a24ff2938927cf6bbd9b766b71",
-    "semantic_hash": "b4d427a24ff2938927cf6bbd9b766b71"
+    "mtime": 1785507427.6831331,
+    "ast_hash": "451b11c8f3944c239527d6dea3feee33",
+    "semantic_hash": "451b11c8f3944c239527d6dea3feee33"
   },
   "paint/PaintCallbacksFactory.java": {
-    "mtime": 1776687415.3133895,
-    "ast_hash": "cb9dbd0d0eaf2ef36561b9af7eeda072",
-    "semantic_hash": "cb9dbd0d0eaf2ef36561b9af7eeda072"
+    "mtime": 1785589053.649293,
+    "ast_hash": "bc5c2adfc2a7d48db4cab3a50e020a92",
+    "semantic_hash": "bc5c2adfc2a7d48db4cab3a50e020a92"
   },
   "paint/PaintEngine.java": {
     "mtime": 1776693294.0792296,
@@ -315,9 +315,9 @@
     "semantic_hash": "b65dd41364dcb300f4fdb65033caed68"
   },
   "paint/PaintToolbar.java": {
-    "mtime": 1776690324.5444393,
-    "ast_hash": "750853915ba61fe73880847b4de0a0f5",
-    "semantic_hash": "750853915ba61fe73880847b4de0a0f5"
+    "mtime": 1785588989.0913043,
+    "ast_hash": "332d019eaf55d5ef47c4857118a1844d",
+    "semantic_hash": "332d019eaf55d5ef47c4857118a1844d"
   },
   "paint/PanelToggleButton.java": {
     "mtime": 1776532598.709851,
@@ -370,9 +370,9 @@
     "semantic_hash": "636882fa3cc004a5afb7d65cdd15c3ba"
   },
   "paint/SaveController.java": {
-    "mtime": 1776536050.7525325,
-    "ast_hash": "195a4ff27afc366517545ec04e55a6d7",
-    "semantic_hash": "195a4ff27afc366517545ec04e55a6d7"
+    "mtime": 1785530054.5452235,
+    "ast_hash": "8af867da618b0bdc72616300081f082c",
+    "semantic_hash": "8af867da618b0bdc72616300081f082c"
   },
   "paint/SceneFileReader.java": {
     "mtime": 1776281213.3680515,
@@ -380,14 +380,14 @@
     "semantic_hash": "2d4519e296980dab6c7a00f60c3b19e0"
   },
   "paint/SceneFileWriter.java": {
-    "mtime": 1776500842.9220357,
-    "ast_hash": "d321ccbc7a1d8e9c9c327f6b90012698",
-    "semantic_hash": "d321ccbc7a1d8e9c9c327f6b90012698"
+    "mtime": 1785528852.6154082,
+    "ast_hash": "7e9d476c4f85f96d830d9fa6569a0e02",
+    "semantic_hash": "7e9d476c4f85f96d830d9fa6569a0e02"
   },
   "paint/SceneImageAdapter.java": {
-    "mtime": 1776537701.641574,
-    "ast_hash": "6763965902ede3667533bcd361043f3f",
-    "semantic_hash": "6763965902ede3667533bcd361043f3f"
+    "mtime": 1785528854.3856492,
+    "ast_hash": "6027fd30e8f3421de7b09e532e61f924",
+    "semantic_hash": "6027fd30e8f3421de7b09e532e61f924"
   },
   "paint/SceneLocator.java": {
     "mtime": 1776343856.777984,
@@ -395,14 +395,14 @@
     "semantic_hash": "90c6256826f974915abdba61446e2545"
   },
   "paint/SceneSerializer.java": {
-    "mtime": 1776500822.2790387,
-    "ast_hash": "df55907f11a3421b9e989bbbe534914c",
-    "semantic_hash": "df55907f11a3421b9e989bbbe534914c"
+    "mtime": 1785528875.4983993,
+    "ast_hash": "9563550344de08258dd51891182712ed",
+    "semantic_hash": "9563550344de08258dd51891182712ed"
   },
   "paint/ScenesController.java": {
-    "mtime": 1776678782.5001235,
-    "ast_hash": "78d5edbaf17064541908ac3610591ac0",
-    "semantic_hash": "78d5edbaf17064541908ac3610591ac0"
+    "mtime": 1785574512.2608504,
+    "ast_hash": "2449cf6eaa244fd3d3ff8e4fb3135622",
+    "semantic_hash": "2449cf6eaa244fd3d3ff8e4fb3135622"
   },
   "paint/SecondaryControlBar.java": {
     "mtime": 1776711355.7293732,
@@ -425,9 +425,9 @@
     "semantic_hash": "fbdddae66538b31951b8384e70e130bc"
   },
   "paint/SelectiveAlphaEditor.java": {
-    "mtime": 1776706877.726584,
-    "ast_hash": "7d7d51e5535024fe97acfd5eb3b2d1fc",
-    "semantic_hash": "7d7d51e5535024fe97acfd5eb3b2d1fc"
+    "mtime": 1785589074.2102013,
+    "ast_hash": "95a3168b3bf9e9d067007406d0272b00",
+    "semantic_hash": "95a3168b3bf9e9d067007406d0272b00"
   },
   "paint/SpriteLayer.java": {
     "mtime": 1776374662.2535577,
@@ -449,15 +449,10 @@
     "ast_hash": "97d10200b49c285272cc3cff74ebff13",
     "semantic_hash": "97d10200b49c285272cc3cff74ebff13"
   },
-  "paint/TextToSpeech.java": {
-    "mtime": 1776171167.62504,
-    "ast_hash": "7376e7e414487557bb4798238ad6c9de",
-    "semantic_hash": "7376e7e414487557bb4798238ad6c9de"
-  },
   "paint/TextToolbar.java": {
-    "mtime": 1776539226.096982,
-    "ast_hash": "ea01414fdb86e98bba231b623d68c34b",
-    "semantic_hash": "ea01414fdb86e98bba231b623d68c34b"
+    "mtime": 1785473217.9599664,
+    "ast_hash": "e2326be2bf860488bec12ed56e6a715c",
+    "semantic_hash": "e2326be2bf860488bec12ed56e6a715c"
   },
   "paint/TextToolbarCallbacksFactory.java": {
     "mtime": 1776423544.1063807,
@@ -470,9 +465,9 @@
     "semantic_hash": "34c3464f2d7b76f396f6045894a60f9c"
   },
   "paint/TileGalleryPanel.java": {
-    "mtime": 1776671542.3115187,
-    "ast_hash": "08997b0e00ab6144f925a62c3ca74002",
-    "semantic_hash": "08997b0e00ab6144f925a62c3ca74002"
+    "mtime": 1785574275.4775536,
+    "ast_hash": "91dc58116f448947d4db1744ce21f99b",
+    "semantic_hash": "91dc58116f448947d4db1744ce21f99b"
   },
   "paint/ToastNotification.java": {
     "mtime": 1775864892.134,
@@ -500,19 +495,19 @@
     "semantic_hash": "e9ac150e8cfc6015563a7a3a1ef7a9d2"
   },
   "paint/TranslationMapListPanel.java": {
-    "mtime": 1776757082.7019176,
-    "ast_hash": "84a7aed7338cec4f52aed0cff4c3f9f7",
-    "semantic_hash": "84a7aed7338cec4f52aed0cff4c3f9f7"
+    "mtime": 1785509648.46278,
+    "ast_hash": "278be71c797eda4d50e205b35f9a5777",
+    "semantic_hash": "278be71c797eda4d50e205b35f9a5777"
   },
   "paint/UIBuilder.java": {
-    "mtime": 1776600121.9513483,
-    "ast_hash": "20d1673dc2ff4f822043b658ecdac6e6",
-    "semantic_hash": "20d1673dc2ff4f822043b658ecdac6e6"
+    "mtime": 1785472316.7091985,
+    "ast_hash": "c6163ffdbd8c8e01f2d6bb555c2aa86d",
+    "semantic_hash": "c6163ffdbd8c8e01f2d6bb555c2aa86d"
   },
   "paint/UIComponentFactory.java": {
-    "mtime": 1776532623.882188,
-    "ast_hash": "786c326293c92e89d3ed882946d3abe7",
-    "semantic_hash": "786c326293c92e89d3ed882946d3abe7"
+    "mtime": 1785471414.326281,
+    "ast_hash": "4223b1cdbafbdfb5acf0b4d70112a7f8",
+    "semantic_hash": "4223b1cdbafbdfb5acf0b4d70112a7f8"
   },
   "paint/VRulerPanel.java": {
     "mtime": 1776518324.086786,
@@ -525,9 +520,9 @@
     "semantic_hash": "00367b84f83491934ba3ac701af697c9"
   },
   "paint/WhiteToAlphaConverter.java": {
-    "mtime": 1775863337.47,
-    "ast_hash": "c802507aa7f3cdd3c29f10950cb6d4a0",
-    "semantic_hash": "c802507aa7f3cdd3c29f10950cb6d4a0"
+    "mtime": 1785528865.8309028,
+    "ast_hash": "c64a291081c5749abbcbf8d3c7f8e9ac",
+    "semantic_hash": "c64a291081c5749abbcbf8d3c7f8e9ac"
   },
   "paint/ZoomController.java": {
     "mtime": 1776684083.565945,
@@ -538,5 +533,50 @@
     "mtime": 1775936664.24,
     "ast_hash": "e51b8a621c1d819cb413a6f5f859c1ac",
     "semantic_hash": "e51b8a621c1d819cb413a6f5f859c1ac"
+  },
+  "paint/AppTheme.java": {
+    "mtime": 1785568351.040926,
+    "ast_hash": "4023723a000e8a15753e01d28adc6cf7",
+    "semantic_hash": "4023723a000e8a15753e01d28adc6cf7"
+  },
+  "paint/ConfirmDialog.java": {
+    "mtime": 1785574250.522873,
+    "ast_hash": "333ce67c1d6c0d050fdc9396e34cdf9f",
+    "semantic_hash": "333ce67c1d6c0d050fdc9396e34cdf9f"
+  },
+  "paint/ContextMenu.java": {
+    "mtime": 1785574216.574874,
+    "ast_hash": "3f43879936447fcceddad5f7b11dafea",
+    "semantic_hash": "3f43879936447fcceddad5f7b11dafea"
+  },
+  "paint/FileActionsController.java": {
+    "mtime": 1785574475.1250007,
+    "ast_hash": "55ade4a3fd394c8fc755791163037685",
+    "semantic_hash": "55ade4a3fd394c8fc755791163037685"
+  },
+  "paint/ImageFileWriter.java": {
+    "mtime": 1785528820.1707857,
+    "ast_hash": "16d4a8bd76a93380fb321a5283eff74c",
+    "semantic_hash": "16d4a8bd76a93380fb321a5283eff74c"
+  },
+  "paint/KeyBindings.java": {
+    "mtime": 1785589016.8925116,
+    "ast_hash": "0cebe10f5d1c10b2c8b4906ae82013ad",
+    "semantic_hash": "0cebe10f5d1c10b2c8b4906ae82013ad"
+  },
+  "paint/KeyBindingsDialog.java": {
+    "mtime": 1785435519.8257828,
+    "ast_hash": "67afabb78a6cd0bfe220898839caa529",
+    "semantic_hash": "67afabb78a6cd0bfe220898839caa529"
+  },
+  "paint/PaintIcons.java": {
+    "mtime": 1785588243.092582,
+    "ast_hash": "8c5b92b5f03841a0ca8a6189a933e216",
+    "semantic_hash": "8c5b92b5f03841a0ca8a6189a933e216"
+  },
+  "paint/TextInputDialog.java": {
+    "mtime": 1785574327.8451173,
+    "ast_hash": "d1f2cd571766bff77321206de8b077bf",
+    "semantic_hash": "d1f2cd571766bff77321206de8b077bf"
   }
 }

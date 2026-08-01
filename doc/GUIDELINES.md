@@ -55,9 +55,9 @@
 | Bild-Persistenz (§34) | **`ImageFileWriter.writePng(...)` ist der einzige Weg, ein Bild zu schreiben.** Kein `ImageIO.write` außerhalb dieser Klasse |
 | Format-Verträge (Univ. §7) | **Szenen-Format ↔ GameII** → §23 |
 | Settings (Univ. §12) | **`AppSettings`** (Singleton) → `%APPDATA%\TransparencyTool\settings\default.txt` (Inhalt: JSON, siehe §31) |
-| Shortcut-Registry (Univ. §11) | **`KeyBindings.ALL`** (81 Einträge, sieben Scopes) + **`KeyBindings.TOOL_KEYS`** (25 Werkzeug-Tasten, seit 2026-08-01) + **`KeyBindings.GUIDE`**; Dialog `KeyBindingsDialog`, Taste **Umschalt+F1** und Knopf „?“ → §25 |
+| Shortcut-Registry (Univ. §11) | **`KeyBindings.ALL`** (82 Einträge, sieben Scopes) + **`KeyBindings.TOOL_KEYS`** (25 Werkzeug-Tasten, seit 2026-08-01) + **`KeyBindings.GUIDE`**; Dialog `KeyBindingsDialog`, Taste **Umschalt+F1** und Knopf „?“ → §25 |
 | Mess-Anzeige (Univ. §13) | **keine** — bewusst, siehe §26 |
-| Graphify-Scope (Univ. §1) | Scan-Root **`src/`** (schließt `bin/`, `doc/`, `resources/` ohne Filter aus), code-only. Graph ist eingecheckt: 2479 Knoten / 6369 Kanten / 123 Communities, 0 Tokens |
+| Graphify-Scope (Univ. §1) | Scan-Root **`src/`** (schließt `bin/`, `doc/`, `resources/` ohne Filter aus), code-only. Graph ist eingecheckt: **2731 Knoten / 6765 Kanten / 125 Communities** (Stand 2026-08-01, zweiter Refresh nach dem Leisten-Umbruch), 0 Tokens. **Konstanten sind keine Knoten** — die AST-Extraktion erfasst Typen und Methoden, keine `static final`-Felder; Fragen nach Tastenbelegungen oder Token-Namen beantwortet der Graph **nicht** (`doc/progress_2026-08-01_graphify-refresh-02.txt`, Befund 4). **Die Community-Zahl ist keine belastbare Größe** — Louvain schneidet bei jedem Lauf anders, die IDs des Vorlaufs sind danach wertlos und alle Communities müssen neu benannt werden. **Zwei Pfadbasen beachten:** `source_file` im Graphen zählt ab dem Projekt-Root (`src/paint/X.java`), `manifest.json` ab dem Scan-Root (`paint/X.java`) — ein `prune_sources` mit der falschen Basis meldet „already clean" und löscht nichts → `doc/progress_2026-08-01_graphify-refresh.txt` |
 
 ---
 

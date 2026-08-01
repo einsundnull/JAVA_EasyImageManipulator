@@ -1,0 +1,167 @@
+==============================================================================
+progress_2026-08-01_bildgroesse-vorlagen-umsetzung-01.txt
+Schritte [2/9] [3/9] [4/9] der PD Task_2026-08-01_1702_Bildgroesse-und-Vorlagen.txt
+Typ: [BT] · Risiko [B] · Build gruen, 363 .class
+==============================================================================
+
+[2/9] FREIGABE — ALLE VIER FRAGEN NACH EMPFEHLUNG ENTSCHIEDEN
+------------------------------------------------------------------------------
+  F1  Ziehen am Bildrand = *** LEINWAND aendern *** (Inhalt bleibt gleich
+      gross, Flaeche waechst transparent / beschneidet). Wie MS Paint.
+  F2  *** 25 MILLIMETER *** (= 94 px), nicht 25 px. Die Zahl im Prompt stimmt,
+      die Einheit war es nicht.
+  F3  Raender als *** OVERLAY, nicht-destruktiv *** — nicht mehr in die Pixel
+      brennen.
+  F4  Die acht _DOC-Varianten verschwinden aus der Formatliste und werden
+      *** VORLAGEN ***.
+  F5 (Vorlagen-Knopf: Ort und Taste) ist NICHT gestellt worden und wird in
+      Schritt [7] entschieden. *** ANNAHME BIS DAHIN: obere Leiste neben
+      "Neu", KEINE Taste *** (F1-F7 sind voll vergeben, §25 verlangt
+      ohnehin zuerst den Registry-Eintrag). Aendert am Rest nichts.
+
+[3/9] EINE PAPIERFORMAT-TABELLE STATT ZWEIER            *** ERLEDIGT ***
+------------------------------------------------------------------------------
+GEAENDERT: book/PaperFormat.java · paint/PageLayout.java ·
+           paint/NewImageDialog.java · paint/BookController.java ·
+           paint/NewFileController.java
+NEUE DATEI: keine.  NEUE KLASSE: keine (PaperFormat war schon da).
+
+  book.PaperFormat ist jetzt die einzige Quelle:
+    + A5, A6
+    + DIN lang (99x210), US-Postkarte 4x6" (102x152), Foto 13x18 (127x178)
+    + Executive (184x267), Half Letter (140x216)
+    + displayName() · isDocVariant() · label() · sizePx(landscape)
+    + selectable() / selectableLabels() / selectableIndexOf() / byDisplayName()
+    + docVariantOf() / docVariants()  (fuer die Vorlagen in [7]/[8])
+    + mmToPx(double) — der Faktor 96/25.4 steht ab jetzt hier
+
+  paint.PageLayout.FORMAT_NAMES ist ABGELEITET statt danebengefuehrt;
+  FORMAT_MM ist entfallen; formatMm() geht ueber byDisplayName().
+
+  *** DIE AUSWAHLLISTE HAT JETZT UEBERALL DIESELBEN 15 EINTRAEGE: ***
+    A0 A1 A2 A3 A4 A5 A6 · DIN lang · US-Postkarte · Foto 13x18 ·
+    Letter · Legal · Tabloid · Executive · Half Letter
+  Vorher: Dialog "Neue Datei" 16 Eintraege (davon 8 Rand-Vorgaben, kein
+  A5/A6), Buchmodus 6 Eintraege (kein A0-A2, kein Tabloid).
+
+*** VIER DINGE, DIE NICHT "VEREINFACHT" WERDEN DUERFEN ***
+ 1. *** NEUE FORMATE WERDEN ANGEHAENGT, NIE EINGEFUEGT. *** Drei Dialoge
+    indizierten mit values() in ihre eigene Auswahlliste
+    (BookController:304 sogar mit einem festen setSelectedIndex(4) fuer A4).
+    Ein Einfuegen in der Mitte haette jede bestehende Auswahl verschoben —
+    A4 waere lautlos zu A5 geworden. Die drei Stellen gehen jetzt ueber
+    selectable() und selectableIndexOf(A4): sie indizieren in DIESELBE
+    Liste, die sie anzeigen.
+ 2. *** DER ANZEIGENAME IST TEIL EINES GESCHRIEBENEN FORMATS. ***
+    PageLayoutManifest legt ihn als "paperFormat: A4" neben jeder Buchseite
+    ab. byDisplayName() findet deshalb OHNE Ruecksicht auf Gross-/
+    Kleinschreibung UND zusaetzlich ueber den enum-Namen — "Letter" (alt)
+    und "LETTER" (enum) fuehren beide zum Ziel. Nachgewiesen, siehe unten.
+ 3. *** formatMm() DARF WEITER null LIEFERN. *** Eine aeltere .layout-Datei
+    mit einem Format, das es nicht mehr gibt ("Custom"), muss laden, nicht
+    werfen. Die Aufrufer fangen null bereits ab; daran wurde nichts geaendert.
+ 4. *** ALLE FORMATE SIND IM HOCHFORMAT DEKLARIERT *** (Breite <= Hoehe).
+    Das Querformat entsteht durch Tauschen. Wer ein Format "quer" als
+    eigenen Eintrag anlegt, bekommt zwei Namen fuer dieselbe Sache.
+
+*** DER BEFUND, DEN ERST DIE AUSGABE GEZEIGT HAT — UND EIN FAST-FEHLER: ***
+    "Ledger" stand im Entwurf als eigenes US-Format. Die gedruckte
+    Auswahlliste zeigte dann:
+        Tabloid  (279 x 432 mm)
+        Ledger   (279 x 432 mm)
+    *** ZEILE FUER ZEILE IDENTISCH. *** Ledger (11 x 17") IST Tabloid
+    (17 x 11") im Querformat — und da alle Formate im Hochformat stehen,
+    faellt es mit Tabloid zusammen. Der Eintrag ist ersatzlos gestrichen,
+    mit Begruendung im Quelltext. Ein zweiter Name fuer dasselbe Format ist
+    dieselbe Fehlerart wie die luegenden Tooltips: er verspricht etwas, das
+    es nicht gibt.
+    *** DAS STAND IM ENTWURF UND WAERE AUS DEM QUELLTEXT NICHT AUFGEFALLEN.
+        Es kam heraus, weil die Probe die Liste AUSGEDRUCKT hat. ***
+
+[4/9] PaintEngine.resizeCanvas(...)                     *** ERLEDIGT ***
+------------------------------------------------------------------------------
+NEU in PaintEngine (die einzige neue Klasse ist der innere enum Anchor):
+    enum Anchor          neun Verankerungen (TOP_LEFT … BOTTOM_RIGHT)
+    MAX_CANVAS_EDGE      20000 px je Kante
+    resizeCanvas(img, w, h, anchor)
+    clampEdge(px)
+
+  Inhalt behaelt seine Pixelmasse, neue Flaeche entsteht TRANSPARENT,
+  ueberstehende wird beschnitten (drawImage klemmt selbst). Stateless,
+  Image-Space, statisch — wie der Rest der Klasse (§27).
+
+*** DREI DINGE, DIE NICHT "VEREINFACHT" WERDEN DUERFEN ***
+ 1. *** g2.drawImage(img, dx, dy, null) — OHNE Zielmasse. *** Wer daraus
+    drawImage(img, dx, dy, w, h, null) macht, hat wieder skaliert und damit
+    genau den Unterschied eingeebnet, um den es in dieser Aufgabe geht.
+ 2. *** DER DECKEL IST KEIN SCHMUCK. *** 20000 x 20000 px sind als ARGB
+    1,6 GB. Bei kleinem Zoom liegen wenige Bildschirmpixel Zugweg weit
+    auseinander — B01 hat am 2026-07-31 gezeigt, was ein unbedachtes Bild
+    im Speicher kostet.
+ 3. *** GLEICHE MASSE -> DIESELBE INSTANZ. *** resizeCanvas gibt das
+    Original zurueck, wenn sich nichts aendert. Das ist Absicht: der
+    Zughandler in [5] ruft die Methode pro Mausbewegung, und eine Kopie je
+    Bewegung waere ein Leck. *** Es heisst aber auch: der Aufrufer darf
+    sich NICHT darauf verlassen, immer ein frisches Bild zu bekommen. ***
+
+NACHWEIS — WEGWERF-PROBE GEGEN DIE KOMPILIERTEN KLASSEN
+------------------------------------------------------------------------------
+scratchpad/paint/ProbeCanvasFormat.java, 36 Pruefungen, ALLE BESTANDEN.
+Nicht hergeleitet, sondern an einzelnen Pixeln gemessen (rotes Bild mit
+gruener 10x10-Marke links oben):
+  A) vergroessern 100x60 -> 200x120: Marke bei (9,9) noch gruen, (11,11)
+     rot -> *** NICHT mitskaliert ***; (150,90) alpha=0 -> neue Flaeche
+     transparent; Quelle unveraendert 100x60.
+     Verankerung MITTE -> Marke bei (55,35); UNTEN RECHTS -> bei (105,65).
+     Verkleinern auf 50x30 beschneidet. clamp(999999)=20000, clamp(0)=1.
+  B) Auswahlliste: 15 Eintraege, KEINE _DOC-Variante, alle Hochformat.
+     A4 = 794 x 1123 px. *** 25 mm = 94 px (die Zahl aus F2). ***
+     Die acht _DOC-Varianten sind ueber docVariants() weiter erreichbar.
+  C) Rueckwaertskompatibilitaet: "A3" "A4" "A5" "A6" "Letter" "Legal"
+     "LETTER" "a4" finden alle; "Gibt-es-nicht" -> null, keine Ausnahme.
+     PageLayout: A4 hoch 210x297, A4 quer 297x210, "Letter" 216,
+     "Custom" -> null. *** A6 ist jetzt AUCH im Buchmodus da, A0 ebenfalls. ***
+
+BUILD:  javac -encoding UTF-8 -sourcepath src -d <leer> src/paint/*.java
+        src/module-info.java  ->  exit 0, *** 363 .class *** (vorher 362).
+        Die EINE neue Klasse ist PaintEngine$Anchor.
+        Gemessen mit javac in ein LEERES Wegwerf-Verzeichnis (ein
+        Eclipse-bin/ hat zwei mehr, siehe CLAUDE.md).
+        Quelldateien unveraendert: src/paint 111 + book 3 + module-info.
+
+NICHT NEBENBEI GEAENDERT (dokumentiert, Univ. §0)
+------------------------------------------------------------------------------
+ - *** NewImageDialog.PX_PER_MM bleibt vorerst stehen. *** Der Faktor
+   96/25.4 steht jetzt in PaperFormat.mmToPx, aber NewImageDialog benutzt
+   ihn 14-mal in seiner Vorschau-Geometrie. Diese Datei wird in [7] ohnehin
+   angefasst — dann in einem Zug, nicht zweimal.
+   Ebenfalls offen: BookController:341 und NewFileController:67/272 tippen
+   ihn je einmal; beide Stellen gehoeren zu [7] (Raender nicht mehr
+   einbrennen).
+ - EditorDialogs.doScale():171 (referenzfreie Kopie, Befund 6 des
+   Vorschlags) bleibt unberuehrt. Gehoert zu L02, eigener Vorgang.
+ - book.Sheet / book.JsonStorage: JsonStorage wirft in ALLEN Methoden
+   UnsupportedOperationException ("Jackson is not on the module path"),
+   Sheet.format wird nirgends geschrieben. *** Die Enum-Aenderung konnte
+   deshalb keine gespeicherten Buchdaten treffen *** — geprueft, nicht
+   angenommen.
+
+RUNTIME-VERIFY (User) — DIE TEILE, DIE JETZT SCHON PRUEFBAR SIND
+------------------------------------------------------------------------------
+  V11 Dialog "Neue Datei" oeffnen: Formatliste zeigt 15 Eintraege MIT
+      Massangabe, darunter A5, A6, DIN lang, US-Postkarte, Foto 13x18 —
+      und KEIN "A4_DOC" mehr.
+  V12 A4 waehlen -> 794 x 1123 px in den Feldern.
+  V13 *** Buchmodus, Seitenlayout-Leiste ("SL"): die Formatliste zeigt
+      jetzt AUCH A0-A2 und Tabloid. Ein zuvor angelegtes Buch oeffnen ->
+      das Format der Seite steht unveraendert da (prueft die
+      Rueckwaertskompatibilitaet der geschriebenen Namen). ***
+  V14 "Neues Blatt" und "Neue Seite": Vorgabe ist weiter A4 — nicht A5.
+      *** Prueft, dass das feste setSelectedIndex(4) richtig ersetzt
+      wurde. ***
+
+NAECHSTER SCHRITT: [5/9] Ziehgriffe am Bildrand — [C], KEIN Haiku.
+  Sinnvoll davor: "/clear" + WEITERMACHEN_PROMPT.txt. [5] braucht den
+  vollen Kontext von §22 (God-Klasse) und §27 (Koordinatensysteme), nicht
+  den Verlauf der Tabellenarbeit.
+==============================================================================

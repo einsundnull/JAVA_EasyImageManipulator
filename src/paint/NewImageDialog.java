@@ -90,11 +90,14 @@ class NewImageDialog extends JDialog {
 		root.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
 
 		// ── Format + orientation ──────────────────────────────────────────────
-		PaperFormat.Format[] fmts = PaperFormat.Format.values();
-		String[] fmtNames = new String[fmts.length + 1];
+		// Die Liste kommt aus PaperFormat.selectable() — nicht aus values().
+		// Dort stehen auch die acht *_DOC-Einträge, die keine Papierformate
+		// sind, sondern Rand-Vorgaben (sie speisen die Vorlagen).
+		String[] fmtLabels = PaperFormat.selectableLabels();
+		String[] fmtNames = new String[fmtLabels.length + 1];
 		fmtNames[0] = "Benutzerdefiniert";
-		for (int i = 0; i < fmts.length; i++) fmtNames[i + 1] = fmts[i].name();
-		formatCombo = combo(fmtNames, 160);
+		System.arraycopy(fmtLabels, 0, fmtNames, 1, fmtLabels.length);
+		formatCombo = combo(fmtNames, 220);
 		formatCombo.addActionListener(e -> onFormatSelected());
 
 		ButtonGroup og = new ButtonGroup();
@@ -238,7 +241,7 @@ class NewImageDialog extends JDialog {
 	private void onFormatSelected() {
 		int sel = formatCombo.getSelectedIndex();
 		if (sel == 0) return;
-		PaperFormat.Format fmt = PaperFormat.Format.values()[sel - 1];
+		PaperFormat.Format fmt = PaperFormat.selectable().get(sel - 1);
 		suppress = true;
 		int wMm = landscape ? fmt.getWidthLandscape()  : fmt.getWidthPortrait();
 		int hMm = landscape ? fmt.getHeightLandscape() : fmt.getHeightPortrait();

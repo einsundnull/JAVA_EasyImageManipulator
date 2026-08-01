@@ -4,6 +4,7 @@ import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -11,12 +12,18 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Insets;
+import java.awt.LayoutManager;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Window;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
@@ -84,7 +91,27 @@ public class PaintToolbar extends JPanel {
     public static final int SWATCH_H  = 22;
     private static final int PAL_COLS = 14;
     private static final int GAP      = 3;
+
+    /**
+     * Höhe der <b>einreihigen</b> Leiste — und nur dieser.
+     *
+     * <p><b>Der Wert bleibt 105, auch seit es den Umbruch gibt.</b> Eine
+     * öffentliche Konstante, die je nach Schalter etwas anderes bedeutete,
+     * wäre eine Falle für jeden Aufrufer. Wer die <i>aktuelle</i> Höhe
+     * braucht, fragt {@link #toolbarHeight()}.
+     */
     public static final int TOOLBAR_H = BTN_SIZE + 55;
+
+    /** Senkrechter Abstand zwischen zwei umgebrochenen Reihen. */
+    private static final int ROW_GAP = 4;
+
+    /**
+     * Luft über und unter den Reihen im Umbruch-Modus.
+     * <p>Deutlich kleiner als die 55 px der einreihigen Leiste: dort steckt
+     * der Platz für die waagerechte Bildlaufleiste drin, die es im Umbruch
+     * nicht gibt.
+     */
+    private static final int WRAP_PAD = 16;
 
     // ── Palette ───────────────────────────────────────────────────────────────
     private static final Color[] PALETTE = {
@@ -125,6 +152,14 @@ public class PaintToolbar extends JPanel {
         void onScale();
         void onUndo();
         void onRedo();
+        /**
+         * Die Leiste hat zwischen einer Reihe und Umbruch gewechselt.
+         *
+         * <p>Der Verdrahter merkt sich den Zustand ({@code AppSettings}) und
+         * passt ein <i>schwebendes</i> Leistenfenster an — beides weiß die
+         * Leiste selbst nicht (§22).
+         */
+        void onPaintBarRowsChanged(boolean wrap);
         BufferedImage getWorkingImage();
     }
 
@@ -158,6 +193,17 @@ public class PaintToolbar extends JPanel {
     private JSlider       replaceBandSlider;
     private JLabel        replaceBandLabel;
     private JToggleButton replaceClosedBtn;
+
+    // ── Ein Streifen, zwei Anordnungen ───────────────────────────────────────
+    /** Der Streifen mit allen Gruppen — <b>einmal gebaut</b>, nie neu erzeugt. */
+    private JPanel        strip;
+    private JScrollPane   scroll;
+    /** Gruppe „Zurück/Vor" — im Umbruch-Modus der rechte Anker der letzten Reihe. */
+    private JPanel        undoRedoGroup;
+    private JToggleButton wrapBtn;
+    private boolean       wrapRows = false;
+    /** Zuletzt gerechnete Reihenzahl — nur zum Erkennen einer echten Änderung. */
+    private int           lastRowCount = 1;
 
     // ── Replace-wand config state ─────────────────────────────────────────────
     private int     replaceBandWidth = 1;    // pixels
@@ -198,9 +244,9 @@ public class PaintToolbar extends JPanel {
         setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppColors.BORDER));
         setPreferredSize(new Dimension(0, TOOLBAR_H));
 
-        JPanel strip = buildStrip();
+        strip = buildStrip();
 
-        JScrollPane scroll = new JScrollPane(strip,
+        scroll = new JScrollPane(strip,
                 JScrollPane.VERTICAL_SCROLLBAR_NEVER,
                 JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         scroll.setBorder(null);
@@ -213,6 +259,20 @@ public class PaintToolbar extends JPanel {
         });
         installMiddleMouseDragPan(scroll, strip);
         add(scroll, BorderLayout.CENTER);
+
+        // Im Umbruch-Modus hängt die Reihenzahl an der Fensterbreite. Ändert
+        // sie sich beim Ziehen des Fensterrands, muss der Elternteil neu
+        // ausgelegt werden — sonst bleibt die Leiste in der alten Höhe stehen
+        // und schneidet die letzte Reihe ab.
+        addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                if (!wrapRows) return;
+                int rows = rowCount();
+                if (rows == lastRowCount) return;
+                lastRowCount = rows;
+                revalidateTree();
+            }
+        });
 
         colorPicker = new ColorPickerPopup(owner);
         colorPicker.setChangeListener(e -> {
@@ -383,12 +443,13 @@ public class PaintToolbar extends JPanel {
     // Strip builder
     // =========================================================================
     private JPanel buildStrip() {
-        JPanel strip = new JPanel();
+        JPanel strip = new Strip();
         strip.setLayout(new BoxLayout(strip, BoxLayout.X_AXIS));
         strip.setBackground(AppColors.BG_TOOLBAR);
         strip.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
 
-        strip.add(buildUndoRedo());
+        undoRedoGroup = buildUndoRedo();
+        strip.add(undoRedoGroup);
         strip.add(vSep());
         strip.add(buildToolButtons());
         strip.add(vSep());
@@ -412,6 +473,231 @@ public class PaintToolbar extends JPanel {
         strip.add(Box.createHorizontalGlue());
 
         return strip;
+    }
+
+    // =========================================================================
+    // Eine Reihe oder Umbruch (2026-08-01)
+    // =========================================================================
+
+    public boolean isWrapRows() { return wrapRows; }
+
+    /**
+     * Schaltet zwischen einer Reihe und dem Umbruch um — <b>der einzige Weg</b>
+     * dorthin, damit der Knopf nie etwas anderes anzeigt als den echten
+     * Zustand (Univ. §12, dieselbe Zusage wie
+     * {@link #setWandPanelVisible(boolean)}).
+     *
+     * <p><b>Der Streifen wird nicht neu gebaut, nur anders ausgelegt.</b> Alle
+     * Gruppen bleiben dieselben Objekte — deshalb bleiben auch die rekursiv
+     * angehängten Maus-Adapter für Rad-Bildlauf und Mittelklick-Zug
+     * ({@link #installMiddleMouseDragPan}) erhalten. Wer hier stattdessen
+     * {@code buildStrip()} erneut aufruft, verliert beide Bedienwege lautlos.
+     *
+     * @param notify {@code false} beim Wiederherstellen aus den Einstellungen —
+     *        dann wird nichts zurückgeschrieben (Univ. §12: gelesen wird genau
+     *        einmal beim Start).
+     */
+    public void setWrapRows(boolean wrap, boolean notify) {
+        if (wrapRows == wrap && wrapBtn != null && wrapBtn.isSelected() == wrap) return;
+        wrapRows = wrap;
+        strip.setLayout(wrap ? new WrapRowsLayout()
+                             : new BoxLayout(strip, BoxLayout.X_AXIS));
+        if (wrapBtn != null) wrapBtn.setSelected(wrap);
+        lastRowCount = rowCount();
+        revalidateTree();
+        if (notify) cb.onPaintBarRowsChanged(wrap);
+    }
+
+    /** Aus den Einstellungen wiederherstellen — ohne Rückschreiben. */
+    public void setWrapRows(boolean wrap) { setWrapRows(wrap, false); }
+
+    public void toggleWrapRows() { setWrapRows(!wrapRows, true); }
+
+    /**
+     * Die <b>aktuelle</b> Höhe der Leiste.
+     *
+     * <p>Einreihig ist das unverändert {@link #TOOLBAR_H}. Im Umbruch-Modus
+     * wird sie <b>gerechnet</b>: {@code Reihen · 50 + Zwischenräume + Luft}.
+     * Ein getippter zweiter Festwert wäre spätestens bei drei Reihen falsch —
+     * und drei Reihen gibt es ab etwa 1200 px Fensterbreite (gemessen,
+     * {@code doc/Schema_PaintToolbar_Zweizeilig.txt}).
+     */
+    public int toolbarHeight() {
+        if (!wrapRows) return TOOLBAR_H;
+        int rows = rowCount();
+        return rows * BTN_SIZE + (rows - 1) * ROW_GAP + WRAP_PAD;
+    }
+
+    /**
+     * Die Höhe hängt von der Breite ab — deshalb reicht die gesetzte
+     * {@code preferredSize} nicht aus, sie kennt nur die Breite.
+     */
+    @Override public Dimension getPreferredSize() {
+        Dimension d = super.getPreferredSize();
+        return new Dimension(d.width, toolbarHeight());
+    }
+
+    /** Wie viele Reihen die Gruppen bei der aktuellen Breite belegen. */
+    private int rowCount() {
+        if (!wrapRows) return 1;
+        return buildRows(availableStripWidth()).size();
+    }
+
+    /** Nutzbare Breite des Streifens — auch bevor er je ausgelegt wurde. */
+    private int availableStripWidth() {
+        int w = getWidth();
+        if (w <= 0 && getParent() != null) w = getParent().getWidth();
+        if (w <= 0) w = 1200;
+        Insets in = strip.getInsets();
+        return Math.max(1, w - in.left - in.right);
+    }
+
+    private void revalidateTree() {
+        strip.revalidate();
+        revalidate();
+        if (getParent() != null) getParent().revalidate();
+        repaint();
+    }
+
+    /**
+     * Verteilt die Gruppen auf Reihen — <b>die einzige Stelle, die umbricht.</b>
+     * Auslegen und Höhe-Rechnen fragen dieselbe Methode; zwei Rechenwege
+     * wären zwei Gelegenheiten, verschieden zu antworten.
+     *
+     * <p>Zwei Regeln, die den Umbruch lesbar halten:
+     * <ul>
+     *   <li><b>Gruppen bleiben ganz.</b> Umgebrochen wird zwischen Gruppen,
+     *       nie zwischen den Knöpfen einer Gruppe — eine zerrissene Palette
+     *       oder ein Regler ohne seine Beschriftung wäre unlesbarer als der
+     *       Bildlauf, den der Umbruch ersetzt.</li>
+     *   <li><b>Kein Trenner am Zeilenanfang.</b> Ein senkzeiler Strich vor dem
+     *       ersten Knopf einer Reihe sieht aus wie ein Rand, nicht wie eine
+     *       Trennung.</li>
+     * </ul>
+     */
+    private List<List<Component>> buildRows(int availW) {
+        List<List<Component>> rows = new ArrayList<>();
+        List<Component> cur = new ArrayList<>();
+        int x = 0;
+        for (Component c : strip.getComponents()) {
+            if (c == undoRedoGroup || !c.isVisible()) continue;
+            int w = c.getPreferredSize().width;
+            if (w <= 0) continue;                       // Dehnfeld des Box-Modus
+            if (!cur.isEmpty() && x + w > availW) {
+                rows.add(cur);
+                cur = new ArrayList<>();
+                x = 0;
+            }
+            if (cur.isEmpty() && isSeparator(c)) continue;
+            cur.add(c);
+            x += w;
+        }
+        if (!cur.isEmpty()) rows.add(cur);
+        if (rows.isEmpty()) rows.add(new ArrayList<>());
+
+        // *** Zurück/Vor ans rechte Ende der LETZTEN Reihe — der Kern des
+        //     Wunsches vom 2026-08-01. Passen sie dort nicht mehr hin,
+        //     bekommen sie eine eigene Reihe, statt die vorige zu sprengen.
+        if (undoRedoGroup != null && undoRedoGroup.isVisible()) {
+            List<Component> last = rows.get(rows.size() - 1);
+            int used = 0;
+            for (Component c : last) used += c.getPreferredSize().width;
+            int aw = undoRedoGroup.getPreferredSize().width;
+            if (!last.isEmpty() && used + aw > availW) {
+                last = new ArrayList<>();
+                rows.add(last);
+            }
+            last.add(undoRedoGroup);
+        }
+        return rows;
+    }
+
+    /**
+     * Ein Trenner ist der Umhüller aus {@link #vSep()}.
+     * <p><b>Eigener Typ statt „Panel mit drei Kindern":</b> die Gruppe
+     * „Zurück/Vor" hat ebenfalls drei Kinder — eine Erkennung über die Zahl
+     * hätte sie beim ersten Umbau zum Trenner erklärt.
+     */
+    private static boolean isSeparator(Component c) {
+        return c instanceof Separator;
+    }
+
+    /** Senkrechter Strich zwischen zwei Gruppen — siehe {@link #vSep()}. */
+    private static final class Separator extends JPanel { }
+
+    /**
+     * Streifen mit zwei Anordnungen.
+     *
+     * <p>{@code getScrollableTracksViewportWidth()} ist der Grund, warum der
+     * Umbruch mit <b>demselben</b> {@link JScrollPane} auskommt: im Umbruch
+     * bekommt der Streifen die Breite des Sichtfensters (und bricht darin um),
+     * einreihig behält er seine natürliche Breite (und wird gescrollt).
+     * <b>Ohne diese Zusage bekäme der Streifen im Umbruch-Modus seine volle
+     * natürliche Breite von 2604 px und bräche nie um.</b>
+     */
+    private final class Strip extends JPanel implements javax.swing.Scrollable {
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(Rectangle v, int o, int d) { return 20; }
+        @Override public int getScrollableBlockIncrement(Rectangle v, int o, int d) { return v.width; }
+        @Override public boolean getScrollableTracksViewportWidth()  { return wrapRows; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
+
+    /**
+     * Anordnung im Umbruch-Modus: Gruppen von links nach rechts, Umbruch am
+     * rechten Rand, {@code undoRedoGroup} rechtsbündig in der letzten Reihe.
+     *
+     * <p><b>Rechtsbündig über den Rand gerechnet, nicht über einen Abstand:</b>
+     * ein einmal gerechneter Zwischenraum stimmt beim nächsten Fenstermaß
+     * nicht mehr.
+     *
+     * <p>Alle Reihen sind {@link #BTN_SIZE} hoch, und jede Gruppe wird darin
+     * mittig gesetzt. Das ist keine Vereinfachung, sondern die Zusage, dass
+     * {@link #toolbarHeight()} und diese Anordnung dieselbe Höhe meinen.
+     */
+    private final class WrapRowsLayout implements LayoutManager {
+        @Override public void addLayoutComponent(String name, Component c) { }
+        @Override public void removeLayoutComponent(Component c) { }
+
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            Insets in = parent.getInsets();
+            List<List<Component>> rows = buildRows(availableStripWidth());
+            int h = rows.size() * BTN_SIZE + (rows.size() - 1) * ROW_GAP;
+            int w = 0;
+            for (List<Component> row : rows) {
+                int rw = 0;
+                for (Component c : row) rw += c.getPreferredSize().width;
+                w = Math.max(w, rw);
+            }
+            return new Dimension(w + in.left + in.right, h + in.top + in.bottom);
+        }
+
+        @Override public Dimension minimumLayoutSize(Container parent) {
+            return preferredLayoutSize(parent);
+        }
+
+        @Override public void layoutContainer(Container parent) {
+            Insets in = parent.getInsets();
+            int availW = Math.max(1, parent.getWidth() - in.left - in.right);
+            // Erst alles einklappen: ein am Zeilenanfang übersprungener Trenner
+            // behielte sonst seine alten Maße und zeichnete einen Strich ins
+            // Nichts.
+            for (Component c : parent.getComponents()) c.setBounds(0, 0, 0, 0);
+
+            List<List<Component>> rows = buildRows(availW);
+            int y = in.top;
+            for (List<Component> row : rows) {
+                int x = in.left;
+                for (int i = 0; i < row.size(); i++) {
+                    Component c = row.get(i);
+                    Dimension d = c.getPreferredSize();
+                    if (c == undoRedoGroup) x = in.left + availW - d.width;
+                    c.setBounds(x, y + (BTN_SIZE - d.height) / 2, d.width, d.height);
+                    x += d.width;
+                }
+                y += BTN_SIZE + ROW_GAP;
+            }
+        }
     }
 
     // ── Undo / Redo ───────────────────────────────────────────────────────────
@@ -770,8 +1056,19 @@ public class PaintToolbar extends JPanel {
         unitCombo.setToolTipText("Lineal-Einheit");
         unitCombo.addActionListener(e -> cb.onRulerUnitChanged(unitCombo.getSelectedIndex()));
 
-        p.add(grid);  p.add(Box.createHorizontalStrut(GAP));
-        p.add(ruler); p.add(Box.createHorizontalStrut(GAP));
+        // Der Umbruch-Schalter steht bei Raster und Lineal, weil er dasselbe
+        // beantwortet: wie die Oberfläche aussieht, nicht womit gemalt wird.
+        // Damit steht er in BEIDEN Anordnungen an derselben Stelle — säße er
+        // links bei „Zurück/Vor", wanderte ausgerechnet der Schalter mit.
+        wrapBtn = toggleBtn(PaintIcons.forAction(PaintIcons.Action.ROW_WRAP),
+                "Umbruch",
+                "Knöpfe umbrechen statt in einer Reihe scrollen  ·  Taste "
+                        + KeyBindings.ROW_WRAP_COMBO);
+        wrapBtn.addActionListener(e -> setWrapRows(wrapBtn.isSelected(), true));
+
+        p.add(grid);    p.add(Box.createHorizontalStrut(GAP));
+        p.add(ruler);   p.add(Box.createHorizontalStrut(GAP));
+        p.add(wrapBtn); p.add(Box.createHorizontalStrut(GAP));
         p.add(unitCombo);
         return p;
     }
@@ -1022,7 +1319,7 @@ public class PaintToolbar extends JPanel {
         s.setPreferredSize(new Dimension(1, BTN_SIZE - 8));
         s.setMaximumSize(new Dimension(1, BTN_SIZE - 8));
         s.setMinimumSize(new Dimension(1, BTN_SIZE - 8));
-        JPanel w = new JPanel();
+        JPanel w = new Separator();
         w.setOpaque(false);
         w.setLayout(new BoxLayout(w, BoxLayout.X_AXIS));
         w.add(Box.createHorizontalStrut(6));

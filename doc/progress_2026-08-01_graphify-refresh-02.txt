@@ -1,0 +1,165 @@
+==============================================================================
+progress_2026-08-01_graphify-refresh-02.txt   —   TransparencyTool
+[ST] kleine Aufgabe, KEINE PD.  Risikoklasse [B] (kein Code angefasst).
+Zweiter Refresh desselben Tages. Der erste: progress_2026-08-01_graphify-refresh.txt
+==============================================================================
+
+PROMPT
+------
+"Lies in dieser Reihenfolge: JAVA_GUIDELINES_UNIVERSAL.md, GUIDELINES.md,
+ Prompt_Handling.txt, WEITERMACHEN_PROMPT.txt, README.md; Graphify auffrischen"
+
+
+ZUSAMMENFASSUNG
+---------------
+Der Graph war vom 2026-08-01, 13:10 Uhr — also VOM SELBEN TAG, aber VOR dem
+Task "PaintToolbar-Zweizeilig" (14:36). Er kannte den Leisten-Umbruch nicht.
+Jetzt auf dem Stand nach diesem Task.
+
+  vorher:   2698 Knoten · 6736 Kanten · 143 Communities
+  nachher:  2731 Knoten · 6765 Kanten · 125 Communities
+  Diff:     +52 Knoten · -19 Knoten (netto +33) · +29 Kanten netto
+  Kosten:   0 LLM-Tokens (code-only -> reine AST-Extraktion)
+
+BACKUP vor dem Lauf: graphify-out/2026-08-01b_vor-update/
+  (graph.json, GRAPH_REPORT.md, manifest.json, graph.html, labels)
+  *** Der Ordner heisst "b", weil 2026-08-01_vor-update schon vom ERSTEN
+      Refresh desselben Tages belegt war. Wer nur nach Datum benennt,
+      ueberschreibt beim zweiten Lauf pro Tag sein eigenes Backup. ***
+
+
+*** BEFUND 1: ACHT DATEIEN — UND DIESMAL STIMMTE DIE SCHAETZUNG AUS DER DOKU
+    FAST. ***
+    detect_incremental meldete 8 geaenderte Dateien, 0 geloeschte:
+      AppLifecycleController · AppSettings · KeyBindings ·
+      KeyboardShortcutManager · PaintCallbacksFactory · PaintIcons ·
+      PaintToolbar · SelectiveAlphaEditor
+    Das ist genau der Umfang des Zweizeilig-Tasks (der laut PD KEINE neue
+    Quelldatei anlegte, aber fuenf .class mitbrachte).
+    *** GEGENSATZ ZUM ERSTEN REFRESH: dort waren es 42 statt der neun aus
+        der Doku. Der Unterschied ist nicht Glueck, sondern Abstand: hier
+        lag EIN Task zwischen den Laeufen, dort SIEBEN. Die Lehre bleibt
+        dieselbe — gemessen wird, nicht geschaetzt (Univ. §13). ***
+
+*** BEFUND 2: KEIN PRUNING NOETIG, ALSO KEINE PFADBASEN-FALLE. ***
+    deleted_files war leer. Die Falle aus dem ersten Refresh (source_file
+    zaehlt ab dem PROJEKT-Root, manifest.json ab dem SCAN-Root) konnte
+    deshalb nicht zuschnappen. *** SIE IST NICHT BEHOBEN, NUR NICHT
+    AUSGELOEST. *** Beim naechsten Lauf mit einer geloeschten Datei gilt
+    wieder: explizit filtern, mit ID-Kollisionsprobe, root= auf dem
+    SCAN-Root belassen.
+
+*** BEFUND 3: DIE COMMUNITY-ZAHL IST GESUNKEN (143 -> 125), OBWOHL DER
+    GRAPH GEWACHSEN IST. ***
+    Das ist KEIN Datenverlust — Louvain-Clustering ist nicht deterministisch
+    und schneidet bei jedem Lauf anders. Knoten- und Kantenzahl sind die
+    belastbaren Groessen, die Community-Zahl ist es nicht.
+    *** FOLGE, DIE MAN EINPLANEN MUSS: die Community-IDs des Vorlaufs sind
+        WERTLOS. Alle 125 mussten neu benannt werden; die 143 alten Namen
+        aus .graphify_labels.json liessen sich NICHT uebernehmen. Wer einen
+        Refresh plant, plant das Benennen mit ein. ***
+    Die L02-Parallelkopien tragen ihre Warnung weiter:
+      [9]   ElementLayerState (dead parallel copy)     52 Knoten
+      [14]  FileStateCache (dead parallel copy)        39 Knoten
+      [40]  FloatSelectionState (dead parallel copy)   23 Knoten
+      [114] CanvasState (dead parallel copy)            4 Knoten
+    *** ZoomState HAT DIESMAL KEINE EIGENE COMMUNITY: Louvain hat es mit
+        ZoomController und CardTtsPlayer in [5] zusammengelegt. Die
+        Community heisst deshalb "Zoom Animation & TTS Playback (enthaelt
+        tote ZoomState-Kopie)" — NICHT pauschal "dead", sonst waere der
+        LEBENDE ZoomController mit abgestempelt. ***
+    *** DIE BENENNUNG IST UND BLEIBT KEINE LOESCHENTSCHEIDUNG (Univ. §1). ***
+
+*** BEFUND 4 — NEU UND WICHTIG FUER JEDE KUENFTIGE ABFRAGE:
+    KONSTANTEN STEHEN NICHT IM GRAPHEN. ***
+    Gegenprobe auf die Kernstuecke des Umbruch-Tasks:
+      Strip                              7 Treffer
+      WrapRowsLayout                     1
+      Separator                          5
+      getScrollableTracksViewportWidth   3
+      toolbarHeight / setWrapRows / rowCount / buildRows   je 1
+      *** ROW_WRAP                       0 Treffer ***
+    ROW_WRAP steht mit ACHT Vorkommen in VIER Dateien im Quelltext
+    (KeyBindings 4, PaintToolbar 2, KeyboardShortcutManager 1, PaintIcons 1)
+    — belegt per Textsuche. Die AST-Extraktion erfasst Typen und Methoden,
+    KEINE static-final-Felder.
+    *** DARAUS FOLGT DIREKT: Fragen nach Tastenbelegungen, Token-Namen oder
+        Registry-Eintraegen lassen sich am Graphen NICHT beantworten.
+        KeyBindings.ALL ist ein Feld, kein Knoten. Der dokumentierte
+        Widerspruch "79 vs 81 vs 82 Eintraege" ist deshalb auch mit dem
+        neuen Graphen nicht zu klaeren — dafuer braucht es den Quelltext.
+        Das ist die zweite Haelfte von Univ. §1: der Graph beantwortet
+        nicht "ist das tot" — und er beantwortet auch nicht "wie viele". ***
+
+
+GEGENPROBE (nicht behauptet, gemessen — Knoten je geaenderter Datei)
+--------------------------------------------------------------------
+  PaintToolbar.java              115 -> 143   (+28, der Umbruch)
+  AppSettings.java               120 -> 122   (+2: isPaintBarWrap/setPaintBarWrap)
+  SelectiveAlphaEditor.java      175 -> 176   (+1: toolbarHeight-Aufrufe)
+  PaintIcons.java                 93 ->  94
+  AppLifecycleController.java     12 ->  12
+  KeyBindings.java                13 ->  13
+  KeyboardShortcutManager.java    12 ->  12
+  PaintCallbacksFactory.java       5 ->   5
+
+  *** DIE VIER UNVERAENDERTEN ZAHLEN SIND KEIN FEHLER. *** Diese Dateien
+  haben Konstanten und Zeilen bekommen (ROW_WRAP, ein Registry-Eintrag,
+  ein Icon-Aufruf) — nichts davon ist ein Knoten (Befund 4). Sie wurden
+  trotzdem re-extrahiert; die Kanten koennen sich geaendert haben.
+
+  #479-Schrumpfsperre: NICHT gegriffen (2731 > 2698), graph.json regulaer
+  geschrieben. Dateiendungen im Graphen: nur .java und .sh (das
+  Deploy-Skript) — der Scan-Root src/ haelt doc/, bin/ und resources/
+  weiterhin draussen.
+
+
+UNNOETIGE SCHRITTE — NICHT AUSGEFUEHRT (Univ. §0)
+-------------------------------------------------
+  - KEIN Voll-Rebuild. 8 Dateien inkrementell, Diff nachvollziehbar.
+  - `graphify update .` NICHT benutzt (Scope-Falle, Univ. §1).
+  - KEIN --obsidian, --wiki, --neo4j, --svg, --graphml. Nicht gefordert.
+  - Der Widerspruch "79/81/82 KeyBindings-Eintraege" wurde NICHT nebenbei
+    aufgeloest. Er ist eine eigene Aufgabe (Univ. §9) und laut Befund 4
+    ohnehin nicht am Graphen zu klaeren.
+
+
+VORGEHEN (reproduzierbar)
+-------------------------
+  Aus dem Projekt-Root, Interpreter aus graphify-out/.graphify_python.
+  *** PYTHON-CODE ALS DATEI AUSFUEHREN, nicht per `python -c "..."` —
+      PowerShell frisst die doppelten Anfuehrungszeichen beim Uebergeben an
+      eine native exe. Gilt unveraendert seit dem ersten Refresh. ***
+  1. Backup nach graphify-out/2026-08-01b_vor-update/ + .graphify_old.json
+  2. detect_incremental(src/)  -> 8 geaendert, 0 geloescht, code_only=True
+  3. extract(<8 Dateien>, cache_root=Projekt-Root) -> 580 Knoten/1574 Kanten
+  4. build_merge([...], graph_path=graph.json, root=<scan-root>,
+     directed=False aus dem Flag der bestehenden graph.json gelesen)
+     + save_manifest(root=<scan-root>)
+  5. build_from_json -> cluster -> to_json -> GRAPH_REPORT.md
+  6. 125 Communities benannt, Report neu erzeugt
+  7. graphify export html
+  8. Diff gegen das Backup, Gegenprobe je Datei
+  9. cost.json fortgeschrieben, Temp-Dateien geloescht
+
+  Semantik-Schritt entfiel (code_only) -> 0 Tokens, keine Subagenten.
+  Die Wegwerf-Skripte lagen im scratchpad, nicht im Projekt.
+
+
+AKTUALISIERTE DOKUMENTE
+-----------------------
+  doc/WEITERMACHEN_PROMPT.txt   (GRAPHIFY-Abschnitt + STRUKTUR/GRAPH)
+  doc/GUIDELINES.md             (Steckbrief, Zeile Graphify-Scope)
+  doc/README.md                 (diese progress-Datei eingetragen)
+  CLAUDE.md                     (KnowledgeMap-Hinweis)
+
+
+RUNTIME-VERIFY
+--------------
+  KEINER. Es wurde kein Code angefasst, das Programm ist unveraendert.
+  Der aufgestaute Verify aus den Code-Tasks (W1-W9, C1-C12, Z1-Z10, U1-U19,
+  P1-P9, S1-S12, D1-D6, B1-B7, X1-X13, T1-T9) bleibt davon UNBERUEHRT offen.
+  Wer den Graphen ansehen will:
+    graphify-out/graph.html          im Browser
+    graphify-out/GRAPH_REPORT.md     Audit-Report
+    graphify explain "WrapRowsLayout"   Beispielabfrage zum neuen Umbruch

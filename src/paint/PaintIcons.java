@@ -224,7 +224,13 @@ public final class PaintIcons {
          * sechs Werkzeugen. Jetzt Zauberstab <i>mit Zahnrad</i>: es öffnet
          * die Einstellungen der Zauberstäbe, es ist keiner.
          */
-        WAND_PANEL(PaintIcons::drawWandPanel);
+        WAND_PANEL(PaintIcons::drawWandPanel),
+        /**
+         * Zeilenumbruch der Leiste — eine lange Reihe, ein Pfeil hinunter,
+         * eine zweite kürzere Reihe. Bewusst <b>kein</b> Zeichen: „☰" und „≡"
+         * bedeuten überall ein Menü, nicht einen Umbruch.
+         */
+        ROW_WRAP(PaintIcons::drawRowWrap);
 
         private final Painter painter;
         Action(Painter p) { this.painter = p; }
@@ -1019,6 +1025,28 @@ public final class PaintIcons {
     }
 
     /** Lineal mit Teilstrichen — vorher eine Wellenlinie. */
+    /**
+     * Zeilenumbruch: obere Reihe über die volle Breite, darunter eine kürzere
+     * zweite Reihe und ein Pfeil, der von rechts oben hinunterführt.
+     *
+     * <p>Die zweite Reihe ist <b>kürzer</b>, nicht gleich lang — zwei gleich
+     * lange Balken sähen wie eine Liste aus und nicht wie ein Umbruch. Der
+     * Pfeil steht rechts, weil dort umgebrochen wird.
+     */
+    private static void drawRowWrap(Graphics2D g, PaintColors c) {
+        g.setColor(AppColors.ICON_FILL);
+        roundRectFill(g, 2.0,  4.0, 20.0, 5.4, 1.6);
+        roundRectFill(g, 2.0, 14.6, 11.0, 5.4, 1.6);
+        g.setColor(AppColors.ICON_LINE);
+        roundRect(g, 2.0,  4.0, 20.0, 5.4, 1.6);
+        roundRect(g, 2.0, 14.6, 11.0, 5.4, 1.6);
+        // Umbruchpfeil: von der oberen Reihe hinunter und nach links.
+        line(g, 19.4, 11.2, 19.4, 17.3);
+        line(g, 19.4, 17.3, 16.2, 17.3);
+        line(g, 16.2, 17.3, 17.8, 15.7);
+        line(g, 16.2, 17.3, 17.8, 18.9);
+    }
+
     private static void drawRuler(Graphics2D g, PaintColors c) {
         AffineTransform old = g.getTransform();
         g.rotate(Math.toRadians(-20), 12, 12);

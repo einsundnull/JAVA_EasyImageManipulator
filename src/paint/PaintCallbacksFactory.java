@@ -119,6 +119,25 @@ class PaintCallbacksFactory {
 				ed.doRedo();
 			}
 
+			/**
+			 * Umbruch der Leiste — <b>hier</b> steht, was die Leiste selbst
+			 * nicht weiß: dass der Zustand einen Neustart überleben soll
+			 * (Univ. §12) und dass eine <i>schwebende</i> Leiste ihr Fenster
+			 * neu packen muss.
+			 */
+			@Override
+			public void onPaintBarRowsChanged(boolean wrap) {
+				// Aus dem LIVE-Zustand abgeleitet, nicht aus dem Argument
+				// mitgeführt — der zweite Bedienweg (Taste gegen Knopf) darf
+				// die Datei nicht desynchronisieren (§31).
+				AppSettings.getInstance().setPaintBarWrap(ed.paintToolbar.isWrapRows());
+				try { AppSettings.getInstance().save(); }
+				catch (java.io.IOException ex) {
+					System.err.println("[WARN] Einstellungen nicht gespeichert: " + ex.getMessage());
+				}
+				ed.repackFloatingPaintBar();
+			}
+
 			@Override
 			public BufferedImage getWorkingImage() {
 				return ed.ci().workingImage;

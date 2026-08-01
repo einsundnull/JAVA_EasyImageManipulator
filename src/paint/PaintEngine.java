@@ -478,6 +478,85 @@ public class PaintEngine {
     }
 
     // ────────────────────────────────────────────────────────────────────────
+    // Leinwandgröße (Canvas) — NICHT skalieren
+    // ────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Verankerung des vorhandenen Inhalts in der neuen Leinwand.
+     * Die beiden Faktoren sind Anteile (0 = links/oben, 1 = rechts/unten);
+     * daraus rechnet {@link #resizeCanvas} den Versatz.
+     */
+    public enum Anchor {
+        TOP_LEFT(0, 0),     TOP_CENTER(1, 0),     TOP_RIGHT(2, 0),
+        MIDDLE_LEFT(0, 1),  CENTER(1, 1),         MIDDLE_RIGHT(2, 1),
+        BOTTOM_LEFT(0, 2),  BOTTOM_CENTER(1, 2),  BOTTOM_RIGHT(2, 2);
+
+        /** 0 = links, 1 = mittig, 2 = rechts. */
+        public final int hx;
+        /** 0 = oben, 1 = mittig, 2 = unten. */
+        public final int vy;
+
+        Anchor(int hx, int vy) { this.hx = hx; this.vy = vy; }
+    }
+
+    /**
+     * Obergrenze je Kante. Ohne sie erzeugt ein unglücklicher Zug bei kleinem
+     * Zoom eine Leinwand, die den Heap sprengt — 20000 x 20000 px sind als
+     * ARGB bereits 1,6 GB. (Befund B01 vom 2026-07-31: ein einziges 6-MB-Bild
+     * mit vollem Undo-Stack kostet 606 MB.)
+     */
+    public static final int MAX_CANVAS_EDGE = 20000;
+
+    /**
+     * Ändert die <b>Leinwandgröße</b>: der Inhalt behält seine Pixelmaße und
+     * bleibt an der Verankerung stehen, neue Fläche entsteht transparent,
+     * überstehende Fläche wird beschnitten.
+     *
+     * <p><b>Das ist nicht {@link #scale(BufferedImage, int, int)}.</b> Dort
+     * wächst der Inhalt mit; hier nicht. In MS Paint sind das die zwei
+     * verschiedenen Funktionen „Größe ändern" und die Ziehgriffe am Bildrand
+     * — und genau diese Unterscheidung fehlte dem Projekt bis 2026-08-01.
+     *
+     * <p>Reiner Image-Space, stateless, ohne Zoom und ohne UI-Zustand (§27).
+     *
+     * @param anchor wohin der vorhandene Inhalt rückt; {@code null} = oben links
+     * @return ein neues Bild; das übergebene bleibt unverändert
+     */
+    public static BufferedImage resizeCanvas(BufferedImage img, int newW, int newH, Anchor anchor) {
+        if (img == null) return null;
+        int w = clampEdge(newW);
+        int h = clampEdge(newH);
+        if (w == img.getWidth() && h == img.getHeight()) return img;
+
+        Anchor a = anchor != null ? anchor : Anchor.TOP_LEFT;
+        int dx = offsetFor(w - img.getWidth(),  a.hx);
+        int dy = offsetFor(h - img.getHeight(), a.vy);
+
+        BufferedImage result = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = result.createGraphics();
+        // Kein Interpolations-Hinweis und keine Zielmaße: der Inhalt wird
+        // 1:1 kopiert. Wer hier drawImage(img, dx, dy, w, h, null) schreibt,
+        // hat wieder skaliert.
+        g2.drawImage(img, dx, dy, null);
+        g2.dispose();
+        return result;
+    }
+
+    /** Klemmt eine Kantenlänge auf 1 … {@link #MAX_CANVAS_EDGE}. */
+    public static int clampEdge(int px) {
+        return Math.max(1, Math.min(MAX_CANVAS_EDGE, px));
+    }
+
+    /** Versatz für eine Differenz bei 0 = Anfang, 1 = Mitte, 2 = Ende. */
+    private static int offsetFor(int delta, int position) {
+        return switch (position) {
+            case 1  -> delta / 2;
+            case 2  -> delta;
+            default -> 0;
+        };
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
     // Polygon operations (for PathLayer fill/clear operations)
     // ────────────────────────────────────────────────────────────────────────
 

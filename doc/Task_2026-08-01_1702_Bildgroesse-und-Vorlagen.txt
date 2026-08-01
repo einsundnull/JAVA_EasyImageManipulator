@@ -1,0 +1,189 @@
+==============================================================================
+Task_2026-08-01_1702_Bildgroesse-und-Vorlagen.txt      (PD nach Prompt_Handling)
+Typ: [BT]  —  neue Funktion (Leinwandgroesse) + Zusammenlegung zweier
+              Formattabellen + neue Persistenz (Vorlagen)
+Stand: 2026-08-01   ·   [1/9] bis [4/9] ERLEDIGT · naechster Schritt [5/9]
+                        Build gruen, 363 .class
+==============================================================================
+
+INITIALER PROMPT (User, 2026-08-01):
+  "in MS-Paint kann ich die Groesse (Hoehe und Breite) des tatsaechlich
+   gezeichneten Bildes ueber Drag und ueber Eingabe aendern. Ich moechte das
+   in meiner App auch koennen. Weisst du, was ich meine?
+   Ich moechte ausserdem auf Button klick A4 vorlagen, mit 25px Rand links
+   und rechts sowie 25px oben und unten. Erstellt automatisch verschiedene
+   Papiergroessen (A0 bis A5, Postkartenformate und amerikanische Formate)
+   zum Waehlen. Ausserdem moechte ich Vorlagen abspeichern koennen."
+
+ENTWURF/MOCKUP:  doc/Schema_Bildgroesse_und_Vorlagen.txt   (WARTET AUF FREIGABE)
+PROTOKOLL:       doc/progress_2026-08-01_bildgroesse-vorlagen-vorschlag.txt
+
+*** DIE DREI BEFUNDE, DIE DEN ZUSCHNITT BESTIMMT HABEN ***
+ 1. "Groesse aendern" gibt es in ZWEI Arten. SKALIEREN existiert
+    (TransformController.doScale, PaintEngine.scale). LEINWANDGROESSE
+    existiert NIRGENDS — auch nicht als PaintEngine-Methode; cropRegion
+    klemmt das Rechteck aufs Bild und kann nicht vergroessern.
+    MS Paints Ziehgriffe sind die LEINWAND-Operation. -> Frage F1.
+ 2. ES GIBT ZWEI PAPIERFORMAT-TABELLEN, die sich widersprechen:
+    book/PaperFormat (A0-A4, US) und paint/PageLayout (A3-A6, Letter,
+    Legal). A5/A6 fehlen im Dialog "Neue Datei", A0-A2 im Buchmodus,
+    Postkarten in beiden. *** Neue Formate kommen ERST NACH der
+    Zusammenlegung dazu, sonst entsteht aus zwei Listen eine dritte. ***
+ 3. Die Raender werden heute IN DIE PIXEL GEBRANNT
+    (NewFileController:70-79) — der nicht-destruktive Overlay existiert
+    aber schon (CanvasPanel:2959), nur an den Buchmodus gebunden.
+    *** FUENFTES MAL DIESELBE LEHRE: anschliessen, nicht bauen. ***
+
+*** UND EINE ZAHL, DIE VOR ALLEM ANDEREN GEKLAERT WERDEN MUSS:
+    25 mm = 94 px, 25 px = 6,6 mm. Das Projekt fuehrt Raender ueberall in
+    mm; PaperFormat hat 25 mm bereits als Vorgabe. Der Prompt sagt "25px".
+    -> Frage F2. Wer hier raet, liefert eine Vorlage, die um Faktor 3,8
+    danebenliegt. ***
+
+------------------------------------------------------------------------------
+SCHRITTE
+------------------------------------------------------------------------------
+[1/9]  [B]  BEFUND + MOCKUP + FRAGEN                        *** ERLEDIGT ***
+       Quellbaum gemessen statt geschaetzt: 46 PaintEngine-Methoden
+       durchgesehen, beide Formattabellen mit ihren Nutzern aufgelistet,
+       Textsuche nach doScale (Nebenbefund 6), Rand-Overlay und
+       Rand-Einbrennen gegenuebergestellt.
+       -> progress_2026-08-01_bildgroesse-vorlagen-vorschlag.txt
+       -> Schema_Bildgroesse_und_Vorlagen.txt (Mockups A/B/C + F1-F5)
+       Modell: das aktuelle (Befund + Entwurf, kein Haiku).
+
+[2/9]  [B]  FREIGABE DES USERS EINHOLEN                  <- HIER STEHEN WIR
+       Univ. §9 (Mockup-First) macht das verbindlich.
+       *** BLOCKIEREND: ohne F1 (Drag = Leinwand oder Skalieren?) ist
+           [4] und [5] nicht schreibbar, ohne F2 (px oder mm?) ist [7]
+           nicht schreibbar. F3/F4/F5 aendern Umfang, nicht Machbarkeit. ***
+
+[3/9]  [B]  EINE PAPIERFORMAT-TABELLE (Befund 2)
+       book/PaperFormat additiv erweitern (A5, A6, vier Postkarten-, drei
+       weitere US-Formate) und paint/PageLayout.FORMAT_MM daraus SPEISEN
+       statt daneben zu fuehren.
+       *** RUECKWAERTSKOMPATIBEL: der Formatname steht als String in den
+           .layout-Dateien (PageLayoutManifest:80). Ein Manifest mit "A4"
+           muss unveraendert laden, ein unbekannter Name weiterhin null
+           liefern statt zu werfen (Univ. §6). ***
+       Kein bestehender Wert wird geaendert — nur ergaenzt.
+       Modell: Haiku moeglich (Tabellenarbeit, exakt vorgezeichnet).
+       Ergebnis gegenlesen: die Umrechnung mm->px darf NICHT gerundet
+       neu getippt werden.
+
+[4/9]  [B]  PaintEngine.resizeCanvas(img, w, h, anchor)
+       Die fehlende Grundoperation: neues BufferedImage, altes an der
+       Verankerung hineinzeichnen, Rest transparent. Stateless,
+       Image-Space, statisch — wie der Rest der Klasse (§27).
+       *** Deckel auf die Kantenlaenge (Vorschlag 20000 px). B01 hat
+           gezeigt, was ein unbedachtes Bild im Speicher kostet. ***
+       Modell: Haiku moeglich — reine, testbare Bildoperation.
+
+[5/9]  [C]  ZIEHGRIFFE AM BILDRAND  (Mockup A)
+       Drei Griffe (rechts, unten, Ecke) in Screen-Space, feste 8 px,
+       gestrichelte Vorschau + Masszahl in ECHTEN Bildpixeln.
+       *** §22: die ENTSCHEIDUNG gehoert NICHT in CanvasPanel. *** Das
+       Panel bekommt Trefferzone und Zeichnung (es ist der Zeichenpfad),
+       die Logik einen eigenen CanvasResizeController hinter dem
+       vorhandenen CanvasCallbacks — genau wie die acht Element-Griffe
+       ueber callbacks.handleRects() laufen.
+       *** Trefferreihenfolge: Bildrand kommt ZULETZT (§22). Ein Layer-
+           Griff am Bildrand muss weiter gewinnen. ***
+       *** EIN pushUndo beim LOSLASSEN, nicht pro Mausbewegung (§29). ***
+       *** Und: die Geste kommt ZUERST in KeyBindings (Scope MOUSE),
+           dann in den Handler (§25). ***
+       [C], weil die Maus-Trefferkette des Canvas beruehrt wird und daran
+       jede eingeuebte Bedienung haengt.
+       Modell: KEIN Haiku.
+
+[6/9]  [B]  DIALOG "BILDGROESSE"  (Mockup B)
+       Zweiter Dialog neben "Skalieren", ueber createBaseDialog (§20).
+       Breite/Hoehe mit px/mm/cm/inch, Formatliste aus [3], neun
+       Verankerungsknoepfe, Haken "Inhalt mitskalieren".
+       *** Die Einheiten-Umrechnung wird NICHT ein drittes Mal getippt:
+           PX_PER_MM steht in NewImageDialog:44, mmToPx in PageLayout:57.
+           Eine Stelle, aus [3]. ***
+       *** Der Dialog "Skalieren" bleibt unangetastet — er funktioniert.
+
+[7/9]  [B]  VORLAGEN: FORMAT + RAENDER  (Mockup C, Teil 1)
+       Knopf -> Vorlagen-Dialog -> neues Bild.
+       *** WIEDERVERWENDUNG STATT NEUBAU: MarginPreviewPanel
+           (NewImageDialog:379) hat Vorschau, gestrichelte Randlinien und
+           die vier Ziehgriffe bereits. Kein zweites Vorschau-Panel. ***
+       Abhaengig von F2 (mm oder px) und F3 (Overlay oder eingebrannt).
+       Bei F3=(a): NewFileController:70-79 brennt nicht mehr, stattdessen
+       wird der Overlay aus CanvasPanel:2959 von "Buchmodus" auf
+       "PageLayout vorhanden" erweitert und die Raender landen in der
+       .layout-Datei neben dem Bild.
+       *** DAS IST EINE VERHALTENSAENDERUNG AN EINER BESTEHENDEN
+           FUNKTION — sie steht und faellt mit der Antwort auf F3. ***
+
+[8/9]  [B]  VORLAGEN SPEICHERN  (Mockup C, Teil 2)
+       AppPaths.getTemplatesDir() (§31: kein Pfad ausserhalb dieser
+       Klasse; Verzeichnis entsteht beim ERSTEN Zugriff, nicht beim Start)
+       + Lesen/Schreiben ueber das Format von PageLayoutManifest,
+       erweitert um name/widthPx/heightPx.
+       *** EIN Reader/Writer-Paar (§6), KEIN sechster JSON-Serializer
+           (§31). Fehlender Schluessel = Default; ein fehlendes
+           templates/ muss exakt das alte Startverhalten ergeben. ***
+       *** Mitgelieferte Vorlagen stehen IM CODE, nicht als Dateien —
+           sonst kaemen geloeschte beim naechsten Start wieder. ***
+       Modell: Haiku moeglich, Muster liegt in PageLayoutManifest vor.
+
+[9/9]  [B]  BUILD + DOKU
+       javac -encoding UTF-8 …, .class-Zahl in ein LEERES Verzeichnis
+       nachmessen (heute 362) und die Messmethode dazuschreiben.
+       Danach: CLAUDE.md (Architektur + Persistenz + Tastatur) ·
+       doc/GUIDELINES.md (Steckbrief: Persistenz-Paare, ggf. neuer §36
+       fuer die Leinwand-Operation) · doc/README.md (Wegweiser) ·
+       WEITERMACHEN_PROMPT.txt · Schema Abschnitt 7 (Verify-Liste
+       V1-V10) · graphify --update fuer die geaenderten Dateien
+       (*** kein `graphify update .` — Scope-Falle, Univ. §1 ***).
+
+------------------------------------------------------------------------------
+UNNOETIGE SCHRITTE — AUSDRUECKLICH NICHT GEMACHT (Univ. §0)
+------------------------------------------------------------------------------
+ - Den Dialog "Skalieren" umbauen oder mit dem neuen zusammenlegen. Er
+   funktioniert, er ist eingeuebt, und die beiden Operationen sind
+   verschieden. Zusammenlegen waere Risiko ohne Gegenwert.
+ - EditorDialogs.doScale():171 loeschen. Es ist eine referenzfreie Kopie
+   von TransformController.doScale (Textsuche: null Aufrufer) und gehoert
+   zu L02 — aber eine Loeschung ist ein eigener Vorgang mit eigener
+   Freigabe, kein Beifang dieser Aufgabe.
+ - CanvasPanel entflechten ([10] im WEITERMACHEN). Diese Aufgabe fasst das
+   Panel nur dort an, wo sie muss (Zeichnen + Trefferzone), und legt die
+   neue Logik daneben — sie macht die God-Klasse nicht groesser, aber sie
+   zerlegt sie auch nicht.
+ - Ein physischer Package-Split nach io/render/ui (§4). Unberuehrt.
+
+------------------------------------------------------------------------------
+FORTSCHRITT
+------------------------------------------------------------------------------
+[1/9] abgeschlossen
+[2/9] abgeschlossen — F1=Leinwand · F2=25 mm · F3=Overlay · F4=_DOC werden
+      Vorlagen. Alle vier nach Empfehlung. F5 (Knopf-Ort/Taste) wird in [7]
+      entschieden; Annahme bis dahin: obere Leiste neben "Neu", keine Taste.
+[3/9] abgeschlossen — eine Papierformat-Tabelle, 15 Eintraege ueberall
+      gleich. *** Ledger wieder gestrichen: es war Zeile fuer Zeile
+      identisch mit Tabloid. ***
+[4/9] abgeschlossen — PaintEngine.resizeCanvas + Anchor + Deckel,
+      36 Pruefungen gegen die kompilierten Klassen bestanden.
+      -> progress_2026-08-01_bildgroesse-vorlagen-umsetzung-01.txt
+[5/9] offen
+[6/9] offen
+[7/9] offen
+[8/9] offen
+[9/9] offen
+
+------------------------------------------------------------------------------
+MODEL-STRATEGIE (Token sparen ohne Kontextverlust)
+------------------------------------------------------------------------------
+ - [3], [4], [8] sind Haiku-tauglich: Tabellen, eine reine Bildoperation,
+   ein Reader/Writer nach vorhandenem Muster. *** Jedes Ergebnis wird
+   gegengelesen — bei [3] besonders die Rueckwaertskompatibilitaet der
+   Formatnamen. ***
+ - [5] und [6] sind es NICHT: Maus-Trefferkette und Koordinatensysteme.
+ - Sinnvoller Schnitt: nach [4] "/clear" + WEITERMACHEN_PROMPT.txt, dann
+   mit [5] frisch einsteigen. [5] braucht den vollen Kontext von §22/§27,
+   nicht den Verlauf der Tabellenarbeit.
+==============================================================================

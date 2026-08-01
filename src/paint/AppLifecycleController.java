@@ -117,6 +117,9 @@ class AppLifecycleController {
 				ed.paintToolbar.setStrokeWidth(settings.getStrokeWidth());
 				ed.paintToolbar.setAntialiasing(settings.isAntialias());
 				ed.paintToolbar.setWandTolerance(settings.getWandTolerance());
+				// Ohne Rückmeldung an den Verdrahter: gelesen wird genau einmal
+				// beim Start, und dabei wird nichts zurückgeschrieben (§12).
+				ed.paintToolbar.setWrapRows(settings.isPaintBarWrap());
 				try {
 					ed.paintToolbar.setFillMode(settings.getFillMode());
 					ed.paintToolbar.setBrushShape(settings.getBrushShape());
@@ -286,6 +289,7 @@ class AppLifecycleController {
 				settings.setStrokeWidth(ed.paintToolbar.getStrokeWidth());
 				settings.setAntialias(ed.paintToolbar.isAntialiasing());
 				settings.setWandTolerance(ed.paintToolbar.getWandTolerancePct());
+				settings.setPaintBarWrap(ed.paintToolbar.isWrapRows());
 				if (ed.paintToolbar.getActiveTool() != null)
 					settings.setActiveTool(ed.paintToolbar.getActiveTool().toString());
 				settings.setFillMode(ed.paintToolbar.getFillMode().toString());

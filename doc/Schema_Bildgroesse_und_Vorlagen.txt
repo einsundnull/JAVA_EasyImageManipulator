@@ -1,0 +1,299 @@
+==============================================================================
+Schema_Bildgroesse_und_Vorlagen.txt          Stand: 2026-08-01, 17:02
+ASCII-Mockup nach Univ. §9 (Mockup-First)
+*** ENTWURF — WARTET AUF FREIGABE. Die fuenf Fragen stehen in Abschnitt 6. ***
+==============================================================================
+AUFGABE (Prompt des Users, 2026-08-01):
+
+  "in MS-Paint kann ich die Groesse (Hoehe und Breite) des tatsaechlich
+   gezeichneten Bildes ueber Drag und ueber Eingabe aendern. Ich moechte das
+   in meiner App auch koennen. [...] auf Button klick A4 vorlagen, mit 25px
+   Rand links und rechts sowie 25px oben und unten. Erstellt automatisch
+   verschiedene Papiergroessen (A0 bis A5, Postkartenformate und
+   amerikanische Formate) zum Waehlen. Ausserdem moechte ich Vorlagen
+   abspeichern koennen."
+
+BEFUND MIT ALLEN MESSWERTEN:
+  doc/progress_2026-08-01_bildgroesse-vorlagen-vorschlag.txt
+
+BETROFFEN:   PaintEngine (neue Methode) · TransformController oder neuer
+             CanvasResizeController · CanvasPanel (nur Zeichnen + Trefferzone)
+             · book/PaperFormat + paint/PageLayout (Formattabellen) ·
+             NewImageDialog + NewFileController (Vorlagen) · AppPaths ·
+             KeyBindings (falls Taste) · AppSettings (falls Schalter)
+NICHT BETROFFEN: Szenen-Format (§23, Vertrag mit GameII) · ImageFileWriter ·
+             Undo-Mechanik · PaintToolbar-Layout
+
+------------------------------------------------------------------------------
+1. DIE UNTERSCHEIDUNG, UM DIE SICH ALLES DREHT
+------------------------------------------------------------------------------
+  SKALIEREN (gibt es)              LEINWAND (gibt es nicht)
+  +----------+                     +----------+
+  |  /\      |                     |  /\      |
+  | /  \     |   ->  +--------+    | /  \     |  ->  +-------------+
+  |/____\    |       |  /\    |    |/____\    |      |  /\         |
+  +----------+       | /  \   |    +----------+      | /  \        |
+                     |/____\  |                      |/____\       |
+   800 x 600         +--------+     800 x 600        |             |
+                      400x300                        +-------------+
+                                                       1200 x 800
+  Inhalt waechst mit.              Inhalt bleibt. Flaeche waechst
+  PaintEngine.scale()              (transparent) oder beschneidet.
+  Dialog "Skalieren"               *** FEHLT VOLLSTAENDIG ***
+
+  In MS Paint sind die ZIEHGRIFFE am Bildrand die LEINWAND-Operation.
+  -> Frage F1.
+
+------------------------------------------------------------------------------
+2. MOCKUP A — ZIEHGRIFFE AM BILDRAND (Canvas)
+------------------------------------------------------------------------------
+Drei Griffe wie in MS Paint: rechts, unten, Ecke rechts-unten. Sie haengen
+am BILD, nicht an einem Layer — deshalb liegen sie ausserhalb der acht
+Element-Griffe und werden NACH ihnen getroffen (Trefferreihenfolge §22:
+Handle -> Punkt/Layer -> Kante/Flaeche -> ZULETZT Bildrand).
+
+   Canvas (grau) mit Bild:
+   +------------------------------------------------+
+   |                                                 |
+   |   +==========================+                  |
+   |   |                          |                  |
+   |   |        B I L D           |                  |
+   |   |                          [o] <- rechts      |
+   |   |                          |    (E_RESIZE)    |
+   |   |                          |                  |
+   |   +=========[o]==========[/] |                  |
+   |             ^            ^                      |
+   |         unten        Ecke rechts-unten          |
+   |       (N_RESIZE)      (SE_RESIZE)               |
+   |                                                 |
+   |   waehrend des Zugs:                            |
+   |   +==========================+- - - - - -+      |
+   |   |                          |           :      |
+   |   |        B I L D           |  gestrichelte    |
+   |   |                          |  Vorschau +      |
+   |   +--------------------------+  Masszahl:       |
+   |                                 :1200 x 800:    |
+   |                                 + - - - - -+    |
+   +------------------------------------------------+
+
+  REGELN DES ZUGS
+   - Griffe sind IMMER 8 px gross, unabhaengig vom Zoom (sie sind
+     Bedienelemente, kein Bildinhalt) — gezeichnet in Screen-Space.
+   - Die ZAHL im Etikett ist Image-Space (echte Pixel), nicht Screen-Space.
+     *** Umrechnung ausschliesslich ueber screenToImage() / toSx (§27).
+         Kein "* zoom" im Zughandler. ***
+   - Verkleinern beschneidet (Inhalt weg), Vergroessern fuellt transparent.
+   - Umschalt beim Eckgriff = Seitenverhaeltnis halten.
+   - EIN pushUndo() beim LOSLASSEN, nicht pro Mausbewegung (§29:
+     ein pushUndo pro Benutzeraktion). Vorbild: das aufgeschobene
+     "pendingUndo" in CanvasPanel.
+   - Minimum 1 x 1 px, Maximum wird gedeckelt (Vorschlag 20000 px je Kante)
+     — sonst erzeugt ein unglueckliches Ziehen bei kleinem Zoom eine
+     Leinwand, die den Heap sprengt. *** B01 hat gezeigt, was ein
+     unbedachtes Bild im Speicher kostet. ***
+
+------------------------------------------------------------------------------
+3. MOCKUP B — DIALOG "BILDGROESSE" (Eingabe)
+------------------------------------------------------------------------------
+Der bestehende Dialog "Skalieren" bleibt UNVERAENDERT. Daneben tritt ein
+zweiter mit derselben Bauweise (createBaseDialog, §20):
+
+  +-- Bildgroesse -----------------------------------------+
+  |                                                        |
+  |   Breite:  [ 794      ]   Hoehe:  [ 1123     ]  [px v] |
+  |                                                        |
+  |   Format:  [ A4  (210 x 297 mm)              v ]       |
+  |            [ Hochformat ] [ Querformat ]               |
+  |                                                        |
+  |   Verankerung des vorhandenen Inhalts:                 |
+  |            +---+---+---+                               |
+  |            | o | o | o |     (9 Knoepfe, Vorgabe       |
+  |            +---+---+---+      links-oben — so macht    |
+  |            | o | o | o |      es MS Paint)             |
+  |            +---+---+---+                               |
+  |            | o | o | o |                               |
+  |            +---+---+---+                               |
+  |                                                        |
+  |   [ ] Inhalt mitskalieren                              |
+  |       (aus = Leinwand aendern, an = wie "Skalieren")   |
+  |                                                        |
+  |                              [ OK ]  [ Abbrechen ]     |
+  +--------------------------------------------------------+
+
+  - Einheiten px/mm/cm/inch wie in NewImageDialog — *** dieselbe
+    Umrechnung, aus EINER Stelle, nicht abgetippt *** (heute steht
+    PX_PER_MM in NewImageDialog:44 UND als mmToPx in PageLayout:57 — die
+    Zusammenlegung gehoert zu Abschnitt 4).
+  - Die Formatliste ist DIESELBE wie in Abschnitt 4. Ein Format waehlen
+    setzt Breite/Hoehe, mehr nicht.
+
+------------------------------------------------------------------------------
+4. EINE PAPIERFORMAT-TABELLE STATT ZWEIER
+------------------------------------------------------------------------------
+IST (Befund 2): book/PaperFormat kennt A0-A4 + US, paint/PageLayout kennt
+A3-A6 + Letter/Legal. *** A5/A6 fehlen im Dialog "Neue Datei", A0-A2 im
+Buchmodus, Postkarten ueberall. ***
+
+SOLL: EINE Quelle. Vorschlag — book/PaperFormat.Format additiv erweitern
+(es traegt bereits Raender, PageLayout nicht) und PageLayout.FORMAT_MM
+daraus SPEISEN statt daneben zu fuehren.
+
+  DIN A                A0 841x1189   A1 594x841   A2 420x594
+                       A3 297x420    A4 210x297   A5 148x210
+                       A6 105x148                                (neu: A5 A6)
+  Postkarte            Postkarte      148 x 105 mm  (A6 quer)     (neu)
+                       DIN lang       210 x  99 mm                (neu)
+                       US-Postkarte   152 x 102 mm  (6 x 4 inch)  (neu)
+                       Foto 5x7       178 x 127 mm                (neu)
+  USA                  Letter         216 x 279 mm
+                       Legal          216 x 356 mm
+                       Tabloid        279 x 432 mm
+                       Ledger         432 x 279 mm                (neu)
+                       Executive      184 x 267 mm                (neu)
+                       Half Letter    140 x 216 mm                (neu)
+
+  *** DREI DINGE, DIE DABEI NICHT SCHIEFGEHEN DUERFEN ***
+   1. Die Auswahlliste in NewImageDialog:93 zeigt heute fmts.length
+      Eintraege — also AUCH die acht "_DOC"-Varianten. Mit den neuen
+      Formaten waeren das ueber 25 Zeilen ohne Gruppierung.
+      -> Die _DOC-Varianten sind KEINE eigenen Formate, sondern
+         Rand-Vorgaben. Sie gehoeren in die Vorlagen (Abschnitt 5),
+         nicht in die Formatliste. *** Das ist eine Verhaltensaenderung
+         am bestehenden Dialog und braucht die Freigabe (F4). ***
+   2. Die Namen sind ANZEIGETEXT und duerfen nicht der enum-Name sein
+      ("Half Letter", "DIN lang", "Postkarte" haben Leerzeichen).
+      PageLayout speichert den Namen als String im .layout-Manifest
+      (PageLayoutManifest:80) — *** das ist ein geschriebenes Format:
+      alte Dateien mit "A4" muessen weiter laden. ***
+   3. PageLayout.formatMm() gibt heute null fuer unbekannte Namen zurueck
+      und der Aufrufer faengt das ab. Das bleibt so — ein Manifest mit
+      einem Format, das es nicht mehr gibt, darf nicht werfen.
+
+------------------------------------------------------------------------------
+5. MOCKUP C — VORLAGEN
+------------------------------------------------------------------------------
+Eine Vorlage ist: Format + Ausrichtung + vier Raender + (optional) Kopf-/
+Fusszeile/Seitenzahl. *** Also exakt das, was PageLayout schon traegt und
+PageLayoutManifest schon liest und schreibt (§6). ***
+
+  Knopf in der oberen Leiste, neben "Neu":
+
+  +-- Vorlage waehlen -------------------------------------+
+  |                                                        |
+  |  EIGENE VORLAGEN                                       |
+  |   > Arbeitsblatt A4          A4 hoch  · 25/25/25/25 mm |
+  |   > Postkarte Gruss          Postk.  quer · 5 mm       |
+  |                                                        |
+  |  MITGELIEFERT                                          |
+  |   > A4 mit Rand              A4 hoch  · 25 mm rundum   |
+  |   > A4 ohne Rand             A4 hoch  · 0 mm           |
+  |   > A5 mit Rand              A5 hoch  · 20 mm rundum   |
+  |   > Postkarte                A6 quer  · 5 mm           |
+  |   > Letter mit Rand          Letter   · 25 mm rundum   |
+  |                                                        |
+  |  +------------------+   Format:  [ A4            v ]   |
+  |  |                  |   [Hoch] [Quer]                  |
+  |  |  Vorschau mit    |   Oben  [25] Unten [25]          |
+  |  |  gestrichelten   |   Links [25] Rechts[25]  [mm v]  |
+  |  |  Randlinien      |                                  |
+  |  |  + 4 Ziehgriffen |   [ Als Vorlage speichern ... ]  |
+  |  +------------------+   [ Vorlage loeschen ]           |
+  |                                                        |
+  |                          [ Erstellen ]  [ Abbrechen ]  |
+  +--------------------------------------------------------+
+
+  *** DIE VORSCHAU WIRD NICHT NEU GEBAUT. *** NewImageDialog hat sie
+  bereits: MarginPreviewPanel (NewImageDialog:379-514) mit weisser Seite,
+  gestrichelten blauen Randlinien, vier runden Ziehgriffen und
+  Millimeter-Beschriftung. Der Vorlagen-Dialog ist derselbe Dialog mit
+  einer Liste davor — *** kein zweites Vorschau-Panel. ***
+
+  ABLAGE (Univ. §12 / §31: alle Pfade ueber AppPaths):
+      %APPDATA%\TransparencyTool\templates\<Name>.layout
+    Format = das des PageLayoutManifest ("key: value", UTF-8), erweitert um
+    zwei Schluessel:
+        name:        Arbeitsblatt A4
+        widthPx:     794          <- damit "Benutzerdefiniert" moeglich ist
+        heightPx:    1123
+    *** Fehlender Schluessel = Default (Univ. §6). Eine .layout-Datei
+        neben einer Buchseite und eine Vorlage sind damit dasselbe Format
+        — sie unterscheiden sich nur durch den Ort. Kein zweites Format,
+        kein sechster JSON-Serializer (§31). ***
+    Die mitgelieferten Vorlagen stehen IM CODE, nicht als Dateien:
+    ein fehlendes templates/-Verzeichnis muss genau das alte Startverhalten
+    ergeben, und mitgelieferte Dateien, die der User loescht, kaemen beim
+    naechsten Start wieder.
+
+  RAENDER SIND OVERLAY, NICHT PIXEL (Befund 3, Frage F3):
+    Heute brennt NewFileController:70-79 die gestrichelte Linie in das PNG.
+    Vorschlag: stattdessen den vorhandenen, nicht-destruktiven Overlay aus
+    CanvasPanel:2959 benutzen und seine Bedingung von "Buchmodus" auf
+    "PageLayout vorhanden" erweitern. Die Raender wandern dann in die
+    .layout-Datei neben das Bild (PageLayoutManifest kann das schon).
+    *** DAS IST EINE VERHALTENSAENDERUNG AN EINER BESTEHENDEN FUNKTION —
+        deshalb Frage, nicht Beschluss. ***
+
+------------------------------------------------------------------------------
+6. FUENF FRAGEN AN DEN USER  (F1 und F2 sind blockierend)
+------------------------------------------------------------------------------
+F1 *** WAS SOLL DAS ZIEHEN TUN? ***
+     (a) LEINWAND aendern — Inhalt bleibt gleich gross, Flaeche waechst
+         transparent oder beschneidet.  *** So macht es MS Paint. ***
+     (b) SKALIEREN — Inhalt waechst mit (das, was der Dialog "Skalieren"
+         heute schon per Eingabe kann).
+     (c) BEIDES: ziehen = Leinwand, Umschalt+ziehen = skalieren.
+     -> EMPFEHLUNG (a). Begruendung: (b) gibt es bereits als Eingabe, und
+        der Prompt nennt MS Paint namentlich. (c) ist verlockend, aber
+        Umschalt ist am Eckgriff schon fuer "Seitenverhaeltnis halten"
+        vorgesehen — zwei Bedeutungen auf einer Taste ist genau der
+        Konflikt, den §25 fuehren muesste.
+
+F2 *** 25 px ODER 25 mm RAND? ***
+     25 mm = 94 px · 25 px = 6,6 mm (bei den projektweiten 96 dpi).
+     Das Projekt fuehrt Raender ueberall in mm; PaperFormat hat bereits
+     25/25/25/25 mm als Vorgabe.
+     -> EMPFEHLUNG: mm. Falls px gemeint war, wird die Vorlage "A4 mit
+        Rand" einen Streifen von 6,6 mm zeigen — auf Papier fast nichts.
+
+F3 *** RAENDER ALS OVERLAY ODER WEITER EINGEBRANNT? ***
+     (a) Overlay (nicht-destruktiv, aus-/einblendbar, aenderbar, nicht im
+         Export) — dafuer gibt es den fertigen Code schon.
+     (b) wie bisher in die Pixel gebrannt.
+     (c) Overlay, und zusaetzlich ein Knopf "Raender einbrennen".
+     -> EMPFEHLUNG (a). (b) ist der Ist-Zustand und der Grund, warum
+        Raender heute nicht korrigierbar sind.
+
+F4 *** SOLLEN DIE ACHT "_DOC"-VARIANTEN AUS DER FORMATLISTE VERSCHWINDEN? ***
+     Sie sind keine Papierformate, sondern Rand-Vorgaben (A4_DOC = A4 mit
+     22/28/28/20 mm). Mit den neuen Formaten haette die Liste sonst ueber
+     25 Eintraege.
+     -> EMPFEHLUNG: ja — sie werden zu mitgelieferten VORLAGEN. Der Wert
+        geht nicht verloren, er wandert nur dorthin, wo er hingehoert.
+
+F5 *** WO SOLL DER VORLAGEN-KNOPF SITZEN, UND BRAUCHT ER EINE TASTE? ***
+     Vorschlag: obere Leiste neben "Neu". Taste: keine — F1-F7 sind voll
+     vergeben, und §25 verlangt zuerst den Registry-Eintrag.
+     Falls doch eine Taste gewuenscht ist: Strg+Umschalt+N waere frei
+     (zu pruefen), *** und sie kaeme ZUERST in KeyBindings, dann in den
+     Handler. ***
+
+------------------------------------------------------------------------------
+7. RUNTIME-VERIFY (wird nach der Umsetzung ausgefuellt — Univ. §10)
+------------------------------------------------------------------------------
+  V1  Bild laden, rechten Griff nach rechts ziehen -> Leinwand breiter,
+      neuer Bereich TRANSPARENT (Schachbrett), Inhalt unveraendert gross.
+  V2  Denselben Griff nach links ziehen -> beschnitten, EIN Strg+Z holt
+      alles zurueck (nicht 30).
+  V3  Eckgriff mit Umschalt -> Seitenverhaeltnis bleibt.
+  V4  Bei Zoom 25 % und bei 400 % ziehen -> die Masszahl im Etikett zeigt
+      ECHTE Bildpixel, nicht Bildschirmpixel.
+  V5  Dialog "Bildgroesse": 210 mm eingeben -> 794 px.
+  V6  Dialog "Skalieren" verhaelt sich UNVERAENDERT.
+  V7  Vorlage "A4 mit Rand" -> 794 x 1123 px, Raender sichtbar, aber im
+      gespeicherten PNG NICHT enthalten (F3a).
+  V8  Eigene Vorlage speichern, Programm neu starten -> Vorlage ist da.
+  V9  templates/-Verzeichnis loeschen -> Programm startet, mitgelieferte
+      Vorlagen sind da, keine Fehlermeldung.
+  V10 Eine alte Buchseite mit page_001.layout oeffnen -> Raender wie vorher.
+      *** WICHTIGSTE PRUEFUNG AUF RUECKWAERTSKOMPATIBILITAET. ***
+==============================================================================

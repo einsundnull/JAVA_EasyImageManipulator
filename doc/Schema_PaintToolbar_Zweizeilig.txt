@@ -1,0 +1,273 @@
+==============================================================================
+Schema_PaintToolbar_Zweizeilig.txt      Stand: 2026-08-01, 14:36
+ASCII-Mockup nach Univ. §9 (Mockup-First)
+*** FREIGEGEBEN UND UMGESETZT am 2026-08-01. Die drei Antworten des Users
+    stehen in Abschnitt 5, was die Umsetzung am Entwurf geaendert hat in
+    Abschnitt 8. ***
+==============================================================================
+AUFGABE (Prompt des Users, 2026-08-01):
+
+  "dass ich einstellen/toggeln kann, ob die Buttons im Paint Menu alle in
+   einer Reihe sind (wie jetzt) oder, ob die Buttons die standardmaessig zu
+   weit rechts sind in einer zweiten Reihe angezeigt werden. die undo und
+   redo Buttons kommen dann in die zweite Reihe ganz ans Ende rechts"
+
+BETROFFEN:  src/paint/PaintToolbar.java (Aufbau + Hoehe)
+            src/paint/SelectiveAlphaEditor.java (zwei Stellen, die
+              PaintToolbar.TOOLBAR_H als feste Hoehe setzen: Andocken 414,
+              Schweben 471)
+            src/paint/AppSettings.java (neuer Schalter, Univ. §12 / §31)
+NICHT BETROFFEN: WandPanel (eigenes Fenster, eigenes Raster) ·
+            SecondaryPaintBar (nur Anzeige) · CanvasPanel · PaintIcons
+
+------------------------------------------------------------------------------
+1. BEFUND — GEMESSEN, NICHT GESCHAETZT
+------------------------------------------------------------------------------
+Wegwerf-Messprogramm gegen die KOMPILIERTEN Klassen (Vorbild:
+progress_2026-08-01_paint-icons-umsetzung.txt), es baut eine echte
+PaintToolbar mit leeren Callbacks und liest die preferredSize des Streifens.
+
+  natuerliche Breite des Streifens : 2592 px  (+12 px Rand = 2604)
+  Hoehe des Streifens              :   58 px  (Knopf 50 + 2x4 Rand)
+  TOOLBAR_H heute                  :  105 px  (BTN_SIZE 50 + 55)
+  Bildschirmbreite hier            : 1600 px
+
+Die elf Gruppen mit ihrer gemessenen Breite (Trenner je 13 px):
+
+  [ 0] Zurueck/Vor (Undo/Redo)                          103
+  [ 2] Werkzeuge (14 Knoepfe a 58+3)                     854
+  [ 4] Farbfelder primaer/sekundaer                       50
+  [ 6] Palette (2 x 14 Farbfelder)                       338
+  [ 8] Staerke + Alpha (zwei Regler)                     180
+  [10] Fuellart + Pinselform (zwei Auswahllisten)         90
+  [12] Glaetten                                           50
+  [14] Staebe (Zauberstab-Raster)                         50
+  [16] Transformationen (8 Knoepfe)                      421
+  [18] Zwischenablage (3 Knoepfe)                        156
+  [20] Ansicht (Raster, Lineal, Einheit)                 158
+                                                       -----
+                                     Gruppen  2580 + 12 Trenner
+
+*** DIE ZAHL, DIE DEN ENTWURF BESTIMMT: 2604 px Inhalt gegen 1588 px
+    nutzbare Fensterbreite (1600 minus Rahmen). Das sind 1,64 Reihen.
+    ZWEI Reihen reichen auf DIESEM Bildschirm — aber nicht auf jedem
+    Fenster: bei 1200 px Fensterbreite waeren es 2,17 Reihen, bei 1024 px
+    2,54. Ein Umbruch "so viel wie passt" erzeugt dort DREI Reihen.
+    Deshalb ist Frage 1 unten keine Formalie. ***
+
+------------------------------------------------------------------------------
+2. IST-ZUSTAND (Modus "eine Reihe" — bleibt unveraendert die Vorgabe)
+------------------------------------------------------------------------------
+                                Fensterbreite 1588
+  <------------------------------------------------------------------>
+  +------------------------------------------------------------------+
+  | [↩ ][↪ ] | [Stift][Fuellen][Linie][Ellipse][Rechteck][Radierer][R|
+  |  Zur. Vor |                                                       |
+  |==================================================================|
+  | ◄  waagerechte Bildlaufleiste — 2604 px Inhalt in 1588 px       ► |
+  +------------------------------------------------------------------+
+                                                        Hoehe 105 px
+
+  Bedienung heute: Rad ueber der Leiste scrollt waagerecht, Mittelklick
+  zieht sie. Beides bleibt in BEIDEN Modi erhalten.
+
+------------------------------------------------------------------------------
+3. ENTWURF (Modus "zwei Reihen")
+------------------------------------------------------------------------------
+Der Umbruch erfolgt ZWISCHEN Gruppen, nie innerhalb einer Gruppe: eine
+zerrissene Palette oder ein Regler ohne seine Beschriftung waere
+unlesbarer als der Bildlauf, den wir gerade abschaffen wollen.
+
+Bei 1588 px nutzbarer Breite ergibt sich rechnerisch (Zahlen aus 1.):
+
+  Reihe 1: Werkzeuge 854 | Farbfelder 50 | Palette 338 | Staerke/Alpha 180
+           | Fuellart/Pinsel 90                       = 1564 von 1588
+  Reihe 2: Glaetten | Staebe | Transformationen | Zwischenablage | Ansicht
+                                                     =  887
+           ... danach freier Platz ... dann GANZ RECHTS: [↩ Zur.][↪ Vor]
+
+  +------------------------------------------------------------------+
+  | [Stift][Fuellen][Linie][Ellipse]…[Wischen] |▣| [Palette 2x14] |≡≡||
+  |                                                                   |
+  |  [Glaetten] | [Staebe] | [Waagr.][Senkr.][90°]…[Skal.] | [Ausschn.|
+  |  [Kopieren][Einfuegen] | [Raster][Lineal][PX ▾]        [↩ ][↪ ]  |
+  |                                                          Zur. Vor |
+  +------------------------------------------------------------------+
+                                                        Hoehe 159 px
+
+*** UNDO/REDO STEHEN RECHTS AUSSEN IN REIHE 2 — das ist der Kern des
+    Wunsches und zugleich der einzige Anker, der die Leiste nicht mit dem
+    Umbruch wandern laesst. Umgesetzt mit einem Dehnfeld (Glue) VOR den
+    beiden Knoepfen, nicht mit einem gerechneten Abstand: ein gerechneter
+    Abstand luegt beim ersten Fenster anderer Breite. ***
+
+HOEHE WIRD GERECHNET, NICHT GETIPPT:
+
+    toolbarHeight(rows) = rows * BTN_SIZE + (rows-1) * ROW_GAP + 55
+      eine Reihe : 1*50 + 0 + 55 = 105   (exakt der heutige Wert)
+      zwei Reihen: 2*50 + 4 + 55 = 159
+
+  Der Summand 55 ist der heutige Abstand zwischen BTN_SIZE und TOOLBAR_H
+  (Rand, Beschriftung unter dem Symbol, Platz fuer die Bildlaufleiste).
+  *** TOOLBAR_H bleibt als Konstante bestehen und behaelt den Wert 105 —
+      eine oeffentliche Konstante, die je nach Schalter etwas anderes
+      bedeutet, waere eine Falle. Die zwei Stellen in
+      SelectiveAlphaEditor (Andocken 414, Schweben 471) fragen kuenftig
+      paintToolbar.toolbarHeight() statt der Konstanten. ***
+
+------------------------------------------------------------------------------
+4. WIE UMGESCHALTET WIRD
+------------------------------------------------------------------------------
+  a) SCHALTER: ein Umschaltknopf in der Leiste selbst, in der Gruppe
+     "Ansicht" (dort stehen bereits Raster und Lineal — es ist die
+     Gruppe fuer "wie sieht es aus", nicht fuer "was male ich").
+     Symbol: gezeichnet ueber PaintIcons (§ Icons), Beschriftung
+     "1 Reihe" / "2 Reihen" — der Knopf sagt den ZIELZUSTAND nicht,
+     sondern den IST-Zustand, wie alle anderen Umschaltknoepfe der Leiste.
+
+  b) PERSISTENZ (Univ. §12 / §31, PFLICHT): neues Feld
+     AppSettings.paintBarRows (int, Vorgabe 1).
+     Reihenfolge nach §31: zuerst Feld + Getter/Setter in AppSettings,
+     dann Handler, dann save() im Umschalter.
+     *** FEHLENDER SCHLUESSEL = 1 = heutiges Startverhalten. Eine fehlende
+         settings/default.txt muss exakt die heutige Leiste ergeben. ***
+     *** Der Wert wird beim Speichern aus dem LIVE-ZUSTAND der Leiste
+         abgeleitet (AppLifecycleController, wie primaryColor & Co.),
+         nicht in einem Schattenfeld mitgefuehrt. ***
+
+  c) KEINE TASTE, kein Registry-Eintrag — vorbehaltlich Frage 2.
+     Begruendung: F1-F7 sind vollstaendig vergeben, die einfachen
+     Buchstaben sind seit 2026-08-01 Werkzeug-Kuerzel (§25). Ein Knopf
+     allein ist keine registrierte Geste. *** Wird doch eine Taste
+     gewuenscht, gilt §25 unveraendert: ZUERST der KeyBindings-Eintrag,
+     dann der Handler — und der Wachposten toolKeysActive() ist zu
+     beachten, sonst schaltet ein getipptes Zeichen im Text die Leiste
+     um. ***
+
+------------------------------------------------------------------------------
+5. DREI FRAGEN AN DEN USER  —  *** BEANTWORTET 2026-08-01 ***
+------------------------------------------------------------------------------
+  F1 -> (b) FREIER UMBRUCH, beliebig viele Reihen. *** GEGEN die Empfehlung
+        (a); der Deckel entfaellt, die Leiste hat bei 1200 px Fensterbreite
+        DREI Reihen und 174 px Hoehe. Wer hier "vereinfacht" und doch
+        deckelt, nimmt dem Umbruch bei schmalem Fenster die Wirkung. ***
+  F2 -> JA, mit Taste.  Gewaehlt: *** Strg + Umschalt + R *** ("Reihen").
+        Frei geprueft gegen die Registry; einfache Buchstaben sind
+        Werkzeug-Kuerzel, R allein dreht das Bild, F1-F7 sind vergeben.
+        Registry-Eintrag ZUERST (§25), dann der Handler.
+  F3 -> (a) Gruppe "Ansicht", neben Raster und Lineal.
+
+------------------------------------------------------------------------------
+5b. DIE URSPRUENGLICHEN FRAGEN (Wortlaut, zur Nachvollziehbarkeit)
+------------------------------------------------------------------------------
+F1  *** WAS PASSIERT, WENN ZWEI REIHEN NICHT REICHEN? ***
+    Gemessen: bei 1200 px Fensterbreite braucht der Inhalt 2,17 Reihen.
+    (a) Deckel bei zwei Reihen — was nicht passt, bleibt ueber die
+        vorhandene waagerechte Bildlaufleiste erreichbar. Die Hoehe der
+        Leiste ist damit IMMER 105 oder 159, nie ueberraschend.
+    (b) Freier Umbruch — so viele Reihen wie noetig (3, 4 …). Kein
+        Bildlauf mehr, aber die Leiste frisst bei schmalem Fenster den
+        halben Bildschirm, und ihre Hoehe aendert sich beim Ziehen des
+        Fensterrands.
+    -> EMPFEHLUNG (a). Der Wunsch lautet "zweite Reihe", nicht "beliebig
+       viele"; und eine Leiste, die beim Fensterziehen springt, ist beim
+       Malen stoerender als ein Bildlauf, den es heute schon gibt.
+
+F2  TASTE ZUM UMSCHALTEN — ja oder nein?
+    -> EMPFEHLUNG NEIN (nur Knopf). Freie Tasten sind knapp; jede neue
+       einfache Taste muss in den Wachposten (§25), und der Schalter wird
+       selten benutzt.
+
+F3  WO STEHT DER UMSCHALTKNOPF?
+    (a) in der Gruppe "Ansicht", neben Raster/Lineal   -> EMPFEHLUNG
+    (b) ganz links, wo heute Zurueck/Vor stehen — dort entsteht im
+        Zwei-Reihen-Modus ohnehin eine Luecke
+    -> (a), weil der Knopf dann in BEIDEN Modi an derselben Stelle steht.
+       Bei (b) wanderte ausgerechnet der Schalter mit dem Umschalten.
+
+------------------------------------------------------------------------------
+6. VIER DINGE, DIE BEIM UMSETZEN NICHT "VEREINFACHT" WERDEN DUERFEN
+------------------------------------------------------------------------------
+ 1. GRUPPEN BLEIBEN GANZ. Der Umbruch faellt zwischen zwei Gruppen, nie
+    zwischen zwei Knoepfe derselben Gruppe. Die Gruppen sind bereits als
+    eigene JPanel gebaut (buildToolButtons, buildPalette, …) — die
+    Struktur ist da, sie muss nur anders angeordnet werden.
+ 2. DER BILDLAUF BLEIBT. Rad = waagerecht scrollen und der
+    Mittelklick-Zug (installMiddleMouseDragPan) haengen an Streifen UND
+    Bildlauffeld. Wer beim Umbau den Streifen neu baut, muss beides neu
+    anhaengen — sonst verliert die Leiste zwei eingeuebte Bedienwege
+    lautlos.
+ 3. HOEHE NUR UEBER toolbarHeight(). Wer TOOLBAR_H an einer der beiden
+    Stellen in SelectiveAlphaEditor stehen laesst, bekommt eine
+    abgeschnittene zweite Reihe im angedockten ODER im schwebenden
+    Zustand — und merkt es nur in einem von beiden.
+ 4. DIE SCHWEBENDE LEISTE MUSS MIT. toggleFloatingPaintBar rechnet die
+    Fensterbreite aus der natuerlichen Breite des Inhalts (Zeile 469).
+    Im Zwei-Reihen-Modus ist die natuerliche Breite eine ANDERE — das
+    Fenster muss nach dem Umschalten neu gepackt werden, sonst steht die
+    schwebende Leiste in der alten Groesse da.
+
+------------------------------------------------------------------------------
+7. RUNTIME-VERIFY (nach der Umsetzung, Sache des Users)
+------------------------------------------------------------------------------
+  Z1  *** WICHTIGSTE: umschalten auf zwei Reihen -> Zurueck/Vor stehen
+      GANZ RECHTS in der zweiten Reihe. ***
+  Z2  Zurueckschalten auf eine Reihe -> Leiste sieht exakt aus wie heute,
+      Zurueck/Vor wieder ganz links.
+  Z3  Programm beenden und neu starten -> der gewaehlte Modus ist noch da
+      (§12).
+  Z4  Fenster schmaler ziehen -> Verhalten wie in F1 entschieden; die
+      Leiste springt nicht in der Hoehe (bei Antwort (a)).
+  Z5  Alt+P: Leiste abkoppeln (schwebend) -> zwei Reihen auch dort, das
+      Fenster ist hoch genug, nichts abgeschnitten.
+  Z6  Schwebend umschalten -> das Fenster passt seine Groesse an.
+  Z7  Rad ueber der Leiste scrollt weiter waagerecht; Mittelklick zieht
+      sie weiter.
+  Z8  Zauberstab-Raster (Knopf "Staebe" / Taste Z) oeffnet unveraendert.
+  Z9  Alle Werkzeug-Kuerzel (P, F, L, …) wirken in beiden Modi.
+  Z10 Erststart ohne settings/default.txt -> EINE Reihe (Vorgabe).
+
+------------------------------------------------------------------------------
+8. WAS DIE UMSETZUNG AM ENTWURF GEAENDERT HAT
+------------------------------------------------------------------------------
+ 1. *** DER STREIFEN WIRD NICHT NEU GEBAUT, NUR ANDERS AUSGELEGT. *** Der
+    Entwurf sprach vom "Umbau von buildStrip()". Das waere der Fehler
+    gewesen: installMiddleMouseDragPan haengt seine Adapter REKURSIV an
+    den Streifen und alle Kinder — ein neu gebauter Streifen haette
+    Rad-Bildlauf und Mittelklick-Zug lautlos verloren. Umgeschaltet wird
+    jetzt NUR der LayoutManager; die Kinder und ihre Reihenfolge bleiben
+    in BEIDEN Modi identisch. Auch "Zurueck/Vor" bleibt das erste Kind —
+    die Umbruch-Anordnung ueberspringt es und setzt es ans Ende.
+ 2. *** DER BILDLAUF BLEIBT, ER WIRD NUR STILLGELEGT. *** Statt das
+    JScrollPane im Umbruch-Modus zu entfernen, sagt der Streifen ueber
+    Scrollable.getScrollableTracksViewportWidth() zu, die Breite des
+    Sichtfensters zu uebernehmen. Ohne diese Zusage bekaeme er seine
+    natuerliche Breite von 2645 px und braeche NIE um. Das ist die
+    Kernzeile des ganzen Umbaus.
+ 3. HOEHE: 105 (eine Reihe) · 120 (zwei) · 174 (drei) — gemessen.
+    Die Luft ist im Umbruch WRAP_PAD=16 statt der 55 der einreihigen
+    Leiste: in den 55 steckt der Platz fuer die waagerechte
+    Bildlaufleiste, die es im Umbruch nicht gibt.
+ 4. TRENNER-ERKENNUNG UEBER EINEN EIGENEN TYP (Klasse Separator), nicht
+    ueber "Panel mit drei Kindern". *** Die Gruppe Zurueck/Vor hat
+    ebenfalls genau drei Kinder — die naheliegende Zaehl-Erkennung haette
+    sie beim ersten Umbau zum Trenner erklaert und den Anker verloren. ***
+ 5. Der Umschaltknopf trug im Entwurf die Beschriftung "1 Reihe/2 Reihen".
+    Er heisst jetzt schlicht "Umbruch": bei freiem Umbruch (Antwort F1)
+    waere "2 Reihen" bei drei Reihen eine luegende Beschriftung — genau
+    die Fehlerart, die am 2026-08-01 zwei Tasks ausgeloest hat.
+ 6. NEU gegenueber dem Entwurf: PaintIcons.Action.ROW_WRAP (gezeichnet).
+    Kein Zeichen — "☰"/"≡" bedeuten ueberall ein Menue, nicht einen
+    Umbruch.
+
+WIE OHNE PROGRAMMSTART GEPRUEFT WURDE
+  Zwei Wegwerf-Programme im scratchpad gegen die KOMPILIERTEN Klassen
+  (Verfahren aus dem Icons-Task): eines misst Gruppenbreiten, Reihenzahl
+  und die rechte Kante von "Zurueck/Vor" bei 1588/1200/1024 px, das andere
+  rendert die Leiste per printAll in eine PNG (ueber ImageFileWriter, §34).
+  Belegt: 2 Reihen bei 1588, 3 bei 1200 und 1024; Zurueck/Vor endet je 6 px
+  vor dem rechten Rand in der LETZTEN Reihe; kein Trenner am Zeilenanfang.
+  *** ES ERSETZT DIE SICHTPRUEFUNG NICHT: Hover, Auswahlzustand, das
+      Verhalten beim Ziehen des Fensterrands und die schwebende Leiste
+      zeigt ein Standbild nicht. Dafuer ist Z1-Z10 da. ***
+==============================================================================

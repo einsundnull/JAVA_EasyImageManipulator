@@ -296,12 +296,11 @@ class BookController {
 	 * @param onAdded       called on EDT after page is created
 	 */
 	void showNewPageDialog(BufferedImage droppedImage, File bookDir, Runnable onAdded) {
-		PaperFormat.Format[] formats = PaperFormat.Format.values();
-		String[] formatLabels = new String[formats.length];
-		for (int i = 0; i < formats.length; i++) formatLabels[i] = formats[i].toString();
-
-		JComboBox<String> formatCombo = new JComboBox<>(formatLabels);
-		formatCombo.setSelectedIndex(4); // A4 default
+		// Auswahl und Zugriff gehen über DIESELBE Liste (PaperFormat.selectable());
+		// ein festes setSelectedIndex(4) wäre nach jedem neuen Format falsch.
+		java.util.List<PaperFormat.Format> formats = PaperFormat.selectable();
+		JComboBox<String> formatCombo = new JComboBox<>(PaperFormat.selectableLabels());
+		formatCombo.setSelectedIndex(PaperFormat.selectableIndexOf(PaperFormat.Format.A4));
 		formatCombo.setBackground(AppColors.BTN_BG);
 		formatCombo.setForeground(AppColors.TEXT);
 
@@ -334,7 +333,7 @@ class BookController {
 		okBtn.setForeground(Color.WHITE);
 
 		okBtn.addActionListener(e -> {
-			PaperFormat.Format fmt = formats[formatCombo.getSelectedIndex()];
+			PaperFormat.Format fmt = formats.get(formatCombo.getSelectedIndex());
 			boolean landscape   = orientCombo.getSelectedIndex() == 1;
 			boolean withMargins = marginsBox.isSelected();
 

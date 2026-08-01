@@ -5,8 +5,19 @@ Die ausfuehrliche Vorgaenger-Fassung mit dem vollen Verlauf der Schritte
 [1]-[4] liegt in doc/WEITERMACHEN_PROMPT_2026-07-30_archiv.txt.
 Details je Schritt: die progress_2026-07-30_*.txt / progress_2026-07-31_*.txt.
 ==============================================================================
-Aktive PD.txt: KEINE.
-  Zuletzt: Task_2026-08-01_1130_Kontextmenues.txt -> ACHT VON NEUN SCHRITTEN
+*** AKTIVE PD.txt: Task_2026-08-01_1702_Bildgroesse-und-Vorlagen.txt
+    [1/9] bis [4/9] ERLEDIGT · NAECHSTER SCHRITT [5/9] Ziehgriffe am
+    Bildrand — [C], KEIN Haiku, braucht §22 und §27.
+    Freigabe liegt vor: F1=Leinwand · F2=25 mm · F3=Overlay ·
+    F4=_DOC werden Vorlagen. F5 (Knopf-Ort/Taste) offen, wird in [7]
+    entschieden — Annahme: obere Leiste neben "Neu", keine Taste.
+    Entwurf: doc/Schema_Bildgroesse_und_Vorlagen.txt
+    Befund:  doc/progress_2026-08-01_bildgroesse-vorlagen-vorschlag.txt
+    Umsetzung [2]-[4]:
+             doc/progress_2026-08-01_bildgroesse-vorlagen-umsetzung-01.txt ***
+  Zuletzt: Task_2026-08-01_1436_PaintToolbar-Zweizeilig.txt -> ALLE SIEBEN
+  SCHRITTE ABGESCHLOSSEN, nur Runtime-Verify Z1-Z10 offen (User).
+  Davor: Task_2026-08-01_1130_Kontextmenues.txt -> ACHT VON NEUN SCHRITTEN
   ABGESCHLOSSEN ([9] Layer-Name auf Wunsch des Users zurueckgestellt), nur
   Runtime-Verify C1-C12 offen (User).
   Davor: Task_2026-08-01_0957_Werkzeug-Kuerzel.txt -> ALLE SECHS SCHRITTE
@@ -17,6 +28,143 @@ Aktive PD.txt: KEINE.
   Davor: Task_2026-07-31_2300_B01-fileCache-deckeln.txt -> ALLE FUENF
   SCHRITTE ABGESCHLOSSEN, nur Runtime-Verify B1-B7 offen (User).
   Davor: Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt (S1-S12 offen).
+
+==============================================================================
+*** NEU 2026-08-01, 17:02: BILDGROESSE (LEINWAND) + VORLAGEN — 4 VON 9 ***
+    [1] Befund · [2] Freigabe · [3] EINE Papierformat-Tabelle ·
+    [4] PaintEngine.resizeCanvas.   Build gruen, 363 .class (vorher 362,
+    die eine neue Klasse ist PaintEngine$Anchor).
+    ENTSCHIEDEN: Ziehen = LEINWAND (nicht skalieren) · Raender = 25 MILLI-
+    METER (= 94 px, nicht 25 px) · Raender als OVERLAY statt eingebrannt ·
+    die acht _DOC-Varianten verlassen die Formatliste und werden VORLAGEN.
+    *** BEFUND AUS DER UMSETZUNG: "Ledger" war Zeile fuer Zeile identisch
+        mit Tabloid (279x432) — Ledger IST Tabloid quer, und alle Formate
+        sind im Hochformat deklariert. Eintrag ersatzlos gestrichen. Er
+        stand im Entwurf und fiel erst auf, weil die Probe die Liste
+        AUSGEDRUCKT hat. ***
+    *** NICHT "VEREINFACHEN": neue Formate werden ANGEHAENGT, nie
+        eingefuegt (drei Dialoge indizierten mit values(), BookController
+        sogar mit festem setSelectedIndex(4) fuer A4) · der Anzeigename
+        steht in geschriebenen .layout-Dateien und aendert sich nicht ·
+        formatMm() darf weiter null liefern · resizeCanvas gibt bei
+        gleichen Massen DIESELBE Instanz zurueck (Absicht, der Zughandler
+        ruft es pro Mausbewegung). ***
+==============================================================================
+SCHEMA:     doc/Schema_Bildgroesse_und_Vorlagen.txt   (ENTWURF, F1-F5 offen)
+PD:         doc/Task_2026-08-01_1702_Bildgroesse-und-Vorlagen.txt   (1/9)
+PROTOKOLL:  doc/progress_2026-08-01_bildgroesse-vorlagen-vorschlag.txt
+
+WUNSCH: Bildgroesse per Ziehen UND per Eingabe aendern (wie MS Paint) ·
+A4-Vorlagen auf Knopfdruck mit Rand · Papiergroessen A0-A5, Postkarten,
+US-Formate zum Waehlen · eigene Vorlagen speichern.
+
+*** DREI BEFUNDE, DIE DEN ZUSCHNITT BESTIMMEN ***
+ 1. "GROESSE" GIBT ES ZWEIMAL. Skalieren (Inhalt waechst mit) EXISTIERT:
+    TransformController.doScale + PaintEngine.scale, Knopf "Skal.".
+    LEINWANDGROESSE (Inhalt bleibt, Flaeche waechst/beschneidet) existiert
+    NIRGENDS — auch nicht in PaintEngine. cropRegion klemmt das Rechteck
+    aufs Bild (Z.331-333) und KANN NICHT VERGROESSERN.
+    *** MS Paints Ziehgriffe sind die LEINWAND-Operation. Deshalb F1. ***
+ 2. *** ZWEI PAPIERFORMAT-TABELLEN, DIE SICH WIDERSPRECHEN. ***
+    book/PaperFormat: A0 A1 A2 A3 A4 + LETTER LEGAL TABLOID + acht _DOC.
+    paint/PageLayout: A3 A4 A5 A6 Letter Legal.
+    A5/A6 fehlen im Dialog "Neue Datei", A0-A2 im Buchmodus, POSTKARTEN
+    IN BEIDEN. Dasselbe Muster wie die luegenden Tooltips und die
+    Kuerzel-Spalte: eine zweite Liste neben der ersten.
+    *** NEUE FORMATE ERST NACH DER ZUSAMMENLEGUNG — sonst wird aus zwei
+        Listen eine dritte. ***
+ 3. *** DIE RAENDER WERDEN HEUTE IN DIE PIXEL GEBRANNT ***
+    (NewFileController:70-79, g2.drawRect ins Bild). Sie sind danach
+    Bildinhalt: nicht ausblendbar, nicht aenderbar, im Export drin.
+    DER NICHT-DESTRUKTIVE OVERLAY EXISTIERT ABER SCHON — CanvasPanel:2959,
+    gestrichelte Linie + Baender aus PageLayout, nur gebunden an
+    `if (callbacks.isBookMode())`. Auch die Lineale zeigen die Randmarken
+    bereits (HRulerPanel:146).
+    *** FUENFTES MAL DIESELBE LEHRE NACH F01, I01, F02, KONTEXTMENUES:
+        ANSCHLIESSEN, NICHT BAUEN. ***
+
+*** DIE ZAHL, DIE VOR ALLEM ANDEREN GEKLAERT WERDEN MUSS (F2):
+    25 mm = 94 px  ·  25 px = 6,6 mm   (projektweit 96 dpi)
+    Der Prompt sagt "25px Rand". Das Projekt fuehrt Raender UEBERALL in mm,
+    und PaperFormat hat 25 mm bereits als Vorgabe. Die Zahl stimmt also,
+    die Einheit vermutlich nicht. WIRD GEFRAGT, NICHT GERATEN — sonst
+    liegt die Vorlage um Faktor 3,8 daneben. ***
+
+FUENF FRAGEN (Schema Abschnitt 6, Empfehlung jeweils dabei):
+  F1 Ziehen = Leinwand (a, EMPFOHLEN) / Skalieren (b) / beides (c)
+     *** BLOCKIEREND *** — (b) gibt es schon per Eingabe; bei (c) waere
+     Umschalt doppelt belegt (Seitenverhaeltnis vs. Modus), also §25-Konflikt.
+  F2 25 mm (EMPFOHLEN) oder 25 px?   *** BLOCKIEREND ***
+  F3 Raender als Overlay (a, EMPFOHLEN) / weiter eingebrannt (b) /
+     Overlay + Knopf "einbrennen" (c)
+  F4 Die acht _DOC-Varianten aus der Formatliste nehmen und zu VORLAGEN
+     machen? (EMPFOHLEN ja — sie sind Rand-Vorgaben, keine Formate)
+  F5 Wo sitzt der Vorlagen-Knopf, und braucht er eine Taste?
+     (Vorschlag: obere Leiste neben "Neu", keine Taste — F1-F7 sind voll)
+
+*** NEBENBEFUND, GEFUEHRT UND NICHT REPARIERT (Univ. §0):
+    EditorDialogs.doScale():171-247 ist eine referenzfreie Kopie von
+    TransformController.doScale():196 — bis auf die Beschriftungen
+    identisch, aber OHNE Auswahl- und Element-Behandlung. Textsuche ueber
+    den ganzen Quellbaum: NULL Aufrufer. Gehoert zu L02. Wer sie fuer das
+    Vorbild haelt, baut die schlechtere Variante nach. ***
+
+==============================================================================
+*** NEU 2026-08-01: MAL-LEISTE BRICHT UM — ERLEDIGT (7/7) ***
+==============================================================================
+SCHEMA:     doc/Schema_PaintToolbar_Zweizeilig.txt  (FREIGEGEBEN UND
+            UMGESETZT; *** Abschnitt 8: was die Umsetzung am Entwurf
+            geaendert hat ***)
+PD:         doc/Task_2026-08-01_1436_PaintToolbar-Zweizeilig.txt   (7/7)
+PROTOKOLL:  doc/progress_2026-08-01_paintbar-zweizeilig-vorschlag.txt (Befund)
+            doc/progress_2026-08-01_paintbar-zweizeilig-umsetzung.txt (Umsetzung)
+
+ANLASS: Die Knoepfe der Mal-Leiste standen alle in EINER Reihe mit
+waagerechtem Bildlauf. Neu: sie koennen umbrechen; Zurueck/Vor stehen dann
+ganz rechts in der LETZTEN Reihe.
+
+BEDIENUNG: Knopf "Umbruch" (Gruppe Ansicht) oder *** Strg+Umschalt+R ***.
+Zustand in AppSettings.paintBarWrap, ueberlebt den Neustart.
+*** VORGABE IST DIE EINE REIHE — fehlender Schluessel = altes Verhalten. ***
+
+ENTSCHEIDUNGEN DES USERS (F1-F3):
+  FREIER Umbruch, beliebig viele Reihen *** GEGEN die Empfehlung "Deckel bei
+  zwei Reihen" *** · mit Taste · Knopf in der Gruppe "Ansicht".
+
+GEMESSEN (nicht hergeleitet): Streifen 2645 px breit.
+  1588 px Fenster -> 2 Reihen, Hoehe 120 · 1200 px -> 3 Reihen, Hoehe 174 ·
+  1024 px -> 3 Reihen. Zurueck/Vor endet je 6 px vor dem rechten Rand.
+BUILD: 362 .class (vorher 357) · KEINE neue Quelldatei, src/paint bleibt 111.
+REGISTRY: KeyBindings.ALL 81 -> 82.
+
+*** SECHS DINGE, DIE NICHT "VEREINFACHT" WERDEN DUERFEN ***
+ 1. *** Strip.getScrollableTracksViewportWidth() IST DIE KERNZEILE. *** Nur
+    weil der Streifen im Umbruch die Breite des Sichtfensters uebernimmt,
+    bricht er um. Ohne sie bekaeme er seine natuerlichen 2645 px und bliebe
+    einreihig — bei scheinbar richtigem Layout.
+ 2. *** DER STREIFEN WIRD NICHT NEU GEBAUT, NUR ANDERS AUSGELEGT. ***
+    installMiddleMouseDragPan haengt rekursiv an Streifen UND Kinder; ein
+    Neubau kostete Rad-Bildlauf und Mittelklick-Zug lautlos. Deshalb bleibt
+    auch die Kinder-Reihenfolge gleich: Zurueck/Vor ist weiter das ERSTE
+    Kind, das Umbruch-Layout ueberspringt es und setzt es ans rechte Ende.
+ 3. *** DER TRENNER HAT EINEN EIGENEN TYP (Separator). *** "Panel mit drei
+    Kindern" haette die Gruppe Zurueck/Vor mitgetroffen — sie hat ebenfalls
+    drei. Der Anker waere zum Trenner geworden.
+ 4. TOOLBAR_H BLEIBT 105 und meint die EINREIHIGE Leiste; die aktuelle Hoehe
+    liefert toolbarHeight(). Beide Stellen in SelectiveAlphaEditor sind
+    umgestellt (Andocken UND Schweben) — wer nur eine umstellt, sieht den
+    Fehler nur in einem Zustand.
+ 5. DER KNOPF HEISST "Umbruch", NICHT "2 Reihen": bei drei Reihen waere das
+    eine luegende Beschriftung — dieselbe Fehlerart wie bei den Tooltips.
+ 6. Beim Wiederherstellen aus den Einstellungen wird NICHT zurueckgeschrieben
+    (setWrapRows(boolean) ohne notify) — gelesen wird genau einmal (§12).
+
+RUNTIME-VERIFY Z1-Z10 OFFEN (User), volle Liste im Schema Abschnitt 7.
+  Z1  *** WICHTIGSTE: umschalten -> Zurueck/Vor ganz rechts in der LETZTEN
+      Reihe. ***
+  Z4  Fenster schmaler ziehen -> dritte Reihe, Leiste wird hoeher. GEWOLLT.
+  Z5/Z6 Alt+P schwebend: Umbruch auch dort, Fenster passt sich an.
+  Z7  Einreihig: Rad scrollt weiter waagerecht, Mittelklick zieht weiter.
 
 ==============================================================================
 *** NEU 2026-08-01: KONTEXTMENUES — ERLEDIGT (8/9) ***
@@ -456,11 +604,65 @@ DREI BEFUNDE, DIE DIE DOKUMENTIERTEN ALTLASTEN VERSCHAERFEN:
            Fehlers A02. Wer A02 repariert, repariert womoeglich die tote
            Kopie. ***
 
-GRAPHIFY: fuer das Audit NICHT aufgefrischt - Priorisierung lief ueber
-Dateigroesse und Textsuche, und der Graph findet ohnehin keine Fehler.
-graphify-out/ ist weiterhin vom 2026-07-30 und kennt AppTheme, KeyBindings
-und KeyBindingsDialog nicht. Gezielter Update dieser drei Dateien bleibt
-offen - NIEMALS `graphify update .` (Scope-Falle).
+GRAPHIFY: *** ZWEIMAL AUFGEFRISCHT AM 2026-08-01 — ERLEDIGT. ***
+
+  --- ZWEITER REFRESH (nach dem Leisten-Umbruch) ---
+  -> doc/progress_2026-08-01_graphify-refresh-02.txt   [ST], [B], kein Code.
+  2698/6736/143  ->  *** 2731 Knoten / 6765 Kanten / 125 Communities. ***
+  8 geaenderte Dateien (genau der Zweizeilig-Task), 0 geloescht, 0 Tokens.
+  Backup: graphify-out/2026-08-01b_vor-update/  (das "b", weil der Name ohne
+  Suffix schon vom ERSTEN Lauf desselben Tages belegt war — wer nur nach
+  Datum benennt, ueberschreibt beim zweiten Lauf pro Tag sein Backup.)
+  *** BEFUND: KONSTANTEN STEHEN NICHT IM GRAPHEN. *** Die AST-Extraktion
+  erfasst Typen und Methoden, KEINE static-final-Felder. Gegenprobe:
+  Strip 7 Treffer, WrapRowsLayout 1, Separator 5,
+  getScrollableTracksViewportWidth 3 — aber *** ROW_WRAP: NULL ***, obwohl
+  es mit acht Vorkommen in vier Dateien im Quelltext steht (Textsuche).
+  FOLGE: Fragen nach Tastenbelegungen, Token-Namen oder Registry-Eintraegen
+  sind am Graphen NICHT zu beantworten. KeyBindings.ALL ist ein FELD, kein
+  Knoten — der Widerspruch "79 vs 81 vs 82 Eintraege" bleibt damit auch mit
+  dem neuen Graphen offen und braucht den Quelltext.
+  *** BEFUND: DIE COMMUNITY-ZAHL SANK (143 -> 125), OBWOHL DER GRAPH WUCHS. ***
+  Kein Datenverlust — Louvain ist nicht deterministisch. Knoten und Kanten
+  sind belastbar, die Community-Zahl NICHT. Folge, die man einplanen muss:
+  die IDs des Vorlaufs sind wertlos, ALLE Communities muessen neu benannt
+  werden. ZoomState hat diesmal KEINE eigene Community (Louvain legte es mit
+  ZoomController + CardTtsPlayer zusammen) — [5] heisst deshalb "Zoom
+  Animation & TTS Playback (enthaelt tote ZoomState-Kopie)" und NICHT
+  pauschal "dead", sonst waere der LEBENDE ZoomController mitabgestempelt.
+  Kein Pruning noetig -> die Pfadbasen-Falle des ersten Laufs konnte nicht
+  zuschnappen. *** SIE IST NICHT BEHOBEN, NUR NICHT AUSGELOEST. ***
+
+  --- ERSTER REFRESH (Vormittag) ---
+  -> doc/progress_2026-08-01_graphify-refresh.txt   [ST], [B], kein Code.
+  2479/6369/123  ->  2698 Knoten / 6736 Kanten / 143 Communities.
+  0 LLM-Tokens (code-only -> reine AST-Extraktion). Backup des Vorstands:
+  graphify-out/2026-08-01_vor-update/.
+  *** ES WAREN NICHT NEUN DATEIEN, SONDERN 42. *** Die Doku nannte nur die
+  neu ANGELEGTEN Klassen; geaendert hatten sich auch die 12 AppTheme-
+  Dateien, die F02-Aufrufstellen usw. Wer den Umfang aus der Doku schaetzt,
+  schaetzt zu klein - messen (Univ. §13).
+  *** DAS PRUNING DER GELOESCHTEN TextToSpeech.java SCHLUG ZUERST STILL
+      FEHL. *** build_merge meldete "already clean", obwohl elf Knoten
+      dastanden. URSACHE: ZWEI PFADBASEN. source_file im Graphen zaehlt ab
+      dem PROJEKT-Root (src/paint/X.java), manifest.json ab dem SCAN-Root
+      (paint/X.java), und beide teilen den Parameter root=.
+      *** NICHT "korrigieren", indem man root= auf den Projekt-Root setzt -
+          dann stimmt das Manifest nicht mehr und der naechste --update
+          haelt JEDE Datei fuer neu. *** Geloeschte Dateien EXPLIZIT
+      filtern, mit ID-Kollisionsprobe davor (ein Knoten hiess
+      src_paint_texttospeech_java_string - externe Typen liegen PRO DATEI
+      vor, Univ. §1).
+  *** PowerShell frisst doppelte Anfuehrungszeichen beim Uebergeben an eine
+      native exe: python -c "...{r[\"nodes\"]}..." kam als r[nodes] an.
+      Python-Code als DATEI ausfuehren. ***
+  Die L02-Parallelkopien (ElementLayerState, FileStateCache, ZoomState,
+  FloatSelectionState, CanvasState) sind jetzt als Communities "(dead
+  parallel copy)" BENANNT, damit sie niemand fuer Produktivcode haelt.
+  *** DAS IST KEINE LOESCHENTSCHEIDUNG *** - der Graph beantwortet nicht
+  "ist das tot" (Univ. §1). L02 bleibt offen.
+  NIEMALS `graphify update .` bei gefilterter Scope (Scope-Falle); hier ist
+  der Scan-Root src/ selbst die Filterung.
 
 
 *** CLAUDE.md IST AM 2026-07-31 GEGEN DEN GEMESSENEN IST-STAND KORRIGIERT ***
@@ -488,7 +690,7 @@ offen - NIEMALS `graphify update .` (Scope-Falle).
     der aufgestaute RUNTIME-VERIFY: U1-U19 (Sichtpruefung), X1-X13
     (Schliessen), T1-T9 (Vorlesen), S1-S12 (Speichern), D1-D6 (Undo),
     B1-B7 (Speicher), P1-P9 (Symbole), W1-W9 (Werkzeug-Kuerzel),
-    C1-C12 (Kontextmenues).
+    C1-C12 (Kontextmenues), Z1-Z10 (Leisten-Umbruch).
     Nur der User kann das. Ein einziger Programmdurchlauf hakt den
     groessten Teil ab. ***
 *** ANFANGEN MIT W1: Textrahmen aufziehen, "raster" tippen. Es ist die
@@ -546,7 +748,11 @@ LIES ZUERST (Reihenfolge ist verbindlich):
 
 BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
        -encoding UTF-8 ist PFLICHT (Unicode im Quelltext).
-       ERWARTET: exit 0, 357 .class in einem LEEREN Zielverzeichnis
+       ERWARTET: exit 0, 362 .class in einem LEEREN Zielverzeichnis
+       (357 vor dem Leisten-Umbruch, der FUENF mitbrachte: Strip,
+        WrapRowsLayout, Separator und zwei anonyme Klassen — ohne eine neue
+        Quelldatei. Clean-Build 2026-08-01.)
+       Aeltere Zwischenstaende: 357 .class
        (347 vor den Kontextmenues; die vier neuen Dateien brachten mit ihren
         inneren Typen genau zehn mit. Clean-Build 2026-08-01.)
        Aeltere Zwischenstaende: 347 .class in einem LEEREN Zielverzeichnis
@@ -569,8 +775,13 @@ STRUKTUR: Projekt-Root = nur CLAUDE.md · src/ = nur Java + Deploy-Skript ·
            angelegt. Beides 2026-07-31. 106 -> 107: PaintIcons, 2026-08-01.
            107 -> 111: ContextMenu, FileActionsController, ConfirmDialog,
            TextInputDialog, 2026-08-01.)
-GRAPH:    graphify-out/ ist eingecheckt. 2479 Knoten / 6369 Kanten /
-          123 Communities, code-only, 0 LLM-Tokens.
+GRAPH:    graphify-out/ ist eingecheckt. *** Stand 2026-08-01 (zweiter
+          Refresh): 2731 Knoten / 6765 Kanten / 125 Communities ***,
+          code-only, 0 LLM-Tokens.
+          (Erster Refresh desselben Tages: 2698 / 6736 / 143.
+           2026-07-30: 2479 / 6369 / 123.)
+          *** KONSTANTEN SIND KEINE KNOTEN — der Graph beantwortet weder
+              "ist das tot" noch "wie viele Eintraege hat KeyBindings.ALL". ***
 
 ==============================================================================
 DAS WICHTIGSTE IN FUENF SAETZEN

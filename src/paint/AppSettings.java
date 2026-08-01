@@ -70,6 +70,16 @@ public class AppSettings {
     private int bg2 = new Color(160, 160, 160).getRGB();
 
     // View
+    /**
+     * Ob die Mal-Leiste ihre Knöpfe umbricht statt sie in <b>einer</b> Reihe
+     * mit waagerechtem Bildlauf zu zeigen.
+     *
+     * <p><b>Vorgabe {@code false} = das bisherige Startverhalten.</b> Eine
+     * fehlende {@code settings/default.txt} muss exakt die einreihige Leiste
+     * ergeben, die es bis zum 2026-08-01 allein gab (Univ. §12).
+     */
+    private boolean paintBarWrap = false;
+
     private boolean showGrid = false;
     private boolean showRuler = true;
     private String rulerUnit = "PX";
@@ -194,6 +204,7 @@ public class AppSettings {
         if (data.containsKey("bg1")) bg1 = parseInt(data.get("bg1"));
         if (data.containsKey("bg2")) bg2 = parseInt(data.get("bg2"));
 
+        if (data.containsKey("paintBarWrap")) paintBarWrap = parseBoolean(data.get("paintBarWrap"));
         if (data.containsKey("showGrid")) showGrid = parseBoolean(data.get("showGrid"));
         if (data.containsKey("showRuler")) showRuler = parseBoolean(data.get("showRuler"));
         if (data.containsKey("rulerUnit")) rulerUnit = data.get("rulerUnit");
@@ -308,6 +319,7 @@ public class AppSettings {
             writeField(writer, "bg1", bg1, true);
             writeField(writer, "bg2", bg2, true);
 
+            writeField(writer, "paintBarWrap", paintBarWrap, true);
             writeField(writer, "showGrid", showGrid, true);
             writeField(writer, "showRuler", showRuler, true);
             writeField(writer, "rulerUnit", rulerUnit, true);
@@ -449,6 +461,9 @@ public class AppSettings {
 
     public int getBg2() { return bg2; }
     public void setBg2(int c) { bg2 = c; }
+
+    public boolean isPaintBarWrap() { return paintBarWrap; }
+    public void setPaintBarWrap(boolean w) { paintBarWrap = w; }
 
     public boolean isShowGrid() { return showGrid; }
     public void setShowGrid(boolean s) { showGrid = s; }

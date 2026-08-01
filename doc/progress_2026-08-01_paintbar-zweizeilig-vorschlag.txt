@@ -1,0 +1,72 @@
+==============================================================================
+progress_2026-08-01_paintbar-zweizeilig-vorschlag.txt
+Schritt [1/7] der PD Task_2026-08-01_1436_PaintToolbar-Zweizeilig.txt
+Typ [BT] · Risiko [B] · KEIN CODE GEAENDERT
+==============================================================================
+
+PROMPT DES USERS
+  Umschaltbar machen, ob die Knoepfe der Paint-Leiste alle in EINER Reihe
+  stehen (wie heute) oder ob das, was rechts nicht mehr hinpasst, in eine
+  ZWEITE Reihe rutscht. Zurueck/Vor (Undo/Redo) sollen dann ganz rechts in
+  der zweiten Reihe stehen.
+
+ZUSAMMENFASSUNG DIESES SCHRITTS
+  Vorgehen nach Univ. §9 (Mockup-First) und Prompt_Handling [BT]: erst
+  messen, dann entwerfen, dann Freigabe — noch keine Zeile Code.
+  Angelegt: doc/Schema_PaintToolbar_Zweizeilig.txt (Mockup beider Modi,
+  drei Fragen) und die PD mit sieben Schritten.
+
+*** DIE MESSUNG, DIE DEN ENTWURF BESTIMMT HAT ***
+  Wegwerf-Programm im scratchpad gegen die KOMPILIERTEN Klassen (dasselbe
+  Verfahren, das beim Icons-Task drei unsichtbare Fehler fand): es baut
+  eine echte PaintToolbar mit leeren Callbacks und liest die
+  preferredSize des Streifens und jeder Gruppe.
+
+    Streifen natuerlich : 2592 px (+12 Rand = 2604)
+    nutzbar bei 1600er Bildschirm : ~1588 px
+    -> 1,64 REIHEN.
+
+  *** ZWEI REIHEN REICHEN NICHT IMMER. *** Bei 1200 px Fensterbreite sind
+  es 2,17 Reihen, bei 1024 px 2,54. Der Wunsch "zweite Reihe" ist damit
+  nicht automatisch erfuellbar — daher Frage F1 (Deckel bei zwei Reihen
+  mit weiterhin vorhandenem Bildlauf, oder freier Umbruch auf 3+ Reihen).
+  Ohne diese Antwort waere jede Implementierung geraten.
+  DAS IST GENAU DER FALL, VOR DEM §26 WARNT: aus dem Quelltext haette man
+  "passt schon in zwei Reihen" hergeleitet.
+
+  Die elf Gruppenbreiten (Werkzeuge 854 · Transformationen 421 ·
+  Palette 338 · Staerke/Alpha 180 · Ansicht 158 · Zwischenablage 156 ·
+  Zurueck/Vor 103 · Fuellart/Pinsel 90 · je 50 fuer Farbfelder, Glaetten,
+  Staebe) stehen im Schema, Abschnitt 1 — wer den Umbruchpunkt spaeter
+  nachrechnet, soll sie nicht neu erheben muessen.
+
+VORSCHLAEGE (im Schema ausformuliert)
+  - Umbruch NUR zwischen Gruppen; die Gruppen sind bereits eigene JPanel.
+  - Undo/Redo per Dehnfeld (Glue) rechtsbuendig, nicht per gerechnetem
+    Abstand — ein gerechneter Abstand luegt beim naechsten Fenstermass.
+  - Hoehe gerechnet: rows*BTN_SIZE + (rows-1)*ROW_GAP + 55 (105 bzw. 159).
+    *** TOOLBAR_H behaelt seinen Wert 105 — eine oeffentliche Konstante,
+        die je nach Schalter etwas anderes bedeutet, waere eine Falle. ***
+  - Schalter als Knopf in der Gruppe "Ansicht", persistent ueber
+    AppSettings.paintBarRows (Vorgabe 1 = heutiges Verhalten).
+  - Keine Taste, solange nicht ausdruecklich gewuenscht: F1-F7 sind
+    vergeben, die einfachen Buchstaben sind seit heute Werkzeug-Kuerzel.
+
+TATSAECHLICHE LOESUNG
+  Noch keine — [1/7] endet bewusst vor der Umsetzung. Offen sind F1
+  (Verhalten, wenn zwei Reihen nicht reichen), F2 (Taste ja/nein),
+  F3 (Ort des Umschaltknopfs).
+
+ZWEI FALLEN, DIE BEIM LESEN DES CODES SICHTBAR WURDEN
+  1. SelectiveAlphaEditor setzt PaintToolbar.TOOLBAR_H an ZWEI Stellen
+     (414 Andocken, 471 Schweben). Wer nur eine umstellt, sieht die
+     abgeschnittene zweite Reihe nur in einem der beiden Zustaende.
+  2. installMiddleMouseDragPan haengt seine Maus-Adapter REKURSIV an den
+     Streifen und alle Kinder. Wird der Streifen umgebaut, muessen
+     Rad-Bildlauf und Mittelklick-Zug neu angehaengt werden — sonst
+     verschwinden zwei eingeuebte Bedienwege lautlos.
+
+RUNTIME-VERIFY
+  Noch keiner faellig (kein Code geaendert). Die Liste Z1-Z10 steht im
+  Schema, Abschnitt 7, und gilt nach Schritt [6].
+==============================================================================

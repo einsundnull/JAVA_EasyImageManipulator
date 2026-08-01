@@ -1,0 +1,110 @@
+==============================================================================
+Task_2026-08-01_1436_PaintToolbar-Zweizeilig.txt        (PD nach Prompt_Handling)
+Typ: [BT]  —  Umbau eines Layouts + neuer persistenter Schalter
+Stand: 2026-08-01   ·   *** ALLE SIEBEN SCHRITTE ABGESCHLOSSEN ***
+                         nur Runtime-Verify Z1-Z10 offen (User)
+==============================================================================
+
+INITIALER PROMPT (User, 2026-08-01):
+  "dass ich einstellen/toggeln kann, ob die Buttons im Paint Menu alle in
+   einer Reihe sind (wie jetzt) oder, ob die Buttons die standardmaessig zu
+   weit rechts sind in einer zweiten Reihe angezeigt werden. die undo und
+   redo Buttons kommen dann in die zweite Reihe ganz ans Ende rechts"
+
+ENTWURF/MOCKUP:  doc/Schema_PaintToolbar_Zweizeilig.txt
+                 (FREIGEGEBEN UND UMGESETZT; Abschnitt 8: was die Umsetzung
+                  am Entwurf geaendert hat)
+PROTOKOLL:       doc/progress_2026-08-01_paintbar-zweizeilig-vorschlag.txt  (Befund)
+                 doc/progress_2026-08-01_paintbar-zweizeilig-umsetzung.txt  (Umsetzung)
+
+ENTSCHEIDUNGEN DES USERS: freier Umbruch (beliebig viele Reihen, GEGEN die
+Empfehlung "Deckel bei zwei") · mit Taste Strg+Umschalt+R · Knopf in der
+Gruppe "Ansicht".
+
+------------------------------------------------------------------------------
+SCHRITTE
+------------------------------------------------------------------------------
+[1/7]  [B]  MESSEN + MOCKUP + FRAGEN                          *** ERLEDIGT ***
+       Natuerliche Breite der Leiste und aller elf Gruppen gegen die
+       KOMPILIERTEN Klassen gemessen (2604 px gegen 1588 px nutzbar =
+       1,64 Reihen). ASCII-Mockup beider Modi, drei Fragen an den User.
+       Modell: das aktuelle (Messung + Entwurf, kein Haiku).
+
+[2/7]  [B]  FREIGABE DES USERS EINHOLEN                        <- HIER STEHEN WIR
+       Univ. §9 (Mockup-First) macht das verbindlich, nicht hoeflich:
+       ohne Antwort auf F1 (Deckel bei zwei Reihen oder freier Umbruch)
+       ist die Kernfrage des Layouts offen.
+       *** BLOCKIEREND. Ohne F1 kann [4] nicht geschrieben werden. ***
+
+[3/7]  [B]  AppSettings.paintBarRows anlegen (Univ. §12 / §31)
+       Feld + Getter/Setter + Lesen in loadFromFile + Schreiben in save,
+       Vorgabe 1. Danach Schema_AppSettings.txt ergaenzen (Feldtabelle
+       ist Vertrag). Rein additiv, kein bestehender Wert beruehrt.
+       *** Fehlender Schluessel = 1 = heutiges Startverhalten. ***
+       Modell: Haiku moeglich — es ist ein exakt vorgezeichnetes Muster
+       (showGrid/showRuler daneben). Ergebnis trotzdem gegenlesen.
+
+[4/7]  [C]  PaintToolbar: zweizeiliger Aufbau + toolbarHeight()
+       Der eigentliche Umbau. Die elf Gruppen existieren bereits als
+       eigene JPanel; neu ist ihre Anordnung und die gerechnete Hoehe.
+       Undo/Redo wandern per Dehnfeld ans rechte Ende der zweiten Reihe.
+       *** [C], weil buildStrip() neu gebaut wird und daran zwei
+           eingeuebte Bedienwege haengen (Rad-Bildlauf, Mittelklick-Zug,
+           installMiddleMouseDragPan). ***
+       Modell: KEIN Haiku. Layout-Umbau mit Nebenwirkungen.
+
+[5/7]  [B]  Die zwei TOOLBAR_H-Stellen in SelectiveAlphaEditor umstellen
+       Zeile 414 (Andocken) und 471 (Schweben) auf toolbarHeight();
+       schwebendes Fenster nach dem Umschalten neu packen.
+       *** Wer nur eine der beiden umstellt, merkt den Fehler nur in
+           einem der beiden Zustaende. ***
+
+[6/7]  [B]  Umschaltknopf verdrahten (Ort nach Antwort auf F3)
+       Knopf -> setPaintBarRows(n) -> revalidate + AppSettings.save().
+       Falls F2 = "Taste ja": ZUERST KeyBindings-Eintrag, DANN Handler,
+       und die Taste in den Wachposten toolKeysActive() haengen (§25).
+
+[7/7]  [B]  Build + Doku
+       javac -encoding UTF-8 …, .class-Zahl in ein LEERES Verzeichnis
+       nachmessen (heute 357). CLAUDE.md + doc/GUIDELINES.md
+       (Steckbrief-Zeile Settings) + WEITERMACHEN_PROMPT.txt + README.md
+       nachziehen; progress-Datei mit Verify-Liste Z1-Z10.
+       *** Doku, die dem Code widerspricht, ist ein Bug (Univ. §9). ***
+
+------------------------------------------------------------------------------
+FORTSCHRITT
+------------------------------------------------------------------------------
+[1/7] abgeschlossen   Messung + Mockup + drei Fragen
+[2/7] abgeschlossen   Freigabe erteilt (F1 = freier Umbruch, F2 = mit Taste,
+                      F3 = Gruppe "Ansicht")
+[3/7] abgeschlossen   AppSettings.paintBarWrap + Schema_AppSettings.txt
+[4/7] abgeschlossen   Strip (Scrollable) + WrapRowsLayout + toolbarHeight()
+[5/7] abgeschlossen   beide TOOLBAR_H-Stellen + repackFloatingPaintBar()
+[6/7] abgeschlossen   Knopf "Umbruch" + Strg+Umschalt+R (Registry zuerst)
+[7/7] abgeschlossen   Build 362 .class, Doku nachgezogen
+
+*** NUR RUNTIME-VERIFY Z1-Z10 IST OFFEN — das kann nur der User. ***
+
+------------------------------------------------------------------------------
+UNNOETIGE SCHRITTE — BEWUSST NICHT GEPLANT (Univ. §0)
+------------------------------------------------------------------------------
+- PaintToolbar NICHT nach AppTheme migrieren. Die Datei steht in der
+  WEITERMACHEN-Liste unter "Farbe als Inhalt" (20 Farbwerte = Mal-Palette
+  des Benutzers). Fuer den NEUEN Code dieses Tasks gilt §21 trotzdem voll:
+  kein neues Literal, fehlendes Token anlegen.
+- Die drei bekannten `new Font(...)` in PaintToolbar (miniLabel,
+  styledCombo, buildReplaceWandConfig) bleiben unangetastet — sie gehoeren
+  nicht zu dieser Aufgabe und stehen seit dem Icons-Task dokumentiert.
+- KEINE Umstellung auf einen fertigen WrapLayout-Nachbau, solange F1 nicht
+  beantwortet ist: bei Antwort (a) waere er die falsche Loesung.
+- SecondaryPaintBar und WandPanel werden nicht angefasst.
+
+------------------------------------------------------------------------------
+EMPFEHLUNG ZUM NAECHSTEN SCHRITT
+------------------------------------------------------------------------------
+Ein Programmstart und die Liste Z1-Z10. Zusammen mit dem aufgestauten
+Runtime-Verify (U, X, T, S, D, B, P, W, C) ist EIN Durchlauf faellig, nicht
+zehn — die Leiste ist in fast jeder dieser Pruefungen ohnehin sichtbar.
+"/clear" LOHNT SICH JETZT: die Aufgabe ist zu, der Einstieg fuehrt ueber
+WEITERMACHEN_PROMPT.txt.
+==============================================================================

@@ -1,0 +1,161 @@
+==============================================================================
+progress_2026-08-01_graphify-refresh.txt   —   TransparencyTool
+[ST] kleine Aufgabe, KEINE PD.  Risikoklasse [B] (kein Code angefasst).
+==============================================================================
+
+PROMPT
+------
+"Lies JAVA_GUIDELINES_UNIVERSAL.md, GUIDELINES.md, Prompt_Handling.txt,
+ WEITERMACHEN_PROMPT.txt, README.md; weiter"
+-> Vier Optionen vorgelegt, der User waehlte:
+   "Graphify-Refresh (9 Dateien) [B]".
+
+
+ZUSAMMENFASSUNG
+---------------
+Der eingecheckte Graph in graphify-out/ war vom 2026-07-30 und kannte weder
+die neuen Klassen (AppTheme, KeyBindings, ImageFileWriter, PaintIcons,
+ContextMenu, FileActionsController, ConfirmDialog, TextInputDialog,
+KeyBindingsDialog) noch die geloeschte TextToSpeech. Er ist jetzt auf dem
+Stand vom 2026-08-01.
+
+  vorher:   2479 Knoten · 6369 Kanten · 123 Communities
+  nachher:  2698 Knoten · 6736 Kanten · 143 Communities
+  Diff:     +244 Knoten · -25 Knoten · +1147 Kanten · -780 Kanten
+  Kosten:   0 LLM-Tokens (code-only -> reine AST-Extraktion)
+
+BACKUP vor dem Lauf: graphify-out/2026-08-01_vor-update/
+  (graph.json, GRAPH_REPORT.md, manifest.json, graph.html, labels)
+
+
+*** BEFUND 1: ES WAREN NICHT NEUN DATEIEN, SONDERN ZWEIUNDVIERZIG. ***
+    Die Dokumente (WEITERMACHEN_PROMPT, CLAUDE.md) nannten nur die neu
+    ANGELEGTEN Klassen. detect_incremental meldete 42 geaenderte Dateien
+    plus eine geloeschte. Der Rest stammt aus Arbeiten, die bestehende
+    Dateien BERUEHRT haben: die AppTheme-Migration (12 Dateien), F02/F03
+    (21 Aufrufstellen), D02/D03, B01, die Icons und die Kontextmenues.
+    LEHRE: "wie viele Dateien sind neu" ist nicht "wie viele Dateien haben
+    sich geaendert". Wer den Umfang aus der Doku schaetzt, schaetzt zu klein
+    — die Messung ist der einzige verlaessliche Weg (Univ. §13/§26).
+
+*** BEFUND 2: DAS PRUNING DER GELOESCHTEN DATEI SCHLUG ZUERST FEHL —
+    UND ZWAR STILL. ***
+    build_merge(prune_sources=[...], root=...) meldete:
+      "1 source file(s) deleted since last run — no matching nodes or edges
+       in graph, already clean."
+    Das war FALSCH: TextToSpeech.java stand mit eff Knoten im Graphen.
+    URSACHE: zwei verschiedene Pfadbasen.
+      - source_file IM GRAPHEN zaehlt ab dem PROJEKT-ROOT:  src/paint/X.java
+      - manifest.json zaehlt ab dem SCAN-ROOT:              paint/X.java
+      - .graphify_root = .../TransparencyTool/src
+    Mit root=<scan-root> relativiert prune_sources auf "paint/X.java" und
+    trifft nichts. Die Meldung "already clean" ist deshalb keine Bestaetigung,
+    sondern genau das Symptom.
+    *** NICHT "REPARIEREN", INDEM MAN root= AUF DEN PROJEKT-ROOT SETZT: ***
+    dann stimmt das MANIFEST nicht mehr (save_manifest teilt denselben
+    Parameter), und der naechste --update-Lauf haelt jede Datei fuer neu.
+    Beide Formen sind je fuer ihren Zweck richtig.
+    LOESUNG: root=<scan-root> beibehalten (Manifest bleibt kompatibel) und
+    die geloeschte Datei EXPLIZIT filtern — mit vorheriger ID-Kollisionsprobe
+    (siehe unten). 11 Knoten und 25 Kanten entfernt, nachgewiesen.
+
+*** BEFUND 3: DIE KOLLISIONSPROBE WAR NOETIG UND HAT §1 BESTAETIGT. ***
+    Unter den elf zu loeschenden Knoten stand
+      src_paint_texttospeech_java_string   (Typ: String)
+    Externe Typen liegen PRO DATEI als eigener Knoten vor — genau die Falle
+    aus Univ. §1. Haette ein anderer Knoten dieselbe ID getragen, waere ein
+    blindes Loeschen ein Datenverlust gewesen. Das Skript bricht in dem Fall
+    ab. Gemessen: 0 Kollisionen, also sicher.
+
+
+UNNOETIGE SCHRITTE — NICHT AUSGEFUEHRT (Univ. §0)
+-------------------------------------------------
+  - KEIN Voll-Rebuild. Der inkrementelle Weg genuegte und haelt den Diff
+    nachvollziehbar.
+  - `graphify update .` NICHT benutzt. Hier waere es sogar harmlos gewesen
+    (der Scan-Root src/ ist die Filterung, es gibt keine zusaetzliche
+    Filterliste), aber der dokumentierte Weg bleibt der gemessene.
+  - KEIN --obsidian, KEIN --wiki, KEIN Neo4j/SVG/GraphML. Nicht gefordert.
+
+
+VORGEHEN (reproduzierbar)
+-------------------------
+  Alle Schritte aus dem Projekt-Root, Interpreter aus
+  graphify-out/.graphify_python. Python-Code als DATEI ausfuehren, nicht
+  per `python -c "..."` aus PowerShell heraus:
+  *** POWERSHELL FRISST DIE DOPPELTEN ANFUEHRUNGSZEICHEN beim Uebergeben an
+      eine native exe. Ein f-string wie {len(r["nodes"])} kam als
+      {len(r[nodes])} an -> NameError. Kostete einen Fehlversuch. ***
+
+  1. Backup nach graphify-out/2026-08-01_vor-update/
+  2. detect_incremental(Path('<scan-root>'))  -> .graphify_incremental.json
+  3. .graphify_detect.json schreiben (files=geaendert, all_files=Korpus)
+  4. code_only-Probe -> True  => Semantik-Schritt entfaellt, 0 Tokens
+  5. extract(<42 Dateien>, cache_root=Path('.'))  -> 1338 Knoten/6687 Kanten
+  6. build_merge([...], graph_path=graph.json, root=<scan-root>)
+     + save_manifest(root=<scan-root>)
+  7. EXPLIZITES PRUNING der geloeschten Datei mit Kollisionsprobe
+  8. build_from_json -> cluster -> to_json -> GRAPH_REPORT.md
+  9. 143 Communities benannt, Report neu erzeugt
+ 10. graphify export html
+ 11. Diff gegen das Backup, Gegenprobe je Datei
+ 12. cost.json fortgeschrieben, Temp-Dateien geloescht
+
+  Die Wegwerf-Skripte lagen im scratchpad, nicht im Projekt.
+
+
+GEGENPROBE (nicht behauptet, gemessen)
+--------------------------------------
+  TextToSpeech.java            alt=11   neu=0     <- Pruning wirkt
+  ContextMenu.java             alt=0    neu=28
+  FileActionsController.java   alt=0    neu=24
+  ConfirmDialog.java           alt=0    neu=6
+  TextInputDialog.java         alt=0    neu=6
+  PaintIcons.java              alt=0    neu=93
+  AppTheme.java                alt=0    neu=7
+  KeyBindings.java             alt=0    neu=13
+  KeyBindingsDialog.java       alt=0    neu=10
+  ImageFileWriter.java         alt=0    neu=7
+
+  Die #479-Schrumpfsperre von to_json() hat NICHT gegriffen (2698 > 2479),
+  d. h. graph.json wurde regulaer geschrieben.
+
+
+NEBENBEFUND — NICHT BEHOBEN, GEHOERT DEM USER
+---------------------------------------------
+  Die vier referenzfreien Parallel-Implementierungen aus Befund L02 sind im
+  neuen Graphen als eigene Communities sichtbar und deshalb jetzt AUCH SO
+  BENANNT, damit sie niemand fuer Produktivcode haelt:
+     [7]   ElementLayerState (dead parallel copy)     51 Knoten
+     [10]  FileStateCache (dead parallel copy)        39 Knoten
+     [26]  ZoomState (dead parallel copy)             27 Knoten
+     [38]  FloatSelectionState (dead parallel copy)   23 Knoten
+     [104] ZoomState UI Wiring (dead)                  9 Knoten
+     [128] CanvasState (dead parallel copy)            4 Knoten
+  *** DIE BENENNUNG IST KEINE LOESCHENTSCHEIDUNG. *** Univ. §1 ist
+  eindeutig: der Graph beantwortet nicht "ist das tot". Die Referenzfreiheit
+  stammt aus dem Audit vom 2026-07-31 (Textsuche), nicht aus dem Graphen.
+  L02 bleibt offen.
+
+  WIDERSPRUCH IN DER DOKU, NICHT ANGEFASST: doc/GUIDELINES.md nennt
+  KeyBindings.ALL mit 81 Eintraegen, WEITERMACHEN_PROMPT.txt und
+  doc/README.md mit 79. Eine der Zahlen ist falsch. Nachmessen ist ein
+  Einzeiler, aber es ist eine eigene Aufgabe (Univ. §9) und war nicht Teil
+  dieses Auftrags.
+
+
+AKTUALISIERTE DOKUMENTE
+-----------------------
+  doc/WEITERMACHEN_PROMPT.txt   (GRAPHIFY-Abschnitt + STRUKTUR/GRAPH)
+  doc/GUIDELINES.md             (Steckbrief, Zeile Graphify-Scope)
+  doc/README.md                 (diese progress-Datei eingetragen)
+  CLAUDE.md                     (KnowledgeMap-Hinweis)
+
+
+RUNTIME-VERIFY
+--------------
+  KEINER. Es wurde kein Code angefasst, das Programm ist unveraendert.
+  Wer den Graphen ansehen will:
+    graphify-out/graph.html          im Browser
+    graphify-out/GRAPH_REPORT.md     Audit-Report
+    graphify explain "ContextMenu"   Beispielabfrage

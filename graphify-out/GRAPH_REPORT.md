@@ -1,539 +1,567 @@
-# Graph Report - C:\Users\pc\eclipse-workspace\TransparencyTool\src  (2026-07-30)
+# Graph Report - C:/Users/pc/eclipse-workspace/TransparencyTool/src  (2026-08-01)
 
 ## Corpus Check
-- 108 files · ~119,980 words
+- 8 files · ~133,589 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2479 nodes · 6369 edges · 123 communities (98 shown, 25 thin omitted)
-- Extraction: 78% EXTRACTED · 22% INFERRED · 0% AMBIGUOUS · INFERRED: 1403 edges (avg confidence: 0.8)
+- 2731 nodes · 6765 edges · 125 communities (102 shown, 23 thin omitted)
+- Extraction: 82% EXTRACTED · 18% INFERRED · 0% AMBIGUOUS · INFERRED: 1190 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_AppSettings|AppSettings]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_SecondaryPanel|SecondaryPanel]]
-- [[_COMMUNITY_MapsPanel|MapsPanel]]
-- [[_COMMUNITY_ElementLayerPanel|ElementLayerPanel]]
-- [[_COMMUNITY_CardListPanel|CardListPanel]]
-- [[_COMMUNITY_StartupDialog|StartupDialog]]
-- [[_COMMUNITY_PathLayer|PathLayer]]
-- [[_COMMUNITY_ElementLayerState|ElementLayerState]]
-- [[_COMMUNITY_CanvasPanel|CanvasPanel]]
-- [[_COMMUNITY_BookController|BookController]]
-- [[_COMMUNITY_FileStateCache|FileStateCache]]
-- [[_COMMUNITY_EditorDialogCallbacks|EditorDialogCallbacks]]
-- [[_COMMUNITY_CardTextOptionsPopup|CardTextOptionsPopup]]
-- [[_COMMUNITY_PaintEngine|PaintEngine]]
-- [[_COMMUNITY_SceneLocator|SceneLocator]]
-- [[_COMMUNITY_ZoomState|ZoomState]]
-- [[_COMMUNITY_TranslationMapListPanel|TranslationMapListPanel]]
-- [[_COMMUNITY_ElementController|ElementController]]
-- [[_COMMUNITY_LayoutController|LayoutController]]
-- [[_COMMUNITY_Sheet|Sheet]]
-- [[_COMMUNITY_TranslationMapListPanel|TranslationMapListPanel]]
-- [[_COMMUNITY_CardListStore|CardListStore]]
-- [[_COMMUNITY_PaintToolbar|PaintToolbar]]
-- [[_COMMUNITY_SecondaryPanel|SecondaryPanel]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_PaintToolbar|PaintToolbar]]
-- [[_COMMUNITY_CanvasPanel|CanvasPanel]]
-- [[_COMMUNITY_UIComponentFactory|UIComponentFactory]]
-- [[_COMMUNITY_UIBuilder|UIBuilder]]
-- [[_COMMUNITY_BaseSidebarPanel|BaseSidebarPanel]]
-- [[_COMMUNITY_PageLayoutToolbar|PageLayoutToolbar]]
-- [[_COMMUNITY_NewImageDialog|NewImageDialog]]
-- [[_COMMUNITY_PaintToolbar|PaintToolbar]]
-- [[_COMMUNITY_ScenesController|ScenesController]]
-- [[_COMMUNITY_TileGalleryPanel|TileGalleryPanel]]
-- [[_COMMUNITY_ClipboardController|ClipboardController]]
-- [[_COMMUNITY_SaveController|SaveController]]
-- [[_COMMUNITY_ProjectManager|ProjectManager]]
-- [[_COMMUNITY_FileLoadController|FileLoadController]]
-- [[_COMMUNITY_TextToolbar|TextToolbar]]
-- [[_COMMUNITY_ColorPickerPopup|ColorPickerPopup]]
-- [[_COMMUNITY_WandPanel|WandPanel]]
-- [[_COMMUNITY_FloatSelectionState|FloatSelectionState]]
-- [[_COMMUNITY_TileGalleryPanel|TileGalleryPanel]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_PaintEngine|PaintEngine]]
-- [[_COMMUNITY_TileGalleryPanel|TileGalleryPanel]]
-- [[_COMMUNITY_TransformController|TransformController]]
-- [[_COMMUNITY_GameSceneReader|GameSceneReader]]
-- [[_COMMUNITY_AppPaths|AppPaths]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_BaseSidebarPanel|BaseSidebarPanel]]
-- [[_COMMUNITY_ElementEditController|ElementEditController]]
-- [[_COMMUNITY_HRulerPanel|HRulerPanel]]
-- [[_COMMUNITY_TextLayer|TextLayer]]
-- [[_COMMUNITY_CanvasInstance|CanvasInstance]]
-- [[_COMMUNITY_SpriteLayer|SpriteLayer]]
-- [[_COMMUNITY_ImageLayer|ImageLayer]]
-- [[_COMMUNITY_PaintToolbar|PaintToolbar]]
-- [[_COMMUNITY_SceneSerializer|SceneSerializer]]
-- [[_COMMUNITY_PaintEngine|PaintEngine]]
-- [[_COMMUNITY_RulerCallbacks|RulerCallbacks]]
-- [[_COMMUNITY_SceneFileWriter|SceneFileWriter]]
-- [[_COMMUNITY_RightCardListPanel|RightCardListPanel]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_ZoomController|ZoomController]]
-- [[_COMMUNITY_PaintToolbar|PaintToolbar]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_TransferableImage|TransferableImage]]
-- [[_COMMUNITY_DropController|DropController]]
-- [[_COMMUNITY_FloatSelectionController|FloatSelectionController]]
-- [[_COMMUNITY_NewImageDialog|NewImageDialog]]
-- [[_COMMUNITY_VRulerPanel|VRulerPanel]]
-- [[_COMMUNITY_SceneImageAdapter|SceneImageAdapter]]
-- [[_COMMUNITY_GameSceneWriter|GameSceneWriter]]
-- [[_COMMUNITY_PageLayout|PageLayout]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_JsonStorage|JsonStorage]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_TextToSpeech|TextToSpeech]]
-- [[_COMMUNITY_GalleryCallbacksFactory|GalleryCallbacksFactory]]
-- [[_COMMUNITY_Layer|Layer]]
-- [[_COMMUNITY_PageLayoutManifest|PageLayoutManifest]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_MapCreateDialog|MapCreateDialog]]
-- [[_COMMUNITY_ColorPickerPopup|ColorPickerPopup]]
-- [[_COMMUNITY_WhiteToAlphaConverter|WhiteToAlphaConverter]]
-- [[_COMMUNITY_SecondaryPaintBar|SecondaryPaintBar]]
-- [[_COMMUNITY_ToolLegacySceneReader|ToolLegacySceneReader]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_FileStateCache|FileStateCache]]
-- [[_COMMUNITY_MapEditDialog|MapEditDialog]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_ToastNotification|ToastNotification]]
-- [[_COMMUNITY_ImageLoader|ImageLoader]]
-- [[_COMMUNITY_KeyboardShortcutManager|KeyboardShortcutManager]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_CanvasCallbacksFactory|CanvasCallbacksFactory]]
-- [[_COMMUNITY_NewFileController|NewFileController]]
-- [[_COMMUNITY_PaintCallbacksFactory|PaintCallbacksFactory]]
-- [[_COMMUNITY_TextToolbarCallbacksFactory|TextToolbarCallbacksFactory]]
-- [[_COMMUNITY_TileGalleryPanel|TileGalleryPanel]]
-- [[_COMMUNITY_ElementLayerPanel|ElementLayerPanel]]
-- [[_COMMUNITY_CardEntry|CardEntry]]
-- [[_COMMUNITY_ElementLayerCallbacksFactory|ElementLayerCallbacksFactory]]
-- [[_COMMUNITY_AppColors|AppColors]]
-- [[_COMMUNITY_JAVA_EasyImageManipulator-Push|JAVA_EasyImageManipulator-Push]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_CanvasCallbacks|CanvasCallbacks]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
-- [[_COMMUNITY_SelectiveAlphaEditor|SelectiveAlphaEditor]]
+- [[_COMMUNITY_PaintEngine Pixel Operations|PaintEngine Pixel Operations]]
+- [[_COMMUNITY_PaintIcons Vector Drawing|PaintIcons Vector Drawing]]
+- [[_COMMUNITY_Sidebar Base + Maps Panel|Sidebar Base + Maps Panel]]
+- [[_COMMUNITY_Page Layout & Text Toolbars|Page Layout & Text Toolbars]]
+- [[_COMMUNITY_AppSettings Accessors|AppSettings Accessors]]
+- [[_COMMUNITY_Zoom Animation & TTS Playback (enthaelt tote ZoomState-Kopie)|Zoom Animation & TTS Playback (enthaelt tote ZoomState-Kopie)]]
+- [[_COMMUNITY_Translation Map Cards|Translation Map Cards]]
+- [[_COMMUNITY_Editor Orchestrator Delegations|Editor Orchestrator Delegations]]
+- [[_COMMUNITY_Startup Dialog & Recent Projects|Startup Dialog & Recent Projects]]
+- [[_COMMUNITY_ElementLayerState (dead parallel copy)|ElementLayerState (dead parallel copy)]]
+- [[_COMMUNITY_Scene & Config File Readers|Scene & Config File Readers]]
+- [[_COMMUNITY_Dialog Factory & ConfirmInput Dialogs|Dialog Factory & Confirm/Input Dialogs]]
+- [[_COMMUNITY_Save Controller & Image Writing|Save Controller & Image Writing]]
+- [[_COMMUNITY_Paint Toolbar Group Builders|Paint Toolbar Group Builders]]
+- [[_COMMUNITY_FileStateCache (dead parallel copy)|FileStateCache (dead parallel copy)]]
+- [[_COMMUNITY_Editor Dialog Callbacks Interface|Editor Dialog Callbacks Interface]]
+- [[_COMMUNITY_Layout & Mode Controllers|Layout & Mode Controllers]]
+- [[_COMMUNITY_Card List Panel Widgets|Card List Panel Widgets]]
+- [[_COMMUNITY_Translation Map Persistence|Translation Map Persistence]]
+- [[_COMMUNITY_Paint Toolbar Core & Palette|Paint Toolbar Core & Palette]]
+- [[_COMMUNITY_Drag & Drop Image Transfer|Drag & Drop Image Transfer]]
+- [[_COMMUNITY_Card Text Options Popup|Card Text Options Popup]]
+- [[_COMMUNITY_Canvas Callbacks State Queries|Canvas Callbacks: State Queries]]
+- [[_COMMUNITY_Book Sheet Model|Book Sheet Model]]
+- [[_COMMUNITY_Clipboard CutCopyPaste|Clipboard Cut/Copy/Paste]]
+- [[_COMMUNITY_AppSettings File Parser|AppSettings File Parser]]
+- [[_COMMUNITY_Book & Page Controller|Book & Page Controller]]
+- [[_COMMUNITY_KeyBindings Registry & Help Dialog|KeyBindings Registry & Help Dialog]]
+- [[_COMMUNITY_Canvas Text Edit Mode|Canvas Text Edit Mode]]
+- [[_COMMUNITY_Wand Panel Options|Wand Panel Options]]
+- [[_COMMUNITY_Paint Toolbar Row Wrapping|Paint Toolbar Row Wrapping]]
+- [[_COMMUNITY_Sprite Layer & Transforms|Sprite Layer & Transforms]]
+- [[_COMMUNITY_New Image Dialog|New Image Dialog]]
+- [[_COMMUNITY_Path Layer Model|Path Layer Model]]
+- [[_COMMUNITY_Secondary Window Controller|Secondary Window Controller]]
+- [[_COMMUNITY_Element Layer Rendering|Element Layer Rendering]]
+- [[_COMMUNITY_File Load & Navigation|File Load & Navigation]]
+- [[_COMMUNITY_Canvas Callbacks Drag Anchors|Canvas Callbacks: Drag Anchors]]
+- [[_COMMUNITY_Layer Panel Painting|Layer Panel Painting]]
+- [[_COMMUNITY_Layer Tile Actions|Layer Tile Actions]]
+- [[_COMMUNITY_FloatSelectionState (dead parallel copy)|FloatSelectionState (dead parallel copy)]]
+- [[_COMMUNITY_Scene Directory Locator|Scene Directory Locator]]
+- [[_COMMUNITY_Gallery File Callbacks|Gallery File Callbacks]]
+- [[_COMMUNITY_Dark Scrollbar UI|Dark Scrollbar UI]]
+- [[_COMMUNITY_Color Picker Popup|Color Picker Popup]]
+- [[_COMMUNITY_Canvas Painting Helpers|Canvas Painting Helpers]]
+- [[_COMMUNITY_File Actions & Context Menu Fill|File Actions & Context Menu Fill]]
+- [[_COMMUNITY_Keyboard Shortcut Wiring|Keyboard Shortcut Wiring]]
+- [[_COMMUNITY_Color Picker Hue Panel|Color Picker Hue Panel]]
+- [[_COMMUNITY_AppPaths Path Central|AppPaths Path Central]]
+- [[_COMMUNITY_Project Manager Persistence|Project Manager Persistence]]
+- [[_COMMUNITY_Secondary Control Bar|Secondary Control Bar]]
+- [[_COMMUNITY_Tool Button Construction|Tool Button Construction]]
+- [[_COMMUNITY_Editor Window Setup|Editor Window Setup]]
+- [[_COMMUNITY_App Lifecycle & Exit Guard|App Lifecycle & Exit Guard]]
+- [[_COMMUNITY_Gallery Tile Selection|Gallery Tile Selection]]
+- [[_COMMUNITY_Card List Store|Card List Store]]
+- [[_COMMUNITY_Canvas Text Layout & Caret|Canvas Text Layout & Caret]]
+- [[_COMMUNITY_Magic Wand Operations|Magic Wand Operations]]
+- [[_COMMUNITY_Image Layer Model|Image Layer Model]]
+- [[_COMMUNITY_UIBuilder Center Layout|UIBuilder Center Layout]]
+- [[_COMMUNITY_Element Edit Mode|Element Edit Mode]]
+- [[_COMMUNITY_Text Layer Rendering & Writer|Text Layer Rendering & Writer]]
+- [[_COMMUNITY_Text Layer Model|Text Layer Model]]
+- [[_COMMUNITY_Gallery Tile Population|Gallery Tile Population]]
+- [[_COMMUNITY_Context Menu Rendering|Context Menu Rendering]]
+- [[_COMMUNITY_Layer Composite Rendering|Layer Composite Rendering]]
+- [[_COMMUNITY_Canvas Background & Ruler Access|Canvas Background & Ruler Access]]
+- [[_COMMUNITY_Brush Preview & Shape Drawing|Brush Preview & Shape Drawing]]
+- [[_COMMUNITY_Horizontal Ruler|Horizontal Ruler]]
+- [[_COMMUNITY_Scene JSON Serializer|Scene JSON Serializer]]
+- [[_COMMUNITY_Paper Format Constants|Paper Format Constants]]
+- [[_COMMUNITY_Callbacks Factories|Callbacks Factories]]
+- [[_COMMUNITY_Left Card List Panel|Left Card List Panel]]
+- [[_COMMUNITY_Right Card List Panel|Right Card List Panel]]
+- [[_COMMUNITY_Context Menu Builder|Context Menu Builder]]
+- [[_COMMUNITY_Point3D Geometry|Point3D Geometry]]
+- [[_COMMUNITY_Ruler Callbacks Interface|Ruler Callbacks Interface]]
+- [[_COMMUNITY_Card Folder Dialog|Card Folder Dialog]]
+- [[_COMMUNITY_Scenes Controller|Scenes Controller]]
+- [[_COMMUNITY_Vertical Ruler|Vertical Ruler]]
+- [[_COMMUNITY_Stroke & Tolerance Controls|Stroke & Tolerance Controls]]
+- [[_COMMUNITY_Canvas Callbacks Element Lists|Canvas Callbacks: Element Lists]]
+- [[_COMMUNITY_Floating Selection Controller|Floating Selection Controller]]
+- [[_COMMUNITY_Page Layout Margins|Page Layout Margins]]
+- [[_COMMUNITY_Panel Toggle Button|Panel Toggle Button]]
+- [[_COMMUNITY_Margin Preview Panel|Margin Preview Panel]]
+- [[_COMMUNITY_Canvas Callbacks Handle Rects|Canvas Callbacks: Handle Rects]]
+- [[_COMMUNITY_GameII Scene Writer|GameII Scene Writer]]
+- [[_COMMUNITY_Book JSON Storage|Book JSON Storage]]
+- [[_COMMUNITY_New Folder Dialog|New Folder Dialog]]
+- [[_COMMUNITY_Editor Float & Handle Delegations|Editor Float & Handle Delegations]]
+- [[_COMMUNITY_Canvas Callbacks Image Access|Canvas Callbacks: Image Access]]
+- [[_COMMUNITY_Layer Base Model|Layer Base Model]]
+- [[_COMMUNITY_Top Bar Mode Toggles|Top Bar Mode Toggles]]
+- [[_COMMUNITY_Scene Data Cache Access|Scene Data Cache Access]]
+- [[_COMMUNITY_Gallery Callbacks Factory|Gallery Callbacks Factory]]
+- [[_COMMUNITY_Map Create Dialog|Map Create Dialog]]
+- [[_COMMUNITY_Canvas Instance File State|Canvas Instance File State]]
+- [[_COMMUNITY_Layer Panel Drop & Outlines|Layer Panel Drop & Outlines]]
+- [[_COMMUNITY_Preload Controller|Preload Controller]]
+- [[_COMMUNITY_Scene File Writer|Scene File Writer]]
+- [[_COMMUNITY_Secondary Paint Bar|Secondary Paint Bar]]
+- [[_COMMUNITY_Legacy GameII Scene Reader|Legacy GameII Scene Reader]]
+- [[_COMMUNITY_Image Loader|Image Loader]]
+- [[_COMMUNITY_Gallery Scrollbar Setup|Gallery Scrollbar Setup]]
+- [[_COMMUNITY_Canvas Callbacks Text Toolbar|Canvas Callbacks: Text Toolbar]]
+- [[_COMMUNITY_Element Layer Callbacks Factory|Element Layer Callbacks Factory]]
+- [[_COMMUNITY_Map Edit Dialog|Map Edit Dialog]]
+- [[_COMMUNITY_Toast Notification|Toast Notification]]
+- [[_COMMUNITY_AppColors Token Source|AppColors Token Source]]
+- [[_COMMUNITY_Canvas Callbacks Factory|Canvas Callbacks Factory]]
+- [[_COMMUNITY_Text Toolbar Callbacks Factory|Text Toolbar Callbacks Factory]]
+- [[_COMMUNITY_CanvasState (dead parallel copy)|CanvasState (dead parallel copy)]]
+- [[_COMMUNITY_Card Entry Model|Card Entry Model]]
+- [[_COMMUNITY_Deploy Script|Deploy Script]]
+- [[_COMMUNITY_Canvas Callbacks App Mode|Canvas Callbacks: App Mode]]
+- [[_COMMUNITY_Canvas Callbacks Page Layout|Canvas Callbacks: Page Layout]]
+- [[_COMMUNITY_Canvas Callbacks Paint Toolbar|Canvas Callbacks: Paint Toolbar]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `SelectiveAlphaEditor` - 153 edges
-2. `AppSettings` - 115 edges
-3. `ArrayList` - 112 edges
-4. `CanvasCallbacks` - 93 edges
-5. `CanvasPanel` - 85 edges
-6. `JPanel` - 69 edges
-7. `PaintToolbar` - 66 edges
+1. `SelectiveAlphaEditor` - 156 edges
+2. `AppSettings` - 117 edges
+3. `CanvasCallbacks` - 93 edges
+4. `CanvasPanel` - 86 edges
+5. `PaintToolbar` - 80 edges
+6. `ArrayList` - 69 edges
+7. `PaintIcons` - 64 edges
 8. `PaintEngine` - 60 edges
-9. `BufferedImage` - 48 edges
-10. `MouseAdapter` - 47 edges
+9. `Graphics2D` - 60 edges
+10. `BufferedImage` - 48 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `SelectiveAlphaEditor` --implements--> `RulerCallbacks`  [EXTRACTED]
-  src/paint/SelectiveAlphaEditor.java → src/paint/HRulerPanel.java
-- `BaseSidebarPanel` --inherits--> `JPanel`  [EXTRACTED]
-  src/paint/BaseSidebarPanel.java → src/paint/CardTextOptionsPopup.java
-- `ElementLayerPanel` --inherits--> `BaseSidebarPanel`  [EXTRACTED]
-  src/paint/ElementLayerPanel.java → src/paint/BaseSidebarPanel.java
-- `MapsPanel` --inherits--> `BaseSidebarPanel`  [EXTRACTED]
-  src/paint/MapsPanel.java → src/paint/BaseSidebarPanel.java
-- `TileGalleryPanel` --inherits--> `BaseSidebarPanel`  [EXTRACTED]
-  src/paint/TileGalleryPanel.java → src/paint/BaseSidebarPanel.java
+- `CardListPanel` --inherits--> `JPanel`  [EXTRACTED]
+  src/paint/CardListPanel.java → src/paint/CardTextOptionsPopup.java
+- `LeftCardListPanel` --inherits--> `CardListPanel`  [EXTRACTED]
+  src/paint/LeftCardListPanel.java → src/paint/CardListPanel.java
+- `RightCardListPanel` --inherits--> `CardListPanel`  [EXTRACTED]
+  src/paint/RightCardListPanel.java → src/paint/CardListPanel.java
+- `CardWidget` --inherits--> `JPanel`  [EXTRACTED]
+  src/paint/CardListPanel.java → src/paint/CardTextOptionsPopup.java
+- `HRulerPanel` --inherits--> `JPanel`  [EXTRACTED]
+  src/paint/HRulerPanel.java → src/paint/CardTextOptionsPopup.java
 
 ## Import Cycles
 - None detected.
 
-## Communities (123 total, 25 thin omitted)
+## Communities (125 total, 23 thin omitted)
 
-### Community 0 - "AppSettings"
-Cohesion: 0.04
-Nodes (3): AppSettings, List, String
-
-### Community 2 - "SecondaryPanel"
+### Community 0 - "PaintEngine Pixel Operations"
 Cohesion: 0.06
-Nodes (19): SecondaryControlBar, SecondaryPanel, SecondaryWindowController, SecondaryWindowController, AbstractButton, JButton, JSeparator, SelectiveAlphaEditor (+11 more)
+Nodes (20): PaintEngine, SecondaryPanel, BrushShape, BufferedImage, Color, FillMode, Graphics2D, List (+12 more)
 
-### Community 3 - "MapsPanel"
+### Community 1 - "PaintIcons Vector Drawing"
+Cohesion: 0.09
+Nodes (16): Graphics, Graphics2D, Action(), GlyphIcon, PaintColors, Painter, PaintIcons, primary() (+8 more)
+
+### Community 2 - "Sidebar Base + Maps Panel"
+Cohesion: 0.05
+Nodes (29): Boolean, ContainerEvent, ImageIcon, BaseSidebarPanel, FileForCopy, PanAdapter, PreloadCallback, PreloadHandle (+21 more)
+
+### Community 3 - "Page Layout & Text Toolbars"
 Cohesion: 0.07
-Nodes (21): Collection, MapManager, Callbacks, MapsPanel, MapsScrollablePanel, MapTile, TranslationMap, TranslationMap (+13 more)
+Nodes (21): JPanel, PageLayoutToolbar, Callbacks, TextToolbar, Component, File, JLabel, JSpinner (+13 more)
 
-### Community 4 - "ElementLayerPanel"
-Cohesion: 0.06
-Nodes (20): Callbacks, ElementLayerPanel, LayerTile, TilesScrollablePanel, PanelToggleButton, Dimension, File, Graphics (+12 more)
+### Community 5 - "Zoom Animation & TTS Playback (enthaelt tote ZoomState-Kopie)"
+Cohesion: 0.05
+Nodes (13): CardTtsPlayer, ZoomController, ZoomState, Process, Runnable, String, Point, SelectiveAlphaEditor (+5 more)
 
-### Community 5 - "CardListPanel"
-Cohesion: 0.07
-Nodes (17): CardWidget, DocumentListener, CardListPanel, CardWidget, CardTtsPlayer, LeftCardListPanel, Process, CardEntry (+9 more)
+### Community 6 - "Translation Map Cards"
+Cohesion: 0.08
+Nodes (18): DocumentListener, MapCardWidget, CardStyle, CloseCallback, MapCardWidget, TranslationMapListPanel, Color, Font (+10 more)
 
-### Community 6 - "StartupDialog"
-Cohesion: 0.07
-Nodes (26): DefaultListCellRenderer, JList, JTabbedPane, Mode, AppLifecycleController, LastProjectsManager, QuickOpenController, ProjectListCellRenderer (+18 more)
+### Community 7 - "Editor Orchestrator Delegations"
+Cohesion: 0.03
+Nodes (4): FilePreloadCallback, SelectiveAlphaEditor, RulerCallbacks, Component
 
-### Community 7 - "PathLayer"
-Cohesion: 0.06
-Nodes (18): PathLayer, Point3D, ImageLayerRef, SceneData, SceneFileReader, TextReader, Serializable, BufferedImage (+10 more)
+### Community 8 - "Startup Dialog & Recent Projects"
+Cohesion: 0.08
+Nodes (24): DefaultListCellRenderer, JList, JTabbedPane, Mode, LastProjectsManager, QuickOpenController, ProjectListCellRenderer, StartupDialog (+16 more)
 
-### Community 8 - "ElementLayerState"
+### Community 9 - "ElementLayerState (dead parallel copy)"
 Cohesion: 0.07
 Nodes (13): CanvasPanel, ElementLayerPanel, ElementLayerState, AppMode, BufferedImage, Color, Layer, List (+5 more)
 
-### Community 9 - "CanvasPanel"
+### Community 10 - "Scene & Config File Readers"
 Cohesion: 0.08
-Nodes (5): CanvasPanel, PaintToolbar, BufferedImage, CanvasCallbacks, Point
+Nodes (23): GameSceneData, GameSceneReader, PageLayoutManifest, ImageLayerRef, SceneData, SceneFileReader, TextReader, Boolean (+15 more)
 
-### Community 10 - "BookController"
-Cohesion: 0.12
-Nodes (19): getHeightLandscape(), getHeightPortrait(), getMarginInner(), getMarginOuter(), getWidthLandscape(), getWidthPortrait(), landscape(), PaperFormat (+11 more)
+### Community 11 - "Dialog Factory & Confirm/Input Dialogs"
+Cohesion: 0.09
+Nodes (19): ConfirmDialog, EditorDialogs, TextInputDialog, UIComponentFactory, JFrame, String, SelectiveAlphaEditor, String (+11 more)
 
-### Community 11 - "FileStateCache"
+### Community 12 - "Save Controller & Image Writing"
+Cohesion: 0.10
+Nodes (13): OutputStream, ImageFileWriter, NewFileController, SaveController, WhiteToAlphaConverter, BufferedImage, File, SelectiveAlphaEditor (+5 more)
+
+### Community 13 - "Paint Toolbar Group Builders"
+Cohesion: 0.10
+Nodes (7): Action, BrushShape, FillMode, Callbacks, Separator, String, JPanel
+
+### Community 14 - "FileStateCache (dead parallel copy)"
 Cohesion: 0.09
 Nodes (11): CanvasState, Deque, FileStateCache, ProjectManager, BufferedImage, File, Layer, List (+3 more)
 
-### Community 12 - "EditorDialogCallbacks"
+### Community 15 - "Editor Dialog Callbacks Interface"
 Cohesion: 0.07
 Nodes (9): EditorDialogCallbacks, BufferedImage, Color, File, JFrame, JLabel, JPanel, Point (+1 more)
 
-### Community 13 - "CardTextOptionsPopup"
-Cohesion: 0.09
-Nodes (9): CardTextOptionsPopup, Color, JComboBox, JLabel, JSpinner, Runnable, String, Window (+1 more)
+### Community 16 - "Layout & Mode Controllers"
+Cohesion: 0.10
+Nodes (6): LayoutController, ModeController, Set, SelectiveAlphaEditor, SelectiveAlphaEditor, Point
 
-### Community 14 - "PaintEngine"
-Cohesion: 0.15
-Nodes (4): PaintEngine, WandColorSource, Color, List
-
-### Community 15 - "SceneLocator"
-Cohesion: 0.14
-Nodes (15): FolderType(), NewFolderDialog, toString(), fromFile(), SceneFormat(), SceneLocator, Component, File (+7 more)
-
-### Community 16 - "ZoomState"
-Cohesion: 0.08
-Nodes (6): ZoomState, BufferedImage, JLabel, JPanel, JScrollPane, Point
-
-### Community 17 - "TranslationMapListPanel"
-Cohesion: 0.13
-Nodes (8): MapCardWidget, MapCardWidget, Font, JButton, JSpinner, List, String, TranslationMap
-
-### Community 18 - "ElementController"
-Cohesion: 0.13
-Nodes (10): ElementController, BufferedImage, CanvasInstance, File, Graphics2D, ImageLayer, Layer, Rectangle (+2 more)
-
-### Community 19 - "LayoutController"
+### Community 17 - "Card List Panel Widgets"
 Cohesion: 0.12
-Nodes (5): LayoutController, ModeController, SelectiveAlphaEditor, SelectiveAlphaEditor, Set
+Nodes (7): CardWidget, CardListPanel, CardWidget, CardEntry, Color, JButton, String
 
-### Community 20 - "Sheet"
+### Community 18 - "Translation Map Persistence"
+Cohesion: 0.13
+Nodes (11): Collection, MapManager, TranslationMap, TranslationMap, Window, List, Map, String (+3 more)
+
+### Community 19 - "Paint Toolbar Core & Palette"
+Cohesion: 0.11
+Nodes (6): MouseAdapter, PaintToolbar, Color, JScrollPane, WandPanel, Window
+
+### Community 20 - "Drag & Drop Image Transfer"
+Cohesion: 0.09
+Nodes (19): DataFlavor, DropController, SceneAsImage, SceneImageAdapter, TransferableImage, Component, File, JPanel (+11 more)
+
+### Community 21 - "Card Text Options Popup"
+Cohesion: 0.09
+Nodes (8): CardTextOptionsPopup, Color, JComboBox, JLabel, JSpinner, Runnable, String, Window
+
+### Community 23 - "Book Sheet Model"
 Cohesion: 0.07
 Nodes (3): Sheet, PaperFormat, String
 
-### Community 21 - "TranslationMapListPanel"
-Cohesion: 0.15
-Nodes (9): CardStyle, CloseCallback, TranslationMapListPanel, Color, JComboBox, JPanel, JSeparator, JToggleButton (+1 more)
-
-### Community 22 - "CardListStore"
-Cohesion: 0.15
-Nodes (11): CardFolderDialog, CardListStore, JButton, JLabel, Runnable, String, Window, CardEntry (+3 more)
-
-### Community 23 - "PaintToolbar"
-Cohesion: 0.17
-Nodes (6): JPanel, JLabel, SelectiveAlphaEditor, JLabel, SuppressWarnings, Window
-
-### Community 24 - "SecondaryPanel"
-Cohesion: 0.22
-Nodes (6): Layer, Color, Graphics, Graphics2D, Override, PathLayer
-
-### Community 26 - "PaintToolbar"
-Cohesion: 0.09
-Nodes (4): Callbacks, BrushShape, FillMode, JButton
-
-### Community 27 - "CanvasPanel"
-Cohesion: 0.15
-Nodes (10): FontMetrics, TLine, Color, Font, Graphics2D, List, Rectangle, String (+2 more)
-
-### Community 28 - "UIComponentFactory"
+### Community 24 - "Clipboard Cut/Copy/Paste"
 Cohesion: 0.16
-Nodes (12): EditorDialogs, UIComponentFactory, SelectiveAlphaEditor, String, Color, JButton, JDialog, JFrame (+4 more)
+Nodes (7): ImageLayer, ClipboardController, BufferedImage, CanvasInstance, Point, Rectangle, SelectiveAlphaEditor
 
-### Community 29 - "UIBuilder"
-Cohesion: 0.13
-Nodes (8): UIBuilder, Consumer, Runnable, Component, JPanel, JToggleButton, SelectiveAlphaEditor, TileGalleryPanel
+### Community 25 - "AppSettings File Parser"
+Cohesion: 0.08
+Nodes (4): BufferedWriter, Object, List, String
 
-### Community 30 - "BaseSidebarPanel"
-Cohesion: 0.12
-Nodes (14): ImageIcon, BaseSidebarPanel, FileForCopy, PreloadCallback, PreloadHandle, PreloadHandle, Boolean, Consumer (+6 more)
+### Community 26 - "Book & Page Controller"
+Cohesion: 0.21
+Nodes (10): BookController, SceneData, BufferedImage, File, Layer, List, Runnable, SelectiveAlphaEditor (+2 more)
 
-### Community 31 - "PageLayoutToolbar"
+### Community 27 - "KeyBindings Registry & Help Dialog"
+Cohesion: 0.11
+Nodes (15): Border, AppTheme, GuideEntry, KeyBinding, KeyBindings, Scope(), ToolKey, KeyBindingsDialog (+7 more)
+
+### Community 28 - "Canvas Text Edit Mode"
+Cohesion: 0.10
+Nodes (3): CanvasPanel, CanvasCallbacks, Layer
+
+### Community 29 - "Wand Panel Options"
+Cohesion: 0.16
+Nodes (10): JRadioButton, WandPanel, Color, JLabel, JPanel, PaintToolbar, String, SuppressWarnings (+2 more)
+
+### Community 30 - "Paint Toolbar Row Wrapping"
+Cohesion: 0.15
+Nodes (12): Container, JComponent, LayoutManager, primary(), secondary(), Strip, WrapRowsLayout, BufferedImage (+4 more)
+
+### Community 31 - "Sprite Layer & Transforms"
 Cohesion: 0.14
-Nodes (9): JScrollBar, PageLayoutToolbar, Component, File, JSpinner, JToggleButton, PageLayout, Runnable (+1 more)
+Nodes (8): SpriteLayer, TransformController, SpriteLayer, BufferedImage, List, Override, String, SelectiveAlphaEditor
 
-### Community 32 - "NewImageDialog"
+### Community 32 - "New Image Dialog"
 Cohesion: 0.15
 Nodes (10): NewImageDialog, Result, Graphics, JComboBox, JLabel, JPanel, JSpinner, JToggleButton (+2 more)
 
-### Community 33 - "PaintToolbar"
-Cohesion: 0.13
-Nodes (4): PaintToolbar, Color, WandColorSource, WandPanel
-
-### Community 34 - "ScenesController"
-Cohesion: 0.11
-Nodes (9): ArrayList, CanvasState, ScenesController, BufferedImage, Callbacks, File, List, SelectiveAlphaEditor (+1 more)
-
-### Community 35 - "TileGalleryPanel"
-Cohesion: 0.16
-Nodes (4): TileGalleryPanel, TilePanel, List, TilePanel
-
-### Community 36 - "ClipboardController"
-Cohesion: 0.18
-Nodes (8): Image, ClipboardController, PathLayer, BufferedImage, CanvasInstance, Point, Rectangle, SelectiveAlphaEditor
-
-### Community 37 - "SaveController"
-Cohesion: 0.12
-Nodes (5): JFrame, SaveController, Point, SelectiveAlphaEditor, String
-
-### Community 38 - "ProjectManager"
-Cohesion: 0.20
-Nodes (8): BufferedWriter, ProjectManager, Object, AppMode, File, Layer, List, String
-
-### Community 39 - "FileLoadController"
+### Community 33 - "Path Layer Model"
 Cohesion: 0.17
+Nodes (7): ArrayList, PathLayer, BufferedImage, List, Override, Point3D, String
+
+### Community 34 - "Secondary Window Controller"
+Cohesion: 0.15
+Nodes (5): SecondaryWindowController, JFrame, SelectiveAlphaEditor, String, TranslationMapListPanel
+
+### Community 35 - "Element Layer Rendering"
+Cohesion: 0.13
+Nodes (9): ElementController, BufferedImage, CanvasInstance, File, Graphics2D, Layer, Rectangle, SelectiveAlphaEditor (+1 more)
+
+### Community 36 - "File Load & Navigation"
+Cohesion: 0.16
 Nodes (5): FileLoadController, BufferedImage, File, SelectiveAlphaEditor, String
 
-### Community 40 - "TextToolbar"
-Cohesion: 0.19
-Nodes (9): Callbacks, TextToolbar, Color, JButton, JComboBox, JLabel, JSpinner, JToggleButton (+1 more)
+### Community 38 - "Layer Panel Painting"
+Cohesion: 0.16
+Nodes (8): LayerTile, TilesScrollablePanel, Dimension, File, Graphics, Graphics2D, Override, Rectangle
 
-### Community 41 - "ColorPickerPopup"
-Cohesion: 0.18
-Nodes (8): ChangeListener, AlphaPanel, ColorPickerPopup, SVPanel, Color, JLabel, String, Window
-
-### Community 42 - "WandPanel"
+### Community 39 - "Layer Tile Actions"
 Cohesion: 0.21
-Nodes (10): JRadioButton, JSlider, WandPanel, Color, JLabel, JPanel, PaintToolbar, String (+2 more)
+Nodes (3): Callbacks, Layer, List
 
-### Community 43 - "FloatSelectionState"
+### Community 40 - "FloatSelectionState (dead parallel copy)"
 Cohesion: 0.15
 Nodes (4): FloatSelectionState, BufferedImage, Point, Rectangle
 
-### Community 44 - "TileGalleryPanel"
+### Community 41 - "Scene Directory Locator"
+Cohesion: 0.24
+Nodes (7): fromFile(), SceneFormat(), SceneLocator, File, List, Object, String
+
+### Community 42 - "Gallery File Callbacks"
 Cohesion: 0.14
-Nodes (6): DropTargetDropEvent, Callbacks, BufferedImage, File, Layer, Supplier
+Nodes (6): Callbacks, BufferedImage, ContextMenu, File, Layer, Supplier
 
-### Community 46 - "PaintEngine"
-Cohesion: 0.28
-Nodes (3): BufferedImage, Point, Rectangle
+### Community 43 - "Dark Scrollbar UI"
+Cohesion: 0.18
+Nodes (10): BasicScrollBarUI, DropTargetDropEvent, Float, DarkScrollBarUI, FileForElement, Graphics, JButton, JComponent (+2 more)
 
-### Community 47 - "TileGalleryPanel"
-Cohesion: 0.20
-Nodes (8): BasicScrollBarUI, DarkScrollBarUI, FileForElement, Graphics, JButton, JComponent, Override, Rectangle
+### Community 44 - "Color Picker Popup"
+Cohesion: 0.18
+Nodes (6): ChangeListener, ColorPickerPopup, Color, JLabel, String, Window
 
-### Community 48 - "TransformController"
-Cohesion: 0.23
-Nodes (6): JTextArea, JTextField, TransformController, JPanel, JDialog, SelectiveAlphaEditor
+### Community 45 - "Canvas Painting Helpers"
+Cohesion: 0.11
+Nodes (8): BufferedImage, Color, Dimension, Graphics, Graphics2D, Override, Rectangle, TexturePaint
 
-### Community 49 - "GameSceneReader"
-Cohesion: 0.24
-Nodes (10): GameSceneData, GameSceneReader, Boolean, BufferedImage, File, Map, PathLayer, SpriteLayer (+2 more)
+### Community 46 - "File Actions & Context Menu Fill"
+Cohesion: 0.30
+Nodes (7): FileActionsController, File, SelectiveAlphaEditor, String, Supplier, TileGalleryPanel, Transferable
 
-### Community 50 - "AppPaths"
-Cohesion: 0.24
+### Community 47 - "Keyboard Shortcut Wiring"
+Cohesion: 0.14
+Nodes (5): ActionMap, InputMap, KeyboardShortcutManager, SelectiveAlphaEditor, Tool
+
+### Community 48 - "Color Picker Hue Panel"
+Cohesion: 0.21
+Nodes (8): JTextArea, JTextField, AlphaPanel, HuePanel, SVPanel, JPanel, Graphics, Override
+
+### Community 49 - "AppPaths Path Central"
+Cohesion: 0.22
 Nodes (3): AppPaths, File, String
 
-### Community 51 - "SelectiveAlphaEditor"
+### Community 50 - "Project Manager Persistence"
+Cohesion: 0.25
+Nodes (6): ProjectManager, AppMode, File, Layer, List, String
+
+### Community 51 - "Secondary Control Bar"
+Cohesion: 0.18
+Nodes (7): SecondaryControlBar, SecondaryWindowController, AbstractButton, JButton, JSeparator, SelectiveAlphaEditor, String
+
+### Community 52 - "Tool Button Construction"
+Cohesion: 0.20
+Nodes (6): AbstractButton, JButton, JToggleButton, Icon, String, Tool
+
+### Community 54 - "App Lifecycle & Exit Guard"
 Cohesion: 0.12
-Nodes (4): BufferedImage, CanvasInstance, Layer, TextLayer
+Nodes (7): JDialog, JFrame, AppLifecycleController, List, SelectiveAlphaEditor, String, String
 
-### Community 52 - "BaseSidebarPanel"
+### Community 55 - "Gallery Tile Selection"
+Cohesion: 0.18
+Nodes (3): TilePanel, List, TilePanel
+
+### Community 56 - "Card List Store"
+Cohesion: 0.27
+Nodes (5): CardEntry, CardListStore, File, List, String
+
+### Community 57 - "Canvas Text Layout & Caret"
+Cohesion: 0.25
+Nodes (5): FontMetrics, TLine, Font, List, String
+
+### Community 58 - "Magic Wand Operations"
 Cohesion: 0.21
-Nodes (6): ContainerEvent, PanAdapter, Component, JScrollPane, MouseEvent, Override
+Nodes (3): Point3D, Point, WandColorSource
 
-### Community 54 - "ElementEditController"
+### Community 59 - "Image Layer Model"
+Cohesion: 0.19
+Nodes (4): ImageLayer, BufferedImage, Override, String
+
+### Community 60 - "UIBuilder Center Layout"
+Cohesion: 0.18
+Nodes (6): UIBuilder, Consumer, Component, JPanel, JToggleButton, SelectiveAlphaEditor
+
+### Community 61 - "Element Edit Mode"
 Cohesion: 0.21
 Nodes (4): ElementEditController, JPanel, Layer, SelectiveAlphaEditor
 
-### Community 55 - "HRulerPanel"
-Cohesion: 0.17
-Nodes (9): HRulerPanel, label(), pxPerUnit(), Graphics, Graphics2D, Override, PageLayout, RulerCallbacks (+1 more)
+### Community 62 - "Text Layer Rendering & Writer"
+Cohesion: 0.23
+Nodes (4): TextWriter, Override, String, TextLayer
 
-### Community 56 - "TextLayer"
+### Community 63 - "Text Layer Model"
 Cohesion: 0.29
 Nodes (4): TextLayer, Color, Override, String
 
-### Community 57 - "CanvasInstance"
+### Community 65 - "Context Menu Rendering"
+Cohesion: 0.18
+Nodes (10): BiConsumer, JSeparator, CheckIcon, Component, File, Graphics, Icon, JComponent (+2 more)
+
+### Community 66 - "Layer Composite Rendering"
+Cohesion: 0.13
+Nodes (4): CanvasInstance, Layer, BufferedImage, TextLayer
+
+### Community 67 - "Canvas Background & Ruler Access"
+Cohesion: 0.15
+Nodes (5): PageLayout, RulerUnit, Color, JScrollPane, Override
+
+### Community 69 - "Horizontal Ruler"
 Cohesion: 0.17
-Nodes (7): CanvasFileState, CanvasInstance, PreloadedFileState, PreloadController, BufferedImage, File, SelectiveAlphaEditor
+Nodes (8): HRulerPanel, label(), pxPerUnit(), Graphics, Graphics2D, Override, RulerCallbacks, String
 
-### Community 58 - "SpriteLayer"
-Cohesion: 0.23
-Nodes (6): SpriteLayer, SpriteLayer, BufferedImage, List, Override, String
+### Community 70 - "Scene JSON Serializer"
+Cohesion: 0.36
+Nodes (5): SceneSerializer, BufferedImage, Layer, List, String
 
-### Community 59 - "ImageLayer"
-Cohesion: 0.23
-Nodes (4): ImageLayer, BufferedImage, Override, String
+### Community 71 - "Paper Format Constants"
+Cohesion: 0.14
+Nodes (4): landscape(), PaperFormat, portrait(), String
 
-### Community 60 - "PaintToolbar"
-Cohesion: 0.20
-Nodes (4): AbstractButton, JToggleButton, String, Tool
+### Community 72 - "Callbacks Factories"
+Cohesion: 0.17
+Nodes (5): CanvasCallbacks, PaintCallbacksFactory, Callbacks, SelectiveAlphaEditor, Callbacks
 
-### Community 61 - "SceneSerializer"
-Cohesion: 0.32
-Nodes (6): SceneSerializer, BufferedImage, Layer, List, Point3D, String
+### Community 73 - "Left Card List Panel"
+Cohesion: 0.24
+Nodes (5): LeftCardListPanel, CardEntry, Color, Override, String
 
-### Community 62 - "PaintEngine"
-Cohesion: 0.23
-Nodes (4): Tool, BrushShape, FillMode, Graphics2D
-
-### Community 63 - "RulerCallbacks"
-Cohesion: 0.16
-Nodes (6): RulerCallbacks, BufferedImage, JPanel, JScrollPane, PageLayout, RulerUnit
-
-### Community 64 - "SceneFileWriter"
-Cohesion: 0.22
-Nodes (8): SceneFileWriter, TextWriter, File, Layer, List, String, String, TextLayer
-
-### Community 65 - "RightCardListPanel"
+### Community 74 - "Right Card List Panel"
 Cohesion: 0.26
 Nodes (5): RightCardListPanel, CardEntry, Color, Override, String
 
-### Community 67 - "ZoomController"
-Cohesion: 0.26
-Nodes (3): ZoomController, Point, SelectiveAlphaEditor
-
-### Community 68 - "PaintToolbar"
-Cohesion: 0.19
-Nodes (6): BufferedImage, Component, JComboBox, JComponent, JScrollPane, Window
-
-### Community 69 - "SelectiveAlphaEditor"
-Cohesion: 0.14
-Nodes (4): JPanel, Override, PageLayout, RulerUnit
-
-### Community 70 - "TransferableImage"
+### Community 75 - "Context Menu Builder"
 Cohesion: 0.28
-Nodes (6): DataFlavor, TransferableImage, Transferable, BufferedImage, Object, Override
+Nodes (5): ContextMenu, Runnable, String, ContextMenu, Runnable
 
-### Community 71 - "DropController"
+### Community 77 - "Ruler Callbacks Interface"
+Cohesion: 0.16
+Nodes (6): RulerCallbacks, BufferedImage, JPanel, JScrollPane, PageLayout, RulerUnit
+
+### Community 78 - "Card Folder Dialog"
+Cohesion: 0.29
+Nodes (6): CardFolderDialog, JButton, JLabel, Runnable, String, Window
+
+### Community 79 - "Scenes Controller"
 Cohesion: 0.19
-Nodes (6): DropController, Component, File, JPanel, Layer, SelectiveAlphaEditor
+Nodes (6): ScenesController, Callbacks, File, List, SelectiveAlphaEditor, String
 
-### Community 72 - "FloatSelectionController"
+### Community 80 - "Vertical Ruler"
+Cohesion: 0.21
+Nodes (7): Format(), VRulerPanel, String, Graphics, Graphics2D, Override, RulerCallbacks
+
+### Community 81 - "Stroke & Tolerance Controls"
+Cohesion: 0.26
+Nodes (5): Dimension, JComboBox, JSlider, JLabel, SuppressWarnings
+
+### Community 83 - "Floating Selection Controller"
 Cohesion: 0.28
 Nodes (4): FloatSelectionController, Point, Rectangle, SelectiveAlphaEditor
 
-### Community 73 - "NewImageDialog"
+### Community 84 - "Page Layout Margins"
+Cohesion: 0.26
+Nodes (3): PageLayout, PageLayout, PageLayout
+
+### Community 85 - "Panel Toggle Button"
+Cohesion: 0.19
+Nodes (8): PanelToggleButton, BaseSidebarPanel, JToggleButton, Component, Graphics, Override, String, Style
+
+### Community 86 - "Margin Preview Panel"
 Cohesion: 0.31
 Nodes (3): MarginPreviewPanel, MouseEvent, Override
 
-### Community 74 - "VRulerPanel"
-Cohesion: 0.23
-Nodes (6): VRulerPanel, Graphics, Graphics2D, Override, PageLayout, RulerCallbacks
-
-### Community 75 - "SceneImageAdapter"
-Cohesion: 0.27
-Nodes (8): SceneAsImage, SceneImageAdapter, BufferedImage, File, Graphics2D, Layer, List, PathLayer
-
-### Community 76 - "GameSceneWriter"
+### Community 88 - "GameII Scene Writer"
 Cohesion: 0.32
 Nodes (5): GameSceneWriter, File, Layer, List, String
 
-### Community 78 - "SelectiveAlphaEditor"
-Cohesion: 0.17
-Nodes (4): Color, JLabel, JScrollPane, List
-
-### Community 81 - "JsonStorage"
+### Community 89 - "Book JSON Storage"
 Cohesion: 0.29
 Nodes (5): JsonStorage, Sheet, File, PaperFormat, String
 
-### Community 83 - "CanvasCallbacks"
-Cohesion: 0.18
-Nodes (3): Dimension, Graphics, Override
-
-### Community 85 - "GalleryCallbacksFactory"
-Cohesion: 0.27
-Nodes (5): GalleryCallbacksFactory, Callbacks, FilePreloadCallback, SelectiveAlphaEditor, FilePreloadCallback
-
-### Community 87 - "PageLayoutManifest"
+### Community 90 - "New Folder Dialog"
 Cohesion: 0.33
-Nodes (4): PageLayoutManifest, File, PageLayout, String
+Nodes (8): FolderType(), NewFolderDialog, toString(), Component, File, Override, Runnable, String
 
-### Community 88 - "CanvasCallbacks"
-Cohesion: 0.25
-Nodes (3): Color, JScrollPane, String
+### Community 96 - "Scene Data Cache Access"
+Cohesion: 0.31
+Nodes (3): Callbacks, AppMode, Callbacks
 
-### Community 90 - "MapCreateDialog"
+### Community 97 - "Gallery Callbacks Factory"
+Cohesion: 0.31
+Nodes (4): GalleryCallbacksFactory, Callbacks, FilePreloadCallback, SelectiveAlphaEditor
+
+### Community 98 - "Map Create Dialog"
 Cohesion: 0.33
 Nodes (3): MapCreateDialog, JFrame, String
 
-### Community 91 - "ColorPickerPopup"
-Cohesion: 0.43
-Nodes (3): HuePanel, Graphics, Override
+### Community 99 - "Canvas Instance File State"
+Cohesion: 0.32
+Nodes (4): CanvasFileState, CanvasInstance, PreloadedFileState, BufferedImage
 
-### Community 92 - "WhiteToAlphaConverter"
+### Community 101 - "Preload Controller"
+Cohesion: 0.36
+Nodes (3): PreloadController, File, SelectiveAlphaEditor
+
+### Community 102 - "Scene File Writer"
 Cohesion: 0.39
-Nodes (3): WhiteToAlphaConverter, File, String
+Nodes (5): SceneFileWriter, File, Layer, List, String
 
-### Community 93 - "SecondaryPaintBar"
+### Community 103 - "Secondary Paint Bar"
 Cohesion: 0.32
 Nodes (4): SecondaryPaintBar, JButton, SelectiveAlphaEditor, String
 
-### Community 94 - "ToolLegacySceneReader"
+### Community 104 - "Legacy GameII Scene Reader"
 Cohesion: 0.29
 Nodes (6): ImportedEntity, ImportedScene, ToolLegacySceneReader, File, Layer, List
 
-### Community 96 - "FileStateCache"
-Cohesion: 0.38
-Nodes (3): Callbacks, AppMode, Callbacks
+### Community 105 - "Image Loader"
+Cohesion: 0.48
+Nodes (4): Image, ImageLoader, BufferedImage, File
 
-### Community 99 - "ToastNotification"
+### Community 106 - "Gallery Scrollbar Setup"
+Cohesion: 0.33
+Nodes (3): JScrollBar, FilePreloadCallback, String
+
+### Community 108 - "Element Layer Callbacks Factory"
+Cohesion: 0.38
+Nodes (4): ElementLayerCallbacksFactory, Callbacks, File, SelectiveAlphaEditor
+
+### Community 110 - "Toast Notification"
 Cohesion: 0.47
 Nodes (4): JWindow, ToastNotification, JFrame, String
 
-### Community 100 - "ImageLoader"
-Cohesion: 0.53
-Nodes (3): ImageLoader, BufferedImage, File
-
-### Community 103 - "CanvasCallbacksFactory"
+### Community 112 - "Canvas Callbacks Factory"
 Cohesion: 0.40
 Nodes (3): CanvasCallbacksFactory, CanvasCallbacks, SelectiveAlphaEditor
 
-### Community 105 - "PaintCallbacksFactory"
-Cohesion: 0.40
-Nodes (3): PaintCallbacksFactory, Callbacks, SelectiveAlphaEditor
-
-### Community 106 - "TextToolbarCallbacksFactory"
+### Community 113 - "Text Toolbar Callbacks Factory"
 Cohesion: 0.40
 Nodes (3): TextToolbarCallbacksFactory, Callbacks, SelectiveAlphaEditor
 
-### Community 111 - "ElementLayerCallbacksFactory"
-Cohesion: 0.50
-Nodes (3): ElementLayerCallbacksFactory, Callbacks, SelectiveAlphaEditor
-
 ## Knowledge Gaps
-- **143 isolated node(s):** `PaperFormat`, `SelectiveAlphaEditor`, `Object`, `Consumer`, `Boolean` (+138 more)
+- **153 isolated node(s):** `PaperFormat`, `AppMode`, `PaintToolbar`, `PageLayout`, `SelectiveAlphaEditor` (+148 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **25 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **23 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ArrayList` connect `ScenesController` to `AppSettings`, `SecondaryPanel`, `MapsPanel`, `CardListPanel`, `StartupDialog`, `PathLayer`, `ElementLayerState`, `CanvasPanel`, `BookController`, `FileStateCache`, `EditorDialogCallbacks`, `PaintEngine`, `SceneLocator`, `TranslationMapListPanel`, `ElementController`, `LayoutController`, `TranslationMapListPanel`, `CardListStore`, `SecondaryPanel`, `CanvasPanel`, `UIBuilder`, `TileGalleryPanel`, `ClipboardController`, `ProjectManager`, `FileLoadController`, `TileGalleryPanel`, `TileGalleryPanel`, `TransformController`, `GameSceneReader`, `CanvasInstance`, `SceneSerializer`, `SceneImageAdapter`, `GameSceneWriter`, `SelectiveAlphaEditor`, `CanvasCallbacksFactory`?**
-  _High betweenness centrality (0.153) - this node is a cross-community bridge._
-- **Why does `JPanel` connect `TransformController` to `SecondaryPanel`, `MapsPanel`, `ElementLayerPanel`, `CardListPanel`, `CanvasPanel`, `BookController`, `CardTextOptionsPopup`, `SceneLocator`, `CardListStore`, `SecondaryPanel`, `CanvasPanel`, `UIComponentFactory`, `BaseSidebarPanel`, `PageLayoutToolbar`, `PaintToolbar`, `ScenesController`, `TileGalleryPanel`, `TextToolbar`, `ColorPickerPopup`, `TileGalleryPanel`, `HRulerPanel`, `CanvasInstance`, `PaintToolbar`, `VRulerPanel`, `ColorPickerPopup`, `SecondaryPaintBar`, `ToastNotification`, `KeyboardShortcutManager`, `NewFileController`?**
-  _High betweenness centrality (0.116) - this node is a cross-community bridge._
-- **Why does `SelectiveAlphaEditor` connect `SelectiveAlphaEditor` to `SelectiveAlphaEditor`, `SelectiveAlphaEditor`, `SelectiveAlphaEditor`, `KeyboardShortcutManager`, `StartupDialog`, `SaveController`, `EditorDialogCallbacks`, `SelectiveAlphaEditor`, `SelectiveAlphaEditor`, `SelectiveAlphaEditor`, `LayoutController`, `SelectiveAlphaEditor`, `GalleryCallbacksFactory`, `SelectiveAlphaEditor`, `SelectiveAlphaEditor`, `HRulerPanel`, `UIBuilder`?**
-  _High betweenness centrality (0.079) - this node is a cross-community bridge._
-- **Are the 9 inferred relationships involving `ArrayList` (e.g. with `.buildTextLines()` and `.commitFreePath()`) actually correct?**
-  _`ArrayList` has 9 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `PaperFormat`, `SelectiveAlphaEditor`, `Object` to the rest of the system?**
-  _143 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `AppSettings` be split into smaller, more focused modules?**
-  _Cohesion score 0.04057124310288867 - nodes in this community are weakly interconnected._
-- **Should `SelectiveAlphaEditor` be split into smaller, more focused modules?**
-  _Cohesion score 0.02531645569620253 - nodes in this community are weakly interconnected._
+- **Why does `ArrayList` connect `Path Layer Model` to `PaintEngine Pixel Operations`, `Translation Map Cards`, `Startup Dialog & Recent Projects`, `ElementLayerState (dead parallel copy)`, `Scene & Config File Readers`, `Dialog Factory & Confirm/Input Dialogs`, `FileStateCache (dead parallel copy)`, `Editor Dialog Callbacks Interface`, `Card List Panel Widgets`, `Translation Map Persistence`, `Drag & Drop Image Transfer`, `Clipboard Cut/Copy/Paste`, `AppSettings File Parser`, `Book & Page Controller`, `Paint Toolbar Row Wrapping`, `Secondary Window Controller`, `Element Layer Rendering`, `File Load & Navigation`, `Scene Directory Locator`, `Dark Scrollbar UI`, `Project Manager Persistence`, `Secondary Control Bar`, `Tool Button Construction`, `Card List Store`, `Scene JSON Serializer`, `Scenes Controller`, `GameII Scene Writer`, `Canvas Instance File State`, `Preload Controller`, `Canvas Callbacks Factory`, `CanvasState (dead parallel copy)`?**
+  _High betweenness centrality (0.185) - this node is a cross-community bridge._
+- **Why does `SelectiveAlphaEditor` connect `Editor Orchestrator Delegations` to `Dialog Factory & Confirm/Input Dialogs`, `Save Controller & Image Writing`, `Layout & Mode Controllers`, `Paint Toolbar Core & Palette`, `Clipboard Cut/Copy/Paste`, `File Load & Navigation`, `Canvas Painting Helpers`, `Keyboard Shortcut Wiring`, `Tool Button Construction`, `Editor Window Setup`, `App Lifecycle & Exit Guard`, `UIBuilder Center Layout`, `Layer Composite Rendering`, `Canvas Background & Ruler Access`, `Brush Preview & Shape Drawing`, `Callbacks Factories`, `Editor Float & Handle Delegations`, `Top Bar Mode Toggles`, `Gallery Callbacks Factory`?**
+  _High betweenness centrality (0.102) - this node is a cross-community bridge._
+- **Why does `JPanel` connect `Dialog Factory & Confirm/Input Dialogs` to `Sidebar Base + Maps Panel`, `Canvas Background & Ruler Access`, `Page Layout & Text Toolbars`, `Layer Panel Painting`, `Dark Scrollbar UI`, `Element Layer Callbacks Factory`, `Canvas Painting Helpers`, `File Actions & Context Menu Fill`, `Save Controller & Image Writing`, `Gallery Tile Selection`, `Book & Page Controller`, `KeyBindings Registry & Help Dialog`, `Canvas Text Edit Mode`?**
+  _High betweenness centrality (0.062) - this node is a cross-community bridge._
+- **What connects `PaperFormat`, `AppMode`, `PaintToolbar` to the rest of the system?**
+  _153 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `PaintEngine Pixel Operations` be split into smaller, more focused modules?**
+  _Cohesion score 0.05862584017923824 - nodes in this community are weakly interconnected._
+- **Should `PaintIcons Vector Drawing` be split into smaller, more focused modules?**
+  _Cohesion score 0.0906478578892372 - nodes in this community are weakly interconnected._
+- **Should `Sidebar Base + Maps Panel` be split into smaller, more focused modules?**
+  _Cohesion score 0.05150905432595573 - nodes in this community are weakly interconnected._
