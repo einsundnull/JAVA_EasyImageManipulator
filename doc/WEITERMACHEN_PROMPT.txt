@@ -6,7 +6,10 @@ Die ausfuehrliche Vorgaenger-Fassung mit dem vollen Verlauf der Schritte
 Details je Schritt: die progress_2026-07-30_*.txt / progress_2026-07-31_*.txt.
 ==============================================================================
 Aktive PD.txt: KEINE.
-  Zuletzt: Task_2026-08-01_0957_Werkzeug-Kuerzel.txt -> ALLE SECHS SCHRITTE
+  Zuletzt: Task_2026-08-01_1130_Kontextmenues.txt -> ACHT VON NEUN SCHRITTEN
+  ABGESCHLOSSEN ([9] Layer-Name auf Wunsch des Users zurueckgestellt), nur
+  Runtime-Verify C1-C12 offen (User).
+  Davor: Task_2026-08-01_0957_Werkzeug-Kuerzel.txt -> ALLE SECHS SCHRITTE
   ABGESCHLOSSEN, nur Runtime-Verify W1-W9 offen (User).
   Davor: Task_2026-08-01_0900_PaintToolbar-Icons.txt -> ALLE SECHS
   SCHRITTE ABGESCHLOSSEN (plus drei Zwischenschritte), nur Runtime-Verify
@@ -14,6 +17,83 @@ Aktive PD.txt: KEINE.
   Davor: Task_2026-07-31_2300_B01-fileCache-deckeln.txt -> ALLE FUENF
   SCHRITTE ABGESCHLOSSEN, nur Runtime-Verify B1-B7 offen (User).
   Davor: Task_2026-07-31_2100_F02-F03-Atomares-Speichern.txt (S1-S12 offen).
+
+==============================================================================
+*** NEU 2026-08-01: KONTEXTMENUES — ERLEDIGT (8/9) ***
+==============================================================================
+SCHEMA:     doc/Schema_Kontextmenue.txt   (FREIGEGEBEN UND UMGESETZT;
+            *** Abschnitt 8: was die Umsetzung am Entwurf geaendert hat ***)
+PD:         doc/Task_2026-08-01_1130_Kontextmenues.txt   (8/9)
+PROTOKOLL:  doc/progress_2026-08-01_kontextmenues-vorschlag.txt  (Befund)
+            doc/progress_2026-08-01_kontextmenues-umsetzung.txt  (Umsetzung)
+
+ANLASS: Rechtsklick zeigte nur "Umbenennen".
+*** UND IN DER BILDGALERIE TAT AUCH DAS NICHTS: onRenameRequested war dort
+    NICHT ueberschrieben (default = no-op). Der eine vorhandene Menuepunkt
+    war ein Blindgaenger. ***
+*** DAS LAYER-PANEL HATTE UEBERHAUPT KEIN MENUE — dort ist die Arbeit
+    "anschliessen", nicht "bauen": ZEHN von elf Eintraegen existierten
+    bereits als Callback. VIERTES MAL DIESELBE LEHRE nach F01, I01, F02. ***
+
+NEU:  ContextMenu · FileActionsController · ConfirmDialog · TextInputDialog
+BUILD: 357 .class (vorher 347) · src/paint 107 -> 111 Dateien.
+
+ENTSCHEIDUNGEN DES USERS (Q1-Q4, alle nach Empfehlung):
+  Galerie + Layer, *** KEIN Canvas-Menue *** (dort ist Rechts mit
+  Sekundaerfarbe-Malen belegt, CanvasPanel:368) · Layer-Name SPAETER ·
+  Loeschen MIT Rueckfrage UND Papierkorb · Umfang wie entworfen.
+
+*** DER WICHTIGSTE BEFUND — EIN BEINAHE-RUECKFALL ***
+    Der eigene Entwurf sah eine Kuerzel-Spalte vor ("Strg+C", "Entf", "F2").
+    Gegenprobe an der Registry: diese Tasten bedeuten im Hauptfenster etwas
+    ANDERES (Strg+C = Bildauswahl als Layer, Entf = Auswahl/Layer loeschen,
+    F2 = Vorschau-Modus). *** DAS WAERE GENAU DER FEHLER GEWESEN, DER DREI
+    STUNDEN ZUVOR DEN WERKZEUG-KUERZEL-TASK AUSGELOEST HAT — luegende
+    Beschriftungen. Die Spalte ist ersatzlos gestrichen. *** Die GESTE steht
+    in der Registry (MOUSE_UI, zwei Eintraege), das Kuerzel nirgends.
+    Eigene Listen-Tasten brauchen erst eine Fokus-Entscheidung.
+
+*** SIEBEN DINGE, DIE NICHT "VEREINFACHT" WERDEN DUERFEN ***
+ 1. isPopupTrigger in mousePressed UND mouseReleased. Unter Windows meldet
+    erst das LOSLASSEN den Trigger. Das alte mouseClicked+isRightMouseButton
+    ist beides nicht.
+ 2. DER ZIEH-WAECHTER in ContextMenu.install (5 px). Ohne ihn ginge nach
+    jedem Drag-to-Copy ein Menue auf — die Geste ist registriert (§25).
+ 3. Das Menue wird BEI JEDEM KLICK NEU GEBAUT. Nur deshalb koennen "grau"
+    und die Haekchen nicht luegen (Univ. §12).
+ 4. Das Haekchen ist GEZEICHNET. JCheckBoxMenuItem braechte den hellgrauen
+    System-Kasten mit — der Stilbruch, den §20 an JOptionPane bemaengelt.
+ 5. Das Panel entscheidet NICHT, was im Menue steht: TileGalleryPanel reicht
+    ein leeres Menue an den Verdrahter (onContextMenu). Deshalb koennen
+    Bild-, Szenen- und Seitenliste dasselbe Panel sein und verschiedene
+    Menues zeigen — ohne "welche Art Liste bin ich"-Feld (§22).
+ 6. Umbenennen/Loeschen sind bei UNGESPEICHERTEN Aenderungen GRAU. Sonst
+    stiller Datenverlust.
+ 7. "Speichern unter" schreibt den BEARBEITETEN Stand, wenn die Datei offen
+    ist (ImageFileWriter, §34) — sonst byteweise Kopie, damit ein JPG ein
+    JPG bleibt.
+
+*** WIE OHNE PROGRAMMSTART GEPRUEFT WURDE — UND EIN FEHLGRIFF ***
+    Der erste Versuch nahm den BILDSCHIRM auf (Robot) und erwischte im
+    zweiten Durchgang das Fenster dahinter statt der Probe. Aufnahmen sofort
+    geloescht. *** Eine Bildschirmaufnahme nimmt auf, was zufaellig darunter
+    liegt — fuer eine Sichtprobe ist das der falsche Weg. *** Der zweite
+    Versuch zeichnet den Komponentenbaum des Popups selbst (printAll, Popup
+    ueber MenuSelectionManager) und ist reproduzierbar.
+
+RUNTIME-VERIFY C1-C12 OFFEN (User), volle Liste im Schema Abschnitt 7.
+  C1  *** WICHTIGSTE: Galerie-Kachel RECHTS ZIEHEN -> kopiert weiter,
+      KEIN Menue (prueft den Zieh-Waechter). ***
+  C2  *** Auf dem Canvas mit Rechts malen -> Sekundaerfarbe malt weiter. ***
+  C5  Sichtbarkeit ueber den KNOPF umschalten, Menue oeffnen -> Haekchen
+      ist mitgegangen.
+  C12 Ungespeicherte Datei: Umbenennen/Loeschen GRAU.
+
+OFFEN GEBLIEBEN: [9] LAYER-NAME. Braucht ein Namensfeld + withName() in
+  Layer und ALLEN VIER Unterklassen (§29) UND einen optionalen Schluessel im
+  Szenenformat — *** das ist der Vertrag mit GameII (§23/§7): zuerst
+  doc/SCENE_FORMAT_READ_WRITE.md aendern, Eintrag in BEIDE Projekte. ***
+  Bis dahin traegt das Layer-Menue KEIN "Umbenennen" (nicht einmal grau).
 
 ==============================================================================
 *** NEU 2026-08-01: WERKZEUG-KUERZEL — ERLEDIGT ***
@@ -407,7 +487,8 @@ offen - NIEMALS `graphify update .` (Scope-Falle).
     Was den Fortschritt jetzt bremst, ist NICHT fehlende Arbeit, sondern
     der aufgestaute RUNTIME-VERIFY: U1-U19 (Sichtpruefung), X1-X13
     (Schliessen), T1-T9 (Vorlesen), S1-S12 (Speichern), D1-D6 (Undo),
-    B1-B7 (Speicher), P1-P9 (Symbole), W1-W9 (Werkzeug-Kuerzel).
+    B1-B7 (Speicher), P1-P9 (Symbole), W1-W9 (Werkzeug-Kuerzel),
+    C1-C12 (Kontextmenues).
     Nur der User kann das. Ein einziger Programmdurchlauf hakt den
     groessten Teil ab. ***
 *** ANFANGEN MIT W1: Textrahmen aufziehen, "raster" tippen. Es ist die
@@ -465,7 +546,10 @@ LIES ZUERST (Reihenfolge ist verbindlich):
 
 BUILD: javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.java
        -encoding UTF-8 ist PFLICHT (Unicode im Quelltext).
-       ERWARTET: exit 0, 347 .class in einem LEEREN Zielverzeichnis
+       ERWARTET: exit 0, 357 .class in einem LEEREN Zielverzeichnis
+       (347 vor den Kontextmenues; die vier neuen Dateien brachten mit ihren
+        inneren Typen genau zehn mit. Clean-Build 2026-08-01.)
+       Aeltere Zwischenstaende: 347 .class in einem LEEREN Zielverzeichnis
        (335 vor PaintIcons, das mit seinen inneren Typen neun mitbrachte;
         344 vor den Werkzeug-Kuerzeln, die drei mitbrachten: record ToolKey
         + zwei anonyme AbstractAction. Beides 2026-08-01, Clean-Build.)
@@ -480,9 +564,11 @@ RUN:   java -cp bin --module-path bin -m TransparencyTool/paint.SelectiveAlphaEd
 
 STRUKTUR: Projekt-Root = nur CLAUDE.md · src/ = nur Java + Deploy-Skript ·
           doc/ = alle Dokumente (flach, Wegweiser in README.md)
-          src/paint 107 .java + book 3 + module-info
+          src/paint 111 .java + book 3 + module-info
           (106 -> 105: TextToSpeech geloescht; 105 -> 106: ImageFileWriter
-           angelegt. Beides 2026-07-31. 106 -> 107: PaintIcons, 2026-08-01.)
+           angelegt. Beides 2026-07-31. 106 -> 107: PaintIcons, 2026-08-01.
+           107 -> 111: ContextMenu, FileActionsController, ConfirmDialog,
+           TextInputDialog, 2026-08-01.)
 GRAPH:    graphify-out/ ist eingecheckt. 2479 Knoten / 6369 Kanten /
           123 Communities, code-only, 0 LLM-Tokens.
 

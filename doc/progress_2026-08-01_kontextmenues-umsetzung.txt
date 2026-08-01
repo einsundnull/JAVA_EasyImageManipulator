@@ -1,0 +1,149 @@
+==============================================================================
+progress_2026-08-01_kontextmenues-umsetzung.txt
+Schritte [3/9] bis [8/9] der PD Task_2026-08-01_1130_Kontextmenues.txt
+==============================================================================
+
+PROMPT
+------------------------------------------------------------------------------
+Vollstaendige Rechtsklick-Menues fuer Bild und Layer. Der User hat Q1-Q4
+beantwortet (alle vier nach Empfehlung): Galerie + Layer, KEIN Canvas-Menue ·
+Layer-Name spaeter · Loeschen mit Rueckfrage und Papierkorb · Umfang wie
+entworfen.
+
+ZUSAMMENFASSUNG
+------------------------------------------------------------------------------
+Sechs Schritte umgesetzt. Vier neue Dateien, acht geaendert.
+BUILD: exit 0, 357 .class in einem LEEREN Zielverzeichnis (vorher 347).
+       Gemessen mit dem javac-Befehl aus CLAUDE.md, nicht mit Eclipse.
+src/paint: 107 -> 111 .java
+
+  NEU        ContextMenu.java            Geruest, Ausloeser, Haekchen
+             FileActionsController.java  die Datei-Aktionen
+             ConfirmDialog.java          Ja/Nein (§20)
+             TextInputDialog.java        Texteingabe (§20)
+  GEAENDERT  KeyBindings                 2 MOUSE_UI-Eintraege + GUIDE-Absatz
+             TileGalleryPanel            Ausloeser + onContextMenu-Callback
+             GalleryCallbacksFactory     3 Menues verdrahtet
+             ScenesController            Szenenmenue
+             ElementLayerPanel           Layer-Menue + visualIndex()
+             ElementLayerCallbacksFactory insertFileAsLayer herausgeloest,
+                                          copyElementToClipboard
+             ClipboardController         copyToSystemClipboard sichtbar
+             SelectiveAlphaEditor        eine Delegations-Zeile
+
+*** REIHENFOLGE EINGEHALTEN: ZUERST DIE REGISTRY, DANN DER HANDLER (§25). ***
+
+DIE DREI ABWEICHUNGEN VOM ENTWURF (Begruendung im Schema, Abschnitt 8)
+------------------------------------------------------------------------------
+1. *** DIE KUERZEL-SPALTE IST GESTRICHEN — DER WICHTIGSTE BEFUND. ***
+   Der Entwurf wollte rechts "Strg+C", "Entf", "F2" anzeigen, abgeleitet aus
+   KeyBindings. Gegenprobe an der Registry: diese Tasten bedeuten im
+   Hauptfenster etwas ANDERES (Strg+C = Bildauswahl als Layer kopieren,
+   Entf = Auswahlinhalt/Layer loeschen, F2 = Vorschau-Modus des
+   Zweitfensters). Ein Kuerzel neben "Datei kopieren" haette eine Taste
+   versprochen, die etwas anderes tut.
+   *** DAS IST DERSELBE FEHLER, DER AM SELBEN TAG DEN WERKZEUG-KUERZEL-TASK
+       AUSGELOEST HAT (luegende Tooltips). Er waere fast ein zweites Mal
+       eingebaut worden — DIESMAL VON MIR SELBST, im eigenen Entwurf, drei
+       Stunden nachdem die Lehre aufgeschrieben wurde. ***
+   Die GESTE steht in der Registry, das Kuerzel nirgends.
+2. Layer-"Umbenennen" fehlt sichtbar NICHT (statt grau): "deaktivieren statt
+   verstecken" gilt fuer Eintraege, die in anderer Lage moeglich waeren.
+3. Zwei Dialoge statt einem: "Umbenennen" braucht eine Texteingabe, und
+   JOptionPane ist fuer neuen Code verboten. Genau der Satz aus §20.
+
+DER BEFUND, DER DEN TASK GERECHTFERTIGT HAT
+------------------------------------------------------------------------------
+*** DER EINE VORHANDENE MENUEPUNKT WAR IN DER BILDLISTE EIN BLINDGAENGER. ***
+TileGalleryPanel rief callbacks.onRenameRequested(file) — und in
+GalleryCallbacksFactory.build (die BILDGALERIE, die der User am haeufigsten
+anklickt) war diese Methode NICHT ueberschrieben. Die Standard-Umsetzung im
+Interface ist ein no-op. "Umbenennen" tat dort also NICHTS.
+Ueberschrieben war sie nur fuer Seiten (GalleryCallbacksFactory:295), Buecher
+(:378) und Szenen (ScenesController:158).
+-> Jetzt ueberschrieben, fuer beide Bildlisten, ueber FileActionsController.
+
+SIEBEN ENTSCHEIDUNGEN, DIE NICHT "VEREINFACHT" WERDEN DUERFEN
+------------------------------------------------------------------------------
+ 1. *** isPopupTrigger in mousePressed UND mouseReleased. *** Unter Windows
+    meldet erst das LOSLASSEN den Trigger, auf anderen Systemen das Druecken.
+    Der alte Code nahm mouseClicked + isRightMouseButton — beides nicht.
+ 2. *** DER ZIEH-WAECHTER. *** Rechts-Ziehen in den Seitenleisten ist eine
+    registrierte Geste (Drag-to-Copy, §25). ContextMenu.install merkt sich
+    den Druckpunkt und schweigt ab 5 px Bewegung. Ohne ihn ginge nach jeder
+    Kopier-Bewegung ein Menue auf.
+ 3. *** DAS MENUE WIRD BEI JEDEM KLICK NEU GEBAUT. *** Damit stammen "grau"
+    und die Haekchen zwangslaeufig aus dem Live-Zustand (Univ. §12). Ein
+    zwischengespeichertes JPopupMenu waere der naechste Kandidat fuer ein
+    luegendes Haekchen — genau wie der Zauberstab-Knopf davor.
+ 4. *** DAS HAEKCHEN IST GEZEICHNET, KEIN JCheckBoxMenuItem. *** Letzteres
+    braechte den hellgrauen System-Kasten mit — derselbe Stilbruch wie
+    JOptionPane. Zwoelf Zeichenbefehle sind billiger als eine Ausnahme.
+ 5. *** DIE PANELS ENTSCHEIDEN NICHT, WAS IM MENUE STEHT. *** TileGalleryPanel
+    reicht ein leeres Menue an den Verdrahter (onContextMenu). Deshalb koennen
+    Bildliste, Szenenliste und Seitenliste DASSELBE Panel sein und trotzdem
+    verschiedene Menues zeigen — ohne ein "welche Art Liste bin ich"-Feld
+    im Panel (§22).
+ 6. *** "UMBENENNEN" UND "LOESCHEN" SIND BEI UNGESPEICHERTEN AENDERUNGEN
+    GRAU. *** Umbenennen zwaenge zum Neuladen von der Platte, Loeschen naehme
+    die Vorlage weg — beides waere stiller Datenverlust.
+ 7. *** "SPEICHERN UNTER" SCHREIBT DEN BEARBEITETEN STAND, wenn die Datei
+    gerade offen ist *** (ueber ImageFileWriter, §34) — sonst kopiert es
+    byteweise und laesst das Format in Ruhe. Ein JPG bleibt so dasselbe JPG.
+
+WAS BEWUSST NICHT GEBAUT WURDE (Univ. §0)
+------------------------------------------------------------------------------
+  - Kein Canvas-Kontextmenue (Q1). CanvasPanel ist NICHT angefasst — dort ist
+    Rechts mit "Malen mit der Sekundaerfarbe" und Strg+Rechts mit Zoom belegt.
+  - Szenen-, Seiten- und Buchmenue bleiben schlank: Loeschen und Kopieren
+    muessten dort ein VERZEICHNIS mitnehmen (Szene = Verzeichnis, §23; Buch =
+    Seiten + Layout). Ein Menuepunkt, der nur die .txt anfasst, hinterliesse
+    eine halbe Szene.
+  - Die sieben Knoepfe der Layer-Kachel bleiben. Das Menue ist ein ZWEITER
+    Bedienweg (ein Klick vs. drei) — kein Ersatz.
+  - Die drei bestehenden JOptionPane-Umbenennungen sind NICHT umgestellt.
+  - TranslationMapListPanel:510 bleibt, wie es ist: ein Aufklapper an einem
+    Knopf, kein Kontextmenue.
+
+TATSAECHLICHE LOESUNG — DIE MENUES
+------------------------------------------------------------------------------
+BILDKACHEL (12):  Oeffnen · Im anderen Canvas oeffnen | Kopieren · Als Layer
+  einfuegen | Speichern · Speichern unter … · Duplizieren | Umbenennen ·
+  Loeschen | Im Explorer zeigen · Eigenschaften …
+LAYER-KACHEL (11): Bearbeiten | Duplizieren · Kopieren | [x] Sichtbar ·
+  [ ] Mausdurchlaessig · Drehung zuruecksetzen | Als Bild exportieren · In den
+  Canvas einbrennen · Als Uebersetzungskarte | Loeschen
+SZENE / SEITE / BUCH (3): Oeffnen | Umbenennen | Im Explorer zeigen
+
+WIE OHNE PROGRAMMSTART GEPRUEFT WURDE — UND EIN FEHLGRIFF, DER FESTGEHALTEN
+GEHOERT
+------------------------------------------------------------------------------
+*** DER ERSTE VERSUCH HAT DEN BILDSCHIRM AUFGENOMMEN (java.awt.Robot) UND
+    BEIM ZWEITEN DURCHGANG DAS FENSTER DAHINTER ERWISCHT STATT DER PROBE.
+    Eine Bildschirmaufnahme nimmt auf, was zufaellig darunter liegt. Die
+    Aufnahmen wurden sofort geloescht. ***
+Der zweite Versuch zeichnet den Komponentenbaum des Popups selbst:
+  - Menue auf einem Fenster ausserhalb des sichtbaren Bereichs zeigen
+  - Popup ueber MenuSelectionManager.getSelectedPath() greifen
+  - JPopupMenu.printAll(g) in ein BufferedImage, drei Zustaende nebeneinander
+  - geschrieben ueber ImageFileWriter (§34); die Probe lag waehrenddessen in
+    src/paint (Modulpfad) und ist danach geloescht — src/paint ist wieder 111.
+NACHGEWIESEN: Haekchen sichtbar und richtig gesetzt (Sichtbar an / Maus-
+  durchlaessig an in zwei verschiedenen Zustaenden), deaktivierte Eintraege
+  grau statt fehlend, erster Eintrag fett, dunkler Hintergrund, buendige
+  Beschriftungen auch ohne Haekchen, Trenner an den vorgesehenen Stellen.
+NICHT NACHGEWIESEN: Hover, Tastatur-Navigation, Klickwirkung, das
+  Ausloeser-Verhalten. *** Das ist C1-C12 und nur der User kann es. ***
+
+RUNTIME-VERIFY C1-C12 OFFEN (User) — volle Liste im Schema, Abschnitt 7
+------------------------------------------------------------------------------
+  C1  *** WICHTIGSTE: Galerie-Kachel RECHTS ZIEHEN -> kopiert weiter,
+      KEIN Menue. Prueft den Zieh-Waechter. ***
+  C2  *** ZWEITWICHTIGSTE: auf dem Canvas mit Rechts malen -> die
+      Sekundaerfarbe malt weiter, kein Menue. ***
+  C4  Rechtsklick auf eine Layer-Kachel: Menue erscheint (vorher: nichts).
+  C5  Sichtbarkeit ueber den KNOPF umschalten, dann Menue oeffnen — das
+      Haekchen muss mitgegangen sein.
+  C9  "Loeschen": Rueckfrage, danach Datei im Papierkorb.
+  C12 Datei mit ungespeicherten Aenderungen: Umbenennen/Loeschen sind GRAU.
+==============================================================================

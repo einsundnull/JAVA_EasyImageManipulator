@@ -12,7 +12,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | Datei | Inhalt |
 |---|---|
 | [`JAVA_GUIDELINES_UNIVERSAL.md`](JAVA_GUIDELINES_UNIVERSAL.md) | **Zuerst.** Projektneutrale Standards für alle Java-Projekte (§0–§15). **KOPIE** — Original: `../../JAVA_GUIDELINES_UNIVERSAL.md` |
-| [`GUIDELINES.md`](GUIDELINES.md) | Projekt-Steckbrief + TransparencyTool-Regeln §20–§33 |
+| [`GUIDELINES.md`](GUIDELINES.md) | Projekt-Steckbrief + TransparencyTool-Regeln §20–§35 |
 | [`Prompt_Handling.txt`](Prompt_Handling.txt) | Task-Workflow: `[BT]`/`[ST]`, Risikoklassen, Abschluss-Block |
 | [`PROMPT_Schwachstellen-Audit.md`](PROMPT_Schwachstellen-Audit.md) | **Wiederverwendbarer Audit-Prompt** (alle Java-Projekte): Schwachstellen finden, bewerten, tabellieren. **KOPIE** — Original: `../../PROMPT_Schwachstellen-Audit.md` |
 | [`WEITERMACHEN_PROMPT.txt`](WEITERMACHEN_PROMPT.txt) | **Aktueller Stand + offene Schritte.** Einstieg nach `/clear` |
@@ -59,6 +59,7 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`TextLayer_Implementation_Documentation.md`](TextLayer_Implementation_Documentation.md) | TextLayer |
 | [`F6_FEATURE.md`](F6_FEATURE.md) | F6 „auf Canvas anwenden" |
 | [`Schema_ButtonLeiste_Top_with_Books.txt`](Schema_ButtonLeiste_Top_with_Books.txt) | ASCII-Mockup der oberen Leiste (Buch-Modus) |
+| [`Schema_Kontextmenue.txt`](Schema_Kontextmenue.txt) | **Rechtsklick-Menüs** (2026-08-01, freigegeben und umgesetzt) — Befund, drei Menü-Mockups, Architektur, §20-Kollision · **Abschnitt 8: was die Umsetzung am Entwurf geändert hat** |
 | [`Schema_PaintToolbar_Icons.txt`](Schema_PaintToolbar_Icons.txt) | **Symbole der Paint-Leiste** (2026-08-01, freigegeben und umgesetzt) — Befund, Vorschlagstabelle, Zauberstab-Familie · **Abschnitt 8: was die Sichtprüfung am Entwurf geändert hat** |
 | [`HowImagesForScenesAreLoaded.txt`](HowImagesForScenesAreLoaded.txt) · [`Preload.txt`](Preload.txt) | Bild-/Preload-Pfade |
 | [`SplitCanvas.txt`](SplitCanvas.txt) · [`SplitCanvas II.txt`](<SplitCanvas II.txt>) | Konzept der zwei Canvases |
@@ -122,6 +123,9 @@ Verweise gebrochen. Statt Ordnern sortiert **diese Liste**.
 | [`Task_2026-08-01_0957_Werkzeug-Kuerzel.txt`](Task_2026-08-01_0957_Werkzeug-Kuerzel.txt) | **PD** zu den Werkzeug-Kürzeln · 6 Schritte · abgeschlossen |
 | [`progress_2026-08-01_werkzeug-kuerzel.txt`](progress_2026-08-01_werkzeug-kuerzel.txt) | **Werkzeug-Kürzel nachgerüstet** · `TOOL_KEYS` als einzige Quelle für Dialog, Verdrahtung und Tooltip · **Befund: ein „r" im Text drehte zugleich das Bild** — einfache Buchstaben feuern vor der Texteingabe · Verify **W1–W9** |
 | [`progress_2026-08-01_paint-icons-umsetzung.txt`](progress_2026-08-01_paint-icons-umsetzung.txt) | **`PaintIcons` gebaut und verdrahtet** · Zauberstab-Familie aus Grundform + Abzeichen · **wie ohne Programmstart geprüft wurde — und welche drei Fehler das fand** · Verify **P1–P9** |
+| [`Task_2026-08-01_1130_Kontextmenues.txt`](Task_2026-08-01_1130_Kontextmenues.txt) | **PD** zu den Kontextmenüs · 9 Schritte, 8 erledigt ([9] Layer-Name zurückgestellt) |
+| [`progress_2026-08-01_kontextmenues-vorschlag.txt`](progress_2026-08-01_kontextmenues-vorschlag.txt) | **Befund:** genau zwei `JPopupMenu` im Quellbaum · das Layer-Panel hatte **keines** · **„Umbenennen" war in der Bildgalerie ein Blindgänger** (Callback nicht überschrieben) · Rechtsklick auf dem Canvas ist belegt |
+| [`progress_2026-08-01_kontextmenues-umsetzung.txt`](progress_2026-08-01_kontextmenues-umsetzung.txt) | **`ContextMenu` gebaut und verdrahtet** · `ConfirmDialog` + `TextInputDialog` lösen `JOptionPane` für neuen Code ab · **die Kürzel-Spalte wurde gestrichen, bevor sie derselbe Fehler wie die lügenden Tooltips wurde** · Verify **C1–C12** |
 | [`WEITERMACHEN_PROMPT_2026-07-30_archiv.txt`](WEITERMACHEN_PROMPT_2026-07-30_archiv.txt) | Vorgänger-Fassung mit dem vollen Verlauf der Schritte [1]–[4] |
 
 ## 7. Historisch — abgeschlossene Arbeiten (nicht als Ist-Stand lesen)

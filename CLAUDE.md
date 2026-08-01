@@ -37,10 +37,12 @@ javac -encoding UTF-8 -sourcepath src -d bin src/paint/*.java src/module-info.ja
 ```
 `-encoding UTF-8` ist **Pflicht** — die Quelldateien enthalten Unicode (Pfeile,
 Symbole, Umlaute). Ohne die Option: „unmappable character".
-**Erwartet: exit 0, 347 `.class`** in einem **leeren** Zielverzeichnis
+**Erwartet: exit 0, 357 `.class`** in einem **leeren** Zielverzeichnis
 (nachgemessen 2026-08-01 — 335 vor `PaintIcons`, das mit seinen inneren Typen
 neun mitbrachte; 344 vor den Werkzeug-Kürzeln, die drei mitbrachten: den
-`record ToolKey` und zwei anonyme `AbstractAction`). Keine neue Quelldatei.
+`record ToolKey` und zwei anonyme `AbstractAction`; 347 vor den
+Kontextmenüs, deren vier neue Dateien mit ihren inneren Typen zehn
+mitbrachten).
 Ein von Eclipse mitgepflegtes `bin/` enthält
 zwei mehr — Eclipse übersetzt alle drei `book`-Klassen, der `javac`-Befehl nur
 die von `paint` aus erreichbare. Wer eine Zahl notiert, schreibt dazu,
@@ -60,9 +62,11 @@ Quellen → `src/` und `resources/`, Ausgabe → `bin/`.
 **Deploy:** `bash src/paint/JAVA_EasyImageManipulator-Push.sh` →
 `https://github.com/einsundnull/JAVA_EasyImageManipulator.git`
 
-> **Quellbaum:** nur noch `paint` (107 Dateien) + `book` (3) +
+> **Quellbaum:** nur noch `paint` (111 Dateien) + `book` (3) +
 > `module-info.java`. (105 → 106 am 2026-07-31: `TextToSpeech` gelöscht,
-> `ImageFileWriter` angelegt; 106 → 107 am 2026-08-01: `PaintIcons`.) Am 2026-07-30 ausgelagert, weil ohne Bezug zu `paint`:
+> `ImageFileWriter` angelegt; 106 → 107 am 2026-08-01: `PaintIcons`;
+> 107 → 111 am 2026-08-01: `ContextMenu`, `FileActionsController`,
+> `ConfirmDialog`, `TextInputDialog`.) Am 2026-07-30 ausgelagert, weil ohne Bezug zu `paint`:
 > `com.spriteanimator` → `../SpriteAnimator/`, `PathAnimator` →
 > `../PathAnimator/`, die startbaren Prototypen (`Demo`, `DemoWorksheetEditor{,2}`,
 > `AutoGrowingPillFieldDemo` + `SmartLabel`) → `../JavaDemos/`.
@@ -384,6 +388,69 @@ Ausnahme: Farben, die der **User** wählt (Primär-/Sekundärfarbe,
 Canvas-Schachbrett, Kartenfarben) sind keine Tokens — sie gehören in
 `AppSettings`.
 
+### Kontextmenüs: `ContextMenu` (seit 2026-08-01)
+
+**Rechtsklick auf eine Kachel öffnet ein Menü** — in beiden Bildlisten (12
+Einträge), im Layer-Panel (11) sowie in Szenen-, Seiten- und Bücherliste (3).
+`ContextMenu` ist der Baukasten: Aussehen, Auslöser, Häkchen. **Die
+Fachlogik steht in `FileActionsController`** bzw. hinter den vorhandenen
+`ElementLayerPanel.Callbacks` — das Panel kennt keine Dateilogik (§22).
+
+> **Das Panel entscheidet nicht, was im Menü steht.** `TileGalleryPanel`
+> reicht ein leeres Menü an `Callbacks.onContextMenu(file, menu)`; **was
+> darin landet, füllt der Verdrahter.** Genau deshalb können Bildliste,
+> Szenenliste und Seitenliste *dasselbe* Panel sein und trotzdem
+> verschiedene Menüs zeigen — ohne ein „welche Art Liste bin ich"-Feld.
+
+> **Das Menü wird bei jedem Rechtsklick neu gebaut.** Nur so stammen „grau"
+> und die Häkchen zwangsläufig aus dem Live-Zustand und können nicht
+> desynchronisieren (Univ. §12). Ein zwischengespeichertes `JPopupMenu` wäre
+> der nächste Kandidat für ein lügendes Häkchen.
+
+> **Der Auslöser prüft `isPopupTrigger()` in `mousePressed` *und*
+> `mouseReleased`** — unter Windows meldet erst das Loslassen den Trigger.
+> Und er hat einen **Zieh-Wächter** (5 px): Rechts-Ziehen in den
+> Seitenleisten ist die registrierte Geste „Datei in eine andere Liste
+> kopieren" (§25); nach einer Kopier-Bewegung darf kein Menü aufgehen.
+
+> **Es gibt keine Kürzel-Spalte, und das ist eine Entscheidung.** Der erste
+> Entwurf sah rechts „Strg+C", „Entf", „F2" vor — diese Tasten bedeuten im
+> Hauptfenster aber etwas anderes (Bildauswahl als Layer kopieren;
+> Auswahl/Layer löschen; Vorschau-Modus). Ein Kürzel neben „Datei kopieren"
+> hätte eine Taste versprochen, die etwas anderes tut — **derselbe Fehler,
+> der am selben Tag den Werkzeug-Kürzel-Task ausgelöst hat.** Die *Geste*
+> steht in `KeyBindings` (Scope `MOUSE_UI`), das Kürzel nirgends.
+
+> **Einträge werden deaktiviert, nicht versteckt** — ein Menü, das je nach
+> Lage die Höhe wechselt, macht die übrigen Einträge unauffindbar. Ausnahme:
+> was es *gar nicht gibt*, fehlt ganz. Deshalb trägt das Layer-Menü **kein**
+> „Umbenennen": `Layer.displayName()` ist abgeleitet, es gibt kein
+> Namensfeld. Ein echter Layer-Name berührt das Modell (§29) **und** den
+> GameII-Vertrag (§23) und ist ein eigener Task.
+
+> **Umbenennen und Löschen sind bei ungespeicherten Änderungen grau.**
+> Umbenennen zwänge zum Neuladen von der Platte, Löschen nähme die Vorlage
+> weg. **„Speichern unter …" schreibt den bearbeiteten Stand**, wenn die
+> Datei gerade offen ist (über `ImageFileWriter`, §34) — sonst kopiert es
+> byteweise, damit ein JPG ein JPG bleibt. **Gelöscht wird in den
+> Papierkorb**, mit Rückfrage: für Dateien gibt es kein Undo, und für Layer
+> ebenso wenig (Befund D01).
+
+**`ConfirmDialog` (Ja/Nein) und `TextInputDialog` (Texteingabe)** sind im
+selben Schritt entstanden — ohne sie hätte „Umbenennen" wieder ein
+`JOptionPane` gebraucht. Genau davor warnt §20. Die drei *bestehenden*
+`JOptionPane`-Umbenennungen (Seite, Buch, Szene) bleiben unangetastet: sie
+funktionieren, ein Umbau wäre ein unnötiger Schritt.
+
+> **Kein Kontextmenü auf dem Canvas** (Entscheidung des Users, 2026-08-01).
+> Dort ist die rechte Taste vergeben: `Strg`+Rechts zoomt, Rechts malt mit
+> der Sekundärfarbe bzw. zieht mit Einrasten (`CanvasPanel:336/368`).
+> `CanvasPanel` ist von dieser Aufgabe **nicht** angefasst worden.
+
+Spezifikation und Befunde: `doc/Schema_Kontextmenue.txt` (Abschnitt 8: was
+die Umsetzung am Entwurf geändert hat), Umsetzung
+`doc/progress_2026-08-01_kontextmenues-umsetzung.txt`.
+
 ### Tastatur
 
 `KeyboardShortcutManager` verdrahtet zwei Wege: die `InputMap`/`ActionMap` des
@@ -397,7 +464,7 @@ F1 wird **nicht** freigeräumt, die Zweitfenster-Belegung ist eingeübt.
 Die Umschalt+F1-Abfrage steht im Dispatcher **vor** der F1-Abfrage; wer sie
 verschiebt, macht die Hilfe unerreichbar.
 
-**`KeyBindings.ALL` ist die Registry** (79 Einträge, sieben Scopes) —
+**`KeyBindings.ALL` ist die Registry** (81 Einträge, sieben Scopes) —
 `KeyBindingsDialog` zeigt sie über **Umschalt+F1** oder den Knopf „?“ rechts
 in der oberen Leiste. **Neue Taste oder Geste → zuerst Registry-Eintrag, dann
 Handler** (§25); der Dialog enthält keinen eigenen Text.

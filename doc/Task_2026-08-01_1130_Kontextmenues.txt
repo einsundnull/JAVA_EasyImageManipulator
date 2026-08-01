@@ -109,15 +109,33 @@ MODEL-STRATEGIE (Token sparen, ohne Kontext zu verlieren)
   eigenstaendig und brauchen den Verdrahtungs-Kontext nicht.
 
 
+ANTWORTEN DES USERS (2026-08-01) — alle vier nach Empfehlung
+------------------------------------------------------------------------------
+  Q1  Galerie + Layer. *** KEIN Canvas-Menue *** -> CanvasPanel unberuehrt.
+  Q2  Layer-Name spaeter, eigener Schritt -> [9] entfaellt vorerst.
+  Q3  Loeschen MIT Rueckfrage UND Papierkorb -> [8] faellig.
+  Q4  Umfang wie entworfen.
+
 FORTSCHRITT
 ------------------------------------------------------------------------------
 [1/9] abgeschlossen
-[2/9] abgeschlossen — WARTET AUF FREIGABE (Q1-Q4)
-[3/9] offen
-[4/9] offen
-[5/9] offen
-[6/9] offen
-[7/9] offen
-[8/9] offen  (entfaellt bei Q3 = "ohne Rueckfrage")
-[9/9] offen  (entfaellt bei Q2 = "nein/spaeter")
+[2/9] abgeschlossen — freigegeben
+[3/9] abgeschlossen  KeyBindings: 2 MOUSE_UI-Eintraege + 1 GUIDE-Absatz
+[4/9] abgeschlossen  ContextMenu.java (Geruest + Ausloeser + Haekchen)
+[5/9] abgeschlossen  Bildlisten (beide) + FileActionsController
+[6/9] abgeschlossen  Layer-Menue, 11 Eintraege, 10 davon reine Verdrahtung
+[7/9] abgeschlossen  Szenen-, Seiten- und Buchliste (schlanker Satz)
+[8/9] abgeschlossen  ConfirmDialog + TextInputDialog (§20, ohne JOptionPane)
+[9/9] ZURUECKGESTELLT (Q2) — Layer-Name beruehrt Modell (§29) und den
+      GameII-Vertrag (§23). Eigener Task, wenn gewuenscht.
+
+ERGEBNIS
+------------------------------------------------------------------------------
+  BUILD: exit 0, 357 .class (vorher 347), src/paint 107 -> 111 .java
+  NEU:   ContextMenu · FileActionsController · ConfirmDialog · TextInputDialog
+  GEAENDERT: KeyBindings · TileGalleryPanel · GalleryCallbacksFactory ·
+             ScenesController · ElementLayerPanel ·
+             ElementLayerCallbacksFactory · ClipboardController ·
+             SelectiveAlphaEditor
+  OFFEN: RUNTIME-VERIFY C1-C12 (User), Liste im Schema Abschnitt 7.
 ==============================================================================

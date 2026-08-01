@@ -1,7 +1,9 @@
 ==============================================================================
 Schema_Kontextmenue.txt  —  Rechtsklick-Menues fuer Galerie, Layer, Szenen
-Stand: 2026-08-01.  ENTWURF — BRAUCHT FREIGABE (Univ. §9, Mockup-First).
-Kein Code geaendert.
+Stand: 2026-08-01.  FREIGEGEBEN UND UMGESETZT.
+Q1-Q4 vom User beantwortet (alle vier nach Empfehlung), Umsetzung in
+Task_2026-08-01_1130_Kontextmenues.txt Schritte [3]-[8].
+*** WAS DIE UMSETZUNG AM ENTWURF GEAENDERT HAT: Abschnitt 8. ***
 ==============================================================================
 
 0. AUFTRAG DES USERS
@@ -300,4 +302,70 @@ Q4  UMFANG: der Entwurf oben, oder schlanker?
       UND die Datei im Papierkorb.
   C10 Menue mit Esc schliessen, dann Doppelklick auf dieselbe Kachel —
       die Kachel oeffnet normal (kein haengender Selektionszustand).
+  C11 Layer-Menue: "Kopieren", dann in einem anderen Programm einfuegen —
+      der Layer kommt als Bild an.
+  C12 Bildliste: "Umbenennen" an einer Datei mit UNGESPEICHERTEN Aenderungen
+      ist GRAU (ebenso "Loeschen"). Nach dem Speichern sind beide aktiv.
+
+
+8. WAS DIE UMSETZUNG AM ENTWURF GEAENDERT HAT
+------------------------------------------------------------------------------
+Drei Abweichungen, jede mit Grund. Sie stehen hier, damit der Entwurf nicht
+laenger etwas anderes behauptet als der Code (Univ. §9).
+
+8.1 *** DIE KUERZEL-SPALTE IST ERSATZLOS GESTRICHEN. ***
+    Abschnitt 3 sah rechts eine Spalte mit "Strg+C", "Entf", "F2" vor,
+    abgeleitet aus KeyBindings. Beim Bauen an der Registry gegengeprueft:
+    diese Tasten bedeuten im Hauptfenster etwas ANDERES —
+      Strg+C = Bildauswahl als Layer kopieren   (KeyBindings BASE, WINDOW)
+      Entf   = Auswahlinhalt loeschen oder gewaehlte Layer entfernen
+      F2     = Vorschau-Modus des Zweitfensters wechseln  (GLOBAL)
+    Ein "Strg+C" neben "Datei kopieren" haette also eine Taste versprochen,
+    die etwas anderes tut. *** GENAU DIESER FEHLER — Kuerzel ohne passenden
+    Handler — HAT AM SELBEN TAG DEN WERKZEUG-KUERZEL-TASK AUSGELOEST. ***
+    Eigene Tasten fuer die Listen waeren moeglich, brauchen aber eine
+    Fokus-Entscheidung (die Listen haben heute keinen Tastaturfokus) und
+    damit einen eigenen Schritt. Bis dahin: keine Kuerzel im Menue, aber die
+    GESTE steht in der Registry (Scope MOUSE_UI, zwei Eintraege).
+
+8.2 LAYER-"UMBENENNEN" IST NICHT NUR VERSCHOBEN, ES FEHLT SICHTBAR NICHT.
+    Q2 = "spaeter". Das Layer-Menue traegt den Eintrag deshalb GAR NICHT —
+    nicht etwa grau. Begruendung im Code: ein grauer Eintrag verspricht eine
+    Funktion, die es noch nicht gibt; ein fehlender verspricht nichts. Die
+    Regel "deaktivieren statt verstecken" gilt fuer Eintraege, die in einer
+    ANDEREN Lage moeglich waeren — nicht fuer solche, die es nicht gibt.
+
+8.3 ZWEI SICHTBARKEITEN WURDEN ERWEITERT STATT LOGIK KOPIERT:
+      - ElementLayerCallbacksFactory.insertFileAsLayer(...) aus der anonymen
+        Klasse herausgeloest (das Galerie-Menue braucht dieselbe Arbeit fuer
+        "Als Layer einfuegen").
+      - ClipboardController.copyToSystemClipboard(...) von private auf
+        paketsichtbar, plus eine Delegation im Hauptfenster
+        (SelectiveAlphaEditor.copyImageToSystemClipboard).
+    *** In beiden Faellen war die Alternative eine zweite Fassung derselben
+        Logik — die Stelle, an der spaeter eine von beiden das Zentrieren
+        bzw. den Alphakanal anders behandelt. ***
+
+8.4 ZWEI NEUE DIALOGE STATT EINEM. Der Entwurf nannte nur ConfirmDialog.
+    "Umbenennen" braucht aber eine Texteingabe, und JOptionPane ist fuer
+    NEUEN Code verboten (§20) — also kam TextInputDialog dazu. Das ist genau
+    der Satz aus §20: "ConfirmDialog und MessageDialog gehoeren in DENSELBEN
+    Schritt, sonst bleibt JOptionPane mangels Alternative stehen."
+    *** Die drei BESTEHENDEN JOptionPane-Umbenennungen (Seite, Buch, Szene)
+        sind NICHT umgestellt worden. Sie funktionieren; ein Umbau waere ein
+        unnoetiger Schritt (Univ. §0). ***
+
+8.5 WIE GEPRUEFT WURDE, OHNE DAS PROGRAMM ZU STARTEN — und ein Fehlgriff,
+    der festgehalten gehoert:
+    Der erste Versuch nahm den BILDSCHIRM auf (java.awt.Robot) und hat beim
+    zweiten Durchgang das Fenster dahinter erwischt statt der Probe. *** Eine
+    Bildschirmaufnahme nimmt auf, was zufaellig darunter liegt. *** Der
+    zweite Versuch zeichnet den Komponentenbaum des Popups selbst
+    (JPopupMenu.printAll, Popup ueber MenuSelectionManager geholt), rendert
+    drei Menue-Zustaende nebeneinander und ist reproduzierbar.
+    -> Nachweis erbracht fuer: Haekchen sichtbar und richtig gesetzt,
+       deaktivierte Eintraege grau statt fehlend, Fettung des ersten
+       Eintrags, dunkler Hintergrund, buendige Beschriftungen.
+    -> NICHT nachgewiesen: Hover, Tastatur-Navigation, Klickwirkung,
+       Ausloeser-Verhalten. Das ist C1-C12.
 ==============================================================================

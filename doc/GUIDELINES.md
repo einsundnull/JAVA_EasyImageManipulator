@@ -44,7 +44,8 @@
 | Zeichenflächen-Basisklasse | **keine** (Swing puffert selbst) → Regeln in §24 |
 | Panel-Basisklassen | **`BaseSidebarPanel`** (6 Unterklassen) · **`CardListPanel`** (2) |
 | Domänen-Basisklasse | **`Layer`** (Wert-Objekt, unveränderlich) → §29 |
-| Bestätigungs-Dialog | **fehlt noch** → §20. `JOptionPane` ist Altlast, kein Vorbild |
+| Bestätigungs-Dialog | **`ConfirmDialog`** (Ja/Nein) + **`TextInputDialog`** (Texteingabe), beide seit 2026-08-01 auf `UIComponentFactory.createBaseDialog`. **Für neuen Code verbindlich** — `JOptionPane` bleibt Altlast, kein Vorbild. Ein `MessageDialog` fehlt weiterhin → §20 |
+| Kontextmenü (§35) | **`ContextMenu`** (Baukasten) + **`FileActionsController`** (Datei-Aktionen). Rechtsklick in Bild-, Layer-, Szenen-, Seiten- und Bücherliste |
 | Grafik-/Widget-Fabrik | `UIComponentFactory` · `UIBuilder` · `PanelToggleButton` (`SmartLabel` ist am 2026-07-30 nach `../JavaDemos/` gezogen — es war nur vom Demo benutzt) |
 | Pfad-Zentrale | **`AppPaths`** — **alle** Pfade unter `%APPDATA%\TransparencyTool\`. Nie `new File("...")` mit hartem Pfad |
 | Zustands-Träger | **`CanvasInstance`** (Zustand **pro Canvas**), `canvases[2]`, `ci()`/`ci(idx)` → §30 |
@@ -54,7 +55,7 @@
 | Bild-Persistenz (§34) | **`ImageFileWriter.writePng(...)` ist der einzige Weg, ein Bild zu schreiben.** Kein `ImageIO.write` außerhalb dieser Klasse |
 | Format-Verträge (Univ. §7) | **Szenen-Format ↔ GameII** → §23 |
 | Settings (Univ. §12) | **`AppSettings`** (Singleton) → `%APPDATA%\TransparencyTool\settings\default.txt` (Inhalt: JSON, siehe §31) |
-| Shortcut-Registry (Univ. §11) | **`KeyBindings.ALL`** (79 Einträge, sieben Scopes) + **`KeyBindings.TOOL_KEYS`** (25 Werkzeug-Tasten, seit 2026-08-01) + **`KeyBindings.GUIDE`**; Dialog `KeyBindingsDialog`, Taste **Umschalt+F1** und Knopf „?“ → §25 |
+| Shortcut-Registry (Univ. §11) | **`KeyBindings.ALL`** (81 Einträge, sieben Scopes) + **`KeyBindings.TOOL_KEYS`** (25 Werkzeug-Tasten, seit 2026-08-01) + **`KeyBindings.GUIDE`**; Dialog `KeyBindingsDialog`, Taste **Umschalt+F1** und Knopf „?“ → §25 |
 | Mess-Anzeige (Univ. §13) | **keine** — bewusst, siehe §26 |
 | Graphify-Scope (Univ. §1) | Scan-Root **`src/`** (schließt `bin/`, `doc/`, `resources/` ohne Filter aus), code-only. Graph ist eingecheckt: 2479 Knoten / 6369 Kanten / 123 Communities, 0 Tokens |
 
@@ -73,6 +74,13 @@ dunkle App (Befunde S1/S2).
   erlaubte Weg — und die dort gesetzten Werte werden nicht lokal überschrieben.
 - **Ab jetzt [B]:** **Keine neuen `JOptionPane`-Aufrufe.** Bestehende sind
   dokumentierte Altlast (Univ. §0), kein Vorbild und keine Rechtfertigung.
+  **Seit 2026-08-01 gibt es dafür auch keine Ausrede mehr:** `ConfirmDialog`
+  (Ja/Nein) und `TextInputDialog` (Texteingabe) decken die beiden häufigsten
+  Fälle ab. Sie sind an einem echten Bedarf entstanden (§35), nicht auf
+  Vorrat — und genau in der Paarung, die dieser Paragraph verlangt: ein
+  Bestätigen ohne ein Eingeben hätte `JOptionPane` beim Umbenennen stehen
+  lassen. **Was noch fehlt, ist ein `MessageDialog`** für Info/Fehler;
+  bis dahin bleibt `EditorDialogs.showErrorDialog(...)` der Weg.
 - **`BaseDialog` ist fällig [C], Reihenfolge Pflicht** (Univ. §2):
   1. `doc/Audit Redundanz Dialoge <Datum>.txt` über alle 12 Fenster —
      was ist wirklich gemeinsam (Titelbar, ESC, Resize, Farben, Positionierung)?
@@ -586,6 +594,48 @@ Schreiben ließ weder die alte noch die neue Fassung zurück. Und
 - **Zwei Verhaltensänderungen, bewusst:** Zielverzeichnisse **entstehen**
   jetzt (Univ. §6), wo vorher eine `FileNotFoundException` kam; und während
   des Schreibens liegt kurz eine `.part`-Datei neben dem Ziel.
+
+---
+
+## §35 Kontextmenüs: das Panel zeigt, der Verdrahter entscheidet  [A/B]
+
+**Anlass:** Bis 2026-08-01 gab es im ganzen Quellbaum **ein** Kontextmenü mit
+**einem** Eintrag („Umbenennen", `TileGalleryPanel:695`) — und in der
+Bildgalerie war dessen Callback nicht überschrieben, der Eintrag tat also
+nichts. Das Layer-Panel hatte gar keines.
+
+- **Ein Menü wird über `ContextMenu` gebaut [B].** Kein rohes `JPopupMenu` in
+  Fachcode. Ein ungestyltes Popup ist hellgrau — derselbe Systembruch, den
+  §20 an `JOptionPane` bemängelt.
+- **Das Panel füllt sein Menü nicht selbst [A].** Es reicht ein leeres Menü
+  an sein `Callbacks`-Interface (`onContextMenu(file, menu)`); der Inhalt
+  kommt vom Verdrahter (§22). Nur deshalb können drei verschiedene Listen
+  dasselbe Panel benutzen. **Ein „welche Art Liste bin ich"-Feld im Panel ist
+  ein Regelverstoß** — es wäre der Anfang einer Fallunterscheidung, die mit
+  jeder neuen Liste wächst.
+- **Das Menü wird bei jedem Rechtsklick neu gebaut [B].** Häkchen und
+  „grau" stammen damit zwangsläufig aus dem Live-Zustand (Univ. §12). Ein
+  zwischengespeichertes Menü ist die nächste Stelle, an der ein zweiter
+  Bedienweg das Häkchen desynchronisiert.
+- **Einträge werden deaktiviert, nicht versteckt [B]** — ein Menü mit
+  wechselnder Höhe macht die übrigen Einträge unauffindbar. **Ausnahme:** was
+  es gar nicht gibt, fehlt ganz. Ein grauer Eintrag verspricht eine Funktion
+  für später; ein fehlender verspricht nichts.
+- **Keine Kürzel-Spalte ohne eigene, registrierte Taste [A].** Eine Taste,
+  die im Hauptfenster etwas anderes tut, darf nicht neben einem Menüpunkt
+  stehen. Das ist §25 in anderer Form — und der Fehler wäre am 2026-08-01
+  fast zum zweiten Mal am selben Tag entstanden.
+- **Der Auslöser ist `isPopupTrigger()` in `mousePressed` UND
+  `mouseReleased`, plus Zieh-Wächter [B].** `mouseClicked` +
+  `isRightMouseButton` ist beides nicht, und ohne den Wächter kollidiert das
+  Menü mit der registrierten Geste „Rechts ziehen = kopieren" (§25).
+- **Zerstörende Einträge fragen nach [B]** (`ConfirmDialog`) und arbeiten,
+  wo die Plattform es hergibt, über den Papierkorb. Begründung ist nicht
+  Höflichkeit, sondern Befund **D01**: Element-Operationen liegen nicht im
+  Undo-Band, und für Dateien gibt es ohnehin kein Zurück.
+
+Entwurf, Befunde und die vier Entscheidungen des Users:
+`doc/Schema_Kontextmenue.txt`.
 
 ---
 
